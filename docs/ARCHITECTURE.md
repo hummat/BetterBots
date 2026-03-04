@@ -44,6 +44,13 @@ Result: item abilities need explicit queued inputs from the mod.
 | 3a | Item-based combat fallback (experimental) | Driven via `weapon_action` sequence probing by action-input names |
 | 3b | Grenades | Not implemented |
 
+## Class ability references
+
+Detailed per-class ability breakdowns (internal IDs, input patterns, cooldowns, talent modifiers, bot usage notes) are in:
+- `CLASS_VETERAN.md`, `CLASS_ZEALOT.md`, `CLASS_PSYKER.md`, `CLASS_OGRYN.md`, `CLASS_ARBITES.md`, `CLASS_HIVE_SCUM.md`
+
+Each doc classifies abilities into the tiers above and includes implementation guidance for bot activation.
+
 ## Key constraints
 
 - Template path still depends on valid `ability_meta_data.activation.action_input`.

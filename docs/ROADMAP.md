@@ -19,6 +19,8 @@ Move BetterBots from working prototype to reliable baseline with explicit scope.
 4. Toggle-safe restore behavior.
    - Status: not implemented.
 
+See `CLASS_*.md` docs for per-class ability details, implementation tiers, and bot usage heuristics.
+
 ## Priority 1: Behavior quality
 
 1. Ability-specific trigger heuristics.

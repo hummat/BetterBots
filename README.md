@@ -68,6 +68,17 @@ Notes:
 - [Manual Test Plan](docs/TEST_PLAN.md)
 - [Roadmap](docs/ROADMAP.md)
 
+### Class ability references
+
+Per-class docs with internal template names, input actions, cooldowns, talent interactions, and bot implementation notes:
+
+- [Veteran](docs/CLASS_VETERAN.md)
+- [Zealot](docs/CLASS_ZEALOT.md)
+- [Psyker](docs/CLASS_PSYKER.md)
+- [Ogryn](docs/CLASS_OGRYN.md)
+- [Arbites](docs/CLASS_ARBITES.md) (DLC)
+- [Hive Scum](docs/CLASS_HIVE_SCUM.md) (DLC)
+
 ## Repository layout
 
 ```text
@@ -83,4 +94,10 @@ docs/
   KNOWN_ISSUES.md
   ROADMAP.md
   TEST_PLAN.md
+  CLASS_VETERAN.md
+  CLASS_ZEALOT.md
+  CLASS_PSYKER.md
+  CLASS_OGRYN.md
+  CLASS_ARBITES.md
+  CLASS_HIVE_SCUM.md
 ```

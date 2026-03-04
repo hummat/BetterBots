@@ -105,6 +105,13 @@ Local clone: `../Darktide-Source-Code/`
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
 
+## Class ability references
+
+Per-class docs with internal template names, input patterns, cooldowns, and bot implementation tiers:
+- `docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
+
+Consult these when working on class-specific ability logic, adding new ability support, or tuning bot trigger heuristics.
+
 ## Mod file structure
 
 ```
