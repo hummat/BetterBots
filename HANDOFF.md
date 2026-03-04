@@ -16,6 +16,14 @@ Claude Opus 4.6 (Claude Code)
 - Tier 2 metadata mapping updated to template-specific inputs:
   - Dash/charge templates use `aim_pressed` + `aim_released` + `min_hold_time` (+ `done_when_arriving_at_destination`)
   - Shout templates use `shout_pressed` + `shout_released` + `min_hold_time`
+- Force-field item fallback prefers regular placement (`aim_force_field` -> `place_force_field`) and keeps instant placement as secondary fallback
+- Force-field ability profile priority is now explicit (`force_field_regular` first), and `broker_ability_stimm_field` is explicitly mapped to `press_release`
+- Zealot relic item fallback channel hold was extended (`wield_previous` delayed from `0.8s` to `4.8s`) to avoid immediate cancel
+- Item fallback now validates current `weapon_action` template support before queuing start/followup/unwield inputs; if template/input drift occurs (for example switched back to primary weapon), it retries instead of sending invalid inputs
+- Item fallback now uses a shared profile catalog (channel/press-release/force-field/drone), ability-specific profile priority, and per-ability profile rotation when a full sequence completes without observed `charge consumed`
+- Item fallback success is now tracked by bot `use_ability_charge(combat_ability)` events per unit, not just by queued input logs
+- Added bot combat-ability state transition failure recovery: hook `ActionCharacterStateChange.finish` and schedule a fast fallback retry when wanted state was not reached
+- Added queue-level weapon-switch lock for item abilities: hook `PlayerUnitActionInputExtension.bot_queue_action_input` and block bot `weapon_action:wield` while protected abilities are active/in-sequence (currently relic active; relic/force-field sequence stages)
 - `zealot_relic` whitelist entry in vanilla code is dead code — the ability has no `ability_template` field so `template_name` stays `"none"` and bails before reaching the whitelist
 - `ability_meta_data` is a bot-only metadata field (only consumed by BT bot system, never by player code) — safe to inject
 - Melee bots fall back to light-only default metadata when weapon `attack_meta_data` is missing (`bt_bot_melee_action.lua`) — same pattern we exploit for ability injection
@@ -67,11 +75,23 @@ Claude Opus 4.6 (Claude Code)
   - `ogryn_charge_increased_distance`
   - `zealot_invisibility_improved`
 - `psyker_force_field` charge consumption was observed earlier in run (`17:11:49`, `17:12:37`), but post-reload sequence (`aim_force_field`/`place_force_field`) is currently mixed and not consistently confirmed by later `charge consumed`
+- Latest run also showed parser mismatches (queued item input while parser template was non-ability weapon), e.g. `aim_force_field` against `combatknife_*` and `channel`/`wield_previous` against `powersword_*`/`bolter_*`; guard logic added to prevent these invalid queues
+- Item fallback now has an explicit `waiting_charge_confirmation` stage; failed full sequences log `fallback item finished without charge consume ...` and rotate profile when alternatives exist (for example force-field regular vs instant)
+- Latest long run (`console-2026-03-04-18.58.17-...`) still shows strong Zealot relic success (`charge consumed` repeatedly), but Psyker force-field remains unstable (many `finished without charge consume` versus few successful consumes)
+- Late-session hot-reload (`20:13:20` UTC) confirms new hooks are installed (`ActionCharacterStateChange.finish`, `PlayerUnitActionInputExtension.bot_queue_action_input`), but the same file stops at `20:13:43` UTC, so post-reload combat evidence for the weapon-switch lock is still missing
+- Class docs are aligned with decompiled reality where previously mismatched:
+  - `psyker_shout` and `zealot_invisibility` documented as metadata-injection paths (not vanilla Tier 1-with-meta)
+  - Zealot grenades documented as Tier 3/out of current scope
+  - Veteran metadata mismatch (`stance_pressed` vs `combat_ability_pressed`/`combat_ability_released`) documented explicitly
 - Frequent `fallback blocked ... invalid action_input=...` log lines are expected transient validity checks but currently noisy
 - Tertium4Or5 personality crash fixed locally; bots selectable again in dropdown
 
 ## Next Steps
 - Stabilize psyker force-field item sequence (timing/inputs) until post-reload runs show repeatable `charge consumed`
+- Capture a fresh combat log after the `20:13:20`-style hook install point and verify:
+  - `blocked weapon switch while keeping ...` appears while relic/force-field are in protected stages
+  - relic hold duration remains intact under close-range pressure
+  - force-field success rate improves (fewer `finished without charge consume`)
 - Reduce debug noise for expected transient `invalid action_input` states
 - Add smarter trigger conditions: health/toughness thresholds, enemy count scaling, ability-specific logic (P1.1)
 - Investigate Tier 3 (grenade) approach: search decompiled source for how grenade item wield/use works (P2.1)
@@ -87,3 +107,8 @@ Claude Opus 4.6 (Claude Code)
 | 2026-03-04 | GPT-5 (Codex CLI) | Debugged crash after `guarantee_special_action` spam: root cause was early top-level require of `player_unit_ability_extension` causing `NetworkConstants` nil during mod init. Switched ability debug hooks to `hook_require` delayed hooks to prevent startup-time load crash. |
 | 2026-03-04 | GPT-5 (Codex CLI) | Hardened runtime patching: moved `AbilityTemplates` metadata injection and `bt_bot_conditions.can_activate_ability` override to `hook_require` instance-safe patches; updated Tier 2 metadata to template-specific action inputs (`aim_pressed`/`shout_pressed`) with release+hold data; added explicit debug markers for patch installation and gameplay state entry. |
 | 2026-03-04 | GPT-5 (Codex CLI) | Latest log snapshot documented: veteran/ogryn/zealot casts confirmed by repeated `charge consumed`; psyker force-field mixed after reload (queueing seen, later consumes not yet repeatable). Added `docs/STATUS.md` and synchronized README/known-issues/handoff state. |
+| 2026-03-04 | GPT-5 (Codex CLI) | Aligned class docs with actual template metadata state (Psyker/Zealot/Veteran corrections). |
+| 2026-03-04 | GPT-5 (Codex CLI) | Investigated new runtime logs: relic was unwielded too early and force-field had no charge-consume evidence. Updated item fallback to keep regular force-field aim/place as primary and increased relic channel hold before unwield (0.8s -> 4.8s). |
+| 2026-03-04 | GPT-5 (Codex CLI) | Found parser-template drift in runtime logs (`aim_force_field`/`channel` queued while parser template was combat knife/sword/bolter). Added per-stage template/input validation in item fallback so invalid queues are skipped/retried instead of being sent. |
+| 2026-03-04 | GPT-5 (Codex CLI) | Added immediate follow-up fixes from `RELATED_MODS` comparison: force-field regular-first profile preference, explicit `broker_ability_stimm_field -> press_release` mapping, and combat-ability state-transition fast retry via `ActionCharacterStateChange.finish`. |
+| 2026-03-04 | GPT-5 (Codex CLI) | Added queue-level bot weapon-switch lock (`PlayerUnitActionInputExtension.bot_queue_action_input`) to prevent switching away during relic active channel / item-sequence critical stages; awaiting post-reload combat log evidence to validate impact. |

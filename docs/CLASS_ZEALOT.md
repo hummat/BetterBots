@@ -119,6 +119,8 @@ stance_pressed: combat_ability_pressed = true   (buffer 0.5s)
 
 This is a **stance ability** -- single press, instant activation. Much simpler for bot implementation than the dash.
 
+**Template note for BetterBots**: Vanilla `zealot_invisibility` has no `ability_meta_data`. BetterBots injects `activation.action_input = "stance_pressed"` so bots can enter this ability path.
+
 **What it does** (from buff `zealot_invisibility`):
 - Grants **3s** of stealth (invisible keyword)
 - **+20% movement speed**
@@ -515,10 +517,10 @@ The Zealot talent tree has three main paths, each centered on a different playst
 
 | Ability | Pattern | Complexity | Priority |
 |---|---|---|---|
-| Stealth (Shroudfield) | `stance_pressed` (single press) | Low | Tier 1 |
+| Stealth (Shroudfield) | `stance_pressed` (single press) | Low | Tier 2 (metadata injection) |
 | Chastise the Wicked | `aim_pressed` -> hold -> `aim_released` | Medium | Tier 2 |
-| Throwing Knives | Item-based grenade | Medium | Tier 2 |
-| Stun/Flame Grenade | Item-based grenade | Medium | Tier 2 |
+| Throwing Knives | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
+| Stun/Flame Grenade | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
 | Bolstering Prayer | Item-based, channel, no `ability_template` | High | Tier 3 |
 
 ### Key Source References

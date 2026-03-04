@@ -71,6 +71,8 @@ The Psyker's base combat ability is **Venting Shriek**. Two alternatives can be 
 
 **Action sequence**: Press F -> aim phase (hold) -> release F -> shout fires. Minimum hold time: 0.075s. The shout hits both enemies and allies in a cone. Animation: `ability_shout`, total time 0.75s, uninterruptible. Uses charge at start.
 
+**Template note for BetterBots**: Vanilla `psyker_shout` has no `ability_meta_data`. BetterBots injects bot metadata at load time (`shout_pressed` + `shout_released`) to enable BT activation.
+
 **What it does**: Knocks down enemies in a cone in front of the Psyker. Applies the `psyker_biomancer_shout` damage profile. Vents 10% Peril (base) or 50% Peril (with `psyker_shout_vent_warp_charge` talent).
 
 **Key modifying talents**:
@@ -539,7 +541,7 @@ Key talents:
 
 | Ability | Type | Input Pattern | Difficulty | Notes |
 |---|---|---|---|---|
-| Venting Shriek | Combat (shout) | shout_pressed -> hold -> shout_released | **Tier 1** (has `ability_template` + `ability_meta_data`) | Best F-ability for bots |
+| Venting Shriek | Combat (shout) | shout_pressed -> hold -> shout_released | **Tier 2** (has `ability_template`, missing `ability_meta_data` in vanilla; injected by BetterBots) | Best F-ability for bots |
 | Scrier's Gaze | Combat (stance) | stance_pressed (instant) | **Tier 1** (has `ability_template` + `ability_meta_data`) | Simple activation |
 | Telekine Shield | Combat (item) | Wield item | **Tier 3** (item-based, no `ability_template`) | Needs separate wield logic |
 | Brain Burst | Blitz (item) | Wield + aim + hold | **Tier 3** (item-based) | Needs targeting + charge logic |

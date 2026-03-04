@@ -42,8 +42,10 @@ ability_meta_data = {
 }
 ```
 
-Both templates use `action_input = "stance_pressed"` -- this is a single-input instant
-activation pattern (Tier 1 for bot implementation).
+Both templates ship with `action_input = "stance_pressed"` in `ability_meta_data`, but their
+actual action graph is `combat_ability_pressed` -> `combat_ability_released` (hold/release).
+BetterBots overrides metadata for bot activation to `combat_ability_pressed` with
+`wait_action = combat_ability_released`.
 
 ### Variant 1: Volley Fire / Executioner's Stance (Ranger path)
 
@@ -531,9 +533,9 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 ## Implementation Notes for BotAbilities Mod
 
 ### Activation Pattern
-All combat ability variants use `ability_meta_data.activation.action_input = "stance_pressed"`,
-which is a single-input instant activation. This is the simplest Tier 1 pattern. Both
-`veteran_combat_ability` and `veteran_stealth_combat_ability` templates share this metadata.
+Vanilla metadata points to `stance_pressed`, but template action inputs are
+`combat_ability_pressed`/`combat_ability_released`. BetterBots patches metadata at runtime so
+bot validity checks and queueing use the actual press/release path.
 
 ### Grenade Challenge
 Veteran grenades are item-based (`inventory_item_name` based, no `ability_template`).

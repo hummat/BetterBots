@@ -3,45 +3,52 @@
 ## Evidence Source
 
 - Latest analyzed log:
-  `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-2026-03-04-17.02.57-4e629ca9-45b7-405b-948d-541bffcb815c.log`
-- Last observed BetterBots entries in this run are around `17:18:56`-`17:18:59`.
+  `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-2026-03-04-18.58.17-f7236365-a8e7-4c7d-a032-82c6d493b567.log`
+- This file contains multiple play segments and hot-reloads.
+- Note: Darktide console log timestamps are UTC, not local timezone.
 
-## Confirmed Working In This Run
+## Confirmed Working In This Log
 
-1. Startup patching is active.
+1. Startup patching is active across reloads.
    - `BetterBots loaded`
    - `patched bt_bot_conditions.can_activate_ability`
    - `patched bt_conditions.can_activate_ability`
 
-2. Template-path casts are working (charge actually consumed).
-   - Veteran: `charge consumed for veteran_combat_ability_stance_improved`
-   - Ogryn: `charge consumed for ogryn_charge_increased_distance`
-   - Zealot: `charge consumed for zealot_invisibility_improved`
+2. Zealot relic item path is repeatedly successful.
+   - Repeated `charge consumed for zealot_relic` entries are present through the run.
 
-3. Item-path cast success was observed for Psyker force-field earlier in the same run.
-   - `17:11:49.154`: `charge consumed for psyker_force_field`
-   - `17:12:37.639`: `charge consumed for psyker_force_field`
+3. Psyker force-field can succeed, but only intermittently.
+   - `charge consumed for psyker_force_field` appears a few times.
+   - The same file also contains many failed no-charge sequences.
 
 ## Partial / Experimental
 
-1. Psyker force-field post-reload behavior is mixed.
-   - After reload around `17:16:41`, the fallback changed to `aim_force_field -> place_force_field -> unwield_to_previous`.
-   - That sequence is being queued repeatedly, but no new `charge consumed for psyker_force_field` is visible in the later slice of this log.
+1. Psyker force-field remains unstable in sustained combat.
+   - Frequent pattern:
+     - `fallback item queued ... aim/place...`
+     - `fallback item continuing charge confirmation ... lost combat-ability wield ...`
+     - `fallback item finished without charge consume ...`
+   - Overall in this file, no-charge outcomes still dominate.
 
-2. Item fallback is still heuristic and not yet fully stable across templates/variants.
+2. New protection hooks are loaded but not yet validated with post-reload combat evidence.
+   - Around `20:13:20` UTC this file shows hook install lines for:
+     - `ActionCharacterStateChange.finish` fast-retry hook
+     - `PlayerUnitActionInputExtension.bot_queue_action_input` weapon-switch lock
+   - After that reload, the file ends around `20:13:43` UTC and does not contain enough new combat events to confirm impact.
 
 ## Known Log Noise
 
 1. Frequent `fallback blocked ... invalid action_input=...` appears during combat.
-   - This is expected whenever an action input is temporarily invalid (cooldown, active state, or transition timing).
-   - It is noisy and can hide real issues; logging rate/conditions should be tightened.
+   - This is expected when inputs are transiently invalid (cooldown/state windows), but it is noisy.
 
-2. Non-mod errors in the same log:
+2. Non-mod engine/nav errors can coexist in the same file:
    - `ERROR [BotNavigationExtension] Can't path, AStar was cancelled...`
-   - These are engine/navigation-side and not a BetterBots Lua traceback.
+   - These are not BetterBots Lua tracebacks.
 
 ## Current Conclusion
 
-1. Bot combat abilities are definitely firing for Veteran, Ogryn, and Zealot in live combat.
-2. Psyker force-field worked earlier, but the newest fallback sequencing after reload is not consistently confirmed by charge-consume evidence yet.
-3. Grenade support remains out of scope.
+1. Zealot relic behavior is substantially better than earlier sessions (repeat charge-consume evidence).
+2. Psyker force-field is still the primary instability hotspot.
+3. Latest code hooks are in place, but a fresh post-reload combat log is still needed to validate:
+   - weapon-switch lock effect (`blocked weapon switch while keeping ...`)
+   - state-transition fast retry effect (`state_fail_retry ...`).

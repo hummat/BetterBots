@@ -33,6 +33,7 @@ Verify template-based and item-based combat ability activation, then check bot r
    - Use bots with item-based combat abilities (for example relic or force-field paths).
    - Confirm cast chain in logs: `fallback item queued ...` -> `charge consumed`.
    - Record any `fallback item blocked ...` signatures.
+   - If charge is not consumed, check whether fallback profile rotation happened (`fallback item finished without charge consume ... rotated=true`).
 
 4. Regression checks
    - Revive/rescue behavior still works.

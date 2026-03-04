@@ -21,6 +21,16 @@ Use DMF `Logging Mode = Custom` and set `Echo` to `Log` or `Log & Chat`.
 
 `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-*.log`
 
+## Timestamp timezone
+
+Darktide console logs use **UTC timestamps** (`UTC time stamps` header in the log file).
+
+If your system clock is local time (for example `CET`/`CEST`), log times will be offset by your current timezone difference:
+- `CET` (winter): local = log + 1h
+- `CEST` (summer): local = log + 2h
+
+When comparing in-game events with system time, convert to UTC or account for the offset first.
+
 ## Practical workflow (learned during debugging)
 
 1. You can read logs while still in mission; quitting game is not required.
@@ -56,6 +66,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item queued ...` (item fallback queued wield/cast/unwield input)
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
+- `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
+- `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 
 ## Interpreting failures
 
@@ -65,3 +77,5 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
   - bot is on item-based combat ability path.
 - repeated `fallback item blocked ... unsupported weapon template`:
   - add a new item sequence mapping in `BetterBots.lua`.
+- repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
+  - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
