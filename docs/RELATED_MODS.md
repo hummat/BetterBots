@@ -249,3 +249,91 @@ No `bot_queue_action_input` — VT2 uses direct flag-based input. Darktide's que
 - VT2 uses direct flag-based bot input; Darktide uses queued action input
 - VT2 has no `ability_meta_data` concept — per-career action_data is defined in the BT
 - VT2's career skills are simpler (mostly instant or aimed); Darktide has more complex multi-step abilities
+
+---
+
+## 7. Bot Improvements - Combat (Grimalackt, VT2) — HIGH
+
+**What it does:** Comprehensive VT2 bot behavior overhaul. Hooks `BTConditions.can_activate` per-career to replace vanilla ability triggers with threat-value-based heuristics. Also improves melee attack selection, revive behavior, elite pinging, boss engagement, and line-of-fire reactions.
+
+**Source:** [GitHub (Fatshark-hosted)](https://github.com/fatshark-mods/bot_improvements_combat) — original Steam Workshop listing removed for guideline violations, but repo is public.
+
+### Key findings
+
+**Per-career ability trigger overrides (7 of 12 careers):**
+
+The mod hooks `BTConditions.can_activate[career_name]` for each career it modifies. Careers not listed use vanilla logic.
+
+| Career | Trigger condition | Threat threshold | Notes |
+|--------|------------------|-----------------|-------|
+| `dr_ironbreaker` | Threat sum within 8m | 50 (vanilla: 15) | Low stamina adds +15 pre-threat. Elites/targeting bot get 1.25x multiplier. |
+| `es_mercenary` | Threat sum within 7m, scaled by group health | 35 × health_multiplier (min 6) | Group health = weighted average of nearby ally health. Healthier team = higher threshold. |
+| `es_huntsman` | Stealth-based, context-aware | N/A | Fires when: prioritized ally needs rescue, low stamina, or targeting threat≥8 enemy. |
+| `we_maidenguard` | Dash toward target, navmesh-validated | N/A | Dashes at threat≥8 targets (specials) or when low stamina. Min 9m, max 12m. Validates navmesh ray before committing. Stores aim_position. |
+| `we_shade` | Stealth, context-aware | N/A | Same priority logic as Huntsman: rescue, low stamina, or threat≥12. |
+| `wh_captain` | Threat sum within 7m | 30 | Similar to Ironbreaker pattern. Low stamina adds +15. |
+| `bw_unchained` | Threat sum within 4m + overcharge | 35 (10 if low health) | Always fires at critical overcharge. Only counts enemies targeting bot. |
+
+**Unchanged careers:** `dr_slayer`, `dr_ranger`, `bw_adept`, `wh_zealot`, `es_knight`, `es_questingknight` — use vanilla `can_activate` from `bt_bot_conditions.lua`.
+
+**Revive-with-ability system:**
+
+Injects a `BTBotActivateAbilityAction` node *before* the revive interact node in the BT:
+```lua
+BotBehaviors.default[3][3] = {
+    "BTBotActivateAbilityAction",
+    name = "use_ability",
+    condition = "can_activate_ability_revive",
+    condition_args = { "activate_ability" },
+    action_data = BotActions.default.use_ability
+}
+BotBehaviors.default[3][4] = {
+    "BTBotInteractAction",
+    name = "do_revive",
+    action_data = BotActions.default.revive
+}
+```
+
+Custom condition `can_activate_ability_revive` fires ability when enemies threaten the bot during revive. Excludes dash/movement abilities (`we_maidenguard`, `dr_slayer`, `es_knight`, `wh_zealot`, `bw_adept`) and ranged abilities (`shoot_ability` category).
+
+**Melee attack selection improvements:**
+
+Hooks `BTBotMeleeAction._choose_attack` with utility-based scoring:
+- +1 for single-target attacks when not outnumbered
+- +8 for penetrating attacks vs armored targets
+- Falls back to `DEFAULT_ATTACK_META_DATA` when weapon lacks it
+
+**Other improvements:**
+- Elite pinging: bots ping elites targeting them (LOS check, 2s cooldown, network RPC)
+- Boss engagement: only engages bosses when <2 nearby enemies or boss is targeting bot
+- Stop chasing: ignores enemies >18.7m away
+- Line-of-fire: ignores gunner fire lines when attacker→victim distance >11.8m
+
+### Relevance to BetterBots
+
+**Directly applicable patterns:**
+
+1. **Threat-value thresholds** — The core pattern BetterBots should adopt. Current `enemies_in_proximity() > 0` is too aggressive. Per-class threat thresholds with configurable base values would be a major improvement.
+
+2. **Stamina-as-urgency** — Low stamina reduces threat threshold across all careers. Maps to Darktide's toughness system: bots should be more willing to use abilities when toughness is low.
+
+3. **Revive-with-ability** — BT node injection pattern for using ability to secure a revive. Directly applicable to Darktide bots (e.g., Veteran Stealth before reviving, Zealot charge to reach downed ally).
+
+4. **Career exclusion from revive-ability** — Smart filtering: don't use dash/movement abilities for revive security, only defensive/stealth abilities. Same logic needed for Darktide's charge vs stance abilities.
+
+**Key differences from Darktide context:**
+- VT2's `threat_value` field exists on breed data; Darktide may use a different field name — verify against decompiled source
+- VT2's `proximite_enemies` is a blackboard field; Darktide equivalent is `perception_component.enemies_in_proximity`
+- VT2's stamina system uses fatigue percentage; Darktide uses toughness
+
+---
+
+## 8. Bot Improvements - Impulse Control (Squatting-Bear, VT2) — LOW-MEDIUM
+
+**What it does:** Prevents bots from wasting consumables and abilities at bad times. Suppresses charge/dash abilities when not near enemies, prevents item waste.
+
+**Source:** [GitHub](https://github.com/Squatting-Bear/vermintide-mods) (directory: `bots_impulse_control`), [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=1477499789)
+
+### Relevance to BetterBots
+
+Complementary angle — suppression conditions rather than activation triggers. Relevant for Tier 2 two-step abilities (aim→hold→release) where bad timing wastes the cooldown. Lower priority than Grimalackt's mod but worth referencing if adding "don't fire near ledges" or "don't charge when no enemies ahead" guards.
