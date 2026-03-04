@@ -1,0 +1,78 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the sections below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug
+      placeholder: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Launch mission with bot class ...
+        2. Encounter enemies in ...
+        3. Observe that ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: class
+    attributes:
+      label: Bot Class
+      description: Which class was the bot playing?
+      options:
+        - Veteran
+        - Zealot
+        - Psyker
+        - Ogryn
+        - Arbites
+        - Hive Scum
+        - Any / Not class-specific
+    validations:
+      required: true
+
+  - type: input
+    id: game-version
+    attributes:
+      label: Game Version
+      placeholder: "e.g., 1.10.7"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: "e.g., Windows 11, Linux (Proton)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs
+      description: Paste relevant error messages from the game console or log file
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have SoloPlay and Tertium4Or5 active
+          required: true
+        - label: I have searched existing issues to ensure this bug hasn't been reported
+          required: true

@@ -1,0 +1,92 @@
+# Issue type
+- name: bug
+  color: "d73a4a"
+  description: Something isn't working
+
+- name: enhancement
+  color: "a2eeef"
+  description: New feature or request
+
+- name: documentation
+  color: "0075ca"
+  description: Improvements or additions to documentation
+
+- name: question
+  color: "d876e3"
+  description: Further information is requested
+
+# Triage
+- name: good first issue
+  color: "7057ff"
+  description: Good for newcomers
+
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed
+
+- name: wontfix
+  color: "ffffff"
+  description: This will not be worked on
+
+- name: duplicate
+  color: "cfd3d7"
+  description: This issue or pull request already exists
+
+- name: invalid
+  color: "e4e669"
+  description: This doesn't seem right
+
+# Priority
+- name: "P0: critical"
+  color: "B60205"
+  description: Must do now — blocks everything
+
+- name: "P1: next"
+  color: "D93F0B"
+  description: Do next — high value, unblocked
+
+- name: "P2: later"
+  color: "FBCA04"
+  description: Planned but not urgent
+
+- name: "P3: backlog"
+  color: "C2E0C6"
+  description: Nice to have, no timeline
+
+# Class
+- name: "class: veteran"
+  color: "1D76DB"
+  description: Veteran Sharpshooter abilities
+
+- name: "class: zealot"
+  color: "E99695"
+  description: Zealot Preacher abilities
+
+- name: "class: psyker"
+  color: "BFD4F2"
+  description: Psyker Psykinetic abilities
+
+- name: "class: ogryn"
+  color: "D4C5F9"
+  description: Ogryn Skullbreaker abilities
+
+- name: "class: arbites"
+  color: "F9D0C4"
+  description: Arbites Exaction Squad abilities
+
+- name: "class: hive-scum"
+  color: "C5DEF5"
+  description: Hive Scum abilities
+
+# Ability tier
+- name: "tier: 1"
+  color: "0E8A16"
+  description: Whitelist removal only — already has ability_meta_data
+
+- name: "tier: 2"
+  color: "FBCA04"
+  description: Needs meta_data injection + whitelist removal
+
+- name: "tier: 3"
+  color: "D93F0B"
+  description: No ability_template — needs custom approach

@@ -29,15 +29,25 @@ Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 Use project-local tooling configs before handing off changes:
 
+- `make deps` → install git hooks (conventional commits)
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
 - `make check` → runs all of the above
+- `make release VERSION=X.Y.Z` → tag + push (CI creates GitHub release with changelog)
 
 Notes:
 
 - `make test` auto-detects a busted runner (`busted`, `lua-busted`, or Arch's packaged luarocks path).
 - `make test` is a no-op unless a `tests/` directory exists.
+
+## Commit conventions
+
+Use [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): description`
+
+Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `revert`, `style`, `build`
+
+Enforced by local `commit-msg` hook (install via `make deps`) and CI commit-lint on PRs.
 
 ## Architecture
 

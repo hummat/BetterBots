@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  commit-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate conventional commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          pattern='^(feat|fix|docs|refactor|perf|test|chore|ci|revert|style|build)(\([a-z0-9._-]+\))?!?: .+'
+          bad=0
+          while IFS= read -r sha; do
+            msg=$(git log -1 --format='%s' "$sha")
+            # Skip merge commits and git-generated reverts.
+            if [[ "$msg" =~ ^Merge\  ]] || [[ "$msg" =~ ^Revert\ \" ]]; then
+              continue
+            fi
+            if ! [[ "$msg" =~ $pattern ]]; then
+              echo "::error::Bad commit message: $msg ($sha)"
+              bad=1
+            fi
+          done < <(git rev-list "$BASE_SHA".."$HEAD_SHA")
+          if [[ "$bad" -eq 1 ]]; then
+            echo ""
+            echo "Expected format: type(scope): description"
+            echo "Allowed types: feat fix docs refactor perf test chore ci revert style build"
+            exit 1
+          fi
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Lua tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq luarocks
+
+          # luacheck via luarocks
+          sudo luarocks install luacheck
+
+          # stylua from GitHub release
+          STYLUA_VERSION="2.0.2"
+          curl -fsSL "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip" -o /tmp/stylua.zip
+          unzip -o /tmp/stylua.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/stylua
+
+          # lua-language-server from GitHub release
+          LLS_VERSION="3.13.6"
+          curl -fsSL "https://github.com/LuaLS/lua-language-server/releases/download/${LLS_VERSION}/lua-language-server-${LLS_VERSION}-linux-x64.tar.gz" -o /tmp/lls.tar.gz
+          mkdir -p /opt/lua-language-server
+          tar -xzf /tmp/lls.tar.gz -C /opt/lua-language-server
+          ln -sf /opt/lua-language-server/bin/lua-language-server /usr/local/bin/lua-language-server
+
+      - name: Run checks
+        run: make check

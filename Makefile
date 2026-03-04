@@ -1,7 +1,10 @@
 LUA_FILES := $(shell rg --files scripts -g '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
 
-.PHONY: lint format format-check lsp-check check test
+.PHONY: deps lint format format-check lsp-check check test release
+
+deps:
+	git config core.hooksPath scripts/hooks
 
 lint:
 	luacheck $(LUA_FILES)
@@ -28,3 +31,6 @@ test:
 	else \
 		echo "No tests directory; skipping busted."; \
 	fi
+
+release:
+	@scripts/release.sh $(VERSION)

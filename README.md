@@ -1,5 +1,8 @@
 # BetterBots
 
+[![CI](https://github.com/hummat/BetterBots/actions/workflows/ci.yml/badge.svg)](https://github.com/hummat/BetterBots/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities in Solo Play by patching the vanilla whitelist, injecting missing bot metadata, and adding an item-based fallback path.
 
 ## Current status (March 4, 2026)
@@ -48,16 +51,24 @@ This repo is configured for local Lua lint/format/type diagnostics:
 
 Commands:
 
-- `make lint`
-- `make format`
-- `make format-check`
-- `make lsp-check`
-- `make check`
+| Target | Description |
+|--------|-------------|
+| `make deps` | Install git hooks (conventional commits) |
+| `make lint` | Run luacheck |
+| `make format` | Format with StyLua |
+| `make format-check` | Check formatting (dry run) |
+| `make lsp-check` | Run lua-language-server diagnostics |
+| `make check` | Run all of the above |
+| `make test` | Run busted tests (if `tests/` exists) |
+| `make release VERSION=X.Y.Z` | Tag and push a release |
 
-Notes:
+After cloning, run `make deps` to install the commit-msg hook.
 
-- `make test` auto-detects a busted runner (`busted`, `lua-busted`, or Arch's packaged luarocks path).
-- `make test` runs only if a `tests/` directory exists.
+CI runs `make check` on every push to `main` and on pull requests.
+
+## Contributing
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style, and PR process.
 
 ## Docs
 
@@ -82,22 +93,23 @@ Per-class docs with internal template names, input actions, cooldowns, talent in
 ## Repository layout
 
 ```text
-BetterBots.mod
-scripts/mods/BetterBots/
+BetterBots.mod                    # DMF entry point
+scripts/mods/BetterBots/          # Mod source
   BetterBots.lua
   BetterBots_data.lua
   BetterBots_localization.lua
-docs/
-  ARCHITECTURE.md
-  STATUS.md
-  LOGGING.md
-  KNOWN_ISSUES.md
-  ROADMAP.md
-  TEST_PLAN.md
-  CLASS_VETERAN.md
-  CLASS_ZEALOT.md
-  CLASS_PSYKER.md
-  CLASS_OGRYN.md
-  CLASS_ARBITES.md
-  CLASS_HIVE_SCUM.md
+scripts/hooks/                    # Git hooks (conventional commits)
+scripts/release.sh                # Release automation
+docs/                             # Architecture, class refs, status
+.github/
+  workflows/                      # CI, release, label sync
+  ISSUE_TEMPLATE/                 # Bug report, feature request
+  CONTRIBUTING.md                 # Dev setup + guidelines
+  PULL_REQUEST_TEMPLATE.md
+  labels.yml                      # Issue labels (auto-synced)
+  dependabot.yml                  # GH Actions auto-updates
 ```
+
+## License
+
+[MIT](LICENSE)
