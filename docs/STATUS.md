@@ -1,11 +1,15 @@
-# Status Snapshot (March 4, 2026)
+# Status Snapshot (March 5, 2026)
 
 ## Evidence Source
 
 - Latest analyzed log:
-  `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-2026-03-04-18.58.17-f7236365-a8e7-4c7d-a032-82c6d493b567.log`
+  `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-2026-03-05-14.57.34-ff2ae36c-e683-46b6-9b33-2885b60f2153.log`
+- Newer validation logs are tracked in `docs/VALIDATION_TRACKER.md`:
+  - `console-2026-03-05-14.44.43-...` (Tier 1 evidence + crash before nil-account guard)
+  - `console-2026-03-05-14.57.34-...` (Tier 2 completion evidence, no new crash signature observed)
 - This file contains multiple play segments and hot-reloads.
 - Note: Darktide console log timestamps are UTC, not local timezone.
+- Ongoing manual run evidence and PASS/PARTIAL/UNKNOWN matrix now live in `docs/VALIDATION_TRACKER.md`.
 
 ## Confirmed Working In This Log
 
@@ -15,26 +19,25 @@
    - `patched bt_conditions.can_activate_ability`
 
 2. Zealot relic item path is repeatedly successful.
-   - Repeated `charge consumed for zealot_relic` entries are present through the run.
+   - In latest extraction: 5 consumes, 0 no-charge completions.
 
-3. Psyker force-field can succeed, but only intermittently.
-   - `charge consumed for psyker_force_field` appears a few times.
-   - The same file also contains many failed no-charge sequences.
+3. Psyker force-field and Arbites Nuncio-Aquila can both succeed, but are still intermittent.
+   - `psyker_force_field_dome`: 9 consumes vs 60 no-charge completions (current rolling-log snapshot).
+   - `adamant_area_buff_drone`: 10 consumes vs 66 no-charge completions (current rolling-log snapshot).
+   - Post-timing-patch window also shows new consumes for both, confirming runtime patch activation.
 
 ## Partial / Experimental
 
-1. Psyker force-field remains unstable in sustained combat.
+1. Psyker force-field and Nuncio-Aquila remain unstable in sustained combat.
    - Frequent pattern:
      - `fallback item queued ... aim/place...`
      - `fallback item continuing charge confirmation ... lost combat-ability wield ...`
      - `fallback item finished without charge consume ...`
    - Overall in this file, no-charge outcomes still dominate.
 
-2. New protection hooks are loaded but not yet validated with post-reload combat evidence.
-   - Around `20:13:20` UTC this file shows hook install lines for:
-     - `ActionCharacterStateChange.finish` fast-retry hook
-     - `PlayerUnitActionInputExtension.bot_queue_action_input` weapon-switch lock
-   - After that reload, the file ends around `20:13:43` UTC and does not contain enough new combat events to confirm impact.
+2. Weapon-switch lock hook behavior is validated in latest runs.
+   - Repeated lock evidence exists for relic, force-field, and Nuncio-Aquila (`blocked weapon switch while keeping ...`).
+   - Locking helps prevent immediate cancel but does not by itself solve item ability reliability.
 
 ## Known Log Noise
 
@@ -47,8 +50,6 @@
 
 ## Current Conclusion
 
-1. Zealot relic behavior is substantially better than earlier sessions (repeat charge-consume evidence).
-2. Psyker force-field is still the primary instability hotspot.
-3. Latest code hooks are in place, but a fresh post-reload combat log is still needed to validate:
-   - weapon-switch lock effect (`blocked weapon switch while keeping ...`)
-   - state-transition fast retry effect (`state_fail_retry ...`).
+1. Tier 1 and Tier 2 validation are complete for currently testable abilities (see `docs/VALIDATION_TRACKER.md` matrix).
+2. Tier 3 remains the active blocker: relic is strong, force-field is still the primary instability hotspot, and Nuncio-Aquila is still unreliable despite multiple confirmed consumes.
+3. Remaining work is reliability hardening for item abilities, not broad Tier 2 activation coverage.

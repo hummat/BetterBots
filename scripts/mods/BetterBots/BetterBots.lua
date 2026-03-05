@@ -3,7 +3,7 @@ local FixedFrame = require("scripts/utilities/fixed_frame")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
-local DEBUG_FORCE_ENABLED = true
+local DEBUG_FORCE_ENABLED = false
 local ITEM_WIELD_TIMEOUT_S = 1.5
 local ITEM_SEQUENCE_RETRY_S = 1.0
 local ITEM_CHARGE_CONFIRM_TIMEOUT_S = 1.2
@@ -27,6 +27,7 @@ local LOCK_WEAPON_SWITCH_DURING_ITEM_SEQUENCE = {
 	psyker_force_field = true,
 	psyker_force_field_improved = true,
 	psyker_force_field_dome = true,
+	adamant_area_buff_drone = true,
 }
 
 local function _fixed_time()
@@ -390,36 +391,42 @@ local ITEM_SEQUENCE_PROFILES = {
 	force_field_regular = {
 		required_inputs = { "aim_force_field", "place_force_field", "unwield_to_previous" },
 		start_input = "aim_force_field",
-		start_delay_after_wield = 0,
+		start_delay_after_wield = 0.05,
 		followup_input = "place_force_field",
-		followup_delay = 0.08,
+		followup_delay = 0.12,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.45,
+		unwield_delay = 0.9,
+		charge_confirm_timeout = 2.2,
 	},
 	force_field_instant = {
 		required_inputs = { "instant_aim_force_field", "instant_place_force_field", "unwield_to_previous" },
 		start_input = "instant_aim_force_field",
-		start_delay_after_wield = 0,
+		start_delay_after_wield = 0.05,
+		followup_input = "instant_place_force_field",
+		followup_delay = 0.12,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.25,
+		unwield_delay = 0.8,
+		charge_confirm_timeout = 2.0,
 	},
 	drone_regular = {
 		required_inputs = { "aim_drone", "release_drone", "unwield_to_previous" },
 		start_input = "aim_drone",
-		start_delay_after_wield = 0,
+		start_delay_after_wield = 0.05,
 		followup_input = "release_drone",
-		followup_delay = 0.2,
+		followup_delay = 0.24,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.5,
+		unwield_delay = 1.0,
+		charge_confirm_timeout = 2.2,
 	},
 	drone_instant = {
 		required_inputs = { "instant_aim_drone", "instant_release_drone", "unwield_to_previous" },
 		start_input = "instant_aim_drone",
-		start_delay_after_wield = 0,
+		start_delay_after_wield = 0.05,
 		followup_input = "instant_release_drone",
-		followup_delay = 0.05,
+		followup_delay = 0.1,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.4,
+		unwield_delay = 0.9,
+		charge_confirm_timeout = 2.0,
 	},
 }
 
@@ -1402,6 +1409,30 @@ mod:hook_require(
 		)
 	end
 )
+
+mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
+	mod:hook(
+		WeaponSystem,
+		"queue_perils_of_the_warp_elite_kills_achievement",
+		function(func, self, player, explosion_queue_index)
+			local account_id = nil
+			if player and type(player.account_id) == "function" then
+				account_id = player:account_id()
+			end
+
+			if account_id == nil then
+				_debug_log(
+					"skip_perils_nil_account",
+					_fixed_time(),
+					"skipped perils achievement queue with nil account_id"
+				)
+				return nil
+			end
+
+			return func(self, player, explosion_queue_index)
+		end
+	)
+end)
 
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
 	mod:hook_safe(BotBehaviorExtension, "update", function(self, unit)

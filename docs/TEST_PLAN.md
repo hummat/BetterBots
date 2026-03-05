@@ -3,6 +3,7 @@
 ## Goal
 
 Verify template-based and item-based combat ability activation, then check bot regressions.
+Use `docs/VALIDATION_TRACKER.md` as the canonical run log and matrix.
 
 ## Prerequisites
 
@@ -42,19 +43,33 @@ Verify template-based and item-based combat ability activation, then check bot r
 ## Result template
 
 ```text
-Date:
-Game build:
-Mod load order:
+Run ID:
+Date (local):
+Date (UTC):
+Git commit:
+Log file:
+Bot lineup / abilities:
+Map + difficulty:
 
-Template abilities:
-- <ability>: pass/fail, notes
+Tier 2 evidence:
+- <ability_template>: PASS/FAIL/UNKNOWN
+  - visual: yes/no
+  - charge consumed log: yes/no
+  - key lines / timestamps:
 
-Item abilities:
-- <ability>: pass/fail, notes
+Tier 3 evidence:
+- <ability_template>: PASS/FAIL/UNKNOWN
+  - visual: yes/no
+  - charge consumed log: yes/no
+  - blocked-switch / retry logs seen: yes/no
+  - key lines / timestamps:
 
 Regressions:
-- revive/rescue:
-- navigation/combat:
+- revive/rescue: PASS/FAIL/UNKNOWN
+- navigation/pathing: PASS/FAIL/UNKNOWN
+- basic combat loop: PASS/FAIL/UNKNOWN
+- Lua errors: yes/no (+ first traceback line if yes)
 
 Conclusion:
+- promote issue state / next fix target:
 ```

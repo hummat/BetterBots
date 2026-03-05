@@ -5,11 +5,12 @@
 
 A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities in Solo Play by patching the vanilla whitelist, injecting missing bot metadata, and adding an item-based fallback path.
 
-## Current status (March 4, 2026)
+## Current status (March 5, 2026)
 
-- Template-path casts are confirmed in live logs for Veteran, Ogryn, and Zealot.
+- Tier 1 and Tier 2 template-path casts are confirmed in live logs for all currently testable non-DLC-blocked rows.
 - Tier 2 templates use template-specific metadata (`aim_pressed`/`shout_pressed`, `wait_action`, `min_hold_time`).
-- Item fallback is implemented and works for some cases, but remains experimental (Psyker force-field is mixed post-reload in the newest run).
+- Item fallback is implemented and active for relic/force-field/drone item abilities.
+- Tier 3 item abilities are partially reliable: relic is stable, while force-field and Nuncio-Aquila remain mixed in sustained combat.
 - Grenade abilities are still out of scope.
 
 See [Status Snapshot](docs/STATUS.md) for exact evidence from the latest log.
@@ -20,6 +21,18 @@ See [Status Snapshot](docs/STATUS.md) for exact evidence from the latest log.
 - [Darktide Mod Framework](https://www.nexusmods.com/warhammer40kdarktide/mods/8)
 - [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176)
 - [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) (recommended)
+
+## Companion mod compatibility (Tertium 5)
+
+BetterBots works without Tertium 5, but testing and practical bot setups are better with it.
+
+Known caveat:
+- Some Tertium 5 versions can crash while building profile lists due to nil personality/archetype lookup in `fetch_all_profiles`.
+- Local workaround used during BetterBots validation: add nil guards in Tertium 5 profile enumeration (`mods/Tertium4Or5/scripts/mods/Tertium4Or5/Tertium4Or5.lua`) so invalid entries are skipped instead of indexed.
+
+Maintenance stance:
+- This crash path is external to BetterBots and should be fixed upstream in Tertium 5.
+- BetterBots release notes should treat Tertium 5 as optional/recommended, not hard-required.
 
 ## Install
 

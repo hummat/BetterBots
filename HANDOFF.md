@@ -1,10 +1,10 @@
 # Handoff
 
 ## Current Task
-Create a Darktide mod that makes bots use their combat abilities (ults/specials) in Solo Play.
+Prepare BetterBots for a first Nexus beta release with Tier 1/2 validated and Tier 3 item-ability behavior documented as partially reliable.
 
 ## Agent
-Claude Opus 4.6 (Claude Code)
+GPT-5 (Codex CLI)
 
 ## Decisions Made
 - Mod name: `BetterBots`, lives in `$GIT_ROOT/BetterBots`, symlinked into Darktide `mods/` dir
@@ -33,6 +33,11 @@ Claude Opus 4.6 (Claude Code)
 - Tertium4Or5 personality crash fixed locally (nil guard on `Personalities` lookup in `fetch_all_profiles`)
 - Startup crash fix in BetterBots: moved debug hooks for `BtBotActivateAbilityAction` and `PlayerUnitAbilityExtension` behind `mod:hook_require(...)` to avoid early `require()` of ability systems before `NetworkConstants` is initialized
 - Condition + template patching now also uses `mod:hook_require(...)` (instance-safe across require store), avoiding single-instance `require()` patch misses
+- 2026-03-05: Tier 2 validation is complete for all non-`N/A` rows; tracking moved to `docs/VALIDATION_TRACKER.md` and GitHub issue `#1` was closed.
+- 2026-03-05: Tier 3 triage now uses ratio metrics (`consume / (consume + no-charge completion)`) instead of one-off success evidence.
+- 2026-03-05: `adamant_area_buff_drone` should use the same sequence-time weapon-switch lock mechanism as relic/force-field.
+- 2026-03-05: `force_field_instant` required explicit followup `instant_place_force_field`; aim-only instant path was insufficient.
+- 2026-03-05: Release decision: first Nexus release is acceptable as **beta/preview**, not stable; keep Tier 3 reliability issue open.
 
 ## Changes
 - `BetterBots.mod` — DMF mod descriptor
@@ -41,6 +46,12 @@ Claude Opus 4.6 (Claude Code)
 - `scripts/mods/BetterBots/BetterBots_localization.lua` — display name/description + debug setting label
 - `mods/mod_load_order.txt` — added `BetterBots` after `Tertium4Or5`
 - `<Darktide>/mods/Tertium4Or5/scripts/mods/Tertium4Or5/Tertium4Or5.lua` — patched nil guard for personality/archetype lookup crash (upstream bug, not committed to this repo)
+- 2026-03-05: `scripts/mods/BetterBots/BetterBots.lua` — added `adamant_area_buff_drone` to sequence switch-lock table; tuned force-field/drone item timings (`start_delay_after_wield`, `followup_delay`, `unwield_delay`, `charge_confirm_timeout`); added `instant_place_force_field` followup to instant force-field profile.
+- 2026-03-05: `docs/VALIDATION_TRACKER.md` — added structured run entries for Tier 1/2/3, added ratio-based reliability snapshots (rolling file + post-patch window), and updated tier matrix states.
+- 2026-03-05: `docs/STATUS.md` — refreshed with latest rolling-log evidence and current Tier 3 blocker framing.
+- 2026-03-05: `README.md` — updated "Current status" to March 5 and beta-scope wording for Tier 3 reliability.
+- 2026-03-05: `docs/CLASS_OGRYN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_ARBITES.md` (and related class docs) — aligned in-game names/exposure notes with observed profiles and current live UI.
+- 2026-03-05: GitHub issue updates — `#3` commented with latest post-patch evidence (`https://github.com/hummat/BetterBots/issues/3#issuecomment-4006146959`), Tier 3 issue remains open.
 
 ## Open Questions
 - **Zealot Dash targeting:** The dash is directional/targeted. Even if activation works, the bot needs a target to dash toward. The BT node's `_start_ability` doesn't handle target selection — the bot may dash in place or random direction.
@@ -49,6 +60,9 @@ Claude Opus 4.6 (Claude Code)
 - **Grenade abilities (Tier 3):** Fundamentally different architecture needed. No `ability_template` → no `template_name` → no entry into the existing BT path. Would need a custom BT node or direct item wield/use approach.
 - **Compatibility with game patches:** Each Darktide update may change `bt_bot_conditions`, `AbilityTemplates`, or the BT structure. Mod needs re-validation after patches.
 - **DMF `require()` caching:** We use `require()` to get `AbilityTemplates` and `bt_bot_conditions` — verify these return the same singleton tables the game uses (they should, but untested).
+- 2026-03-05: Why does force-field still have low consume ratio despite lock + explicit instant place followup? Candidate causes: overlapping item fallbacks, slot churn, and stage timeout interactions under heavy combat.
+- 2026-03-05: Drone no-charge outcomes are skewed toward `drone_instant` in the post-patch window; should `drone_regular` be preferred/forced as temporary reliability mode?
+- 2026-03-05: Should force-field/drone instant profiles be disabled by default for beta, or exposed as an advanced option?
 
 ## Key Files in Decompiled Source
 - `scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions.lua` — the whitelist gate (lines 59-100)
@@ -66,6 +80,11 @@ Claude Opus 4.6 (Claude Code)
 - **AbilityGod** (Nexus, no public source) — automates ability activation for player based on thresholds
 
 ## Current Status
+- 2026-03-05 update:
+  - Tier 1 and Tier 2 are complete for currently testable rows (`docs/VALIDATION_TRACKER.md`).
+  - Tier 3: `zealot_relic` is stable PASS; `psyker_force_field_dome` and `adamant_area_buff_drone` are PARTIAL with repeated consume evidence but still many no-charge completions.
+  - Latest rolling-file snapshot (`console-2026-03-05-14.57.34-...`): force-field `9/69`, drone `10/76`, relic `5/5` (consume/attempt).
+  - Post-patch window (from first `instant_place_force_field`): force-field `4/38` (10.5%), drone `7/33` (21.2%).
 - Mod loads, injection logs appear, debug logging system functional
 - Startup crash signature `attempt to index global 'NetworkConstants'` in `action_handler.lua` (via top-level `require("player_unit_ability_extension")`) has been fixed locally by delayed hooks
 - Tier 2 metadata now uses template-specific action inputs with wait/release support and hold timing
@@ -78,7 +97,6 @@ Claude Opus 4.6 (Claude Code)
 - Latest run also showed parser mismatches (queued item input while parser template was non-ability weapon), e.g. `aim_force_field` against `combatknife_*` and `channel`/`wield_previous` against `powersword_*`/`bolter_*`; guard logic added to prevent these invalid queues
 - Item fallback now has an explicit `waiting_charge_confirmation` stage; failed full sequences log `fallback item finished without charge consume ...` and rotate profile when alternatives exist (for example force-field regular vs instant)
 - Latest long run (`console-2026-03-04-18.58.17-...`) still shows strong Zealot relic success (`charge consumed` repeatedly), but Psyker force-field remains unstable (many `finished without charge consume` versus few successful consumes)
-- Late-session hot-reload (`20:13:20` UTC) confirms new hooks are installed (`ActionCharacterStateChange.finish`, `PlayerUnitActionInputExtension.bot_queue_action_input`), but the same file stops at `20:13:43` UTC, so post-reload combat evidence for the weapon-switch lock is still missing
 - Class docs are aligned with decompiled reality where previously mismatched:
   - `psyker_shout` and `zealot_invisibility` documented as metadata-injection paths (not vanilla Tier 1-with-meta)
   - Zealot grenades documented as Tier 3/out of current scope
@@ -88,15 +106,13 @@ Claude Opus 4.6 (Claude Code)
 
 ## Next Steps
 - Stabilize psyker force-field item sequence (timing/inputs) until post-reload runs show repeatable `charge consumed`
-- Capture a fresh combat log after the `20:13:20`-style hook install point and verify:
-  - `blocked weapon switch while keeping ...` appears while relic/force-field are in protected stages
-  - relic hold duration remains intact under close-range pressure
-  - force-field success rate improves (fewer `finished without charge consume`)
+- Stabilize Arbites drone item sequence; explicitly test whether `drone_regular`-first-only improves consume ratio.
 - Reduce debug noise for expected transient `invalid action_input` states
 - Add smarter trigger conditions: health/toughness thresholds, enemy count scaling, ability-specific logic (P1.1)
 - Investigate Tier 3 (grenade) approach: search decompiled source for how grenade item wield/use works (P2.1)
 - Consider adding mod options (via `_data.lua` widgets) to toggle individual ability classes on/off (P1.3)
-- Publish to Nexus Mods once stable
+- Prepare Nexus **beta/preview** release notes (explicitly list Tier 3 as partial reliability and DLC-blocked Hive Scum validation)
+- After beta publish, decide whether to ship temporary conservative defaults (regular-only for force-field/drone) until reliability improves
 
 ## Log
 | When | Agent | Summary |
@@ -112,3 +128,4 @@ Claude Opus 4.6 (Claude Code)
 | 2026-03-04 | GPT-5 (Codex CLI) | Found parser-template drift in runtime logs (`aim_force_field`/`channel` queued while parser template was combat knife/sword/bolter). Added per-stage template/input validation in item fallback so invalid queues are skipped/retried instead of being sent. |
 | 2026-03-04 | GPT-5 (Codex CLI) | Added immediate follow-up fixes from `RELATED_MODS` comparison: force-field regular-first profile preference, explicit `broker_ability_stimm_field -> press_release` mapping, and combat-ability state-transition fast retry via `ActionCharacterStateChange.finish`. |
 | 2026-03-04 | GPT-5 (Codex CLI) | Added queue-level bot weapon-switch lock (`PlayerUnitActionInputExtension.bot_queue_action_input`) to prevent switching away during relic active channel / item-sequence critical stages; awaiting post-reload combat log evidence to validate impact. |
+| 2026-03-05 | GPT-5 (Codex CLI) | Validated Tier 1/2 completion; hardened Tier 3 fallback (`adamant_area_buff_drone` lock, force-field instant place followup, timing/timeout tuning); documented ratio-based reliability metrics; updated README/STATUS/VALIDATION tracker; commented issue #3 and marked first Nexus release as beta-ready with Tier 3 caveats. |
