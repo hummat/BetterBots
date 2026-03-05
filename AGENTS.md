@@ -34,7 +34,8 @@ Use project-local tooling configs before handing off changes:
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
 - `make check` → runs all of the above
-- `make release VERSION=X.Y.Z` → tag + push (CI creates GitHub release with changelog)
+- `make package` → build Nexus-ready `BetterBots.zip`
+- `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
 
 Notes:
 
@@ -74,9 +75,10 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 | Tier | Status | Examples | What's needed |
 |------|--------|----------|---------------|
-| 1 | Implemented | Veteran Stealth, Psyker Stance, Ogryn Gunlugger, Broker Focus/Rage | Whitelist removal only |
-| 2 | Implemented (untested) | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout | Meta_data injection + whitelist removal |
-| 3 | Not addressed | All grenades, Zealot Relic, Psyker Force Field, Smite | No `ability_template` field → needs different approach (custom BT node or item wield) |
+| 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance, Broker Focus/Rage | Whitelist removal only |
+| 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
+| 3 | Partial | Zealot Relic (stable), Psyker Force Field (~13%), Arbites Drone (~21%) | Item-based fallback (wield/use/unwield sequence) |
+| 3 | Not addressed | All grenades, Psyker Smite/Assail/Chain Lightning, Hive Scum Stimm Field | No `ability_template` field → needs different approach |
 
 ### Decompiled source repo (Aussiemon/Darktide-Source-Code)
 
@@ -121,6 +123,18 @@ Per-class docs with internal template names, input patterns, cooldowns, and bot 
 - `docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
 
 Consult these when working on class-specific ability logic, adding new ability support, or tuning bot trigger heuristics.
+
+## Bot system reference docs
+
+Deep-dive documentation of Darktide's bot internals from decompiled source:
+- `docs/BOT_BEHAVIOR_TREE.md` — full BT node hierarchy, all conditions, blackboard schema
+- `docs/BOT_COMBAT_ACTIONS.md` — melee/shoot/ability action node lifecycles, utility scoring
+- `docs/BOT_PERCEPTION_TARGETING.md` — target selection scoring formula, gestalt weights, proximity
+- `docs/BOT_NAVIGATION.md` — pathfinding, follow behavior, teleport triggers, formation
+- `docs/BOT_INPUT_SYSTEM.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
+- `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots are veterans, zero talents, weapon templates
+
+Consult these when modifying bot behavior beyond ability activation (e.g., targeting heuristics, movement during abilities, weapon switching).
 
 ## Mod file structure
 

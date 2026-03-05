@@ -20,19 +20,17 @@ See [Status Snapshot](docs/STATUS.md) for exact evidence from the latest log.
 - [Darktide Mod Loader](https://www.nexusmods.com/warhammer40kdarktide/mods/19)
 - [Darktide Mod Framework](https://www.nexusmods.com/warhammer40kdarktide/mods/8)
 - [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176)
-- [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) (recommended)
+- [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) or [Tertium 6](https://www.nexusmods.com/warhammer40kdarktide/mods/725) (recommended — for non-veteran bot classes)
 
-## Companion mod compatibility (Tertium 5)
+## Companion mod compatibility
 
-BetterBots works without Tertium 5, but testing and practical bot setups are better with it.
+BetterBots works standalone (vanilla bots are all veterans), but bot class diversity requires a Tertium mod.
 
-Known caveat:
-- Some Tertium 5 versions can crash while building profile lists due to nil personality/archetype lookup in `fetch_all_profiles`.
-- Local workaround used during BetterBots validation: add nil guards in Tertium 5 profile enumeration (`mods/Tertium4Or5/scripts/mods/Tertium4Or5/Tertium4Or5.lua`) so invalid entries are skipped instead of indexed.
+**Tertium 5** — the original. Some versions crash on `fetch_all_profiles` when encountering Arbites/Hive Scum archetypes it doesn't recognize. Workaround: add nil guards in `Tertium4Or5.lua` profile enumeration.
 
-Maintenance stance:
-- This crash path is external to BetterBots and should be fixed upstream in Tertium 5.
-- BetterBots release notes should treat Tertium 5 as optional/recommended, not hard-required.
+**Tertium 6 (temporary)** — a fork by KristopherPrime that supports all 6 classes and player + 5 bots. If Tertium 5's crash affects you, try Tertium 6 instead.
+
+Both are optional/recommended, not hard-required.
 
 ## Install
 
@@ -73,7 +71,7 @@ Commands:
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
 | `make test` | Run busted tests (if `tests/` exists) |
-| `make release VERSION=X.Y.Z` | Tag and push a release |
+| `make package` | Build Nexus-ready `BetterBots.zip` |\n| `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
 After cloning, run `make deps` to install the commit-msg hook.
 
@@ -91,6 +89,17 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style
 - [Logging and Diagnostics](docs/LOGGING.md)
 - [Manual Test Plan](docs/TEST_PLAN.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Validation Tracker](docs/VALIDATION_TRACKER.md)
+- [Related Mods](docs/RELATED_MODS.md)
+
+### Bot system internals (from decompiled source)
+
+- [Behavior Tree](docs/BOT_BEHAVIOR_TREE.md) — full node hierarchy and conditions
+- [Combat Actions](docs/BOT_COMBAT_ACTIONS.md) — melee, shoot, ability activation
+- [Perception and Targeting](docs/BOT_PERCEPTION_TARGETING.md) — scoring, gestalt weights
+- [Navigation](docs/BOT_NAVIGATION.md) — pathfinding, follow, teleport, formation
+- [Input System](docs/BOT_INPUT_SYSTEM.md) — input routing, ActionInputParser
+- [Profiles and Spawning](docs/BOT_PROFILES_SPAWNING.md) — loadouts, weapon templates
 
 ### Class ability references
 
