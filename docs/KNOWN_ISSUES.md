@@ -31,7 +31,10 @@
 ## Dependency issues
 
 1. Tertium4Or5 profile selection can still be an external crash point depending on local patch state.
-   - Upstream issue is outside this repository.
+   - Symptom: crash while enumerating personalities/archetypes in Tertium profile collection (`fetch_all_profiles` path).
+   - Local validation workaround: nil-guard invalid personality/archetype entries in `mods/Tertium4Or5/scripts/mods/Tertium4Or5/Tertium4Or5.lua`.
+   - BetterBots should not vendor this patch; keep it as upstream Tertium4Or5 responsibility and document it as a compatibility note.
+   - Release policy: Tertium4Or5 is optional/recommended for better bot profile UX, not required for BetterBots core ability logic.
 
 2. DMF Dev Console/Dev Mode interactions can produce crashes outside this mod's code path.
    - Treat as external until a BetterBots-specific traceback is captured.
@@ -42,3 +45,4 @@
 2. Replace heuristic item matching with explicit per-template mapping table.
 3. Reduce debug-log noise for expected transient `invalid action_input` states.
 4. Add smarter per-ability trigger policies (threat/toughness/ally state).
+5. Track upstream status of the Tertium4Or5 nil-guard fix and remove local compatibility note once upstreamed.
