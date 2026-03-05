@@ -1,0 +1,70 @@
+[size=4][b]BetterBots — Bot Combat Abilities for Solo Play[/b][/size]
+
+Aims to bring VT2-level bot ability usage to Darktide. This first beta covers stance, dash, charge, shout, and stealth abilities — with item-based abilities (relics, shields) experimental and grenades planned.
+
+Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects the missing metadata so the existing infrastructure handles the rest.
+
+[size=3][b]What works[/b][/size]
+
+[b]Stance abilities (reliable):[/b]
+[list]
+[*]Veteran: Executioner's Stance / Voice of Command
+[*]Psyker: Scrier's Gaze
+[*]Ogryn: Point-Blank Barrage
+[*]Arbites: Castigator's Stance
+[*]Hive Scum: Enhanced Desperado / Rampage
+[/list]
+
+[b]Dash / shout / stealth abilities (reliable):[/b]
+[list]
+[*]Veteran: Infiltrate (stealth)
+[*]Zealot: Fury of the Faithful (dash), Shroudfield (stealth)
+[*]Ogryn: Bull Rush (charge), Loyal Protector (taunt)
+[*]Psyker: Venting Shriek (shout)
+[*]Arbites: Break the Line (charge)
+[/list]
+
+[b]Item-based abilities (experimental):[/b]
+[list]
+[*]Zealot: Bolstering Prayer (relic) — works well
+[*]Psyker: Telekine Shield — works sometimes
+[*]Arbites: Nuncio-Aquila — works sometimes
+[/list]
+
+[size=3][b]What doesn't work yet[/b][/size]
+[list]
+[*]Grenades / blitz abilities (different architecture needed)
+[*]Hive Scum: Stimm Field (item-based, same challenge as above)
+[*]Smart trigger conditions (bots currently use abilities whenever enemies are nearby and cooldown is ready)
+[/list]
+
+[size=3][b]Requirements[/b][/size]
+[list]
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/19]Darktide Mod Loader[/url]
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/8]Darktide Mod Framework (DMF)[/url]
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] — recommended for non-veteran bot classes
+[/list]
+
+[size=3][b]Install[/b][/size]
+[list=1]
+[*]Extract [font=Courier New]BetterBots.zip[/font] into your Darktide [font=Courier New]mods/[/font] folder
+[*]Add [font=Courier New]BetterBots[/font] to [font=Courier New]mods/mod_load_order.txt[/font] (below [font=Courier New]dmf[/font])
+[*]Re-patch mods
+[/list]
+
+[size=3][b]Verify[/b][/size]
+
+Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]injected meta_data for ...[/font] in game chat on mission start.
+
+[size=3][b]Known limitations[/b][/size]
+[list]
+[*]Abilities fire whenever enemies are nearby — no per-career smart heuristics yet
+[*]Item-based abilities (force field, drone) have low success rates in sustained combat
+[*]Mods are disabled after every Darktide update — re-patch required
+[*]Hive Scum abilities are untested (DLC required)
+[/list]
+
+[size=3][b]Source[/b][/size]
+
+[url=https://github.com/hummat/BetterBots]GitHub[/url] — MIT License

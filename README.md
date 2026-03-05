@@ -3,17 +3,40 @@
 [![CI](https://github.com/hummat/BetterBots/actions/workflows/ci.yml/badge.svg)](https://github.com/hummat/BetterBots/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities in Solo Play by patching the vanilla whitelist, injecting missing bot metadata, and adding an item-based fallback path.
+[![Nexus Mods](https://img.shields.io/badge/Nexus-BetterBots-orange)](https://www.nexusmods.com/warhammer40kdarktide/mods/745)
 
-## Current status (March 5, 2026)
+A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities in Solo Play. Aims to bring VT2-level bot ability usage to Darktide.
 
-- Tier 1 and Tier 2 template-path casts are confirmed in live logs for all currently testable non-DLC-blocked rows.
-- Tier 2 templates use template-specific metadata (`aim_pressed`/`shout_pressed`, `wait_action`, `min_hold_time`).
-- Item fallback is implemented and active for relic/force-field/drone item abilities.
-- Tier 3 item abilities are partially reliable: relic is stable, while force-field and Nuncio-Aquila remain mixed in sustained combat.
-- Grenade abilities are still out of scope.
+Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects missing metadata so the existing infrastructure handles the rest.
 
-See [Status Snapshot](docs/STATUS.md) for exact evidence from the latest log.
+## What bots can do with this mod
+
+**Stance abilities (reliable):**
+- Veteran: Executioner's Stance / Voice of Command
+- Psyker: Scrier's Gaze
+- Ogryn: Point-Blank Barrage
+- Arbites: Castigator's Stance
+- Hive Scum: Enhanced Desperado / Rampage
+
+**Dash / shout / stealth abilities (reliable):**
+- Veteran: Infiltrate (stealth)
+- Zealot: Fury of the Faithful (dash), Shroudfield (stealth)
+- Ogryn: Bull Rush (charge), Loyal Protector (taunt)
+- Psyker: Venting Shriek (shout)
+- Arbites: Break the Line (charge)
+
+**Item-based abilities (experimental):**
+- Zealot: Bolstering Prayer (relic) — works well
+- Psyker: Telekine Shield — works sometimes
+- Arbites: Nuncio-Aquila — works sometimes
+
+## What doesn't work yet
+
+- Grenades / blitz abilities (different architecture needed)
+- Hive Scum: Stimm Field (item-based, same challenge as above)
+- Smart trigger conditions (bots currently use abilities whenever enemies are nearby and cooldown is ready)
+
+See [Status Snapshot](docs/STATUS.md) and [Validation Tracker](docs/VALIDATION_TRACKER.md) for detailed evidence.
 
 ## Requirements
 
@@ -22,21 +45,17 @@ See [Status Snapshot](docs/STATUS.md) for exact evidence from the latest log.
 - [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176)
 - [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) or [Tertium 6](https://www.nexusmods.com/warhammer40kdarktide/mods/725) (recommended — for non-veteran bot classes)
 
-## Companion mod compatibility
-
-BetterBots works standalone (vanilla bots are all veterans), but bot class diversity requires a Tertium mod.
-
-**Tertium 5** — the original. Some versions crash on `fetch_all_profiles` when encountering Arbites/Hive Scum archetypes it doesn't recognize. Workaround: add nil guards in `Tertium4Or5.lua` profile enumeration.
-
-**Tertium 6 (temporary)** — a fork by KristopherPrime that supports all 6 classes and player + 5 bots. If Tertium 5's crash affects you, try Tertium 6 instead.
-
-Both are optional/recommended, not hard-required.
-
 ## Install
 
-1. Clone or copy this repo to your Darktide mods directory as `mods/BetterBots`.
+**From Nexus (recommended):**
+1. Extract `BetterBots.zip` into your Darktide `mods/` folder.
 2. Add `BetterBots` in `mods/mod_load_order.txt` below `dmf`.
 3. Re-patch mods with `toggle_darktide_mods.bat` (Windows) or `handle_darktide_mods.sh` (Linux).
+
+**From source:**
+1. Clone or copy this repo into your Darktide `mods/` directory as `mods/BetterBots`.
+2. Add `BetterBots` in `mods/mod_load_order.txt` below `dmf`.
+3. Re-patch mods.
 
 Mods are disabled after each game update, so re-patching is required again.
 
@@ -44,13 +63,19 @@ Mods are disabled after each game update, so re-patching is required again.
 
 1. Launch Solo Play.
 2. Start a mission (`/solo`).
-3. Confirm startup output:
+3. Confirm in game chat:
    - `BetterBots loaded`
-   - `BetterBots: injected meta_data for ...` (for each injected template)
-4. Confirm runtime debug output includes either:
-   - template path logs (`decision ...`, `fallback queued ...`), or
-   - item path logs (`fallback item queued ...`).
-5. Confirm at least one `charge consumed for ...` line during combat.
+   - `BetterBots: injected meta_data for ...` (one line per injected template)
+
+## Companion mod compatibility
+
+BetterBots works standalone (vanilla bots are all veterans), but bot class diversity requires a Tertium mod.
+
+**Tertium 5** — the original. Some versions crash when encountering Arbites/Hive Scum archetypes it doesn't recognize.
+
+**Tertium 6 (temporary)** — a fork by KristopherPrime that supports all 6 classes and player + 5 bots. If Tertium 5's crash affects you, try Tertium 6 instead.
+
+Both are optional/recommended, not hard-required.
 
 ## Developer tooling
 
@@ -71,7 +96,8 @@ Commands:
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
 | `make test` | Run busted tests (if `tests/` exists) |
-| `make package` | Build Nexus-ready `BetterBots.zip` |\n| `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
+| `make package` | Build Nexus-ready `BetterBots.zip` |
+| `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
 After cloning, run `make deps` to install the commit-msg hook.
 
