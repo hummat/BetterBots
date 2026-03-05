@@ -1,10 +1,10 @@
 # Handoff
 
 ## Current Task
-Prepare BetterBots for a first Nexus beta release with Tier 1/2 validated and Tier 3 item-ability behavior documented as partially reliable.
+Implement per-career threat heuristics for ability activation (issue #2). Research phase complete — 6 tactics docs exist with proposed bot rules. Next: map rules to perception signals and implement per-template `can_activate` functions.
 
 ## Agent
-GPT-5 (Codex CLI)
+Claude Opus 4.6 (Claude Code)
 
 ## Decisions Made
 - Mod name: `BetterBots`, lives in `$GIT_ROOT/BetterBots`, symlinked into Darktide `mods/` dir
@@ -52,6 +52,14 @@ GPT-5 (Codex CLI)
 - 2026-03-05: `README.md` — updated "Current status" to March 5 and beta-scope wording for Tier 3 reliability.
 - 2026-03-05: `docs/CLASS_OGRYN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_ARBITES.md` (and related class docs) — aligned in-game names/exposure notes with observed profiles and current live UI.
 - 2026-03-05: GitHub issue updates — `#3` commented with latest post-patch evidence (`https://github.com/hummat/BetterBots/issues/3#issuecomment-4006146959`), Tier 3 issue remains open.
+- 2026-03-05: Published v0.1.0 on Nexus Mods (https://www.nexusmods.com/warhammer40kdarktide/mods/745)
+- 2026-03-05: Added Nexus badge to README, restructured README for dual GitHub/Nexus audience
+- 2026-03-05: Created `docs/NEXUS_DESCRIPTION.bbcode` — BBCode source for Nexus mod page description
+- 2026-03-05: Fixed CI: replaced `rg` with `find` in Makefile (rg not on GitHub Actions runners)
+- 2026-03-05: Rewrote issue #4 body with complete blitz/grenade inventory (18 internal definitions, 6 classes)
+- 2026-03-05: Created 6 `docs/CLASS_*_TACTICS.md` files — community-sourced tactical heuristics with USE WHEN / DON'T USE / PROPOSED BOT RULES per ability
+- 2026-03-05: Updated issue #2 body to reference tactics docs and revised design constraints (Peril tracking, toughness-reactive, class_tag detection)
+- 2026-03-05: Added mandatory docs-first policy to CLAUDE.md — agents must consult local docs before implementing ability work
 
 ## Open Questions
 - **Zealot Dash targeting:** The dash is directional/targeted. Even if activation works, the bot needs a target to dash toward. The BT node's `_start_ability` doesn't handle target selection — the bot may dash in place or random direction.
@@ -105,14 +113,17 @@ GPT-5 (Codex CLI)
 - Tertium4Or5 personality crash fixed locally; bots selectable again in dropdown
 
 ## Next Steps
-- Stabilize psyker force-field item sequence (timing/inputs) until post-reload runs show repeatable `charge consumed`
-- Stabilize Arbites drone item sequence; explicitly test whether `drone_regular`-first-only improves consume ratio.
+- ~~Prepare Nexus beta/preview release~~ DONE (v0.1.0 published 2026-03-05)
+- Commit 6 tactics docs + README tactics links + CLAUDE.md docs-first policy (uncommitted)
+- Implement per-career threat heuristics (#2): map tactics doc rules to perception signals, implement per-template `can_activate` functions
+- Add Peril tracking hook for Psyker bot abilities (new requirement from tactics research)
+- Add `class_tag` detection for Veteran Voice of Command vs Executioner's Stance branching
+- Stabilize psyker force-field item sequence (#3)
+- Stabilize Arbites drone item sequence (#3); test `drone_regular`-first-only
 - Reduce debug noise for expected transient `invalid action_input` states
-- Add smarter trigger conditions: health/toughness thresholds, enemy count scaling, ability-specific logic (P1.1)
-- Investigate Tier 3 (grenade) approach: search decompiled source for how grenade item wield/use works (P2.1)
-- Consider adding mod options (via `_data.lua` widgets) to toggle individual ability classes on/off (P1.3)
-- Prepare Nexus **beta/preview** release notes (explicitly list Tier 3 as partial reliability and DLC-blocked Hive Scum validation)
-- After beta publish, decide whether to ship temporary conservative defaults (regular-only for force-field/drone) until reliability improves
+- Investigate Tier 3 (grenade) approach (#4)
+- Add mod settings for per-ability toggle (#6)
+- Ship conservative defaults for force-field/drone until reliability improves
 
 ## Log
 | When | Agent | Summary |
@@ -129,3 +140,4 @@ GPT-5 (Codex CLI)
 | 2026-03-04 | GPT-5 (Codex CLI) | Added immediate follow-up fixes from `RELATED_MODS` comparison: force-field regular-first profile preference, explicit `broker_ability_stimm_field -> press_release` mapping, and combat-ability state-transition fast retry via `ActionCharacterStateChange.finish`. |
 | 2026-03-04 | GPT-5 (Codex CLI) | Added queue-level bot weapon-switch lock (`PlayerUnitActionInputExtension.bot_queue_action_input`) to prevent switching away during relic active channel / item-sequence critical stages; awaiting post-reload combat log evidence to validate impact. |
 | 2026-03-05 | GPT-5 (Codex CLI) | Validated Tier 1/2 completion; hardened Tier 3 fallback (`adamant_area_buff_drone` lock, force-field instant place followup, timing/timeout tuning); documented ratio-based reliability metrics; updated README/STATUS/VALIDATION tracker; commented issue #3 and marked first Nexus release as beta-ready with Tier 3 caveats. |
+| 2026-03-05 | Claude Opus 4.6 (Claude Code) | Published v0.1.0 on Nexus Mods. Restructured README for dual audience. Fixed CI (rg→find). Rewrote issue #4 with complete blitz inventory (18 defs, 6 classes). Researched per-class tactical heuristics via 6 parallel sub-agents; created 6 CLASS_*_TACTICS.md docs. Updated issue #2 with research results and revised design. Added docs-first mandate to CLAUDE.md. |

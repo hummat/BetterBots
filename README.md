@@ -129,14 +129,15 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style
 
 ### Class ability references
 
-Per-class docs with internal template names, input actions, cooldowns, talent interactions, and bot implementation notes:
+Per-class docs with internal template names, input actions, cooldowns, talent interactions, and bot implementation notes.
+Each class also has a tactics doc with community-sourced heuristics for when/how to use each ability:
 
-- [Veteran](docs/CLASS_VETERAN.md)
-- [Zealot](docs/CLASS_ZEALOT.md)
-- [Psyker](docs/CLASS_PSYKER.md)
-- [Ogryn](docs/CLASS_OGRYN.md)
-- [Arbites](docs/CLASS_ARBITES.md) (DLC)
-- [Hive Scum](docs/CLASS_HIVE_SCUM.md) (DLC)
+- [Veteran](docs/CLASS_VETERAN.md) | [Tactics](docs/CLASS_VETERAN_TACTICS.md)
+- [Zealot](docs/CLASS_ZEALOT.md) | [Tactics](docs/CLASS_ZEALOT_TACTICS.md)
+- [Psyker](docs/CLASS_PSYKER.md) | [Tactics](docs/CLASS_PSYKER_TACTICS.md)
+- [Ogryn](docs/CLASS_OGRYN.md) | [Tactics](docs/CLASS_OGRYN_TACTICS.md)
+- [Arbites](docs/CLASS_ARBITES.md) (DLC) | [Tactics](docs/CLASS_ARBITES_TACTICS.md)
+- [Hive Scum](docs/CLASS_HIVE_SCUM.md) (DLC) | [Tactics](docs/CLASS_HIVE_SCUM_TACTICS.md)
 
 ## Repository layout
 

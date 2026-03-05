@@ -117,10 +117,26 @@ Local clone: `../Darktide-Source-Code/`
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
 
+## MANDATORY: Consult local docs before implementation
+
+Before starting any implementation work on ability activation, trigger logic, or class-specific behavior, you MUST read the relevant local documentation first. Do not guess from memory or make assumptions about game internals — the decompiled source and our docs are the ground truth.
+
+**Required reading order for ability work:**
+1. This file (architecture overview)
+2. The relevant `docs/CLASS_*.md` (template names, input patterns, tiers)
+3. The relevant `docs/CLASS_*_TACTICS.md` (when/how to use each ability, proposed bot rules)
+4. The relevant `docs/BOT_*.md` files (system internals)
+5. Decompiled source in `../Darktide-Source-Code/` for field-level verification
+
+Do not write trigger heuristics without first reading the tactics doc for that class.
+
 ## Class ability references
 
 Per-class docs with internal template names, input patterns, cooldowns, and bot implementation tiers:
 - `docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
+
+Per-class tactical heuristics with community-sourced USE WHEN / DON'T USE / proposed bot rules:
+- `docs/CLASS_VETERAN_TACTICS.md`, `docs/CLASS_ZEALOT_TACTICS.md`, `docs/CLASS_PSYKER_TACTICS.md`, `docs/CLASS_OGRYN_TACTICS.md`, `docs/CLASS_ARBITES_TACTICS.md`, `docs/CLASS_HIVE_SCUM_TACTICS.md`
 
 Consult these when working on class-specific ability logic, adding new ability support, or tuning bot trigger heuristics.
 
