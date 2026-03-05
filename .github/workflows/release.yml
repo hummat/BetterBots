@@ -17,6 +17,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Build mod package
+        run: |
+          zip -9 BetterBots.zip \
+            BetterBots.mod \
+            scripts/mods/BetterBots/BetterBots.lua \
+            scripts/mods/BetterBots/BetterBots_data.lua \
+            scripts/mods/BetterBots/BetterBots_localization.lua
+
       - name: Generate changelog
         uses: orhun/git-cliff-action@v4
         id: changelog
@@ -28,4 +36,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.changelog.outputs.content }}
+          files: BetterBots.zip
           token: ${{ secrets.GITHUB_TOKEN }}

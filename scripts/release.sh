@@ -12,8 +12,9 @@ Example:
   scripts/release.sh 0.2.0
 
 Notes:
-  - Requires: git
-  - Runs: make check, creates/pushes annotated tag. CI handles GitHub release.
+  - Requires: git, zip, gh
+  - Runs: make check, make package, creates/pushes annotated tag.
+  - CI handles GitHub release creation; script uploads ZIP artifact.
 EOF
   exit 0
 fi
@@ -38,6 +39,8 @@ require_clean_git() {
 }
 
 require_cmd git
+require_cmd zip
+require_cmd gh
 
 require_clean_git
 
@@ -47,15 +50,28 @@ echo "Release: $TAG"
 echo "Running checks..."
 make check
 
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Tag already exists: $TAG" >&2
-  exit 2
-fi
+echo "Building package..."
+make package
 
-git tag -a "$TAG" -m "$TAG"
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+  echo "Tag already exists locally: $TAG"
+else
+  git tag -a "$TAG" -m "$TAG"
+fi
 
 echo "Pushing commit + tag..."
 git push
 git push origin "$TAG"
 
-echo "Done. Tag push will trigger release.yml workflow."
+echo "Waiting for GitHub release to be created by CI..."
+for i in $(seq 1 12); do
+  if gh release view "$TAG" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+
+echo "Uploading BetterBots.zip to release..."
+gh release upload "$TAG" BetterBots.zip --clobber
+
+echo "Done. Release: https://github.com/hummat/BetterBots/releases/tag/$TAG"
