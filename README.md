@@ -9,6 +9,8 @@ A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mo
 
 Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects missing metadata so the existing infrastructure handles the rest.
 
+> **Solo Play only.** Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. It does **not** work in public matchmaking or any other online mode.
+
 ## What bots can do with this mod
 
 **Stance abilities (reliable):**
