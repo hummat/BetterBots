@@ -52,16 +52,29 @@ _debug_log(key, fixed_t, message, min_interval_s)
 - Throttled to 2s per unique key (avoids spam)
 - Outputs to chat via `mod:echo("BetterBots DEBUG: " .. message)`
 
-### Improvements to add
+### Runtime commands in BetterBots
 
-1. **`mod:dump()` for table inspection** — dump ability templates, blackboard state, perception data
-2. **`mod:pcall()` around risky hooks** — get stack traces instead of crashes
-3. **Chat commands for runtime debugging:**
-   - `/bb_state` — dump current ability state for all bots
-   - `/bb_force <template>` — force-activate a specific ability
-   - `/bb_cooldowns` — show all bot ability cooldowns
-   - `/bb_perception` — dump perception data for nearest bot
-4. **`tail -f` console log** in a terminal alongside the game
+These are implemented and intended for targeted diagnostics, not constant spam.
+
+1. `/bb_state`
+   - Per-bot one-line state snapshot: current ability/template, charges/cooldown, `can_use`, active flag, wielded slot/template, fallback stage, retry timer, last charge age.
+   - Use this first when something looks off.
+2. `/bb_decide`
+   - Evaluates current heuristic decision (`true/false`) and rule for each alive bot without queuing inputs.
+   - Best for threshold tuning or "why didn't it cast?" questions.
+   - Do **not** run after every successful cast; run around suspected misses or surprising behavior.
+3. `/bb_brain`
+   - Dumps deeper bot snapshot via `mod:dump()` (context + selected perception + fallback state).
+   - Use only when `/bb_state` + logs are insufficient.
+
+### Practical debug workflow
+
+1. Observe behavior in mission.
+2. If behavior looks correct, continue without commands.
+3. If behavior looks wrong, run `/bb_state`.
+4. If decision logic is unclear, run `/bb_decide` once around the event.
+5. If still unclear, run `/bb_brain` once and inspect the dump.
+6. Correlate with log lines (`fallback held/queued`, `charge consumed`, `invalid action_input`).
 
 ## Automated testing
 
@@ -89,7 +102,7 @@ Move to `heuristics.lua`:
 - All `_can_activate_*` functions (13 functions, each with 3-7 branches)
 - `TIER2_META_DATA` table
 - `META_DATA_OVERRIDES` table
-- `SUPER_ARMOR_BREEDS` table
+- `_breed_has_super_armor()` logic + related cache
 - `_is_tagged()`, `_resolve_veteran_class_tag()`
 - `TEMPLATE_HEURISTICS` dispatch table
 

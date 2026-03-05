@@ -1,5 +1,6 @@
 local mod = get_mod("BetterBots")
 local FixedFrame = require("scripts/utilities/fixed_frame")
+local ArmorSettings = require("scripts/settings/damage/armor_settings")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
@@ -10,13 +11,16 @@ local ITEM_CHARGE_CONFIRM_TIMEOUT_S = 1.2
 local ITEM_DEFAULT_START_DELAY_S = 0.2
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
 local META_PATCH_VERSION = "2026-03-04-tier2-v3"
-local CONDITIONS_PATCH_VERSION = "2026-03-04-conditions-v3"
+local CONDITIONS_PATCH_VERSION = "2026-03-05-conditions-v4"
 local _last_debug_log_t_by_key = {}
 local _patched_ability_templates = setmetatable({}, { __mode = "k" })
 local _patched_bt_bot_conditions = setmetatable({}, { __mode = "k" })
 local _patched_bt_conditions = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
+local _fallback_queue_dumped_by_key = {}
+local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _super_armor_breed_flag_by_name = {}
 
 local LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY = {
 	zealot_relic = true,
@@ -29,6 +33,9 @@ local LOCK_WEAPON_SWITCH_DURING_ITEM_SEQUENCE = {
 	psyker_force_field_dome = true,
 	adamant_area_buff_drone = true,
 }
+
+local ARMOR_TYPES = ArmorSettings.types
+local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
@@ -208,6 +215,826 @@ local function _inject_missing_ability_meta_data(AbilityTemplates)
 	)
 end
 
+local function _is_tagged(tags, tag_name)
+	return tags and tags[tag_name] == true
+end
+
+local function _enemy_breed(unit)
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	return unit_data_extension and unit_data_extension:breed() or nil
+end
+
+local function _breed_has_super_armor(breed)
+	if not breed then
+		return false
+	end
+
+	local breed_name = breed.name
+	if breed_name ~= nil then
+		local cached_value = _super_armor_breed_flag_by_name[breed_name]
+		if cached_value ~= nil then
+			return cached_value
+		end
+	end
+
+	local has_super_armor = false
+	if ARMOR_TYPE_SUPER_ARMOR and breed.armor_type == ARMOR_TYPE_SUPER_ARMOR then
+		has_super_armor = true
+	end
+
+	local tags = breed.tags
+	if not has_super_armor and tags and tags.super_armor == true then
+		has_super_armor = true
+	end
+
+	local hit_zone_armor_override = breed.hit_zone_armor_override
+	if not has_super_armor and hit_zone_armor_override and ARMOR_TYPE_SUPER_ARMOR then
+		for _, armor_type in pairs(hit_zone_armor_override) do
+			if armor_type == ARMOR_TYPE_SUPER_ARMOR then
+				has_super_armor = true
+				break
+			end
+		end
+	end
+
+	if breed_name ~= nil then
+		_super_armor_breed_flag_by_name[breed_name] = has_super_armor
+	end
+
+	return has_super_armor
+end
+
+local function _build_ability_decision_context(unit, blackboard)
+	local fixed_t = _fixed_time()
+	local cached_entry = _decision_context_cache_by_unit[unit]
+	if cached_entry and cached_entry.fixed_t == fixed_t then
+		return cached_entry.context
+	end
+
+	local context = {
+		num_nearby = 0,
+		challenge_rating_sum = 0,
+		elite_count = 0,
+		special_count = 0,
+		monster_count = 0,
+		ranged_count = 0,
+		melee_count = 0,
+		health_pct = 1,
+		toughness_pct = 1,
+		peril_pct = nil,
+		target_enemy = nil,
+		target_enemy_distance = nil,
+		target_enemy_type = nil,
+		priority_target_enemy = nil,
+		opportunity_target_enemy = nil,
+		urgent_target_enemy = nil,
+		target_ally_needs_aid = false,
+		target_ally_distance = nil,
+		target_is_elite_special = false,
+		target_is_monster = false,
+		target_is_super_armor = false,
+	}
+
+	local perception_component = blackboard and blackboard.perception
+	if perception_component then
+		context.target_enemy = perception_component.target_enemy
+		context.target_enemy_distance = perception_component.target_enemy_distance
+		context.target_enemy_type = perception_component.target_enemy_type
+		context.priority_target_enemy = perception_component.priority_target_enemy
+		context.opportunity_target_enemy = perception_component.opportunity_target_enemy
+		context.urgent_target_enemy = perception_component.urgent_target_enemy
+		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
+		context.target_ally_distance = perception_component.target_ally_distance
+	end
+
+	local health_extension = ScriptUnit.has_extension(unit, "health_system")
+	if health_extension and health_extension.current_health_percent then
+		context.health_pct = health_extension:current_health_percent() or context.health_pct
+	end
+
+	local toughness_extension = ScriptUnit.has_extension(unit, "toughness_system")
+	if toughness_extension and toughness_extension.current_toughness_percent then
+		context.toughness_pct = toughness_extension:current_toughness_percent() or context.toughness_pct
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if unit_data_extension then
+		local warp_charge_component = unit_data_extension:read_component("warp_charge")
+		if warp_charge_component and warp_charge_component.current_percentage ~= nil then
+			context.peril_pct = warp_charge_component.current_percentage
+		end
+	end
+
+	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
+	if perception_extension then
+		local enemies_in_proximity, num_enemies_in_proximity = perception_extension:enemies_in_proximity()
+		context.num_nearby = num_enemies_in_proximity or 0
+
+		for i = 1, context.num_nearby do
+			local enemy_unit = enemies_in_proximity[i]
+			local enemy_breed = _enemy_breed(enemy_unit)
+			if enemy_breed then
+				local tags = enemy_breed.tags
+				context.challenge_rating_sum = context.challenge_rating_sum + (enemy_breed.challenge_rating or 0)
+				if _is_tagged(tags, "elite") then
+					context.elite_count = context.elite_count + 1
+				end
+				if _is_tagged(tags, "special") then
+					context.special_count = context.special_count + 1
+				end
+				if _is_tagged(tags, "monster") then
+					context.monster_count = context.monster_count + 1
+				end
+				if _is_tagged(tags, "ranged") then
+					context.ranged_count = context.ranged_count + 1
+				else
+					context.melee_count = context.melee_count + 1
+				end
+			end
+		end
+	end
+
+	if context.target_enemy then
+		local target_breed = _enemy_breed(context.target_enemy)
+		if target_breed then
+			local tags = target_breed.tags
+			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
+			context.target_is_monster = _is_tagged(tags, "monster")
+			context.target_is_super_armor = _breed_has_super_armor(target_breed)
+		end
+	end
+
+	_decision_context_cache_by_unit[unit] = {
+		fixed_t = fixed_t,
+		context = context,
+	}
+
+	return context
+end
+
+local function _resolve_veteran_class_tag(ability_extension)
+	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
+	local combat_ability = equipped_abilities and equipped_abilities.combat_ability
+	local tweak_data = combat_ability and combat_ability.ability_template_tweak_data
+	local class_tag = tweak_data and tweak_data.class_tag
+	local ability_name = combat_ability and combat_ability.name or ""
+
+	if class_tag then
+		return class_tag, "class_tag"
+	end
+
+	if string.find(ability_name, "shout", 1, true) then
+		return "squad_leader", "ability_name"
+	end
+	if string.find(ability_name, "stance", 1, true) then
+		return "ranger", "ability_name"
+	end
+
+	return nil, "unknown"
+end
+
+local function _can_activate_veteran_combat_ability(
+	conditions,
+	unit,
+	blackboard,
+	scratchpad,
+	condition_args,
+	action_data,
+	is_running,
+	ability_extension,
+	context
+)
+	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
+	if class_tag == "squad_leader" then
+		if context.num_nearby >= 4 then
+			return true, "veteran_voc_surrounded"
+		end
+		if context.toughness_pct < 0.45 and context.num_nearby >= 2 then
+			return true, "veteran_voc_low_toughness"
+		end
+		if context.toughness_pct < 0.25 and context.num_nearby >= 1 then
+			return true, "veteran_voc_critical_toughness"
+		end
+		if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) <= 9 then
+			return true, "veteran_voc_ally_aid"
+		end
+		if context.toughness_pct > 0.80 and context.num_nearby <= 2 then
+			return false, "veteran_voc_block_safe_state"
+		end
+
+		return false, "veteran_voc_hold"
+	end
+
+	if class_tag == "base" or class_tag == "ranger" then
+		if context.num_nearby > 5 and context.target_enemy_type == "melee" then
+			return false, "veteran_stance_block_surrounded"
+		end
+
+		local can_activate_vanilla = conditions._can_activate_veteran_ranger_ability(
+			unit,
+			blackboard,
+			scratchpad,
+			condition_args,
+			action_data,
+			is_running
+		)
+		if can_activate_vanilla then
+			return true, "veteran_stance_target_elite_special"
+		end
+
+		if context.urgent_target_enemy and context.num_nearby <= 2 then
+			return true, "veteran_stance_urgent_target"
+		end
+
+		return false, "veteran_stance_hold"
+	end
+
+	return nil, "veteran_variant_" .. source
+end
+
+local function _can_activate_veteran_stealth(context)
+	if context.num_nearby == 0 then
+		return false, "veteran_stealth_block_no_enemies"
+	end
+	if context.toughness_pct < 0.15 and context.num_nearby >= 3 then
+		return true, "veteran_stealth_critical_toughness"
+	end
+	if context.health_pct < 0.35 and context.num_nearby >= 2 then
+		return true, "veteran_stealth_low_health"
+	end
+	if
+		context.target_ally_needs_aid
+		and (context.target_ally_distance or math.huge) <= 20
+		and context.num_nearby >= 2
+	then
+		return true, "veteran_stealth_ally_aid"
+	end
+	if context.num_nearby >= 7 and context.toughness_pct < 0.40 then
+		return true, "veteran_stealth_overwhelmed"
+	end
+
+	return false, "veteran_stealth_hold"
+end
+
+local function _can_activate_zealot_dash(context)
+	local target_distance = context.target_enemy_distance
+	if not context.target_enemy then
+		return false, "zealot_dash_block_no_target"
+	end
+	if target_distance and target_distance < 3 then
+		return false, "zealot_dash_block_target_too_close"
+	end
+	if context.target_is_super_armor then
+		return false, "zealot_dash_block_super_armor"
+	end
+	if context.priority_target_enemy and target_distance and target_distance > 4 then
+		return true, "zealot_dash_priority_target"
+	end
+	if
+		context.toughness_pct < 0.30
+		and context.num_nearby > 0
+		and target_distance
+		and target_distance > 3
+		and target_distance < 20
+	then
+		return true, "zealot_dash_low_toughness"
+	end
+	if context.target_is_elite_special and target_distance and target_distance > 5 and target_distance < 20 then
+		return true, "zealot_dash_elite_special_gap"
+	end
+
+	return false, "zealot_dash_hold"
+end
+
+local function _can_activate_zealot_invisibility(context)
+	if context.num_nearby == 0 then
+		return false, "zealot_stealth_block_no_enemies"
+	end
+	if (context.toughness_pct < 0.20 and context.num_nearby >= 3) or context.health_pct < 0.25 then
+		return true, "zealot_stealth_emergency"
+	end
+	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+		return true, "zealot_stealth_overwhelmed"
+	end
+	if
+		context.target_ally_needs_aid
+		and (context.target_ally_distance or math.huge) <= 12
+		and context.num_nearby >= 2
+	then
+		return true, "zealot_stealth_ally_reposition"
+	end
+
+	return false, "zealot_stealth_hold"
+end
+
+local function _can_activate_psyker_shout(context)
+	if context.num_nearby == 0 then
+		return false, "psyker_shout_block_no_enemies"
+	end
+	if context.peril_pct and context.peril_pct >= 0.75 then
+		return true, "psyker_shout_high_peril"
+	end
+	if context.num_nearby >= 3 then
+		return true, "psyker_shout_surrounded"
+	end
+	if context.toughness_pct < 0.20 and context.num_nearby >= 1 then
+		return true, "psyker_shout_low_toughness"
+	end
+	if context.priority_target_enemy and context.target_enemy_distance and context.target_enemy_distance <= 15 then
+		return true, "psyker_shout_priority_target"
+	end
+	if context.peril_pct and context.peril_pct < 0.30 and context.num_nearby < 3 and context.toughness_pct > 0.50 then
+		return false, "psyker_shout_block_low_value"
+	end
+
+	return false, "psyker_shout_hold"
+end
+
+local function _can_activate_psyker_stance(context)
+	if context.peril_pct == nil then
+		return nil, "psyker_stance_missing_peril"
+	end
+	if context.num_nearby == 0 then
+		return false, "psyker_stance_block_no_enemies"
+	end
+	if context.health_pct < 0.25 then
+		return false, "psyker_stance_block_low_health"
+	end
+	if context.peril_pct < 0.20 or context.peril_pct > 0.90 then
+		return false, "psyker_stance_block_peril_window"
+	end
+	if
+		(context.opportunity_target_enemy or context.urgent_target_enemy)
+		and context.peril_pct >= 0.35
+		and context.peril_pct <= 0.85
+	then
+		return true, "psyker_stance_target_window"
+	end
+	if context.challenge_rating_sum >= 5.0 and context.peril_pct >= 0.35 and context.peril_pct <= 0.85 then
+		return true, "psyker_stance_threat_window"
+	end
+
+	return false, "psyker_stance_hold"
+end
+
+local function _can_activate_ogryn_charge(context)
+	local target_distance = context.target_enemy_distance
+	if target_distance and target_distance < 4 then
+		return false, "ogryn_charge_block_target_too_close"
+	end
+	if context.priority_target_enemy and target_distance and target_distance > 4 then
+		return true, "ogryn_charge_priority_target"
+	end
+	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 6 then
+		return true, "ogryn_charge_ally_aid"
+	end
+	if context.opportunity_target_enemy and target_distance and target_distance >= 8 and target_distance <= 18 then
+		return true, "ogryn_charge_opportunity_target"
+	end
+	if context.num_nearby >= 4 and context.toughness_pct < 0.20 then
+		return true, "ogryn_charge_escape"
+	end
+	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_ally_needs_aid then
+		return false, "ogryn_charge_block_no_pressure"
+	end
+	if not context.target_enemy and not context.priority_target_enemy then
+		return false, "ogryn_charge_block_no_target"
+	end
+
+	return false, "ogryn_charge_hold"
+end
+
+local function _can_activate_ogryn_taunt(context)
+	if context.toughness_pct < 0.20 and context.health_pct < 0.30 then
+		return false, "ogryn_taunt_block_too_fragile"
+	end
+	if context.target_ally_needs_aid and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
+		return true, "ogryn_taunt_ally_aid"
+	end
+	if context.num_nearby >= 4 and context.toughness_pct > 0.40 and context.health_pct > 0.30 then
+		return true, "ogryn_taunt_horde_control"
+	end
+	if context.challenge_rating_sum >= 5.0 and context.num_nearby >= 3 and context.toughness_pct > 0.35 then
+		return true, "ogryn_taunt_high_threat"
+	end
+	if context.num_nearby <= 2 and context.challenge_rating_sum < 1.5 then
+		return false, "ogryn_taunt_block_low_value"
+	end
+
+	return false, "ogryn_taunt_hold"
+end
+
+local function _can_activate_ogryn_gunlugger(context)
+	local target_distance = context.target_enemy_distance
+	if context.num_nearby >= 3 then
+		return false, "ogryn_gunlugger_block_melee_pressure"
+	end
+	if target_distance and target_distance < 4 then
+		return false, "ogryn_gunlugger_block_target_too_close"
+	end
+	if context.challenge_rating_sum < 2.0 then
+		return false, "ogryn_gunlugger_block_low_threat"
+	end
+	if context.urgent_target_enemy and context.num_nearby <= 1 and target_distance and target_distance > 5 then
+		return true, "ogryn_gunlugger_urgent_target"
+	end
+	if
+		context.target_enemy_type == "ranged"
+		and target_distance
+		and target_distance > 5
+		and (context.elite_count + context.special_count) >= 2
+	then
+		return true, "ogryn_gunlugger_ranged_pack"
+	end
+	if context.challenge_rating_sum >= 6.0 and target_distance and target_distance > 5 and context.num_nearby <= 2 then
+		return true, "ogryn_gunlugger_high_threat"
+	end
+
+	return false, "ogryn_gunlugger_hold"
+end
+
+local function _can_activate_adamant_stance(context)
+	local target_distance = context.target_enemy_distance
+	if context.toughness_pct < 0.30 then
+		return true, "adamant_stance_low_toughness"
+	end
+	if context.num_nearby >= 3 and context.toughness_pct < 0.60 then
+		return true, "adamant_stance_surrounded"
+	end
+	if context.target_is_monster and target_distance and target_distance < 8 then
+		return true, "adamant_stance_monster_pressure"
+	end
+	if context.elite_count >= 2 and context.toughness_pct < 0.50 then
+		return true, "adamant_stance_elite_pressure"
+	end
+	if context.toughness_pct > 0.70 and context.num_nearby <= 1 then
+		return false, "adamant_stance_block_safe_state"
+	end
+
+	return false, "adamant_stance_hold"
+end
+
+local function _can_activate_adamant_charge(context)
+	local target_distance = context.target_enemy_distance
+	if target_distance and target_distance < 3 then
+		return false, "adamant_charge_block_target_too_close"
+	end
+	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_is_elite_special then
+		return false, "adamant_charge_block_no_pressure"
+	end
+	if context.num_nearby >= 2 and target_distance and target_distance > 3 and target_distance < 10 then
+		return true, "adamant_charge_density"
+	end
+	if context.target_is_elite_special and target_distance and target_distance > 3 and target_distance < 10 then
+		return true, "adamant_charge_elite_special"
+	end
+	if context.priority_target_enemy and target_distance and target_distance > 3 then
+		return true, "adamant_charge_priority_target"
+	end
+
+	return false, "adamant_charge_hold"
+end
+
+local function _can_activate_adamant_shout(context)
+	if context.toughness_pct < 0.25 and context.num_nearby >= 2 then
+		return true, "adamant_shout_low_toughness"
+	end
+	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+		return true, "adamant_shout_density"
+	end
+
+	return false, "adamant_shout_hold"
+end
+
+local function _can_activate_broker_focus(context)
+	if context.num_nearby == 0 then
+		return false, "broker_focus_block_no_enemies"
+	end
+	if context.toughness_pct < 0.40 then
+		return true, "broker_focus_low_toughness"
+	end
+	if context.target_enemy_type == "ranged" and context.num_nearby >= 2 then
+		return true, "broker_focus_ranged_pressure"
+	end
+	if context.num_nearby >= 5 then
+		return true, "broker_focus_density"
+	end
+
+	return false, "broker_focus_hold"
+end
+
+local function _can_activate_broker_rage(context)
+	if context.num_nearby == 0 then
+		return false, "broker_rage_block_no_enemies"
+	end
+	if context.toughness_pct < 0.40 then
+		return true, "broker_rage_low_toughness"
+	end
+	if context.num_nearby >= 3 and context.melee_count >= 2 then
+		return true, "broker_rage_melee_pressure"
+	end
+	if (context.elite_count + context.monster_count) >= 1 and context.num_nearby >= 1 then
+		return true, "broker_rage_elite_pressure"
+	end
+	if context.num_nearby >= 6 then
+		return true, "broker_rage_density"
+	end
+	if context.target_enemy_type == "ranged" and context.num_nearby <= 2 then
+		return false, "broker_rage_block_ranged_only"
+	end
+
+	return false, "broker_rage_hold"
+end
+
+local TEMPLATE_HEURISTICS = {
+	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_veteran_stealth(context)
+	end,
+	zealot_dash = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_zealot_dash(context)
+	end,
+	-- Runtime normally resolves these to template `zealot_dash`, but we keep aliases
+	-- for safety and debug clarity.
+	zealot_targeted_dash = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_zealot_dash(context)
+	end,
+	zealot_targeted_dash_improved = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_zealot_dash(context)
+	end,
+	zealot_targeted_dash_improved_double = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_zealot_dash(context)
+	end,
+	zealot_invisibility = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_zealot_invisibility(context)
+	end,
+	psyker_shout = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_psyker_shout(context)
+	end,
+	psyker_overcharge_stance = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_psyker_stance(context)
+	end,
+	ogryn_charge = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_ogryn_charge(context)
+	end,
+	-- Runtime normally resolves these to template `ogryn_charge`.
+	ogryn_charge_increased_distance = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_ogryn_charge(context)
+	end,
+	ogryn_taunt_shout = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_ogryn_taunt(context)
+	end,
+	ogryn_gunlugger_stance = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_ogryn_gunlugger(context)
+	end,
+	adamant_stance = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_adamant_stance(context)
+	end,
+	adamant_charge = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_adamant_charge(context)
+	end,
+	adamant_shout = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_adamant_shout(context)
+	end,
+	broker_focus = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_broker_focus(context)
+	end,
+	broker_punk_rage = function(_, _, _, _, _, _, _, _, context)
+		return _can_activate_broker_rage(context)
+	end,
+}
+
+local function _evaluate_template_heuristic(
+	ability_template_name,
+	conditions,
+	unit,
+	blackboard,
+	scratchpad,
+	condition_args,
+	action_data,
+	is_running,
+	ability_extension,
+	context
+)
+	if ability_template_name == "veteran_combat_ability" then
+		return _can_activate_veteran_combat_ability(
+			conditions,
+			unit,
+			blackboard,
+			scratchpad,
+			condition_args,
+			action_data,
+			is_running,
+			ability_extension,
+			context
+		)
+	end
+
+	local fn = TEMPLATE_HEURISTICS[ability_template_name]
+	if not fn then
+		return nil, "fallback_unhandled_template"
+	end
+
+	return fn(
+		conditions,
+		unit,
+		blackboard,
+		scratchpad,
+		condition_args,
+		action_data,
+		is_running,
+		ability_extension,
+		context
+	)
+end
+
+local function _fmt_percent(value)
+	if value == nil then
+		return "n/a"
+	end
+
+	return string.format("%.2f", value)
+end
+
+local function _fmt_seconds(value)
+	if value == nil then
+		return "n/a"
+	end
+
+	if value == math.huge then
+		return "inf"
+	end
+
+	return string.format("%.2f", value)
+end
+
+local function _sanitize_dump_name_fragment(value)
+	local fragment = tostring(value or "unknown")
+	fragment = string.gsub(fragment, "[^%w_%-]", "_")
+
+	return fragment
+end
+
+local function _enemy_unit_label(enemy_unit)
+	if not enemy_unit then
+		return "none"
+	end
+
+	local breed = _enemy_breed(enemy_unit)
+
+	return (breed and breed.name) or tostring(enemy_unit)
+end
+
+local function _context_snapshot(context)
+	if not context then
+		return nil
+	end
+
+	return {
+		num_nearby = context.num_nearby,
+		challenge_rating_sum = context.challenge_rating_sum,
+		elite_count = context.elite_count,
+		special_count = context.special_count,
+		monster_count = context.monster_count,
+		ranged_count = context.ranged_count,
+		melee_count = context.melee_count,
+		health_pct = context.health_pct,
+		toughness_pct = context.toughness_pct,
+		peril_pct = context.peril_pct,
+		target_enemy_distance = context.target_enemy_distance,
+		target_enemy_type = context.target_enemy_type,
+		target_enemy = _enemy_unit_label(context.target_enemy),
+		priority_target_enemy = _enemy_unit_label(context.priority_target_enemy),
+		opportunity_target_enemy = _enemy_unit_label(context.opportunity_target_enemy),
+		urgent_target_enemy = _enemy_unit_label(context.urgent_target_enemy),
+		target_ally_needs_aid = context.target_ally_needs_aid,
+		target_ally_distance = context.target_ally_distance,
+		target_is_elite_special = context.target_is_elite_special,
+		target_is_monster = context.target_is_monster,
+		target_is_super_armor = context.target_is_super_armor,
+	}
+end
+
+local function _fallback_state_snapshot(state, fixed_t)
+	if not state then
+		return {
+			active = false,
+			item_stage = "none",
+		}
+	end
+
+	local snapshot = {
+		active = state.active == true,
+		hold_until = state.hold_until,
+		hold_remaining_s = state.hold_until and math.max(state.hold_until - fixed_t, 0) or nil,
+		wait_action_input = state.wait_action_input,
+		wait_sent = state.wait_sent == true,
+		next_try_t = state.next_try_t,
+		next_try_in_s = state.next_try_t and (state.next_try_t - fixed_t) or nil,
+		item_stage = state.item_stage or "none",
+		item_profile_name = state.item_profile_name,
+		item_wait_t = state.item_wait_t,
+		item_wait_in_s = state.item_wait_t and (state.item_wait_t - fixed_t) or nil,
+		item_charge_confirmed = state.item_charge_confirmed == true,
+		item_start_input = state.item_start_input,
+		item_followup_input = state.item_followup_input,
+		item_unwield_input = state.item_unwield_input,
+	}
+
+	return snapshot
+end
+
+local function _dump_fallback_queue_context_once(kind, ability_name, payload)
+	if not _debug_enabled() then
+		return
+	end
+
+	local key = tostring(kind) .. ":" .. tostring(ability_name)
+	if _fallback_queue_dumped_by_key[key] then
+		return
+	end
+
+	_fallback_queue_dumped_by_key[key] = true
+
+	mod:echo("BetterBots DEBUG: one-shot context dump for " .. key)
+	mod:dump(payload, "betterbots_" .. _sanitize_dump_name_fragment(key), 3)
+end
+
+local function _player_debug_label(player)
+	local name = type(player.name) == "function" and player:name() or "unknown"
+	local slot = type(player.slot) == "function" and player:slot() or "?"
+	local archetype = type(player.archetype_name) == "function" and player:archetype_name() or "?"
+
+	return tostring(name) .. " [slot=" .. tostring(slot) .. ", archetype=" .. tostring(archetype) .. "]"
+end
+
+local function _collect_alive_bots()
+	local manager_table = rawget(_G, "Managers")
+	local alive_lookup = rawget(_G, "ALIVE")
+	local player_manager = manager_table and manager_table.player
+	if not player_manager then
+		return nil, "Managers.player unavailable"
+	end
+
+	local players = player_manager:players()
+	local bots = {}
+	if not players then
+		return bots
+	end
+
+	for _, player in pairs(players) do
+		if player and not player:is_human_controlled() then
+			local unit = player.player_unit
+			if unit and alive_lookup and alive_lookup[unit] then
+				bots[#bots + 1] = {
+					player = player,
+					unit = unit,
+				}
+			end
+		end
+	end
+
+	table.sort(bots, function(a, b)
+		local a_slot = type(a.player.slot) == "function" and a.player:slot() or math.huge
+		local b_slot = type(b.player.slot) == "function" and b.player:slot() or math.huge
+		return a_slot < b_slot
+	end)
+
+	return bots
+end
+
+local function _bot_blackboard(unit)
+	local behavior_extension = ScriptUnit.has_extension(unit, "behavior_system")
+	local brain = behavior_extension and behavior_extension._brain
+
+	return brain and brain._blackboard or nil
+end
+
+local function _log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
+	_debug_log(
+		"decision:" .. ability_template_name,
+		fixed_t,
+		"decision "
+			.. ability_template_name
+			.. " -> "
+			.. tostring(can_activate)
+			.. " (rule="
+			.. tostring(rule)
+			.. ", nearby="
+			.. tostring(context.num_nearby)
+			.. ", challenge="
+			.. string.format("%.2f", context.challenge_rating_sum or 0)
+			.. ", hp="
+			.. _fmt_percent(context.health_pct)
+			.. ", tough="
+			.. _fmt_percent(context.toughness_pct)
+			.. ", peril="
+			.. _fmt_percent(context.peril_pct)
+			.. ", target_dist="
+			.. _fmt_percent(context.target_enemy_distance)
+			.. ")"
+	)
+end
+
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
 	local ability_component_name = action_data.ability_component_name
 
@@ -286,49 +1113,58 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return false
 	end
 
-	if ability_template_name == "veteran_combat_ability" then
-		local can_activate = conditions._can_activate_veteran_ranger_ability(
-			unit,
-			blackboard,
-			scratchpad,
-			condition_args,
-			action_data,
-			is_running
-		)
-		_debug_log(
-			"decision:" .. ability_template_name,
-			fixed_t,
-			"decision " .. ability_template_name .. " -> " .. tostring(can_activate)
-		)
-		return can_activate
-	end
+	_debug_log(
+		"bt_gate:" .. ability_template_name,
+		fixed_t,
+		"bt gate evaluated " .. ability_template_name .. " (component=" .. tostring(ability_component_name) .. ")",
+		0.75
+	)
 
 	if ability_template_name == "zealot_relic" then
 		local can_activate =
 			conditions._can_activate_zealot_relic(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		_debug_log(
-			"decision:" .. ability_template_name,
+		_log_ability_decision(
+			ability_template_name,
 			fixed_t,
-			"decision " .. ability_template_name .. " -> " .. tostring(can_activate)
+			can_activate,
+			"zealot_relic_vanilla",
+			_build_ability_decision_context(unit, blackboard)
 		)
 		return can_activate
 	end
 
-	local perception_extension = ScriptUnit.extension(unit, "perception_system")
-	local _, num_nearby = perception_extension:enemies_in_proximity()
-	local can_activate = num_nearby > 0
-
-	_debug_log(
-		"decision:" .. ability_template_name,
-		fixed_t,
-		"decision "
-			.. ability_template_name
-			.. " -> "
-			.. tostring(can_activate)
-			.. " (nearby="
-			.. tostring(num_nearby)
-			.. ")"
+	local context = _build_ability_decision_context(unit, blackboard)
+	local can_activate, rule = _evaluate_template_heuristic(
+		ability_template_name,
+		conditions,
+		unit,
+		blackboard,
+		scratchpad,
+		condition_args,
+		action_data,
+		is_running,
+		ability_extension,
+		context
 	)
+
+	if can_activate == nil then
+		if ability_template_name == "veteran_combat_ability" then
+			can_activate = conditions._can_activate_veteran_ranger_ability(
+				unit,
+				blackboard,
+				scratchpad,
+				condition_args,
+				action_data,
+				is_running
+			)
+			rule = rule and (tostring(rule) .. "->fallback_veteran_vanilla") or "fallback_veteran_vanilla"
+		else
+			can_activate = context.num_nearby > 0
+			rule = rule or "fallback_nearby"
+		end
+	end
+
+	_log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
 
 	return can_activate
 end
@@ -648,7 +1484,7 @@ local function _queue_weapon_action_input(state, input_name)
 	action_input_extension:bot_queue_action_input("weapon_action", input_name, nil)
 end
 
-local function _queue_item_start_input(ability_name, state, fixed_t)
+local function _queue_item_start_input(unit, ability_name, state, fixed_t, blackboard)
 	_queue_weapon_action_input(state, state.item_start_input)
 	_debug_log(
 		"fallback_item_start:" .. ability_name,
@@ -668,6 +1504,18 @@ local function _queue_item_start_input(ability_name, state, fixed_t)
 		state.item_wait_t = fixed_t + state.item_unwield_delay
 		state.item_stage_deadline_t = fixed_t + ITEM_WIELD_TIMEOUT_S
 	end
+
+	local context = _build_ability_decision_context(unit, blackboard)
+	_dump_fallback_queue_context_once("item", ability_name, {
+		fixed_t = fixed_t,
+		ability_name = ability_name,
+		item_profile_name = state.item_profile_name,
+		item_start_input = state.item_start_input,
+		item_followup_input = state.item_followup_input,
+		item_unwield_input = state.item_unwield_input,
+		context = _context_snapshot(context),
+		fallback_state = _fallback_state_snapshot(state, fixed_t),
+	})
 end
 
 local function _transition_to_charge_confirmation(state, fixed_t)
@@ -723,7 +1571,8 @@ local function _fallback_try_queue_item_combat_ability(
 	ability_extension,
 	state,
 	fixed_t,
-	combat_ability
+	combat_ability,
+	blackboard
 )
 	local ability_name = combat_ability and combat_ability.name or "unknown"
 	local has_item_flow = combat_ability and not combat_ability.ability_template and combat_ability.inventory_item_name
@@ -827,7 +1676,7 @@ local function _fallback_try_queue_item_combat_ability(
 		end
 
 		if fixed_t >= (state.item_wait_t or 0) then
-			_queue_item_start_input(ability_name, state, fixed_t)
+			_queue_item_start_input(unit, ability_name, state, fixed_t, blackboard)
 		end
 
 		return
@@ -879,7 +1728,7 @@ local function _fallback_try_queue_item_combat_ability(
 			return
 		end
 
-		_queue_item_start_input(ability_name, state, fixed_t)
+		_queue_item_start_input(unit, ability_name, state, fixed_t, blackboard)
 
 		return
 	end
@@ -1068,7 +1917,7 @@ local function _fallback_try_queue_item_combat_ability(
 	)
 end
 
-local function _fallback_try_queue_combat_ability(unit)
+local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
 	local fixed_t = _fixed_time()
 	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
@@ -1100,7 +1949,8 @@ local function _fallback_try_queue_combat_ability(unit)
 				ability_extension,
 				state,
 				fixed_t,
-				combat_ability
+				combat_ability,
+				blackboard
 			)
 		end
 
@@ -1145,7 +1995,6 @@ local function _fallback_try_queue_combat_ability(unit)
 	end
 
 	local action_input = activation_data and activation_data.action_input
-
 	if not action_input then
 		_debug_log(
 			"fallback_missing_action_input:" .. ability_template_name,
@@ -1192,9 +2041,43 @@ local function _fallback_try_queue_combat_ability(unit)
 		return
 	end
 
-	local perception_extension = ScriptUnit.extension(unit, "perception_system")
-	local _, num_nearby = perception_extension:enemies_in_proximity()
-	if num_nearby <= 0 then
+	local context = _build_ability_decision_context(unit, blackboard)
+	local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
+	local can_activate, rule = _evaluate_template_heuristic(
+		ability_template_name,
+		conditions,
+		unit,
+		blackboard,
+		nil,
+		nil,
+		nil,
+		false,
+		ability_extension,
+		context
+	)
+
+	if can_activate == nil then
+		if ability_template_name == "veteran_combat_ability" then
+			can_activate = conditions._can_activate_veteran_ranger_ability(unit, blackboard, nil, nil, nil, false)
+			rule = rule and (tostring(rule) .. "->fallback_veteran_vanilla") or "fallback_veteran_vanilla"
+		else
+			can_activate = context.num_nearby > 0
+			rule = rule or "fallback_nearby"
+		end
+	end
+
+	if not can_activate then
+		_debug_log(
+			"fallback_decision_block:" .. ability_template_name,
+			fixed_t,
+			"fallback held "
+				.. ability_template_name
+				.. " (rule="
+				.. tostring(rule)
+				.. ", nearby="
+				.. tostring(context.num_nearby)
+				.. ")"
+		)
 		return
 	end
 
@@ -1214,9 +2097,84 @@ local function _fallback_try_queue_combat_ability(unit)
 			.. ability_template_name
 			.. " input="
 			.. tostring(action_input)
-			.. " (nearby="
-			.. tostring(num_nearby)
+			.. " (rule="
+			.. tostring(rule)
+			.. ", nearby="
+			.. tostring(context.num_nearby)
 			.. ")"
+	)
+
+	_dump_fallback_queue_context_once("template", ability_template_name, {
+		fixed_t = fixed_t,
+		ability_template_name = ability_template_name,
+		ability_name = _equipped_combat_ability_name(unit),
+		activation_input = action_input,
+		rule = rule,
+		context = _context_snapshot(context),
+		fallback_state = _fallback_state_snapshot(state, fixed_t),
+	})
+end
+
+local function _resolve_current_heuristic_decision(unit, blackboard)
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not ability_extension or not unit_data_extension then
+		return nil, "missing_extensions", "none", "unknown", nil
+	end
+
+	local ability_component = unit_data_extension:read_component("combat_ability_action")
+	local ability_template_name = ability_component and ability_component.template_name or "none"
+	local ability_name = _equipped_combat_ability_name(unit)
+	local context = _build_ability_decision_context(unit, blackboard)
+
+	if ability_template_name == "none" then
+		local can_activate = _can_use_item_fallback(unit, ability_extension, ability_name)
+		local rule = can_activate and "item_fallback_ready" or "item_fallback_blocked"
+
+		return can_activate, rule, ability_template_name, ability_name, context
+	end
+
+	local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
+	local can_activate, rule = _evaluate_template_heuristic(
+		ability_template_name,
+		conditions,
+		unit,
+		blackboard,
+		nil,
+		nil,
+		nil,
+		false,
+		ability_extension,
+		context
+	)
+
+	if can_activate == nil then
+		if ability_template_name == "veteran_combat_ability" then
+			can_activate = conditions._can_activate_veteran_ranger_ability(unit, blackboard, nil, nil, nil, false)
+			rule = rule and (tostring(rule) .. "->fallback_veteran_vanilla") or "fallback_veteran_vanilla"
+		else
+			can_activate = context.num_nearby > 0
+			rule = rule or "fallback_nearby"
+		end
+	end
+
+	return can_activate, rule, ability_template_name, ability_name, context
+end
+
+local function _install_condition_patch(conditions, patched_set, patch_label)
+	if not conditions or patched_set[conditions] then
+		return
+	end
+
+	conditions.can_activate_ability = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+		return _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	end
+	patched_set[conditions] = true
+
+	_debug_log(
+		"condition_patch:" .. patch_label .. ":" .. tostring(conditions),
+		0,
+		"patched " .. patch_label .. ".can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
 	)
 end
 
@@ -1225,38 +2183,38 @@ mod:hook_require("scripts/settings/ability/ability_templates/ability_templates",
 end)
 
 mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
-	if _patched_bt_bot_conditions[conditions] then
-		return
-	end
-
-	conditions.can_activate_ability = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		return _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
-	end
-	_patched_bt_bot_conditions[conditions] = true
-
-	_debug_log(
-		"condition_patch:bot_conditions:" .. tostring(conditions),
-		0,
-		"patched bt_bot_conditions.can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
-	)
+	_install_condition_patch(conditions, _patched_bt_bot_conditions, "bt_bot_conditions")
 end)
 
 mod:hook_require("scripts/extension_systems/behavior/utilities/bt_conditions", function(conditions)
-	if _patched_bt_conditions[conditions] then
+	_install_condition_patch(conditions, _patched_bt_conditions, "bt_conditions")
+end)
+
+local function _try_patch_conditions_now(module_path, patched_set, patch_label)
+	local ok, conditions_or_err = pcall(require, module_path)
+	if not ok then
+		_debug_log(
+			"condition_patch_require_failed:" .. patch_label,
+			0,
+			"require failed for " .. patch_label .. " (" .. tostring(conditions_or_err) .. ")",
+			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+		)
 		return
 	end
 
-	conditions.can_activate_ability = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		return _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
-	end
-	_patched_bt_conditions[conditions] = true
+	_install_condition_patch(conditions_or_err, patched_set, patch_label)
+end
 
-	_debug_log(
-		"condition_patch:bt_conditions:" .. tostring(conditions),
-		0,
-		"patched bt_conditions.can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
-	)
-end)
+_try_patch_conditions_now(
+	"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions",
+	_patched_bt_bot_conditions,
+	"bt_bot_conditions"
+)
+_try_patch_conditions_now(
+	"scripts/extension_systems/behavior/utilities/bt_conditions",
+	_patched_bt_conditions,
+	"bt_conditions"
+)
 
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
@@ -1441,15 +2399,203 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			return
 		end
 
-		_fallback_try_queue_combat_ability(unit)
+		local brain = self._brain
+		local blackboard = brain and brain._blackboard or nil
+		_fallback_try_queue_combat_ability(unit, blackboard)
 	end)
 end)
 
 function mod.on_game_state_changed(status, state)
 	if status == "enter" and state == "GameplayStateRun" then
+		for key in pairs(_fallback_queue_dumped_by_key) do
+			_fallback_queue_dumped_by_key[key] = nil
+		end
+		for unit in pairs(_decision_context_cache_by_unit) do
+			_decision_context_cache_by_unit[unit] = nil
+		end
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
 	end
 end
+
+mod:command("bb_state", "Dump BetterBots bot ability + fallback state", function()
+	local bots, error_message = _collect_alive_bots()
+	if error_message then
+		mod:echo("BetterBots: /bb_state unavailable (" .. error_message .. ")")
+		return
+	end
+	bots = bots or {}
+	if #bots == 0 then
+		mod:echo("BetterBots: /bb_state found no alive bots")
+		return
+	end
+
+	local fixed_t = _fixed_time()
+	mod:echo("BetterBots: /bb_state bots=" .. tostring(#bots) .. " fixed_t=" .. _fmt_seconds(fixed_t))
+
+	for i, bot_entry in ipairs(bots) do
+		local player = bot_entry.player
+		local unit = bot_entry.unit
+		local label = _player_debug_label(player)
+		local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+		local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+		local ability_action_component = unit_data_extension
+			and unit_data_extension:read_component("combat_ability_action")
+		local combat_ability_component = unit_data_extension and unit_data_extension:read_component("combat_ability")
+		local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
+		local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action")
+		local template_name = ability_action_component and ability_action_component.template_name or "none"
+		local ability_name = _equipped_combat_ability_name(unit)
+		local charges = ability_extension and ability_extension:remaining_ability_charges("combat_ability") or nil
+		local max_charges = ability_extension and ability_extension:max_ability_charges("combat_ability") or nil
+		local cooldown = ability_extension and ability_extension:remaining_ability_cooldown("combat_ability") or nil
+		local max_cooldown = ability_extension and ability_extension:max_ability_cooldown("combat_ability") or nil
+		local can_use = ability_extension and ability_extension:can_use_ability("combat_ability") or false
+		local fallback_state = _fallback_state_snapshot(_fallback_state_by_unit[unit], fixed_t)
+		local last_charge = _last_charge_event_by_unit[unit]
+		local last_charge_age_s = last_charge and (fixed_t - last_charge.fixed_t) or nil
+
+		mod:echo(
+			"BetterBots: ["
+				.. tostring(i)
+				.. "] "
+				.. label
+				.. " ability="
+				.. tostring(ability_name)
+				.. " template="
+				.. tostring(template_name)
+				.. " charges="
+				.. tostring(charges)
+				.. "/"
+				.. tostring(max_charges)
+				.. " cd="
+				.. _fmt_seconds(cooldown)
+				.. "/"
+				.. _fmt_seconds(max_cooldown)
+				.. " can_use="
+				.. tostring(can_use)
+				.. " active="
+				.. tostring(combat_ability_component and combat_ability_component.active == true)
+				.. " slot="
+				.. tostring(inventory_component and inventory_component.wielded_slot or "none")
+				.. " weapon_template="
+				.. tostring(weapon_action_component and weapon_action_component.template_name or "none")
+				.. " stage="
+				.. tostring(fallback_state.item_stage)
+				.. " next_try_in_s="
+				.. _fmt_seconds(fallback_state.next_try_in_s)
+				.. " last_charge_age_s="
+				.. _fmt_seconds(last_charge_age_s)
+		)
+	end
+end)
+
+mod:command("bb_brain", "Dump BetterBots bot brain/blackboard snapshots", function()
+	local bots, error_message = _collect_alive_bots()
+	if error_message then
+		mod:echo("BetterBots: /bb_brain unavailable (" .. error_message .. ")")
+		return
+	end
+	bots = bots or {}
+	if #bots == 0 then
+		mod:echo("BetterBots: /bb_brain found no alive bots")
+		return
+	end
+
+	local fixed_t = _fixed_time()
+	for i, bot_entry in ipairs(bots) do
+		local player = bot_entry.player
+		local unit = bot_entry.unit
+		local blackboard = _bot_blackboard(unit)
+		local context = _build_ability_decision_context(unit, blackboard)
+		local player_slot = type(player.slot) == "function" and player:slot() or "?"
+		local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+		local ability_action_component = unit_data_extension
+			and unit_data_extension:read_component("combat_ability_action")
+		local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
+		local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action")
+		local ability_name = _equipped_combat_ability_name(unit)
+		local perception = blackboard and blackboard.perception or nil
+		local dump_name = "bb_brain_"
+			.. tostring(i)
+			.. "_"
+			.. _sanitize_dump_name_fragment(ability_name)
+			.. "_"
+			.. _sanitize_dump_name_fragment(player_slot)
+		local dump_payload = {
+			fixed_t = fixed_t,
+			bot = _player_debug_label(player),
+			unit = tostring(unit),
+			ability = {
+				name = ability_name,
+				template_name = ability_action_component and ability_action_component.template_name or "none",
+				wielded_slot = inventory_component and inventory_component.wielded_slot or "none",
+				weapon_template_name = weapon_action_component and weapon_action_component.template_name or "none",
+			},
+			fallback_state = _fallback_state_snapshot(_fallback_state_by_unit[unit], fixed_t),
+			context = _context_snapshot(context),
+			perception = {
+				target_enemy = _enemy_unit_label(perception and perception.target_enemy),
+				target_enemy_distance = perception and perception.target_enemy_distance or nil,
+				target_enemy_type = perception and perception.target_enemy_type or nil,
+				priority_target_enemy = _enemy_unit_label(perception and perception.priority_target_enemy),
+				opportunity_target_enemy = _enemy_unit_label(perception and perception.opportunity_target_enemy),
+				urgent_target_enemy = _enemy_unit_label(perception and perception.urgent_target_enemy),
+				target_ally_needs_aid = perception and perception.target_ally_needs_aid == true or false,
+				target_ally_distance = perception and perception.target_ally_distance or nil,
+			},
+		}
+
+		mod:echo("BetterBots: /bb_brain dump " .. tostring(i) .. " -> " .. dump_name)
+		mod:dump(dump_payload, dump_name, 3)
+	end
+end)
+
+mod:command("bb_decide", "Evaluate BetterBots heuristics without queuing input", function()
+	local bots, error_message = _collect_alive_bots()
+	if error_message then
+		mod:echo("BetterBots: /bb_decide unavailable (" .. error_message .. ")")
+		return
+	end
+	bots = bots or {}
+	if #bots == 0 then
+		mod:echo("BetterBots: /bb_decide found no alive bots")
+		return
+	end
+
+	local fixed_t = _fixed_time()
+	mod:echo("BetterBots: /bb_decide bots=" .. tostring(#bots) .. " fixed_t=" .. _fmt_seconds(fixed_t))
+
+	for i, bot_entry in ipairs(bots) do
+		local player = bot_entry.player
+		local unit = bot_entry.unit
+		local blackboard = _bot_blackboard(unit)
+		local can_activate, rule, template_name, ability_name, context =
+			_resolve_current_heuristic_decision(unit, blackboard)
+
+		mod:echo(
+			"BetterBots: ["
+				.. tostring(i)
+				.. "] "
+				.. _player_debug_label(player)
+				.. " ability="
+				.. tostring(ability_name)
+				.. " template="
+				.. tostring(template_name)
+				.. " decide="
+				.. tostring(can_activate)
+				.. " rule="
+				.. tostring(rule)
+				.. " nearby="
+				.. tostring(context and context.num_nearby or "n/a")
+				.. " tough="
+				.. _fmt_percent(context and context.toughness_pct or nil)
+				.. " peril="
+				.. _fmt_percent(context and context.peril_pct or nil)
+				.. " dist="
+				.. _fmt_percent(context and context.target_enemy_distance or nil)
+		)
+	end
+end)
 
 mod:echo("BetterBots loaded")
 if _debug_enabled() then
