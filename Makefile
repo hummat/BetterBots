@@ -1,4 +1,4 @@
-LUA_FILES := $(shell rg --files scripts -g '*.lua')
+LUA_FILES := $(shell find scripts -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
 
 .PHONY: deps lint format format-check lsp-check check test release package
