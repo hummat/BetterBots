@@ -112,6 +112,7 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style
 - [Architecture](docs/ARCHITECTURE.md)
 - [Status Snapshot](docs/STATUS.md)
 - [Known Issues and Risks](docs/KNOWN_ISSUES.md)
+- [Debugging and Testing](docs/DEBUGGING.md)
 - [Logging and Diagnostics](docs/LOGGING.md)
 - [Manual Test Plan](docs/TEST_PLAN.md)
 - [Roadmap](docs/ROADMAP.md)

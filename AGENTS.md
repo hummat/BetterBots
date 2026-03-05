@@ -25,6 +25,18 @@ No automated tests — this is a Lua mod running inside Darktide's engine. Verif
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
+## Debugging
+
+See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
+- `mod:echo(msg)` — print to chat + log (current approach)
+- `mod:dump(table, name, depth)` — recursively dump tables to log
+- `mod:dtf(table, name, depth)` — export table as JSON to `./dump/`
+- `mod:pcall(func)` — safe call with stack trace via `Script.callstack()`
+- `mod:command(name, desc, func)` — register `/name` chat commands for runtime debugging
+- Hot-reload: `Ctrl+Shift+R` (requires DMF Developer Mode)
+- Console logs: `tail -f` on `console_logs/console-*.log`, grep for `BetterBots\|Script Error`
+- **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
+
 ## Local static checks
 
 Use project-local tooling configs before handing off changes:
