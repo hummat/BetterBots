@@ -1,5 +1,7 @@
 # Hive Scum (Internal: `broker`)
 
+> Last updated: 2026-03-05 | Source: Darktide decompiled v1.10.7 (Feb 2026)
+
 ## Overview
 
 The Hive Scum is a DLC class (released December 2, 2025) built around high mobility, close-range aggression, and chemical enhancement. Internal archetype name is `broker`. Base stats: 150 HP, 75 Toughness (5/s regen, 3s delay), 10% base crit chance, 3 base stamina. Toughness recovery on melee kill: 5%. Toughness damage is halved while sliding.
@@ -126,10 +128,10 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 - Cooldown pauses while `syringe_broker_buff` is active
 
 **Stimm Lab categories:**
-- **Celerity** (5 tiers + 2 branches): Attack speed (+4% per tier), wield speed (+25%), stamina cost reduction, reload speed, movement speed, stun/slowdown immunity at tier 5
-- **Combat** (5 tiers + 2 branches): Power level (+4% per tier), finesse damage, rending, crit chance
-- **Durability** (4 tiers + 2 branches): Toughness restore on use (6.25% per tier), +5% toughness replenish, 4% damage reduction per tier, toughness over time
-- **Concentration** (5 tiers + 2 branches): Combat ability cooldown regen (+6.25% per tier), cooldown on melee/ranged kills
+- **Celerity** (5 main tiers + 2 branches at tier 5): Attack speed (+4% per tier), wield speed (+25% tiers 1-2), stamina cost reduction (tiers 2-4: -15%/-15%/-20%), stun/slowdown immunity at tier 5a. Branches: 5b = +30% reload speed/-50% recoil, 5c = +10% move speed/+10% dodge distance/+10% dodge speed/-10% dodge cooldown
+- **Combat** (3 shared tiers + 3 branches of 2 tiers each): Power level (+4% per tier, all nodes). Branch A: tiers 4a/5a add finesse (+10%/+25%). Branch B: tiers 4b/5b add rending (+5%/+10%). Branch C: tiers 4c/5c add crit chance (+5%/+10%)
+- **Durability** (4 main tiers + 2 branches at tier 5): Toughness restore on use (6.25% per tier), +5% toughness replenish per tier, 4% damage reduction per tier. Branches: 5a = +30% toughness replenish, 5b = 5% toughness over time per second
+- **Concentration** (5 main tiers + 2 branches at tier 5): Combat ability cooldown regen (+6.25% tiers 1-4, +25% at tier 5a). Branches: 5b = cooldown on melee kills, 5c = cooldown on ranged kills
 
 **Bot usage notes:** Another item-based ability (`pocketable_ability`). Tier 3 difficulty -- same issues as Stimm Field. Bot should use when: (a) about to engage a tough fight, (b) combat ability is on cooldown and concentration buffs would help, (c) generally on cooldown (use whenever available in combat).
 
@@ -303,12 +305,16 @@ Three mutually exclusive aura choices.
 - `broker_passive_close_range_damage_on_slide`: +15% close-range damage while sliding
 - `broker_passive_melee_damage_carry_over`: 25% of overkill melee damage carries to next target (1s window)
 - `broker_passive_cleave_on_cleave`: +50% hit mass on attacks hitting 3+ targets
+- `broker_passive_melee_cleave_on_melee_kill`: Melee kills grant stacking cleave bonus
+- `broker_passive_damage_vs_elites_monsters`: Bonus damage vs elites and monsters
 
 **Crit Chance:**
 - `broker_passive_ninja_grants_crit_chance`: Dodging grants +20% crit chance for 3s
 - `broker_passive_parries_grant_crit_chance`: Parrying grants +20% crit chance for 2s
 - `broker_passive_backstabs_grant_crit_chance`: Backstabs grant +20% crit chance for 2s
 - `broker_passive_reload_on_crit`: Ranged crits replenish 15% ammo
+- `broker_passive_crit_to_damage`: Crit chance is converted into damage
+- `broker_passive_melee_crit_instakill`: Melee crit instakill on enemies below a health-by-damage threshold
 
 **Toughness / Survivability:**
 - `broker_passive_restore_toughness_on_close_ranged_kill`: +8% toughness on close-range ranged kill, +15% for elites
@@ -316,8 +322,10 @@ Three mutually exclusive aura choices.
 - `broker_passive_reduced_toughness_damage_during_reload`: -25% toughness damage taken for 4s while reloading
 - `broker_passive_replenish_toughness_on_ranged_toughness_damage`: Restoring 30% toughness over 3s when taking ranged toughness damage
 - `broker_passive_stun_immunity_on_toughness_broken`: On toughness break, gain stun immunity for 6s and restore 50% toughness (10s cooldown)
-- `broker_passive_push_on_damage_taken`: Taking damage reduces push cost and grants impact (stacks 3x)
+- `broker_passive_push_on_damage_taken`: Taking damage reduces push cost, grants +50% impact, +10% damage reduction per stack (stacks 3x)
 - `broker_passive_punk_grit`: +10% ranged damage, 10% toughness damage reduction
+- `broker_passive_stamina_on_successful_dodge`: +10% stamina on successful dodge
+- `broker_passive_damage_vs_heavy_staggered`: Bonus damage vs staggered/medium-staggered enemies
 
 **Mobility:**
 - `broker_passive_improved_dodges`: +25% dodge speed, +0.15s dodge linger time
@@ -327,12 +335,16 @@ Three mutually exclusive aura choices.
 - `broker_passive_improved_dodges_at_full_stamina`: At 75%+ stamina, -40% dodge cooldown
 - `broker_passive_sprinting_reduces_threat`: Sprinting reduces enemy threat weight (stacks 4x)
 - `broker_passive_increased_ranged_dodges`: +1 extra consecutive dodge while wielding ranged weapon
+- `broker_passive_heavy_attack_dash`: On melee hit, next sprint heavy attack leaps forward with extra damage/impact
 
 **Weapon Handling:**
 - `broker_passive_reduce_swap_time`: +40% wield speed, -10% recoil, -30% spread
 - `broker_passive_extended_mag`: +15% clip size
 - `broker_passive_reload_speed_on_close_kill`: +30% reload speed for 8s after close-range kill
 - `broker_passive_stamina_grants_atk_speed`: +2% attack speed per stamina point (stacks 15x)
+- `broker_passive_crit_kill_at_close_range_reload`: Close-range critical kills instantly reload ranged weapon
+- `broker_passive_hollowtip_bullets`: Revolvers have higher stagger; human-sized enemies may be sent flying
+- `broker_passive_low_ammo_regen`: Ammo regen when below ammo threshold
 
 **Toxin:**
 - `broker_passive_melee_attacks_apply_toxin`: Melee attacks apply 1 stack of Chem Toxin
@@ -343,13 +355,15 @@ Three mutually exclusive aura choices.
 - `broker_passive_damage_after_toxined_enemies`: +5% damage per toxin stack on nearby enemies (max +15%, 12.5m)
 - `broker_passive_toughness_on_toxined_kill`: +15% toughness on killing toxined enemy
 - `broker_passive_increased_toxin_damage`: +10% toxin DoT damage
+- `broker_passive_blitz_inflicts_toxin`: Blitz attacks inflict Chem Toxin stacks (amount varies by grenade type)
 - `broker_passive_blitz_charge_on_kill`: Regain 1 grenade charge per 20 kills
+- `broker_passive_increased_blitz_ammo`: +1 extra grenade charge
 
 **Stimm:**
 - `broker_passive_stimm_increased_duration`: +5s to Cartel Special duration
 - `broker_passive_stimm_cleanse_on_kill`: Kills during stimm cleanse 1% corruption (up to 50% threshold)
 - `broker_passive_stimm_cd_on_kill`: Kills restore 1% stimm cooldown (2% for toxined targets)
-- `broker_passive_dr_damage_tradeoff_on_stamina`: +20% damage but +20% damage taken based on stamina
+- `broker_passive_dr_damage_tradeoff_on_stamina`: Scales with stamina -- at full stamina: up to -20% damage taken; at zero stamina: up to +20% melee damage
 - `broker_passive_ammo_on_backstab`: Backstabs restore 1% ammo (5s cooldown)
 - `broker_passive_increased_aura_size`: +75% coherency radius
 

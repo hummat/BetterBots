@@ -1,6 +1,7 @@
 # Zealot (Preacher) -- Class Ability Reference
 
-> Generated from decompiled source (`Darktide-Source-Code/` v1.10.x) and community guides.
+> Last updated: 2026-03-05
+> Generated from decompiled source (`Darktide-Source-Code/` v1.10.7, Feb 2026) and community guides.
 > For BetterBots mod development. All internal IDs and values traced to source files.
 
 ## Overview
@@ -18,7 +19,7 @@ The Zealot (Preacher) is a melee-focused class with high mobility, self-sustain 
 From `zealot_archetype.lua`:
 ```lua
 base_talents = {
-    zealot_dash = 1,               -- Chastise the Wicked (combat ability)
+    zealot_dash = 1,               -- Fury of the Faithful / Chastise the Wicked (combat ability)
     zealot_shock_grenade = 1,       -- Stun Grenade (blitz)
     zealot_toughness_damage_coherency = 1,  -- Aura: The Emperor's Will
 }
@@ -30,7 +31,7 @@ base_talents = {
 
 The Zealot has **three** mutually exclusive combat ability variants, selected via talent tree.
 
-### 1. Chastise the Wicked (Targeted Dash)
+### 1. Fury of the Faithful (Targeted Dash, internal: Chastise the Wicked)
 
 | Field | Value |
 |---|---|
@@ -42,11 +43,12 @@ The Zealot has **three** mutually exclusive combat ability variants, selected vi
 | Cooldown | **30s** (`talent_settings_2.combat_ability.cooldown`) |
 | Max charges | 1 |
 | Lunge template | `zealot_dash` (file: `lunge/zealot_lunge_templates.lua`) |
+| In-game name | `Fury of the Faithful` (current UI), historically `Chastise the Wicked` |
 
 **Input actions** (two-step charge pattern):
 ```
 aim_pressed:  combat_ability_pressed = true   (buffer 0.2s)
-aim_released: combat_ability_hold = false      (time_window = inf)
+aim_released: combat_ability_hold = false      (buffer 0.1s, time_window = inf)
 block_cancel: action_two_pressed while holding (buffer 0)
 ```
 
@@ -131,7 +133,8 @@ This is a **stance ability** -- single press, instant activation. Much simpler f
 - **+100% melee rending**
 - Allows backstabbing and flanking while active
 - Breaks on: shooting, hitting enemies, reviving, rescuing, pulling up, removing nets, throwing grenades
-- 0.5s exit grace period (actions within 0.5s of activation don't break stealth)
+- Exception: bleeding, burning, frag grenade, plasma, and electrocution damage types do NOT break stealth via `on_hit`
+- 0.5s exit grace period (non-damaging actions within 0.5s of activation don't break stealth)
 
 **Bot usage notes**: Single press of `combat_ability_pressed`. Ideal for:
 - Repositioning behind an elite for a massive backstab
@@ -232,6 +235,7 @@ Three mutually exclusive grenade types.
 | Player ability ID | `zealot_fire_grenade` |
 | Ability type | `grenade_ability` |
 | Inventory item | `content/items/weapons/player/grenade_fire` |
+| Stat buff for extra | `extra_max_amount_of_grenades` |
 | Max charges | **3** (`talent_settings_3.grenade.max_charges`) |
 
 **What it does**: Throws a fire grenade that creates a burning area (liquid_area_fire_burning damage profile). Deals damage over time to enemies in the area.
@@ -246,6 +250,7 @@ Three mutually exclusive grenade types.
 | Player ability ID | `zealot_throwing_knives` |
 | Ability type | `grenade_ability` |
 | Inventory item | `content/items/weapons/player/zealot_throwing_knives` |
+| Stat buff for extra | `extra_max_amount_of_grenades` |
 | Max charges | **12** |
 | Refill | 1 knife per melee kill |
 
@@ -330,7 +335,7 @@ Four mutually exclusive aura options.
 | Buff | `zealot_martyrdom_base` |
 
 **Effect**: For each missing health segment (wound), gain **+10% damage**. Max 5 stacks.
-- Toughness variant (`zealot_martyrdom_toughness`): -7.5% toughness damage taken per missing segment
+- Toughness variant (talent: `zealot_martyrdom_grants_toughness`, buff: `zealot_martyrdom_toughness`): -7.5% toughness damage taken per missing segment
 - Attack speed variant (`zealot_martyrdom_grants_attack_speed`): +6% attack speed per missing segment
 - CDR variant (`zealot_martyrdom_cdr`): +10% ability cooldown regeneration per missing segment per second
 
@@ -343,7 +348,7 @@ Four mutually exclusive aura options.
 | Cooldown | **120s** (2 minutes) |
 | Trigger | `on_damage_taken` that would kill |
 
-**Effect**: When you would die, instead become invulnerable for 5s. 120s internal cooldown. Shows `resist_death` and `stun_immune` keywords while off cooldown.
+**Effect**: When you would die, instead become invulnerable for 5s. 120s internal cooldown. Shows `resist_death` keyword while off cooldown (via `off_cooldown_keywords`). Note: `stun_immune` is NOT on this buff -- it exists on the separate `bolstering_prayer_resist_death` buff.
 
 #### Improved Variant (with Leech)
 - Buff: `zealot_resist_death_improved_with_leech`
@@ -457,7 +462,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 - **Key talents**: `zealot_backstab_damage`, `zealot_increased_crit_and_weakspot_damage_after_dodge`, `zealot_increased_stagger_on_weakspot_melee`, `zealot_more_damage_when_low_on_stamina`, `zealot_increased_damage_when_flanking`
 
 ### Center Path: Maniac / Berserker (zealot_2)
-- **Combat ability**: Chastise the Wicked (dash)
+- **Combat ability**: Fury of the Faithful (dash; internal/template naming still references Chastise the Wicked)
 - **Keystone**: Martyrdom
 - **Aura**: The Emperor's Will (toughness DR)
 - **Focus**: Attack speed, bleed, crit chains, melee damage stacking
@@ -485,7 +490,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 
 ## Practical Usage (Community Guides)
 
-### When to use Chastise the Wicked (Dash)
+### When to use Fury of the Faithful (Dash)
 - **Engage**: Close distance to specials (trappers, snipers, flamers) for quick kills
 - **Toughness recovery**: Use when toughness is depleted for 50% instant restore
 - **Elite burst**: The guaranteed crit + rending makes the first hit post-dash devastating against armored targets
@@ -496,7 +501,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 ### When to use Stealth (Shroudfield)
 - **Assassination**: Activate, reposition behind a Crusher/Mauler, deliver a massive backstab
 - **Emergency**: Pop when surrounded to shed aggro and reposition
-- **Revive**: Stealth does NOT break on revive -- use it to safely revive downed allies
+- **Revive**: Stealth DOES break on revive (`on_revive` is a registered proc event in the buff). Do not use stealth to revive.
 - **Duration management**: Attack quickly after activating -- the buffs are massive but brief (3-5s)
 - **Caution**: Throwing grenades WILL break stealth
 
@@ -518,7 +523,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 | Ability | Pattern | Complexity | Priority |
 |---|---|---|---|
 | Stealth (Shroudfield) | `stance_pressed` (single press) | Low | Tier 2 (metadata injection) |
-| Chastise the Wicked | `aim_pressed` -> hold -> `aim_released` | Medium | Tier 2 |
+| Fury of the Faithful (Chastise the Wicked) | `aim_pressed` -> hold -> `aim_released` | Medium | Tier 2 |
 | Throwing Knives | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
 | Stun/Flame Grenade | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
 | Bolstering Prayer | Item-based, channel, no `ability_template` | High | Tier 3 |
@@ -541,3 +546,4 @@ The Zealot talent tree has three main paths, each centered on a different playst
 - [Tips For Playing A Zealot](https://www.thegamer.com/warhammer-40000-darktide-zealot-preacher-class-guide/)
 - [Zealot: Preacher Wiki](https://warhammer-40k-darktide.fandom.com/wiki/Zealot:_Preacher)
 - [Fatshark Dev Blog: Talent Trees Deep Dive](https://www.playdarktide.com/news/dev-blog-talent-trees-deep-dive)
+- [SteamDB Hotfix #35 (shows dual naming `Chastise the Wicked` / `Fury of the Faithful`)](https://steamdb.info/patchnotes/13937298/)

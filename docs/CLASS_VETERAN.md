@@ -1,7 +1,7 @@
 # Veteran (Sharpshooter)
 
 > Source version: Darktide v1.10.7 (decompiled source at `../Darktide-Source-Code/`)
-> Last updated: 2026-03-04
+> Last updated: 2026-03-05
 
 ## Overview
 
@@ -69,10 +69,10 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
   - +15% Ranged Damage
   - +15% Ranged Weakspot Damage
   - +50% Ranged Impact Modifier
-- Improved stats (with outlines talent via `..._outlines` buff, additive on top of base):
-  - +25% Ranged Damage total
-  - +25% Ranged Weakspot Damage total
-  - +100% Ranged Impact Modifier total
+- Improved stats (with outlines talent via `..._outlines` buff, replaces base buff entirely):
+  - +25% Ranged Damage (replaces base +15%)
+  - +25% Ranged Weakspot Damage (replaces base +15%)
+  - +100% Ranged Impact Modifier (replaces base +50%)
   - Replenishes 10% toughness/s while active
   - FOV multiplied by 0.85 (slight zoom)
   - Recoil -24%, Spread -38%, Sway x0.4

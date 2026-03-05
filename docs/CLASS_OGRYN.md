@@ -1,5 +1,6 @@
 # Ogryn (Skullbreaker) - Class Ability Reference
 
+> Last updated: 2026-03-05
 > Source: Decompiled Darktide v1.10.7 (Feb 2026) + community guides.
 > Purpose: Complete ability mapping for BetterBots mod development.
 
@@ -25,7 +26,7 @@ while reviving allies (`ogryn_helping_hand`). Innate dodge-stagger (`ogryn_dodge
 The Ogryn has **three** mutually exclusive combat ability paths selected via the talent tree. All
 use `ability_type = "combat_ability"` and are bound to `combat_ability_pressed`.
 
-### 1. Bull Rush (Charge) -- `ogryn_charge`
+### 1. Bull Rush / Indomitable (Charge path) -- `ogryn_charge`
 
 **Template:** `ogryn_charge` (ability template), `ogryn_charge` (lunge template)
 **Ability group:** `ogryn_charge`
@@ -49,7 +50,7 @@ hold) to lunge forward. This is a **charge/dash** type -- not instant.
 **Lunge properties:**
 - `allow_steering = true`, `sensitivity_modifier = 5`
 - `disable_minion_collision = true` -- passes through enemies
-- Ramps from 0 to 10 speed over 0.5s
+- Speed ramp: 0→0s, 4→0.2s, 6→0.3s, 8→0.4s, 10→0.5s (5-step acceleration)
 - Stops on: super_armor, void_shield, resistant armor types
 - On finish: creates explosion (ExplosionTemplates.ogryn_charge_impact)
 - `is_dodging = true` -- grants dodge frames during charge
@@ -61,12 +62,17 @@ hold) to lunge forward. This is a **charge/dash** type -- not instant.
 
 **Talent modifier variants:**
 
-| Talent | Ability ID | Changes | Cooldown |
+| Talent | Mechanism | Changes | Cooldown |
 |--------|-----------|---------|----------|
-| `ogryn_charge_applies_bleed` | `ogryn_charge_bleed` | Applies 5 bleed stacks to hit enemies, uses `ogryn_charge_bleed` lunge template | 30s |
-| `ogryn_longer_charge` | `ogryn_charge_increased_distance` | Distance 24m, only monsters stop the charge (ignores super_armor/resistant), extended timing anim | 30s |
-| `ogryn_charge_toughness` | `ogryn_charge_cooldown_reduction` | Restores 10% toughness per enemy hit during charge | 30s |
-| `ogryn_charge_trample` | (buff, not separate ability) | Each enemy hit during charge grants +2.5% damage buff (stacks to 20, 10s duration, refreshes) | N/A |
+| `ogryn_charge_applies_bleed` | Passive buff `ogryn_charge_bleed` (no ability swap) | Applies 5 bleed stacks to hit enemies during lunge | 30s |
+| `ogryn_longer_charge` | Swaps ability to `ogryn_charge_increased_distance` | Distance 24m, only monsters stop the charge (ignores super_armor/resistant), extended timing anim | 30s |
+| `ogryn_charge_toughness` | Passive buff `ogryn_bull_rush_hits_replenish_toughness` (no ability swap) | Restores 10% toughness per enemy hit during charge | 30s |
+| `ogryn_charge_trample` | Passive buff `ogryn_charge_trample` (no ability swap) | Each enemy hit during charge grants +2.5% damage buff (stacks to 20, 10s duration, refreshes) | N/A |
+
+> **Note:** `ogryn_charge_bleed`, `ogryn_charge_cooldown_reduction`, and `ogryn_charge_damage` exist
+> as player abilities in `ogryn_abilities.lua` with their own lunge templates, but no talent in the
+> tree references them. They appear to be orphaned/deprecated ability variants. The actual bleed and
+> toughness mechanics are implemented entirely through passive buff templates.
 
 **Bot usage notes:**
 - Charge is a directional lunge with a two-step input (aim then release). Bots need to inject both
@@ -79,7 +85,7 @@ hold) to lunge forward. This is a **charge/dash** type -- not instant.
 
 ---
 
-### 2. Indomitable (Taunt Shout) -- `ogryn_taunt_shout`
+### 2. Loyal Protector (Taunt Shout) -- `ogryn_taunt_shout`
 
 **Template:** `ogryn_taunt_shout`
 **Ability group:** `ogryn_taunt_shout`
@@ -104,7 +110,8 @@ Press F to begin aiming, release to shout. Minimum hold time 0.075s.
 - Applies `taunted` buff to enemies (forces them to target the Ogryn)
 - `force_stagger_type = "light"`, `force_stagger_duration = 1`
 - `power_level = 500`
-- Cannot affect: chaos_daemonhost, chaos_mutator_daemonhost, chaos_mutator_ritualist
+- `can_not_taunt`: chaos_daemonhost, chaos_mutator_daemonhost, chaos_mutator_ritualist
+- `can_not_hit`: chaos_mutator_daemonhost, chaos_mutator_ritualist (daemonhost CAN be hit/staggered, just not taunted)
 - With `ogryn_taunt_damage_taken_increase` talent: also applies `ogryn_taunt_increased_damage_taken_buff` (+20% damage taken, 15s)
 
 **Repeat taunt buff** (`ogryn_repeat_taunt`):
@@ -127,7 +134,7 @@ Press F to begin aiming, release to shout. Minimum hold time 0.075s.
 
 ---
 
-### 3. Loyal Protector (Gunlugger Stance / Barrage) -- `ogryn_ranged_stance`
+### 3. Point-Blank Barrage (Gunlugger Stance / Barrage) -- talent `ogryn_special_ammo`, ability `ogryn_ranged_stance`
 
 **Template:** `ogryn_gunlugger_stance`
 **Ability group:** `ogryn_gunlugger_stance`
@@ -142,7 +149,9 @@ Has `ability_meta_data.activation.action_input = "stance_pressed"`.
 - `auto_wield_slot = "slot_secondary"` -- auto-switches to ranged weapon
 - `reload_secondary = true` -- reloads the ranged weapon
 - `stop_current_action = true`, `uninterruptible = true`
-- `required_weapon_type = "ranged"` -- requires ranged weapon to activate
+- `target_enemies = true` -- faces nearest enemy on activation
+- `total_time = 0` -- instant activation
+- `required_weapon_type = "ranged"` -- requires ranged weapon (set on player ability, not template)
 
 **Cooldown:** 80s
 **Max charges:** 1
@@ -155,7 +164,7 @@ Has `ability_meta_data.activation.action_input = "stance_pressed"`.
 - Keyword: `ogryn_combat_ability_stance`
 
 **Conditionally added sub-buffs** (based on talent special rules):
-- `ogryn_ranged_stance_no_movement_penalty_buff`: No braced movement penalty (with `ogryn_special_ammo_movement` talent)
+- `ogryn_ranged_stance_no_movement_penalty_buff`: 50% reduced braced/weapon-action movement penalty, +15% close-range damage (with `ogryn_special_ammo_movement` talent)
 - `ogryn_ranged_stance_fire_shots`: Shots apply fire stacks, gain damage stacks per shot (with `ogryn_special_ammo_fire_shots` talent)
 - `ogryn_ranged_stance_armor_pierce`: +15% rending, +15% ranged damage (with `ogryn_special_ammo_armor_pen` talent)
 - `ogryn_ranged_stance_toughness_regen`: 2.5% toughness per shot, 15% on reload (with `ogryn_ranged_stance_toughness_regen` talent)
@@ -166,7 +175,7 @@ Has `ability_meta_data.activation.action_input = "stance_pressed"`.
 |--------|--------|
 | `ogryn_special_ammo_fire_shots` | Shots ignite enemies; gain +4 damage stacks per shot (max 16) |
 | `ogryn_special_ammo_armor_pen` | +15% rending + 15% ranged damage during stance |
-| `ogryn_special_ammo_movement` | No braced slowdown + 15% increased close-range damage, 50% reduced move penalty |
+| `ogryn_special_ammo_movement` | 50% reduced braced/weapon-action move penalty, +15% close-range damage |
 | `ogryn_ranged_stance_toughness_regen` | 2.5% toughness per shot, 15% on reload |
 
 **Bot usage notes:**
@@ -231,7 +240,7 @@ All Ogryn blitz abilities use `ability_type = "grenade_ability"`. They are **ite
 
 ## Aura (Coherency)
 
-The Ogryn has **three** mutually exclusive aura options:
+The Ogryn has **four** mutually exclusive aura options:
 
 ### 1. Intimidating Presence (Default) -- `ogryn_melee_damage_coherency`
 
@@ -291,15 +300,15 @@ Stacks are consumed when taking damage.
 ### 3. Leadbelcher -- `ogryn_leadbelcher_no_ammo_chance`
 
 **Buff:** `ogryn_leadbelcher_aura_tracking_buff` + `ogryn_blo_new_passive`
-**Mechanic:** 15% chance not to consume ammo on ranged shots. Proc grants stacking buffs:
-- +2% ranged damage per stack, +1.5% fire rate per stack
-- Max 10 stacks, 10s duration
+**Mechanic:** 15% chance not to consume ammo on ranged shots. Ranged kills grant `ogryn_blo_stacking_buff`:
+- +2% ranged damage per stack
+- Max 10 stacks, 10s duration (refreshes on new stack)
 
 **Modifier talents:**
 - `ogryn_leadbelcher_cooldown_reduction`: Leadbelcher procs grant +100% cooldown regen for 4s
 - `ogryn_leadbelcher_trigger_chance_increase`: Increase proc chance to 12% (net 27%)
 - `ogryn_leadbelcher_crits`: Leadbelcher shots are always critical hits
-- `ogryn_blo_wield_speed`: Leadbelcher stacks also grant +1.5% fire rate per stack
+- `ogryn_blo_wield_speed`: Leadbelcher stacks also grant lerped ranged attack speed (up to +15% at max stacks, via `ogryn_blo_fire_rate` buff)
 - `ogryn_blo_melee`: 10% chance per melee hit to gain Leadbelcher stacks (max 10)
 - `ogryn_blo_ally_ranged_buffs`: Leadbelcher procs grant allies +15% ranged damage for 8s
 
@@ -319,8 +328,8 @@ Stacks are consumed when taking damage.
 | Talent | Internal ID | Effect |
 |--------|-------------|--------|
 | Bull Rush | `ogryn_charge` | Charge forward, 30s CD, +25% speed/attack speed for 5s after |
-| Indomitable | `ogryn_taunt_shout` | AoE taunt in 12m, 50s CD, 3 pulses over 6s |
-| Loyal Protector | `ogryn_special_ammo` | Ranged stance, 80s CD, 10s duration, +25% attack speed, +65% reload |
+| Loyal Protector | `ogryn_taunt_shout` | AoE taunt in 12m, 50s CD, 3 pulses over 6s |
+| Point-Blank Barrage | `ogryn_special_ammo` | Ranged stance, 80s CD, 10s duration, +25% attack speed, +65% reload |
 
 ### Blitz Row (choose one)
 | Talent | Internal ID | Effect |
@@ -352,7 +361,7 @@ Stacks are consumed when taking damage.
 |--------|-------------|--------|
 | Fire Shots | `ogryn_special_ammo_fire_shots` | Shots ignite, +4 damage stacks/shot (max 16) |
 | Armor Pierce | `ogryn_special_ammo_armor_pen` | +15% rending, +15% ranged damage |
-| No Movement Penalty | `ogryn_special_ammo_movement` | No braced slowdown, +15% close damage |
+| No Movement Penalty | `ogryn_special_ammo_movement` | 50% reduced braced/weapon move penalty, +15% close damage |
 | Toughness Regen | `ogryn_ranged_stance_toughness_regen` | 2.5% toughness/shot, 15% on reload |
 
 **Taunt modifiers:**
@@ -368,7 +377,7 @@ Stacks are consumed when taking damage.
 |--------|-------------|--------|
 | Ogryn Killer | `ogryn_ogryn_killer` | +30% dmg vs Ogryns, 30% DR from Ogryns |
 | Heavy Bleeds | `ogryn_heavy_bleeds` | Heavy attacks apply bleed (1 light / 4 heavy stacks) |
-| Block All Attacks | `ogryn_block_all_attacks` | Perfect blocks stop all attack types, +20% melee damage |
+| Block All Attacks | `ogryn_block_all_attacks` | Perfect blocks stop all attack types, +20% melee damage for 5s (consumed on next melee sweep) |
 | Blocking Taunts | `ogryn_blocking_ranged_taunts` | Blocking/pushing applies short taunt |
 | Pushing Brittleness | `ogryn_pushing_applies_brittleness` | Pushes apply 4 brittleness stacks |
 | Stagger Cleave | `ogryn_stagger_cleave_on_third` | Every 3rd attack: +25% cleave, +25% stagger |
@@ -389,7 +398,7 @@ Stacks are consumed when taking damage.
 - With Longer Charge talent: use as a long-range repositioning tool (24m)
 - Avoid charging into super armor (Crushers) unless running Longer Charge
 
-### When to use Indomitable (Taunt)
+### When to use Loyal Protector (Taunt)
 - When allies are under heavy pressure from melee elites
 - Against mixed hordes with ranged enemies -- taunt pulls all aggro
 - Before a revive attempt to ensure enemies target you instead
@@ -397,7 +406,7 @@ Stacks are consumed when taking damage.
 - Pair with Blocking Taunts talent for sustained aggro control between cooldowns
 - Save for emergencies -- 50s cooldown is unforgiving
 
-### When to use Barrage (Ranged Stance)
+### When to use Point-Blank Barrage (Ranged Stance)
 - Against dense ranged enemy formations (Scab Shooters)
 - When armored targets appear and the Ogryn has a good ranged weapon
 - The auto-reload on activation means timing doesn't need to account for reload state
@@ -425,14 +434,14 @@ Stacks are consumed when taking damage.
 | Ability | Pattern | Inputs | Has `ability_meta_data`? |
 |---------|---------|--------|--------------------------|
 | Bull Rush | Two-step charge | `combat_ability_pressed` -> hold -> `combat_ability_hold = false` | **No** -- needs injected metadata |
-| Indomitable | Two-step shout | `combat_ability_pressed` -> hold -> `combat_ability_hold = false` | **No** -- needs injected metadata |
-| Barrage | Single-press stance | `combat_ability_pressed` | **Yes** -- has `ability_meta_data.activation` |
+| Loyal Protector (taunt) | Two-step shout | `combat_ability_pressed` -> hold -> `combat_ability_hold = false` | **No** -- needs injected metadata |
+| Point-Blank Barrage | Single-press stance | `combat_ability_pressed` | **Yes** -- has `ability_meta_data.activation` |
 | Grenades | Item-based | Equip grenade item -> aim -> throw | **N/A** -- no `ability_template` at all |
 
 ### Implementation priority
-1. **Barrage** (Tier 1): Already has `ability_meta_data`, single-press activation. Easiest to implement.
-2. **Bull Rush** (Tier 2): Needs injected metadata with both `aim_pressed` and `aim_released` inputs. Charge direction targeting required.
-3. **Indomitable** (Tier 2): Needs injected metadata with `shout_pressed` and `shout_released`. No directional targeting needed (AoE around self).
+1. **Point-Blank Barrage** (Tier 1): Already has `ability_meta_data`, single-press activation. Easiest to implement.
+2. **Bull Rush / Indomitable (charge path)** (Tier 2): Needs injected metadata with both `aim_pressed` and `aim_released` inputs. Charge direction targeting required.
+3. **Loyal Protector (taunt path)** (Tier 2): Needs injected metadata with `shout_pressed` and `shout_released`. No directional targeting needed (AoE around self).
 4. **Grenades** (Tier 3): No ability template -- requires different approach entirely (inventory item manipulation).
 
 ### Key source files

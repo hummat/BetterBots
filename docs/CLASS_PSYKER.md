@@ -1,5 +1,7 @@
 # Psyker (Psykinetic)
 
+> **Last updated:** 2026-03-05 | **Source version:** Darktide v1.10.7 (decompiled, Feb 2026)
+
 ## Overview
 
 The Psyker is Darktide's "mage" archetype. Health: 150. Base crit chance: 7.5%. The class revolves around the **Peril of the Warp** (warp charge) mechanic: using warp-powered abilities and weapons generates Peril, and hitting 100% causes a warp explosion that knocks the Psyker down. Managing Peril is the class's central tension -- powerful abilities cost Peril, and venting Peril costs health.
@@ -33,10 +35,10 @@ Source: `scripts/settings/warp_charge/archetype_warp_charge_templates.lua`
 | Manual vent interval | 0.25s |
 | Vent self-damage | 0-8 power level (scales with Peril) |
 
-**Decay rates** (Peril per second, auto-vent):
-- Low (<30%): 1.0/s
-- High (30-50%): 0.9/s
-- Critical (>97%): 0.7/s
+**Decay rate multipliers** (applied during auto-vent; higher = faster decay):
+- Low (<30%): 1.0x
+- High (30-50%): 0.9x
+- Critical (>97%): 0.7x
 
 **Bot usage notes**: Bots must manage Peril proactively. At >80% Peril, a bot should stop using warp abilities and either vent manually or wait for auto-vent. At >97% the bot risks explosion. Venting deals self-damage, so it should be avoided when health is critically low.
 
@@ -107,6 +109,7 @@ The Psyker's base combat ability is **Venting Shriek**. Two alternatives can be 
 | Post-stance buff duration | 10s |
 | Venting on activation | 50% Peril |
 | Base damage bonus | 10% |
+| Weakspot damage bonus | +10% |
 | Damage per weakspot stack | 1% |
 | Finesse damage per stack | 1% |
 | Max stacks | 30 |
@@ -250,7 +253,7 @@ The Psyker's base blitz is **Brain Burst (Smite)**. Two alternatives: **Assail (
 | Parameter | Value |
 |---|---|
 | Max charges | 0 (unlimited, costs Peril) |
-| Cooldown | 1s |
+| Cooldown | None (Peril-gated) |
 | Default power level | 500 |
 | Stun interval | 0.3-0.8s |
 | On-hit proc chance | 15% |
@@ -552,4 +555,4 @@ Key talents:
 
 ---
 
-*Sources: Decompiled Darktide source (v1.10.7), community guides from [Gamer Guides](https://www.gamerguides.com/warhammer-40000-darktide/guide/classes/psyker), [Darktide GameSlantern](https://darktide.gameslantern.com/builds/psyker), [Steam Community Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3094028505), [Fatshark Forums](https://forums.fatsharkgames.com/t/psyker-talent-tree-assessment-discussion/100668)*
+*Sources: Decompiled Darktide source (v1.10.7, Feb 2026), community guides from [Gamer Guides](https://www.gamerguides.com/warhammer-40000-darktide/guide/classes/psyker), [Darktide GameSlantern](https://darktide.gameslantern.com/builds/psyker), [Steam Community Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3094028505), [Fatshark Forums](https://forums.fatsharkgames.com/t/psyker-talent-tree-assessment-discussion/100668)*

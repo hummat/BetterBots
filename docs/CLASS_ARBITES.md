@@ -1,5 +1,7 @@
 # Arbites (Internal Codename: `adamant`)
 
+> Last updated: 2026-03-05
+>
 > Reference document for mod development. All internal names, values, and mechanics
 > extracted from decompiled source (v1.10.7). Community usage notes from web guides.
 
@@ -28,7 +30,16 @@ kill synergy), **Subjugator** (stagger / control / tanking).
 
 ## Combat Ability (F Key)
 
-The Arbites has **three** mutually-exclusive combat ability choices in the talent tree.
+The Arbites has **three** mutually-exclusive combat ability choices in the talent tree
+(`exclusive_group = "ability_1"`): **Nuncio-Aquila Improved** (`adamant_area_buff_drone_improved`),
+**Break the Line** (`adamant_charge`), and **Castigator's Stance** (`adamant_stance`).
+
+The base Nuncio-Aquila (`adamant_area_buff_drone`) is always active as a base talent. Taking the
+Improved node upgrades it; taking Charge or Stance provides an alternative combat ability.
+
+> **Note:** `adamant_shout` and `adamant_shout_improved` exist in ability/talent data but do NOT
+> appear in the talent tree layout (`adamant_tree.lua`). They may be cut content or reserved for
+> future use. Documented below for completeness.
 
 ### 1. Shout (Base) -- `adamant_shout`
 
@@ -42,7 +53,7 @@ The Arbites has **three** mutually-exclusive combat ability choices in the talen
 | Cooldown | **60s**, 1 charge |
 | Range | 6m (near), 12m (far/cone forward) |
 | Shape | Cone (`shout_dot = 0.75`) |
-| Effects | Staggers enemies (light stagger, 2.5s duration, power 1000). Applies `adamant_whistle_electrocution` to enemies. Refills own toughness to 100%. |
+| Effects | Staggers enemies (light stagger, 2.5s duration, shout_target power 1000, action power 500). Applies `adamant_whistle_electrocution` to enemies. Refills own toughness to 100%. |
 | Animation | `ability_shout`, 0.75s total |
 | `ability_meta_data` | **None** -- no pre-defined bot activation metadata |
 
@@ -73,7 +84,7 @@ The Arbites has **three** mutually-exclusive combat ability choices in the talen
 | Cooldown | **20s**, 1 charge |
 | Distance | 3.75m base (7.5m with `adamant_charge_longer_distance` talent) |
 | Speed | Ramps 8 -> 13 m/s over 0.2s |
-| Effects | Disables minion collision during charge. Deals `adamant_charge_impact` damage in 1m radius. Stops on elites/specials/monsters. On finish: directional shout with heavy stagger (2.5s). Post-charge buff: +25% damage, +50% impact for **6s**. Counts as blocking + dodge vs ranged/hound/netgunner during lunge. |
+| Effects | Disables minion collision during charge. Deals `adamant_charge_impact` damage in 1m radius. Stops on elites/specials/monsters/captains. On finish: directional shout with heavy stagger (2.5s). Post-charge buff: +25% damage, +50% impact for **6s**. During lunge: counts as blocking (melee + ranged) + dodge vs chaos hound pounce + dodge vs netgunner. |
 | Lunge template | `adamant_charge` -- `slot_to_wield = "slot_primary"`, `disable_weapon_actions = true` |
 | `ability_meta_data` | **None** -- needs injected metadata |
 
@@ -84,7 +95,7 @@ The Arbites has **three** mutually-exclusive combat ability choices in the talen
 
 **Bot usage notes:** Short-cooldown gap-closer. Two-step aim+release pattern like zealot dash. Bot should use to close distance to priority targets or escape danger. The blocking-during-charge makes it good for traversing dangerous ground.
 
-### 4. Stance (Hunt Stance) -- `adamant_stance`
+### 4. Stance (Castigator's Stance) -- `adamant_stance`
 
 | Field | Value |
 |-------|-------|
@@ -95,7 +106,7 @@ The Arbites has **three** mutually-exclusive combat ability choices in the talen
 | Action kind | `stance_change` |
 | Cooldown | **50s**, 1 charge |
 | Duration | **10s** (+ 2s linger for damage reduction) |
-| Effects | +15% movement speed, removes ADS/weapon action movement penalty, **-80% damage taken** (`damage_taken_multiplier = 0.2`), disables sprint (`no_sprint` keyword). On expiry: 2s lingering DR at same 80% reduction. |
+| Effects | **Refills toughness to 100%** on activation. +15% movement speed, removes ADS/weapon action movement penalty, **-80% damage taken** (`damage_taken_multiplier = 0.2`), disables sprint (`no_sprint` keyword). On expiry: 2s lingering DR at same 80% reduction. |
 | `ability_meta_data` | **Yes** -- has `activation.action_input = "stance_pressed"`. Bots can use this natively. |
 | Buff applied | `adamant_hunt_stance` (proc buff, duration-based) |
 
@@ -105,13 +116,18 @@ The Arbites has **three** mutually-exclusive combat ability choices in the talen
 - `adamant_stance_elite_kills_stack_damage`: Elite/special kills during stance grant +5% damage stacks (max 10, 10s duration)
 - `adamant_stance_ranged_kills_transfer_ammo`: Ranged kills during stance transfer 10% ammo from reserve to clip (1.5s ICD)
 
-**Bot usage notes:** This is the easiest ability for bots -- single-press activation with pre-existing `ability_meta_data`. Massive 80% DR makes it ideal as a defensive panic button. Bot should activate when taking heavy damage or before engaging a dangerous pack. The `no_sprint` keyword means bot will walk during stance -- factor this into movement logic.
+**Bot usage notes:** This is the easiest ability for bots -- single-press activation with pre-existing `ability_meta_data`. Massive 80% DR plus full toughness refill makes it ideal as a defensive panic button. Bot should activate when taking heavy damage or before engaging a dangerous pack. The `no_sprint` keyword means bot will walk during stance -- factor this into movement logic. Note: internal identifiers still use `adamant_stance`/`adamant_hunt_stance`.
 
 ---
 
 ## Blitz / Grenade Ability
 
-The Arbites has **five** mutually-exclusive blitz choices. All use `grenade_ability` type.
+The Arbites has **three** mutually-exclusive blitz choices in the talent tree
+(`exclusive_group = "blitz_1"`): **Whistle** (`adamant_whistle`), **Frag Grenade Improved**
+(`adamant_grenade_improved`), and **Shock Mine** (`adamant_shock_mine`).
+
+The base frag grenade (`adamant_grenade`) is always active as a base talent. The Whistle is
+`incompatible_talent = "adamant_disable_companion"` (cannot be used with Lone Wolf).
 
 ### 1. Frag Grenade (Base) -- `adamant_grenade`
 
@@ -149,7 +165,7 @@ Modifying talents:
 | Effects | Commands Cyber-Mastiff to target. Electric discharge at mastiff's position dealing damage + heavy stagger. Disables grenade pickups (`disable_grenade_pickups` special rule). |
 | Charge replenishment | Auto-replenishes charges on cooldown timer (via `adamant_whistle_replenishment` buff) |
 
-**Bot usage notes:** This replaces grenades entirely. Uses `grenade_ability_pressed/hold` input -- different from combat ability. The `order_companion` action kind is unique to Arbites. Bot should use to direct mastiff at priority targets (specials, elites). Requires companion to be alive.
+**Bot usage notes:** This replaces grenades entirely. Uses `grenade_ability_pressed/hold` input -- different from combat ability. The `order_companion` action kind is unique to Arbites. Bot should use to direct mastiff at priority targets (specials, elites). Requires companion to be alive. Incompatible with Lone Wolf talent.
 
 ### 4. Shock Mine -- `adamant_shock_mine`
 
@@ -163,11 +179,17 @@ Modifying talents:
 
 **Bot usage notes:** Deployable mine, item-based. Difficult for bot to use effectively -- requires positional awareness of choke points.
 
-### 5. Nuncio-Aquila (Area Buff Drone) -- `adamant_area_buff_drone`
+---
+
+## Nuncio-Aquila (Area Buff Drone) -- `adamant_area_buff_drone`
+
+The Nuncio-Aquila is a **base talent** (always active) AND a selectable **combat ability** in the
+talent tree (`exclusive_group = "ability_1"`). The base version is always present; the tree offers
+`adamant_area_buff_drone_improved` as one of three combat ability choices.
 
 | Field | Value |
 |-------|-------|
-| Ability type | `combat_ability` (NOTE: despite being in the blitz row, this is typed as combat_ability) |
+| Ability type | `combat_ability` |
 | Inventory item | `content/items/weapons/player/drone_area_buff` |
 | Cooldown | **60s** |
 | Max charges | 1 |
@@ -182,7 +204,7 @@ Modifying talents:
 - `adamant_drone_buff_talent`: Allies in zone get -30% TDR, +30% revive speed, +10% attack speed
 - `adamant_drone_debuff_talent`: Enemies in zone get -25% melee attack speed, -25% melee damage
 
-**Bot usage notes:** This is a deployable zone, classified as `combat_ability`. Bot should deploy it at the team's hold position during horde defense or near objectives. Long cooldown makes timing important.
+**Bot usage notes:** Deployable zone, typed `combat_ability` but item-based (no `ability_template`). Bot should deploy it at the team's hold position during horde defense or near objectives. Long cooldown makes timing important. Tier 3 for bot integration (item-based, no ability template).
 
 ---
 
@@ -198,7 +220,7 @@ The default aura. Makes the companion count toward coherency via `adamant_dog_co
 
 | Talent | Buff | Effect |
 |--------|------|--------|
-| `adamant_wield_speed_aura` | `adamant_wield_speed_aura` | NOT wield speed despite name -- see below |
+| `adamant_wield_speed_aura` | `adamant_wield_speed_aura` | +10% wield speed in coherency (talent setting: `coherency.adamant_wield_speed_aura.wield_speed = 0.1`; note: buff template `"adamant_wield_speed_aura"` not found in buff_templates -- may be dynamically registered) |
 | `adamant_reload_speed_aura` | `adamant_reload_speed_aura` | +12.5% reload speed in coherency |
 | `adamant_damage_vs_staggered_aura` | `adamant_damage_vs_staggered_aura` | +10% damage vs staggered in coherency |
 | `adamant_companion_coherency` | `adamant_companion_aura` | Companion counts for coherency + allies get -7.5% TDR in coherency |
@@ -231,7 +253,7 @@ At max stacks, conditional bonuses apply based on sub-talents.
 |--------|--------|
 | `adamant_forceful_toughness_regen_per_stack` | +0.5% toughness per stack |
 | `adamant_forceful_stun_immune_and_block_all` | At max stacks: stun immune + block all (3s linger) |
-| `adamant_forceful_ranged` | Conditional at high stacks: +10% ranged attack speed, +15% reload speed |
+| `adamant_forceful_ranged` | Per-stack conditional: +2.5% ranged attack speed, +2% reload speed (at 10 stacks: +25%/+20%) |
 | `adamant_forceful_ability_damage` | Using combat ability at max stacks: +2.5% power for 12s |
 | `adamant_forceful_stagger_on_low_high` | At 0 stacks: stagger burst. At 10 stacks: stagger burst. 5s ICD |
 | `adamant_forceful_offensive` | At max stacks: +10% attack speed, +50% cleave for 3s |
@@ -308,6 +330,7 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 ### 5. Execution Order (Advanced Mark & Execute) -- `adamant_execution_order`
 
 **Core mechanic:** An upgrade/extension of Exterminator. Automatically marks the nearest visible enemy. Killing marked targets grants:
+- +15% toughness (instant)
 - +10% damage for 8s
 - +10% attack speed for 8s
 - +150% companion damage for 8s
@@ -317,7 +340,7 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 |--------|--------|
 | `adamant_execution_order_crit` | +10% crit chance, +25% crit damage for 8s |
 | `adamant_execution_order_rending` | +10% rending for 8s |
-| `adamant_execution_order_cdr` | +50% CDR per second while buff active (0.5s per tick) |
+| `adamant_execution_order_cdr` | +50% combat ability CDR while kill buff is active (8s window) |
 | `adamant_execution_order_permastack` | Permanent stacks (max 30): +1% damage vs monsters, +1% monster DR per stack |
 | `adamant_execution_order_monster_debuff` | Companion hits on monsters debuff them: -25% melee damage |
 | `adamant_execution_order_ally_toughness` | Allied kills on marked targets restore 10% toughness |
@@ -392,15 +415,14 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 
 ### When to Use Combat Ability
 
-- **Shout variants**: Use for emergency toughness recovery + crowd control. The improved shout is better for team play (30% ally toughness). Best used when the team is getting overwhelmed. 60s cooldown means you should save it for critical moments.
+- **Nuncio-Aquila (base/improved)**: Deploy at hold positions. The damage amp zone benefits the whole team. With improved talents, it provides suppression immunity -- critical for ranged play. 60s cooldown means you should save it for key holdouts.
 - **Charge**: With only 20s cooldown, use aggressively. Good for closing distance to specials, repositioning, or escaping. The blocking-during-charge makes it safe. Post-charge damage buff (+25%) encourages using it offensively before a fight.
-- **Hunt Stance**: The 80% damage reduction makes this a powerful defensive tool. Best used when holding a position or tanking a boss. The `no_sprint` keyword means you commit to standing your ground. Pair with companion damage talents for synergy.
+- **Castigator's Stance**: The 80% damage reduction + full toughness refill makes this a powerful defensive tool. Best used when holding a position or tanking a boss. The `no_sprint` keyword means you commit to standing your ground. Pair with companion damage talents for synergy.
 
 ### When to Use Blitz
 
 - **Grenades (frag)**: Standard use against dense packs. 3-4 charges means you can be liberal.
-- **Whistle (Remote Detonation)**: Best blitz for Cyber-Mastiff builds. Direct the dog to priority targets. The electric discharge provides AoE stagger. Use on specials, elites, or to interrupt dangerous enemies.
-- **Nuncio-Aquila (Drone)**: Deploy at hold positions. The damage amp zone benefits the whole team. With improved talents, it provides suppression immunity -- critical for ranged play.
+- **Whistle (Remote Detonation)**: Best blitz for Cyber-Mastiff builds. Direct the dog to priority targets. The electric discharge provides AoE stagger. Use on specials, elites, or to interrupt dangerous enemies. Incompatible with Lone Wolf.
 - **Shock Mine**: Place at choke points or flanking routes. Niche but effective in defense missions.
 
 ### Positioning / Priority Tips
@@ -436,3 +458,4 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 | `scripts/settings/buff/archetype_buff_templates/adamant_buff_templates.lua` | All buff implementations |
 | `scripts/settings/lunge/adamant_lunge_templates.lua` | Charge lunge physics/behavior |
 | `scripts/settings/ability/shout_target_templates.lua` | Shout target configs (stagger, damage, ally effects) |
+| `scripts/ui/views/talent_builder_view/layouts/adamant_tree.lua` | Talent tree layout (node positions, exclusive groups, parent/child links) |
