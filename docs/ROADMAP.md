@@ -1,65 +1,91 @@
 # Roadmap
 
-## Goal
+## Vision
 
-Move BetterBots from working prototype to reliable baseline with explicit scope.
+Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvements - Combat). Start with ability activation (already shipped), then add smart trigger heuristics, safety guards, and general behavior improvements.
 
-## Priority 0: Correctness
+## What's shipped (v0.1.0)
 
-1. Tier 2 metadata/input mapping.
-   - Status: implemented.
+- Tier 1 + Tier 2 ability activation for all 6 classes (whitelist removal + meta_data injection)
+- Tier 3 item-based abilities: zealot relic (stable), force field (~13%), drone (~21%)
+- Runtime diagnostics (condition/enter/charge trace hooks, debug logging)
+- Generic trigger: `enemies_in_proximity() > 0`
 
-2. Runtime diagnostics.
-   - Status: implemented (`decision`, `enter`, `fallback`, `charge consumed`, item fallback logs).
+## Priority tiers
 
-3. Item-based combat fallback.
-   - Status: implemented (profile-based matching + per-stage guards + charge-confirm feedback loop).
-   - Next: expand profile catalog and add explicit per-template overrides where needed.
+Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P1: next`, `P2: later`, `P3: backlog`.
 
-4. Toggle-safe restore behavior.
-   - Status: not implemented.
+### P1: Next — High value, unblocked
 
-See `CLASS_*.md` docs for per-class ability details, implementation tiers, and bot usage heuristics.
+| # | Issue | Category | Status |
+|---|-------|----------|--------|
+| 2 | Per-career threat heuristics | ability-quality | Research complete (6 tactics docs). Ready for implementation. |
+| 3 | Tier 3 item-ability reliability | tier: 3 | Force field and drone need improved consume ratios. |
+| 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
+| 11 | Ability suppression / impulse control | ability-quality | Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
 
-## Priority 1: Behavior quality
+### P2: Later — Planned, not urgent
 
-1. Ability-specific trigger heuristics.
-   - Keep veteran elite/special logic.
-   - Add threat/toughness-aware triggers where useful.
+**Ability activation quality:**
 
-2. Anti-spam controls.
-   - Per-ability post-cooldown delay.
-   - Optional gating by nearby enemy count.
+| # | Issue | Notes |
+|---|-------|-------|
+| 12 | Stance early cancellation | Cancel stance when all enemies die or bot needs to sprint. |
+| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
+| 15 | Suppress dodge during ability hold | Prevent dodge from interrupting charge/hold phases. |
+| 21 | Hazard avoidance during abilities | Don't stance in fire/gas/bomber puddles. |
 
-3. Per-class/per-ability mod options.
-   - Keep global toggle.
-   - Add granular enable/disable switches.
+**Ability scope expansion:**
 
-## Priority 2: Scope expansion
+| # | Issue | Notes |
+|---|-------|-------|
+| 4 | Blitz / grenade support | 18 internal defs across 6 classes. `adamant_whistle` only blitz with `ability_template`. |
+| 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
+| 8 | Hive Scum ability support | Focus + Rage (Tier 1), Stimm Field (Tier 3). DLC-blocked for testing. |
 
-1. Grenade support spike.
-   - Investigate explicit wield + throw flow for bot grenades.
+**General bot behavior:**
 
-2. Hardening item templates.
-   - Cover additional item-based combat templates beyond relic/force-field style flows.
+| # | Issue | Notes |
+|---|-------|-------|
+| 16 | Bot pinging of elites/specials | Tag high-threat enemies (LOS + 2s cooldown). VT2 mod's #2 feature. |
+| 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
+| 18 | Boss engagement discipline | Don't focus boss when adds are up. |
+| 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
+| 20 | Don't interrupt own revive | Raise combat interrupt threshold during active revive. |
+
+### P3: Backlog — Nice to have, no timeline
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 7 | Revive-with-ability | Inject ability BT node before revive (stealth/taunt/shout to protect revive). |
+| 14 | Ability cooldown staggering | Team-level coordination: don't stack all abilities simultaneously. |
+| 22 | Utility-based ability scoring | Replace boolean conditions with spline-interpolated utility curves (90+ considerations in VT2). Architectural upgrade. |
+| 23 | Smart melee attack selection | Armor-aware attack choice (+utility for penetrating vs carapace). |
+| 24 | Healing item management | Don't waste medicae, distribute healing to wounded allies, stim usage. |
+
+## Design principles
+
+1. **Don't break what works.** Vanilla bot combat (melee, shoot, revive, rescue, follow) must remain functional. Every change is additive.
+2. **Per-ability, not per-class.** Trigger heuristics are per ability template, not per archetype. A Zealot with Dash needs different rules than a Zealot with Stealth.
+3. **Conservative by default.** Bots should under-use abilities rather than waste them. A missed opportunity costs nothing; a wasted 80s cooldown costs the next fight.
+4. **Observable.** Debug logging traces every activation decision. If a bot does something wrong, the log should explain why.
+
+## Research basis
+
+Heuristics and feature ideas are sourced from:
+- **VT2 Bot Improvements - Combat** (Grimalackt) — per-career threat thresholds, revive-with-ability, elite pinging, boss engagement, melee selection
+- **VT2 Bot Improvements - Impulse Control** (Squatting-Bear) — ability suppression, anti-waste conditions
+- **VT2 decompiled source** — 14-level BT, utility-based scoring, 90+ considerations, item management
+- **Darktide community** (Fatshark forums, Steam, Reddit) — prioritized pain points
+- **Darktide decompiled source** (v1.10.7) — untapped perception signals, blackboard data, cover system, formation logic
+- **Per-class tactics docs** (`docs/CLASS_*_TACTICS.md`) — community-sourced USE WHEN / DON'T USE / proposed bot rules
+
+See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.md` for per-ability heuristics.
 
 ## Milestones
 
-1. M1: Tier 1 + Tier 2 + known item abilities cast in manual solo tests.
-2. M2: No obvious regressions (revive/rescue/navigation/basic combat).
-3. M3: Stable fallback behavior with low false casts/spam.
-4. M4: Optional grenade decision documented (implement vs non-goal).
-
-## Tracking checklist
-
-```text
-[x] P0.1 Tier 2 metadata/input mapping
-[x] P0.2 Runtime diagnostics
-[x] P0.3 Item fallback baseline (profile-based)
-[ ] P0.4 Toggle-safe restore behavior
-[ ] P1.1 Ability-specific triggers
-[ ] P1.2 Anti-spam controls
-[ ] P1.3 Per-ability mod options
-[ ] P2.1 Grenade support technical spike
-[ ] P2.2 Item fallback hardening (explicit mapping)
-```
+1. **M1 (shipped):** Tier 1 + Tier 2 abilities activate in solo play. v0.1.0 on Nexus.
+2. **M2:** Per-career threat heuristics (#2) + ability suppression (#11). Bots use abilities intelligently instead of spamming.
+3. **M3:** Tier 3 reliability improved (#3) + grenade spike (#4). Full ability coverage.
+4. **M4:** General bot behavior improvements (#16-#20). Beyond abilities.
+5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
