@@ -34,14 +34,20 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics may need threshold tuning.
-   - 13 per-template functions replaced the generic `enemies_in_proximity() > 0` trigger.
-   - Thresholds are initial guesses from tactics docs — not yet validated in-game.
+5. Per-career heuristics: 8/13 validated, thresholds loosened for testing.
+   - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
+   - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
    - Use `/bb_decide` to inspect live decisions during play.
 
-6. Debug log noise is high during combat.
-   - Frequent `fallback blocked ... invalid action_input=...` lines are expected from transient invalid states.
-   - This makes it harder to spot real failures quickly.
+6. Psyker Scrier's Gaze causes warp overcharge explosions.
+   - Discovered in H-02b: bot activates stance at peril=0, stance builds peril passively, bot has no vent ability (Venting Shriek is a different ability slot) and explodes.
+   - The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance.
+   - Mitigations: (a) block stance activation if bot lacks a peril vent ability, (b) lower peril ceiling for activation, (c) tie into stance cancellation (#12) to exit early when peril is critical.
+
+7. Debug log noise reduced — idle-state decisions now invisible.
+   - `decision -> false`, `fallback held (nearby=0)`, and `bt gate evaluated` are suppressed.
+   - Idle hold counts in `bb-log summary` will show 0 for new runs.
+   - See `docs/LOGGING.md` for details and how to re-enable.
 
 ## Low severity
 

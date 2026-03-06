@@ -340,6 +340,53 @@ Conclusion:
 - Next: swap bot loadouts to cover remaining 9 heuristic functions
 ```
 
+### Run 2026-03-06-heuristics-02b
+
+```text
+Run ID: 2026-03-06-heuristics-02b
+Date (local): 2026-03-06
+Date (UTC): 2026-03-06
+Git commit: 452ed12 (post threshold loosening + log noise reduction)
+Log file: console-2026-03-06-13.10.29-496d0373-62c7-4a55-9e45-3224b9dcb189.log
+Bot lineup / abilities: Veteran (Executioner's Stance), Zealot (Fury of the Faithful), Psyker (Scrier's Gaze), Ogryn (Indomitable/charge)
+Map + difficulty: mission (standard)
+
+Heuristic validation evidence:
+- veteran_combat_ability (ranger): PASS
+  - queued: 1 (rule=veteran_stance_target_elite_special)
+  - charge consumed: 1 (veteran_combat_ability_stance_improved)
+  - hold rules observed: veteran_stance_hold (17), veteran_stance_block_surrounded (8)
+
+- zealot_dash: PASS
+  - queued: 5 (rules: combat_gap_close ×4, elite_special_gap ×1)
+  - charge consumed: 5 (zealot_targeted_dash_improved_double)
+  - hold rules observed: zealot_dash_hold (8), zealot_dash_block_target_too_close (4)
+  - note: new combat_gap_close trigger is the primary activation rule
+
+- psyker_overcharge_stance: PASS
+  - queued: 0 (activated via BT condition path, not fallback)
+  - charge consumed: 2 (psyker_overcharge_stance)
+  - hold rules observed: psyker_stance_block_peril_window (5), psyker_stance_hold (1)
+  - note: bot generates peril via staff attacks; exploded twice from overcharge
+  - finding: peril=0 bypass works, but Scrier's Gaze builds peril with no vent ability
+
+- ogryn_charge: PASS
+  - queued: 1 (rule=ogryn_charge_ally_aid)
+  - charge consumed: 1 (ogryn_charge_increased_distance)
+  - hold rules observed: ogryn_charge_block_target_too_close (15), ogryn_charge_hold (10)
+  - note: Ogryn stays in melee most of the time, limiting charge opportunities
+
+Regression checks:
+- basic combat loop: PASS
+- Lua errors: 0 error lines
+
+Conclusion:
+- 4/4 targeted heuristics validated with correct rule + hold behavior
+- Zealot dash combat_gap_close is the dominant activation path — lenient threshold working
+- Psyker stance overcharge explosion is a new known issue — needs peril budget or stance cancellation
+- Heuristic validation now at 8/13 PASS
+```
+
 ## Reliability Snapshot (current rolling log)
 
 ```text
@@ -404,7 +451,7 @@ Legend: `PASS` = repeated successful evidence in logs and in-game effect, `PARTI
 |---|---|---|
 | `veteran_combat_ability` | PASS | run `2026-03-05-tier1-01`: `charge consumed for veteran_combat_ability_shout` |
 | `veteran_stealth_combat_ability` | UNKNOWN | not explicitly tracked in current status docs |
-| `psyker_overcharge_stance` | PASS | run `2026-03-05-tier1-01`: `charge consumed for psyker_overcharge_stance` |
+| `psyker_overcharge_stance` | PASS | runs `2026-03-05-tier1-01` + `H-02b`: `charge consumed for psyker_overcharge_stance` (2 in H-02b) |
 | `ogryn_gunlugger_stance` | PASS | run `2026-03-05-tier1-01`: `charge consumed for ogryn_ranged_stance` |
 | `adamant_stance` | PASS | run `2026-03-05-tier1-01`: `charge consumed for adamant_stance` |
 | `broker_focus` | UNKNOWN | not explicitly tracked in current status docs |
@@ -415,8 +462,8 @@ Legend: `PASS` = repeated successful evidence in logs and in-game effect, `PARTI
 | Ability Template | Status | Evidence Notes |
 |---|---|---|
 | `zealot_invisibility` | PASS | run `2026-03-05-tier2-03`: `charge consumed for zealot_invisibility_improved` |
-| `zealot_dash` | PASS | run `2026-03-05-tier2-02`: `charge consumed for zealot_targeted_dash_improved_double` |
-| `ogryn_charge` | PASS | run `2026-03-05-tier2-03`: `charge consumed for ogryn_charge_increased_distance` |
+| `zealot_dash` | PASS | runs `2026-03-05-tier2-02` + `H-02b`: 5 consumes in H-02b (`zealot_targeted_dash_improved_double`) |
+| `ogryn_charge` | PASS | runs `2026-03-05-tier2-03` + `H-02b`: 1 consume in H-02b (`ogryn_charge_increased_distance`) |
 | `ogryn_taunt_shout` | PASS | run `2026-03-05-tier2-01`: `charge consumed for ogryn_taunt_shout` |
 | `psyker_shout` | PASS | run `2026-03-05-tier2-01`: `charge consumed for psyker_discharge_shout_improved` |
 | `adamant_shout` | N/A | internal template present, but not currently exposed as Arbites player-facing ability in live UI |
@@ -437,31 +484,38 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 
 | Heuristic Function | Template(s) | Status | Run | Rules fired |
 |---|---|---|---|---|
-| `_can_activate_veteran_combat_ability` (VoC) | `veteran_combat_ability` | PASS | `2026-03-06-heuristics-01` | `voc_surrounded`, `voc_block_safe_state` |
-| `_can_activate_veteran_combat_ability` (ranger) | `veteran_combat_ability` | UNTESTED | — | needs ranger class_tag bot |
+| `_can_activate_veteran_combat_ability` (VoC) | `veteran_combat_ability` | PASS | H-01 | `voc_surrounded`, `voc_block_safe_state` |
+| `_can_activate_veteran_combat_ability` (ranger) | `veteran_combat_ability` | PASS | H-02b | `stance_target_elite_special`, `stance_hold`, `stance_block_surrounded` |
 | `_can_activate_veteran_stealth` | `veteran_stealth_combat_ability` | UNTESTED | — | — |
-| `_can_activate_zealot_dash` | `zealot_dash`, `zealot_targeted_dash*` | UNTESTED | — | activation PASS in Tier 2 run, but pre-heuristic |
-| `_can_activate_zealot_invisibility` | `zealot_invisibility` | PASS | `2026-03-06-heuristics-01` | `stealth_overwhelmed`, `stealth_ally_reposition`, `stealth_hold` |
-| `_can_activate_psyker_shout` | `psyker_shout` | PASS | `2026-03-06-heuristics-01` | `shout_surrounded`, `shout_block_low_value` |
-| `_can_activate_psyker_stance` | `psyker_overcharge_stance` | UNTESTED | — | — |
-| `_can_activate_ogryn_charge` | `ogryn_charge*` | UNTESTED | — | — |
+| `_can_activate_zealot_dash` | `zealot_dash`, `zealot_targeted_dash*` | PASS | H-02b | `combat_gap_close` (4), `elite_special_gap` (1), `dash_hold`, `block_target_too_close` |
+| `_can_activate_zealot_invisibility` | `zealot_invisibility` | PASS | H-01 | `stealth_overwhelmed`, `stealth_ally_reposition`, `stealth_hold` |
+| `_can_activate_psyker_shout` | `psyker_shout` | PASS | H-01 | `shout_surrounded`, `shout_block_low_value` |
+| `_can_activate_psyker_stance` | `psyker_overcharge_stance` | PASS | H-02b | 2 consumes; `block_peril_window` (5), `stance_hold` (1). Bot generates peril via staff/stance — exploded twice from overcharge. See known issues. |
+| `_can_activate_ogryn_charge` | `ogryn_charge*` | PASS | H-02b | `ally_aid` (1); `block_target_too_close` (15), `charge_hold` (10). Ogryn stays in melee, limiting charge opportunities. |
 | `_can_activate_ogryn_taunt` | `ogryn_taunt_shout` | UNTESTED | — | — |
-| `_can_activate_ogryn_gunlugger` | `ogryn_gunlugger_stance` | PASS | `2026-03-06-heuristics-01` | `gunlugger_high_threat`, `block_melee_pressure`, `block_target_too_close` |
+| `_can_activate_ogryn_gunlugger` | `ogryn_gunlugger_stance` | PASS | H-01 | `gunlugger_high_threat`, `block_melee_pressure`, `block_target_too_close` |
 | `_can_activate_adamant_stance` | `adamant_stance` | UNTESTED | — | — |
 | `_can_activate_adamant_charge` | `adamant_charge` | UNTESTED | — | — |
 | `_can_activate_adamant_shout` | `adamant_shout` | N/A | — | not player-facing |
 | `_can_activate_broker_focus` | `broker_focus` | UNTESTED | — | DLC-blocked |
 | `_can_activate_broker_rage` | `broker_punk_rage` | UNTESTED | — | DLC-blocked |
 
+**Summary: 8/13 PASS, 3 UNTESTED, 1 N/A, 2 DLC-blocked.**
+
 **Remaining validation runs needed:**
 
-1. **Run H-02**: Veteran (Executioner's Stance/ranger) + Zealot (Dash) + Psyker (Scrier's Gaze) + Ogryn (Bull Rush or Indomitable)
-   - Covers: `veteran_combat_ability` (ranger), `zealot_dash`, `psyker_overcharge_stance`, `ogryn_charge`
-2. **Run H-03**: Veteran (Stealth) + Ogryn (Loyal Protector/taunt) + Arbites (Stance) + Arbites (Charge)
+1. **Run H-03**: Veteran (Stealth) + Ogryn (Loyal Protector/taunt) + Arbites (Stance) + Arbites (Charge)
    - Covers: `veteran_stealth`, `ogryn_taunt`, `adamant_stance`, `adamant_charge`
    - Note: requires Tertium 5/6 for Arbites bots
-3. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
+2. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
    - Covers: `broker_focus`, `broker_punk_rage`
+
+**New issue discovered in H-02b:**
+
+Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while active, and without Venting Shriek (different ability slot) the bot has no way to vent. The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance. Needs investigation — possible mitigations:
+- Block Scrier's Gaze activation if bot lacks a peril vent ability
+- Lower the peril ceiling for stance activation (e.g., block above 0.50 instead of 0.90)
+- Tie into stance cancellation (#12) to exit early when peril is critical
 
 ## Decision Rules
 
