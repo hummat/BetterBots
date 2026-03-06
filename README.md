@@ -32,11 +32,13 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Psyker: Telekine Shield — works sometimes
 - Arbites: Nuncio-Aquila — works sometimes
 
+**Smart trigger conditions (new in v0.2.0):**
+Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 12 of 13 ability-specific trigger functions validated in-game.
+
 ## What doesn't work yet
 
 - Grenades / blitz abilities (different architecture needed)
 - Hive Scum: Stimm Field (item-based, same challenge as above)
-- Smart trigger conditions (bots currently use abilities whenever enemies are nearby and cooldown is ready)
 
 See [Status Snapshot](docs/STATUS.md) and [Validation Tracker](docs/VALIDATION_TRACKER.md) for detailed evidence.
 
@@ -147,9 +149,15 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 scripts/mods/BetterBots/          # Mod source
-  BetterBots.lua
-  BetterBots_data.lua
-  BetterBots_localization.lua
+  BetterBots.lua                  #   Main: hooks, condition patch, fallback queue
+  heuristics.lua                  #   13 per-ability trigger functions + context builder
+  meta_data.lua                   #   ability_meta_data injection at load time
+  item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
+  debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
+  BetterBots_data.lua             #   Mod options / widget definitions
+  BetterBots_localization.lua     #   Display strings
+tests/                            # Unit tests (busted)
+bb-log                            # Log analysis CLI
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status

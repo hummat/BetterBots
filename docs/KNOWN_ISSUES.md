@@ -34,7 +34,7 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics: 8/13 validated, thresholds loosened for testing.
+5. Per-career heuristics: 12/13 validated, thresholds loosened for testing.
    - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
    - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
    - Use `/bb_decide` to inspect live decisions during play.

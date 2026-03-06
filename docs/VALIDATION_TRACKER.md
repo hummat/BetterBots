@@ -486,28 +486,25 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 |---|---|---|---|---|
 | `_can_activate_veteran_combat_ability` (VoC) | `veteran_combat_ability` | PASS | H-01 | `voc_surrounded`, `voc_block_safe_state` |
 | `_can_activate_veteran_combat_ability` (ranger) | `veteran_combat_ability` | PASS | H-02b | `stance_target_elite_special`, `stance_hold`, `stance_block_surrounded` |
-| `_can_activate_veteran_stealth` | `veteran_stealth_combat_ability` | UNTESTED | — | — |
+| `_can_activate_veteran_stealth` | `veteran_stealth_combat_ability` | PASS | H-03 | 2 consumes (`veteran_combat_ability_stealth`); `stealth_hold` (37). Activated under pressure on standard difficulty. |
 | `_can_activate_zealot_dash` | `zealot_dash`, `zealot_targeted_dash*` | PASS | H-02b | `combat_gap_close` (4), `elite_special_gap` (1), `dash_hold`, `block_target_too_close` |
 | `_can_activate_zealot_invisibility` | `zealot_invisibility` | PASS | H-01 | `stealth_overwhelmed`, `stealth_ally_reposition`, `stealth_hold` |
 | `_can_activate_psyker_shout` | `psyker_shout` | PASS | H-01 | `shout_surrounded`, `shout_block_low_value` |
 | `_can_activate_psyker_stance` | `psyker_overcharge_stance` | PASS | H-02b | 2 consumes; `block_peril_window` (5), `stance_hold` (1). Bot generates peril via staff/stance — exploded twice from overcharge. See known issues. |
 | `_can_activate_ogryn_charge` | `ogryn_charge*` | PASS | H-02b | `ally_aid` (1); `block_target_too_close` (15), `charge_hold` (10). Ogryn stays in melee, limiting charge opportunities. |
-| `_can_activate_ogryn_taunt` | `ogryn_taunt_shout` | UNTESTED | — | — |
+| `_can_activate_ogryn_taunt` | `ogryn_taunt_shout` | PASS | H-03 | 5 consumes; `horde_control` (3), `block_low_value` (11). |
 | `_can_activate_ogryn_gunlugger` | `ogryn_gunlugger_stance` | PASS | H-01 | `gunlugger_high_threat`, `block_melee_pressure`, `block_target_too_close` |
-| `_can_activate_adamant_stance` | `adamant_stance` | UNTESTED | — | — |
-| `_can_activate_adamant_charge` | `adamant_charge` | UNTESTED | — | — |
+| `_can_activate_adamant_stance` | `adamant_stance` | PASS | H-03 | 2 consumes; `low_toughness` (1), `block_safe_state` (20), `stance_hold` (27). |
+| `_can_activate_adamant_charge` | `adamant_charge` | PASS | H-03 | 6 consumes; `block_target_too_close` (3), `charge_hold` (1). |
 | `_can_activate_adamant_shout` | `adamant_shout` | N/A | — | not player-facing |
 | `_can_activate_broker_focus` | `broker_focus` | UNTESTED | — | DLC-blocked |
 | `_can_activate_broker_rage` | `broker_punk_rage` | UNTESTED | — | DLC-blocked |
 
-**Summary: 8/13 PASS, 3 UNTESTED, 1 N/A, 2 DLC-blocked.**
+**Summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
 
 **Remaining validation runs needed:**
 
-1. **Run H-03**: Veteran (Stealth) + Ogryn (Loyal Protector/taunt) + Arbites (Stance) + Arbites (Charge)
-   - Covers: `veteran_stealth`, `ogryn_taunt`, `adamant_stance`, `adamant_charge`
-   - Note: requires Tertium 5/6 for Arbites bots
-2. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
+1. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
    - Covers: `broker_focus`, `broker_punk_rage`
 
 **New issue discovered in H-02b:**
