@@ -13,10 +13,10 @@ variants, but zig-zagging between lanes is encouraged by the layout.
 **Archetype file:** `scripts/settings/archetype/archetypes/veteran_archetype.lua`
 
 **Base talents (always active):**
-- `veteran_aura_gain_ammo_on_elite_kill` (Scavenger aura)
-- `veteran_combat_ability_stance` (Volley Fire / Executioner's Stance)
+- `veteran_aura_gain_ammo_on_elite_kill` (**Survivalist** aura; formerly: Scavenger)
+- `veteran_combat_ability_stance` (Volley Fire — base combat ability)
 - `veteran_cover_peeking` (Cover Peeking)
-- `veteran_frag_grenade` (Frag Grenade)
+- `veteran_frag_grenade` (**Shredder Frag Grenade**; formerly: Frag Grenade)
 - `veteran_supression_immunity` (Suppression Immunity)
 
 ---
@@ -49,9 +49,11 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 
 ### Variant 1: Volley Fire / Executioner's Stance (Ranger path)
 
+**Volley Fire** is the base combat ability. **Executioner's Stance** (internal: `veteran_combat_ability_elite_and_special_outlines`) is its augmented talent upgrade that adds enemy outlines, improved damage bonuses, toughness regen, and kill-based duration extension.
+
 | Field | Value |
 |---|---|
-| Internal name | `veteran_combat_ability_stance` / `veteran_combat_ability_stance_improved` |
+| Internal name | `veteran_combat_ability_stance` (base) / `veteran_combat_ability_stance_improved` (augmented) |
 | Ability group | `volley_fire_stance` |
 | Ability template | `veteran_combat_ability` |
 | Ability type | `combat_ability` |
@@ -59,17 +61,17 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 | Cooldown | 30s (`veteran_2.combat_ability.cooldown`) |
 | Max charges | 1 |
 | Required weapon | `ranged` (must have ranged weapon) |
-| Duration | 5s (base), 8s (with Ogryn outlines talent) |
+| Duration | 5s (base Volley Fire), 8s (with Big Game Hunter talent) |
 
 **What it does:**
 - Enters Ranged Stance, instantly equipping the ranged weapon
 - Applies `veteran_combat_ability_stance_master` buff (or `_increased_duration` variant)
 - Grants keyword `veteran_combat_ability_stance` which activates conditional stat buffs
-- Base stats (always active during stance via `veteran_combat_ability_increased_ranged_and_weakspot_damage_base`):
+- Base Volley Fire stats (always active during stance via `veteran_combat_ability_increased_ranged_and_weakspot_damage_base`):
   - +15% Ranged Damage
   - +15% Ranged Weakspot Damage
   - +50% Ranged Impact Modifier
-- Improved stats (with outlines talent via `..._outlines` buff, replaces base buff entirely):
+- Executioner's Stance stats (with outlines talent via `..._outlines` buff, replaces base buff entirely):
   - +25% Ranged Damage (replaces base +15%)
   - +25% Ranged Weakspot Damage (replaces base +15%)
   - +100% Ranged Impact Modifier (replaces base +50%)
@@ -80,9 +82,9 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 **Key talents that modify it:**
 | Talent | Internal ID | Effect |
 |---|---|---|
-| Executioner's Stance (base) | `veteran_combat_ability_stance` | Base Volley Fire: +15% ranged damage/weakspot |
-| Marksman's Eye (outlines) | `veteran_combat_ability_elite_and_special_outlines` | Upgrades to +25%/25%, outlines elites/specials, outlined kills extend duration, toughness regen |
-| Big Game Hunter (ogryn outlines) | `veteran_combat_ability_ogryn_outlines` | Also outlines Ogryn-type enemies, +25% damage vs Ogryn/Monsters, extends duration to 8s |
+| Volley Fire (base) | `veteran_combat_ability_stance` | Base combat ability: +15% ranged damage/weakspot |
+| Executioner's Stance (augmented) | `veteran_combat_ability_elite_and_special_outlines` | Upgrades Volley Fire to +25%/25%, outlines elites/specials, outlined kills extend duration, toughness regen |
+| Big Game Hunter | `veteran_combat_ability_ogryn_outlines` | Also outlines Ogryn-type enemies, +25% damage vs Ogryn/Monsters, extends duration to 8s |
 | Ranged Roamer Outlines | `veteran_combat_ability_ranged_roamer_outlines` | Outlines ranged enemies too |
 | Coherency Outlines | `veteran_combat_ability_coherency_outlines` | Shares outlines to allies in coherency for 5s |
 | Reloads Weapon | `veteran_combat_ability_reloads_secondary_weapon` | Ability instantly reloads ranged weapon |
@@ -189,7 +191,7 @@ via the standard BT ability activation path. This is a **Tier 3** implementation
 
 **Abilities file:** `scripts/settings/ability/player_abilities/abilities/veteran_abilities.lua`
 
-### Frag Grenade (Default)
+### Shredder Frag Grenade (Default; formerly: Frag Grenade)
 
 | Field | Value |
 |---|---|
@@ -200,7 +202,7 @@ via the standard BT ability activation path. This is a **Tier 3** implementation
 | Stat buff | `extra_max_amount_of_grenades` |
 
 **What it does:**
-- Standard fragmentation grenade -- AoE explosion dealing damage in radius
+- Fragmentation grenade with bleed -- AoE explosion dealing damage in radius
 - Good horde clear and stagger
 - Base 3 charges
 
@@ -273,7 +275,7 @@ Mixed talent: +50% krak damage (`veteran_3.mixed_2.krak_damage`).
 Veterans have a coherency-based aura system. Only one aura can be active (all share the
 `veteran_aura` identifier with different priorities).
 
-### Scavenger (Default)
+### Survivalist (Default; internal: `veteran_aura_gain_ammo_on_elite_kill`; formerly: Scavenger)
 
 | Field | Value |
 |---|---|
@@ -285,7 +287,7 @@ Veterans have a coherency-based aura system. Only one aura can be active (all sh
 - Elite kills by you or allies in coherency replenish 0.75% ammo to you and coherency allies
 - 5s cooldown between procs
 
-### Scavenger (Improved)
+### Survivalist (Improved)
 
 | Field | Value |
 |---|---|
@@ -296,7 +298,9 @@ Veterans have a coherency-based aura system. Only one aura can be active (all sh
 **What it does:**
 - Same as base but increases to 1% ammo replenishment
 
-### Close Order Drill (Damage Aura)
+### Fire Team (internal: `veteran_increased_damage_coherency`; formerly: Close Order Drill)
+
+Note: Close Order Drill is a separate passive talent, not this aura.
 
 | Field | Value |
 |---|---|
@@ -307,7 +311,7 @@ Veterans have a coherency-based aura system. Only one aura can be active (all sh
 **What it does:**
 - Allies in coherency gain bonus damage
 
-### Double Time (Movement Speed Aura)
+### Close and Kill (internal: `veteran_movement_speed_coherency`; formerly: Double Time)
 
 | Field | Value |
 |---|---|
@@ -324,7 +328,7 @@ Veterans have a coherency-based aura system. Only one aura can be active (all sh
 
 The Veteran has three keystone talent paths. Each fundamentally changes playstyle.
 
-### 1. Marksman's Focus (Sniper's Focus)
+### 1. Marksman's Focus (internal: `veteran_snipers_focus`)
 
 | Field | Value |
 |---|---|
@@ -350,7 +354,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 - "Stacks on Still" is the easiest modifier for bots -- just stop moving
 - Rewards staying at range and aiming carefully
 
-### 2. Weapons Specialist (Weapon Switch)
+### 2. Weapons Specialist
 
 | Field | Value |
 |---|---|
@@ -378,7 +382,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 - More complex to implement -- requires deliberate swap cadence
 - Works well with builds that alternate melee/ranged frequently
 
-### 3. Focus Target (Improved Tag)
+### 3. Focus Target!
 
 | Field | Value |
 |---|---|
@@ -476,7 +480,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 
 ### When to Use Combat Ability
 
-**Executioner's Stance (Volley Fire):**
+**Volley Fire / Executioner's Stance:**
 - Activate when you spot a cluster of elites/specials at range
 - Use to burst down high-priority targets (Ragers, Gunners, Snipers)
 - Pair with a high-DPS semi-auto weapon (Infantry Lasgun MkIX is popular)
@@ -502,7 +506,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 
 ### When to Use Grenades
 
-**Frag Grenade:**
+**Shredder Frag Grenade:**
 - Throw into dense hordes for maximum AoE damage and stagger
 - With bleed talent, useful for softening elite packs
 - 3 charges -- use moderately
@@ -526,7 +530,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 - Maintain coherency range for aura benefits
 - For Marksman's Focus builds: find a vantage point and aim for headshots
 - For Weapon Specialist builds: alternate melee/ranged regularly
-- For Focus Target builds: tag priority targets immediately and let the team focus them
+- For Focus Target! builds: tag priority targets immediately and let the team focus them
 
 ---
 
@@ -545,7 +549,7 @@ or intercepting the grenade input system.
 
 ### Class Tag Detection
 The `ability_template_tweak_data.class_tag` field determines which variant is active:
-- `"base"` or `"ranger"` = Executioner's Stance
+- `"base"` or `"ranger"` = Volley Fire / Executioner's Stance
 - `"shock_trooper"` = Infiltrate
 - `"squad_leader"` = Voice of Command
 

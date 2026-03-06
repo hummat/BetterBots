@@ -182,10 +182,11 @@ The Psyker's base combat ability is **Venting Shriek**. Two alternatives can be 
 
 ## Blitz Abilities (Grenade Slot)
 
-The Psyker's base blitz is **Brain Burst (Smite)**. Two alternatives: **Assail (Throwing Knives)** and **Chain Lightning**.
+The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing Knives)** and **Chain Lightning**.
 
-### 1. Brain Burst / Smite
+### 1. Brain Burst
 
+**In-game name**: Brain Burst. Note: the internal weapon name is `psyker_smite`, but "Smite" is not the in-game display name -- it is only the internal identifier.
 **Internal name**: `psyker_smite`
 **Ability type**: `grenade_ability`
 **Talent key**: `psyker_grenade_smite` (base talent)
@@ -196,13 +197,13 @@ The Psyker's base blitz is **Brain Burst (Smite)**. Two alternatives: **Assail (
 | Max charges | 0 (unlimited, costs Peril) |
 | Cooldown | None (Peril-gated) |
 
-**What it does**: Wield the Smite "weapon" -- target an enemy and charge up a psychic attack that deals massive single-target damage. Effective for killing elites and specials at range. High Peril cost per use.
+**What it does**: Wield the Brain Burst ability -- target an enemy and charge up a psychic attack that deals massive single-target damage. Effective for killing elites and specials at range. High Peril cost per use.
 
 **Key modifying talents**:
-- `psyker_brain_burst_improved`: Increased Brain Burst damage
-- `psyker_smite_on_hit`: All attacks have a chance to auto-Smite the target (100% chance vs specials/elites, 12s cooldown)
-- `psyker_ability_increase_brain_burst_speed`: After combat ability, Smite charges 75% faster and costs 50% less Peril for 10s
-- `psyker_empowered_ability` (keystone): Empowered Smite costs 0% Peril, has increased attack speed and damage
+- `psyker_brain_burst_improved`: Upgraded version called **Brain Rupture** in-game (internal: `psyker_brain_burst_improved`; formerly: just "improved Brain Burst"). Increased Brain Burst damage.
+- `psyker_smite_on_hit`: All attacks have a chance to auto-trigger Brain Burst on the target (100% chance vs specials/elites, 12s cooldown)
+- `psyker_ability_increase_brain_burst_speed`: After combat ability, Brain Burst charges 75% faster and costs 50% less Peril for 10s
+- `psyker_empowered_ability` (keystone): Empowered Brain Burst costs 0% Peril, has increased attack speed and damage
 
 **Bot usage notes**: Brain Burst is the most straightforward blitz for bots.
 - Item-based ability (wielded like weapon), so it requires wield/aim/fire sequence
@@ -307,11 +308,11 @@ Three aura choices, mutually exclusive (all share `identifier = "psyker_aura"`).
 
 | Parameter | Value |
 |---|---|
-| Damage vs elites | +10% |
+| Damage vs elites | +10% (decompiled value is 0.1; web sources report +7.5% -- **needs in-game verification**) |
 
 **What it does**: All allies in coherency deal 10% more damage to elites and specials.
 
-### 3. Gunslinger Aura (Crit Chance)
+### 3. Prescience (Crit Chance) (internal: `psyker_aura_crit_chance_aura`; formerly: Gunslinger Aura)
 
 **Internal name**: `psyker_aura_crit_chance_aura`
 **Buff template**: `psyker_aura_crit_chance_aura`
@@ -405,18 +406,18 @@ Three keystones, mutually exclusive (`exclusive_group = "keystone"`). Located at
 - `psyker_grenade_chain_lightning` (Chain Lightning) -- center/right path
 
 **Blitz modifiers**:
-- `psyker_brain_burst_improved`: +damage to Brain Burst
+- `psyker_brain_burst_improved`: +damage to Brain Burst (upgrades to Brain Rupture)
 - `psyker_throwing_knives_piercing`: Knives pierce enemies
 - `psyker_throwing_knives_cast_speed`: Faster throw, reduced recharge
 - `psyker_throwing_knives_combat_ability_recharge`: Combat ability restores 5 knives
 - `psyker_chain_lightning_improved_target_buff`: Targets hit take more damage
 - `psyker_increased_chain_lightning_size`: +1 chain lightning jumps
-- `psyker_smite_on_hit`: Attacks randomly trigger Brain Burst (12s CD)
+- `psyker_smite_on_hit`: Attacks randomly trigger Brain Burst on target (12s CD)
 
 **Aura selection** (pick one):
 - `psyker_aura_ability_cooldown` (Seer's Presence) -- base
 - `psyker_aura_damage_vs_elites` (Kinetic Presence)
-- `psyker_aura_crit_chance_aura` (Gunslinger Aura)
+- `psyker_aura_crit_chance_aura` (Prescience)
 
 ### Left Path (Biomancer / Soulblaze Focus)
 
@@ -429,7 +430,7 @@ Key talents:
 - `psyker_venting_improvements`: Venting no longer slows movement, reloading doesn't slow
 - `psyker_aura_souls_on_kill`: Coherency kills have 4% chance to grant a Soul
 - `psyker_2_tier_3_name_2`: Elite kills restore 60% combat ability cooldown to allies (5s CD)
-- `psyker_2_tier_3_name_3`: Smite-damaged enemies take 25% more damage for 5s
+- `psyker_2_tier_3_name_3`: Brain Burst-damaged enemies take 25% more damage for 5s
 
 ### Middle Path (Protectorate / Support)
 

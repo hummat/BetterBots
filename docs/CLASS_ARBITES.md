@@ -20,7 +20,7 @@ Breed: `human`. Companion breed: `companion_dog` (Cyber-Mastiff).
 - `adamant_command_tog_with_tag` (Mastiff target command)
 - `adamant_companion_aura` (companion coherency aura)
 - `adamant_companion_damage_per_level` (mastiff scales with level)
-- `adamant_grenade` (frag grenades)
+- `adamant_grenade` (Arbites Grenades)
 
 The Arbites is a frontline enforcer with a unique Cyber-Mastiff companion. Three talent
 tree paths: **Investigator** (target marking / execution), **Exterminator** (companion +
@@ -31,11 +31,11 @@ kill synergy), **Subjugator** (stagger / control / tanking).
 ## Combat Ability (F Key)
 
 The Arbites has **three** mutually-exclusive combat ability choices in the talent tree
-(`exclusive_group = "ability_1"`): **Nuncio-Aquila Improved** (`adamant_area_buff_drone_improved`),
+(`exclusive_group = "ability_1"`): **Nuncio-Aquila** (`adamant_area_buff_drone_improved`; formerly: Nuncio-Aquila Improved),
 **Break the Line** (`adamant_charge`), and **Castigator's Stance** (`adamant_stance`).
 
 The base Nuncio-Aquila (`adamant_area_buff_drone`) is always active as a base talent. Taking the
-Improved node upgrades it; taking Charge or Stance provides an alternative combat ability.
+upgraded node (`adamant_area_buff_drone_improved`) enhances it; taking Charge or Stance provides an alternative combat ability.
 
 > **Note:** `adamant_shout` and `adamant_shout_improved` exist in ability/talent data but do NOT
 > appear in the talent tree layout (`adamant_tree.lua`). They may be cut content or reserved for
@@ -123,13 +123,13 @@ Improved node upgrades it; taking Charge or Stance provides an alternative comba
 ## Blitz / Grenade Ability
 
 The Arbites has **three** mutually-exclusive blitz choices in the talent tree
-(`exclusive_group = "blitz_1"`): **Whistle** (`adamant_whistle`), **Frag Grenade Improved**
-(`adamant_grenade_improved`), and **Shock Mine** (`adamant_shock_mine`).
+(`exclusive_group = "blitz_1"`): **Remote Detonation** (`adamant_whistle`), **Arbites Grenade**
+(improved variant, `adamant_grenade_improved`), and **Voltaic Shock Mine** (`adamant_shock_mine`).
 
-The base frag grenade (`adamant_grenade`) is always active as a base talent. The Whistle is
+The base Arbites Grenade (`adamant_grenade`) is always active as a base talent. Remote Detonation is
 `incompatible_talent = "adamant_disable_companion"` (cannot be used with Lone Wolf).
 
-### 1. Frag Grenade (Base) -- `adamant_grenade`
+### 1. Arbites Grenade (internal: `adamant_grenade`; formerly: Frag Grenade)
 
 | Field | Value |
 |-------|-------|
@@ -138,9 +138,9 @@ The base frag grenade (`adamant_grenade`) is always active as a base talent. The
 | Max charges | **3** |
 | No ability_template | Item-based (thrown grenade). No `ability_template` field. |
 
-**Bot usage notes:** Standard thrown grenade, same pattern as other classes. Item-based, no ability template -- must be used through inventory/grenade system. Tier 3 complexity for bot integration.
+**Bot usage notes:** Standard thrown grenade, same pattern as other classes. Item-based, no ability template -- must be used through inventory/grenade system. Tier 3 complexity for bot integration. Note: displayed as "Arbites Grenade" in-game despite internal `adamant_grenade` ID.
 
-### 2. Frag Grenade Improved -- `adamant_grenade_improved`
+### 2. Arbites Grenade — Improved Variant (internal: `adamant_grenade_improved`; formerly: Frag Grenade Improved)
 
 | Field | Value |
 |-------|-------|
@@ -150,7 +150,7 @@ Modifying talents:
 - `adamant_grenade_increased_radius`: +50% explosion radius
 - `adamant_grenade_increased_damage`: +50% frag damage
 
-### 3. Whistle (Remote Detonation / Mastiff Command) -- `adamant_whistle`
+### 3. Remote Detonation (internal: `adamant_whistle`; formerly: Whistle)
 
 | Field | Value |
 |-------|-------|
@@ -167,7 +167,7 @@ Modifying talents:
 
 **Bot usage notes:** This replaces grenades entirely. Uses `grenade_ability_pressed/hold` input -- different from combat ability. The `order_companion` action kind is unique to Arbites. Bot should use to direct mastiff at priority targets (specials, elites). Requires companion to be alive. Incompatible with Lone Wolf talent.
 
-### 4. Shock Mine -- `adamant_shock_mine`
+### 4. Voltaic Shock Mine (internal: `adamant_shock_mine`; formerly: Shock Mine)
 
 | Field | Value |
 |-------|-------|
@@ -200,7 +200,7 @@ talent tree (`exclusive_group = "ability_1"`). The base version is always presen
 | `can_be_wielded_when_depleted` | false |
 
 **Key modifying talents:**
-- `adamant_area_buff_drone_improved`: Adds suppression immunity, slowdown immunity, +30% suppression dealt, +30% impact, -25% recoil, toughness regen increased to 7.5%/sec
+- `adamant_area_buff_drone_improved` (in-game: Nuncio-Aquila; formerly: Nuncio-Aquila Improved): Adds suppression immunity, slowdown immunity, +30% suppression dealt, +30% impact, -25% recoil, toughness regen increased to 7.5%/sec
 - `adamant_drone_buff_talent`: Allies in zone get -30% TDR, +30% revive speed, +10% attack speed
 - `adamant_drone_debuff_talent`: Enemies in zone get -25% melee attack speed, -25% melee damage
 
@@ -221,24 +221,28 @@ The default aura. Makes the companion count toward coherency via `adamant_dog_co
 | Talent | Buff | Effect |
 |--------|------|--------|
 | `adamant_wield_speed_aura` | `adamant_wield_speed_aura` | +10% wield speed in coherency (talent setting: `coherency.adamant_wield_speed_aura.wield_speed = 0.1`; note: buff template `"adamant_wield_speed_aura"` not found in buff_templates -- may be dynamically registered) |
-| `adamant_reload_speed_aura` | `adamant_reload_speed_aura` | +12.5% reload speed in coherency |
-| `adamant_damage_vs_staggered_aura` | `adamant_damage_vs_staggered_aura` | +10% damage vs staggered in coherency |
-| `adamant_companion_coherency` | `adamant_companion_aura` | Companion counts for coherency + allies get -7.5% TDR in coherency |
+| `adamant_reload_speed_aura` (**Ruthless Efficiency**) | `adamant_reload_speed_aura` | +12.5% reload speed in coherency |
+| `adamant_damage_vs_staggered_aura` (**Breaking Dissent**) | `adamant_damage_vs_staggered_aura` | +10% damage vs staggered in coherency |
+| `adamant_companion_coherency` (**Part of the Squad**) | `adamant_companion_aura` | Companion counts for coherency + allies get -7.5% TDR in coherency |
 
 Note: When `adamant_wield_speed_aura` is selected, it replaces the companion coherency with a `adamant_no_companion_coherency` buff (no-op). The companion no longer counts for coherency. Same for `adamant_reload_speed_aura` and `adamant_damage_vs_staggered_aura`.
 
-### Lone Wolf -- `adamant_disable_companion`
+---
 
-A special talent that **disables the companion entirely** in exchange for:
+## Keystones
+
+> **Note:** **Lone Wolf** (`adamant_disable_companion`) is classified as a **Keystone** talent
+> in-game, not an aura, despite appearing in the aura section of some references. It is listed
+> here among the other keystones.
+
+### 0. Lone Wolf (Keystone) -- `adamant_disable_companion`
+
+A keystone talent that **disables the companion entirely** in exchange for:
 - +10% damage
 - +15% TDR
 - +10% attack speed
 - +1 grenade charge
 - Blitz recharges over time (60s whistle / 45s grenade / 90s mine)
-
----
-
-## Keystones
 
 ### 1. Forceful -- `adamant_forceful`
 
@@ -260,7 +264,10 @@ At max stacks, conditional bonuses apply based on sub-talents.
 
 **Bot usage notes:** Passive keystone, no special activation needed. Stacks build naturally from the Arbites' frontline playstyle (blocking + staggering). Bot benefits automatically.
 
-### 2. Stance Dance (Weapon Swap Keystone) -- `adamant_stance_dance`
+### 2. Terminus Warrant (internal: `adamant_stance_dance`; formerly: Stance Dance) — Weapon Swap Keystone
+
+> **Note:** The in-game keystone is named **Terminus Warrant**. The internal ID `adamant_stance_dance`
+> and earlier documentation used the name "Stance Dance", which appears to be an internal/cut name.
 
 **Core mechanic:** Alternating between melee and ranged weapons grants buffs. After swapping to melee:
 - +15% melee damage
@@ -284,7 +291,7 @@ Buffs last 5s after each swap.
 
 **Bot usage notes:** Requires frequent weapon swapping to maintain buffs. Bot would need custom swap logic to maximize this keystone. Most effective when bot alternates melee/ranged regularly.
 
-### 3. Terminus Warrant (Stacking Keystone) -- `adamant_terminus_warrant`
+### 3. Terminus Warrant — Stacking Variant (internal: `adamant_terminus_warrant`)
 
 **Core mechanic:** Build stacks (max 30) by fighting. Stacks grant different bonuses based on weapon type:
 
@@ -310,15 +317,19 @@ Swapping weapons converts 15 stacks to the new weapon type. Stacks last 8s.
 | `adamant_terminus_warrant_melee` | Melee kills restore 100% toughness, +10 bonus stacks on melee swap, 25% toughness shared |
 | `adamant_terminus_warrant_improved` | +15% melee/ranged rending, +25% crit damage, +25% weakspot damage, swap grants 30 stacks |
 
-**Bot usage notes:** Like Stance Dance, benefits from weapon swapping. The stack system is more forgiving -- stacks accumulate from combat and transfer on swap.
+**Bot usage notes:** Like the weapon-swap variant (internal: `adamant_stance_dance`), benefits from weapon swapping. The stack system is more forgiving -- stacks accumulate from combat and transfer on swap.
 
-### 4. Exterminator (Mark & Execute) -- `adamant_exterminator`
+### 4. Execution Order (internal: `adamant_execution_order`) — Mark & Execute Keystone
 
-**Core mechanic:** Passively marks enemies (via `adamant_mark_enemies_passive`). Marked enemies take bonus damage. Companion and player damage against marked targets triggers execution bonuses.
+> **Note:** "Exterminator" is the talent tree **branch** name, not a keystone. The actual keystone
+> is **Execution Order** (`adamant_execution_order`). The base marking mechanic comes from
+> `adamant_exterminator` (a prerequisite talent node in the Exterminator branch, not a keystone).
+
+**Exterminator branch base** (`adamant_exterminator`): Passively marks enemies (via `adamant_mark_enemies_passive`). Marked enemies take bonus damage. Companion and player damage against marked targets triggers execution bonuses.
 
 Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 
-**Sub-talents:**
+**Exterminator sub-talents:**
 | Talent | Effect |
 |--------|--------|
 | `adamant_exterminator_toughness` | Marked kills restore 10% toughness |
@@ -327,15 +338,13 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 | `adamant_exterminator_stack_during_activation` | Gain 2 stacks on combat ability use |
 | `adamant_exterminator_stamina_ammo` | Marked kills restore 10% stamina and 10% ammo |
 
-### 5. Execution Order (Advanced Mark & Execute) -- `adamant_execution_order`
-
-**Core mechanic:** An upgrade/extension of Exterminator. Automatically marks the nearest visible enemy. Killing marked targets grants:
+**Execution Order keystone** (`adamant_execution_order`): An upgrade/extension of the Exterminator base. Automatically marks the nearest visible enemy. Killing marked targets grants:
 - +15% toughness (instant)
 - +10% damage for 8s
 - +10% attack speed for 8s
 - +150% companion damage for 8s
 
-**Sub-talents:**
+**Execution Order sub-talents:**
 | Talent | Effect |
 |--------|--------|
 | `adamant_execution_order_crit` | +10% crit chance, +25% crit damage for 8s |
@@ -415,15 +424,15 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 
 ### When to Use Combat Ability
 
-- **Nuncio-Aquila (base/improved)**: Deploy at hold positions. The damage amp zone benefits the whole team. With improved talents, it provides suppression immunity -- critical for ranged play. 60s cooldown means you should save it for key holdouts.
+- **Nuncio-Aquila**: Deploy at hold positions. The damage amp zone benefits the whole team. The upgraded variant provides suppression immunity -- critical for ranged play. 60s cooldown means you should save it for key holdouts.
 - **Charge**: With only 20s cooldown, use aggressively. Good for closing distance to specials, repositioning, or escaping. The blocking-during-charge makes it safe. Post-charge damage buff (+25%) encourages using it offensively before a fight.
 - **Castigator's Stance**: The 80% damage reduction + full toughness refill makes this a powerful defensive tool. Best used when holding a position or tanking a boss. The `no_sprint` keyword means you commit to standing your ground. Pair with companion damage talents for synergy.
 
 ### When to Use Blitz
 
-- **Grenades (frag)**: Standard use against dense packs. 3-4 charges means you can be liberal.
-- **Whistle (Remote Detonation)**: Best blitz for Cyber-Mastiff builds. Direct the dog to priority targets. The electric discharge provides AoE stagger. Use on specials, elites, or to interrupt dangerous enemies. Incompatible with Lone Wolf.
-- **Shock Mine**: Place at choke points or flanking routes. Niche but effective in defense missions.
+- **Arbites Grenades**: Standard use against dense packs. 3-4 charges means you can be liberal.
+- **Remote Detonation**: Best blitz for Cyber-Mastiff builds. Direct the dog to priority targets. The electric discharge provides AoE stagger. Use on specials, elites, or to interrupt dangerous enemies. Incompatible with Lone Wolf.
+- **Voltaic Shock Mine**: Place at choke points or flanking routes. Niche but effective in defense missions.
 
 ### Positioning / Priority Tips
 
@@ -452,7 +461,7 @@ Stacks: max 10, duration 12s. Each stack: +4% damage, +4% companion damage.
 | `scripts/settings/ability/ability_templates/adamant_charge.lua` | Charge ability template (inputs, actions) |
 | `scripts/settings/ability/ability_templates/adamant_shout.lua` | Shout ability template (inputs, actions) |
 | `scripts/settings/ability/ability_templates/adamant_stance.lua` | Stance ability template (inputs, actions, **has ability_meta_data**) |
-| `scripts/settings/ability/ability_templates/adamant_whistle.lua` | Whistle/companion command template |
+| `scripts/settings/ability/ability_templates/adamant_whistle.lua` | Remote Detonation / companion command template |
 | `scripts/settings/talent/talent_settings_adamant.lua` | All numerical values (cooldowns, percentages, durations) |
 | `scripts/settings/ability/archetype_talents/talents/adamant_talents.lua` | Full talent tree definitions |
 | `scripts/settings/buff/archetype_buff_templates/adamant_buff_templates.lua` | All buff implementations |

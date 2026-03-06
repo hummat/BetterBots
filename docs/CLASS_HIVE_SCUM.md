@@ -14,7 +14,7 @@ The class has three playstyle paths: **Gunslinger** (ranged-focused), **Ruffian*
 
 Three mutually exclusive combat ability choices, all `ability_type = "combat_ability"`.
 
-### 1. Enhanced Desperado (Focus)
+### 1. Desperado (internal: `broker_ability_focus`; formerly: Enhanced Desperado)
 
 | Field | Value |
 |---|---|
@@ -37,7 +37,7 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 - FOV widens (1.1x multiplier, lerps back over duration)
 - Close-range ranged kills extend duration (diminishing returns, divisor 5, max 20s)
 
-**Improved variant** (`broker_ability_focus_improved`): Adds enemy outlines within close range, highlighting targets. Duration extends by 1s per close-range kill.
+**Improved variant — Enhanced Desperado** (`broker_ability_focus_improved`): Adds enemy outlines within close range, highlighting targets. Duration extends by 1s per close-range kill.
 
 **Talent modifiers (sub-nodes):**
 - `broker_ability_focus_noclip`: Disables minion collision during sprint and dodge while in Focus
@@ -48,7 +48,7 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 
 ---
 
-### 2. Rampage (Punk Rage)
+### 2. Rampage! (internal: `broker_ability_punk_rage`; formerly: Rampage)
 
 | Field | Value |
 |---|---|
@@ -81,7 +81,7 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 
 ---
 
-### 3. Stimm Field
+### 3. Stimm Supply (internal: `broker_ability_stimm_field`; formerly: Stimm Field)
 
 | Field | Value |
 |---|---|
@@ -133,7 +133,7 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 - **Durability** (4 main tiers + 2 branches at tier 5): Toughness restore on use (6.25% per tier), +5% toughness replenish per tier, 4% damage reduction per tier. Branches: 5a = +30% toughness replenish, 5b = 5% toughness over time per second
 - **Concentration** (5 main tiers + 2 branches at tier 5): Combat ability cooldown regen (+6.25% tiers 1-4, +25% at tier 5a). Branches: 5b = cooldown on melee kills, 5c = cooldown on ranged kills
 
-**Bot usage notes:** Another item-based ability (`pocketable_ability`). Tier 3 difficulty -- same issues as Stimm Field. Bot should use when: (a) about to engage a tough fight, (b) combat ability is on cooldown and concentration buffs would help, (c) generally on cooldown (use whenever available in combat).
+**Bot usage notes:** Another item-based ability (`pocketable_ability`). Tier 3 difficulty -- same issues as Stimm Supply. Bot should use when: (a) about to engage a tough fight, (b) combat ability is on cooldown and concentration buffs would help, (c) generally on cooldown (use whenever available in combat).
 
 ---
 
@@ -141,7 +141,7 @@ Three mutually exclusive combat ability choices, all `ability_type = "combat_abi
 
 Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`.
 
-### 1. Flash Grenade (Default)
+### 1. Blinder / Blackout (internal: `broker_flash_grenade`; formerly: Flash Grenade)
 
 | Field | Value |
 |---|---|
@@ -157,7 +157,7 @@ Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`
 
 **Bot usage notes:** Standard grenade ability. Bot should throw at: (a) dense enemy groups, (b) specials/elites to interrupt attacks, (c) to create breathing room when overwhelmed.
 
-### 2. Tox Grenade
+### 2. Chem Grenade (internal: `broker_tox_grenade`; formerly: Tox Grenade)
 
 | Field | Value |
 |---|---|
@@ -173,7 +173,7 @@ Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`
 
 **Bot usage notes:** Area denial grenade. Bot should throw at: (a) chokepoints, (b) dense hordes, (c) priority targets when running Chemist build.
 
-### 3. Missile Launcher
+### 3. Boom Bringer (internal: `broker_missile_launcher`; formerly: Missile Launcher)
 
 | Field | Value |
 |---|---|
@@ -373,26 +373,26 @@ Three mutually exclusive aura choices.
 
 | Ability | Template | Type | Input | `ability_meta_data` | Bot Tier |
 |---|---|---|---|---|---|
-| Enhanced Desperado | `broker_focus` | `stance_change` | `combat_ability_pressed` | Yes (`stance_pressed`) | Tier 1 |
-| Rampage | `broker_punk_rage` | `stance_change` | `combat_ability_pressed` | Yes (`stance_pressed`) | Tier 1 |
-| Stimm Field | None (item-based) | `inventory_item` | Wield + use | No | Tier 3 |
+| Desperado | `broker_focus` | `stance_change` | `combat_ability_pressed` | Yes (`stance_pressed`) | Tier 1 |
+| Rampage! | `broker_punk_rage` | `stance_change` | `combat_ability_pressed` | Yes (`stance_pressed`) | Tier 1 |
+| Stimm Supply | None (item-based) | `inventory_item` | Wield + use | No | Tier 3 |
 | Cartel Special | None (pocketable) | `pocketable_ability` | Wield + use | No | Tier 3 |
-| Flash Grenade | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
-| Tox Grenade | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
-| Missile Launcher | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
+| Blinder / Blackout | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
+| Chem Grenade | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
+| Boom Bringer | None (inventory item) | `grenade_ability` | `grenade_ability_pressed` | No | Tier 3 |
 
 ---
 
 ## Practical Usage (from community guides)
 
-### When to use Enhanced Desperado (Focus)
+### When to use Desperado
 - Activate before engaging a group of ranged specials/elites at close-mid range
 - Use for the toughness refill when shields are low
 - The free ammo allows sustained fire without conservation
 - Sprint through enemies with noclip talent to reposition
 - Best paired with Vulture's Mark keystone for ranged elite hunting
 
-### When to use Rampage (Punk Rage)
+### When to use Rampage!
 - Activate when surrounded by melee enemies or engaging a horde
 - Use the instant toughness refill as an emergency defensive tool
 - The stun/slowdown immunity allows uninterrupted melee combos
@@ -400,9 +400,9 @@ Three mutually exclusive aura choices.
 - Extend duration by continuously hitting enemies; elites give more extension with Sub 4
 
 ### When to use grenades/blitz
-- Flash grenades: crowd control tool, throw into dense groups before engaging
-- Tox grenades: area denial at chokepoints and synergy with Chemist talents
-- Missile launcher: save for monsters, bosses, or tightly packed elite groups
+- Blinder grenades: crowd control tool, throw into dense groups before engaging
+- Chem Grenades: area denial at chokepoints and synergy with Chemist talents
+- Boom Bringer: save for monsters, bosses, or tightly packed elite groups
 
 ### Positioning/priority tips
 - Hive Scum excels at close range (12.5m) where many damage bonuses activate

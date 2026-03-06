@@ -167,7 +167,7 @@ Increases cooldown (flat reduction is negative = increase), but adds extra fines
 
 ---
 
-### 3. Bolstering Prayer (Relic / Channel)
+### 3. Chorus of Spiritual Fortitude (internal: `zealot_bolstering_prayer`; formerly: Bolstering Prayer) (Relic / Channel)
 
 | Field | Value |
 |---|---|
@@ -225,9 +225,9 @@ Three mutually exclusive grenade types.
 **Bot usage notes**: Standard grenade throw via `grenade_ability_pressed`. Use against dense packs, especially to interrupt dangerous enemy attacks or to stagger elites.
 
 #### Talent Modifier
-- **Improved Stun Grenade** (`zealot_improved_stun_grenade`): +50% explosion radius
+- **Stunstorm Grenade** (internal: `zealot_improved_stun_grenade`; formerly: Improved Stun Grenade): +50% explosion radius
 
-### 2. Flame Grenade
+### 2. Immolation Grenade (internal: `zealot_flame_grenade`; formerly: Flame Grenade)
 
 | Field | Value |
 |---|---|
@@ -242,7 +242,7 @@ Three mutually exclusive grenade types.
 
 **Bot usage notes**: Best thrown at chokepoints or dense groups. Creates area denial. Bots should avoid throwing at their own feet.
 
-### 3. Throwing Knives
+### 3. Blades of Faith (internal: `zealot_throwing_knives`; formerly: Throwing Knives)
 
 | Field | Value |
 |---|---|
@@ -282,12 +282,12 @@ Four mutually exclusive aura options.
 
 **Effect**: Allies in coherency take **7.5% less toughness damage** (`toughness_damage_taken_multiplier = 0.925`).
 
-#### Improved Variant
+#### Improved Variant — Benediction
 - Talent: `zealot_toughness_damage_reduction_coherency_improved`
 - Buff: `zealot_coherency_toughness_damage_resistance_improved`
 - Effect: **15% toughness damage reduction** (`multiplier = 0.85`)
 
-### 2. Cleansing Prayer (Corruption Healing)
+### 2. Beacon of Purity (internal: `zealot_corruption_healing_coherency`; formerly: Cleansing Prayer) (Corruption Healing)
 
 | Field | Value |
 |---|---|
@@ -298,7 +298,7 @@ Four mutually exclusive aura options.
 
 **Effect**: Allies in coherency heal **0.5 corruption** per second.
 
-#### Improved Variant
+#### Improved Variant (Beacon of Purity)
 - Talent: `zealot_corruption_healing_coherency_improved`
 - Buff: `zealot_preacher_coherency_corruption_healing_improved`
 - Effect: **1.5 corruption** healed per second
@@ -312,7 +312,7 @@ Four mutually exclusive aura options.
 
 **Effect**: Allies in coherency have **15% reduced stamina cost** (`stamina_cost_multiplier = 0.85`).
 
-### 4. Lone Wolf (Always in Coherency)
+### 4. Loner (internal: `zealot_always_in_coherency`; formerly: Lone Wolf) (Always in Coherency)
 
 | Field | Value |
 |---|---|
@@ -389,7 +389,7 @@ Four mutually exclusive aura options.
 
 See Passives > Martyrdom above. The core keystone for the Maniac (zealot_2) path. Damage scales with missing health.
 
-### 2. Fanatic Rage (zealot_3 tree -- Preacher)
+### 2. Blazing Piety (internal: `zealot_fanatic_rage`; formerly: Fanatic Rage) (zealot_3 tree -- Preacher)
 
 | Field | Value |
 |---|---|
@@ -410,7 +410,7 @@ See Passives > Martyrdom above. The core keystone for the Maniac (zealot_2) path
 - **Toughness on max** (`zealot_fanatic_rage_toughness_on_max`): 50% toughness restore on reaching max, 2% per tick while at max, 25% toughness DR
 - **Shared rage** (`zealot_shared_fanatic_rage`): allies in coherency gain 10% crit from your rage
 
-### 3. Quickness (zealot_3 tree -- Preacher)
+### 3. Inexorable Judgement (internal: `zealot_quickness_passive`; formerly: Quickness) (zealot_3 tree -- Preacher)
 
 | Field | Value |
 |---|---|
@@ -457,7 +457,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 
 ### Left Path: Infiltrator / Assassin (zealot_1 / Pious Stabber)
 - **Combat ability**: Stealth / Shroudfield
-- **Aura**: Lone Wolf (always in coherency)
+- **Aura**: Loner (always in coherency)
 - **Focus**: Backstab damage, flanking, dodge synergies, finesse damage
 - **Key talents**: `zealot_backstab_damage`, `zealot_increased_crit_and_weakspot_damage_after_dodge`, `zealot_increased_stagger_on_weakspot_melee`, `zealot_more_damage_when_low_on_stamina`, `zealot_increased_damage_when_flanking`
 
@@ -467,15 +467,15 @@ The Zealot talent tree has three main paths, each centered on a different playst
 - **Aura**: The Emperor's Will (toughness DR)
 - **Focus**: Attack speed, bleed, crit chains, melee damage stacking
 - **Key talents**: `zealot_crits_apply_bleed`, `zealot_multi_hits_grant_impact_and_uninterruptible`, `zealot_martyrdom_grants_attack_speed`, `zealot_hits_grant_stacking_damage`
-- **Blitz**: Stun Grenade or Throwing Knives
+- **Blitz**: Stun Grenade or Blades of Faith
 
 ### Right Path: Preacher / Support (zealot_3)
-- **Combat ability**: Bolstering Prayer (relic channel)
-- **Keystones**: Fanatic Rage, Quickness
-- **Aura**: Cleansing Prayer (corruption healing)
+- **Combat ability**: Chorus of Spiritual Fortitude (relic channel)
+- **Keystones**: Blazing Piety, Inexorable Judgement
+- **Aura**: Beacon of Purity (corruption healing)
 - **Focus**: Team support, impact/cleave, damage vs elites, toughness management
 - **Key talents**: `zealot_fanatic_rage`, `zealot_quickness_passive`, `zealot_increased_impact`, `zealot_multi_hits_increase_damage`, `zealot_increased_cleave`, `zealot_shared_fanatic_rage`
-- **Blitz**: Flame Grenade
+- **Blitz**: Immolation Grenade
 
 ### Cross-Path Talents (available to multiple builds)
 - `zealot_crits_rend`: +15% rending on crits
@@ -505,7 +505,7 @@ The Zealot talent tree has three main paths, each centered on a different playst
 - **Duration management**: Attack quickly after activating -- the buffs are massive but brief (3-5s)
 - **Caution**: Throwing grenades WILL break stealth
 
-### When to use Bolstering Prayer (Relic)
+### When to use Chorus of Spiritual Fortitude (Relic)
 - **Team heal**: Use during safe moments when team toughness is depleted
 - **Pre-engagement**: Channel briefly before a known dangerous encounter
 - **Stagger utility**: With the stagger talent, can be used defensively when surrounded
@@ -513,8 +513,8 @@ The Zealot talent tree has three main paths, each centered on a different playst
 
 ### When to use grenades
 - **Stun grenade**: Interrupt dangerous enemy attacks, crowd control dense packs, stagger mutants mid-charge
-- **Flame grenade**: Area denial at chokepoints, soften hordes before engagement
-- **Throwing knives**: Use constantly on specials at range; the 12-charge pool and melee-kill refill means these should be used aggressively and often
+- **Immolation Grenade**: Area denial at chokepoints, soften hordes before engagement
+- **Blades of Faith**: Use constantly on specials at range; the 12-charge pool and melee-kill refill means these should be used aggressively and often
 
 ---
 
@@ -524,9 +524,9 @@ The Zealot talent tree has three main paths, each centered on a different playst
 |---|---|---|---|
 | Stealth (Shroudfield) | `stance_pressed` (single press) | Low | Tier 2 (metadata injection) |
 | Fury of the Faithful (Chastise the Wicked) | `aim_pressed` -> hold -> `aim_released` | Medium | Tier 2 |
-| Throwing Knives | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
-| Stun/Flame Grenade | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
-| Bolstering Prayer | Item-based, channel, no `ability_template` | High | Tier 3 |
+| Blades of Faith | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
+| Stun/Immolation Grenade | Item-based grenade | Medium | Tier 3 (grenade path, out of current scope) |
+| Chorus of Spiritual Fortitude | Item-based, channel, no `ability_template` | High | Tier 3 |
 
 ### Key Source References
 
