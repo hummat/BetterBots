@@ -1,10 +1,8 @@
 # Tier 3 Reliability + Heuristics Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
 **Goal:** Fix Tier 3 item-ability timing (force field ~13% → reliable, drone ~21% → reliable) and add per-ability heuristics for all 4 Tier 3 abilities.
 
-**Architecture:** Two orthogonal changes: (1) fix `ITEM_SEQUENCE_PROFILES` timing values in `item_fallback.lua` to match decompiled engine action durations, (2) add `ITEM_HEURISTICS` table in `heuristics.lua` keyed by ability name, wire into `can_use_item_fallback()`, extend `build_context()` with ally/corruption fields.
+**Architecture:** Two sequential changes validated separately: (1) fix `ITEM_SEQUENCE_PROFILES` timing values in `item_fallback.lua`, validate consume-rate improvement, (2) add `ITEM_HEURISTICS` table in `heuristics.lua` keyed by ability name, wire into `can_use_item_fallback()`, extend `build_context()` with ally/corruption fields, update debug plumbing.
 
 **Tech Stack:** Lua (Darktide Mod Framework), busted (test framework), make (build system)
 
@@ -22,6 +20,10 @@
 In `ITEM_SEQUENCE_PROFILES`, change these values:
 
 ```lua
+-- press_release (line 44-46)
+followup_delay = 0.6,    -- was 0.08; place_time = 0.54s + margin
+unwield_delay = 0.7,     -- was 0.35; 0.6s + unwield margin
+
 -- force_field_regular (line 53-55)
 followup_delay = 1.2,    -- was 0.12; 0.6s buffer_time + 0.6s total_time
 unwield_delay = 1.6,     -- was 0.9; 1.2s action + 0.4s margin
@@ -35,10 +37,6 @@ unwield_delay = 2.3,     -- was 1.0; 1.9s action + 0.4s margin
 
 -- drone_instant (line 85)
 unwield_delay = 1.1,     -- was 0.9; 1.0s action + 0.1s margin
-
--- press_release (line 44-46)
-followup_delay = 0.6,    -- was 0.08; place_time = 0.54s + margin
-unwield_delay = 0.7,     -- was 0.35; 0.6s + unwield margin
 ```
 
 **Step 2: Run lint**
@@ -55,40 +53,63 @@ git commit -m "fix(item_fallback): align ITEM_SEQUENCE_PROFILES timing with engi
 
 ---
 
-### Task 2: Extend build_context() with ally and corruption fields
+### Task 2: Validate timing fix in-game (manual)
+
+**Purpose:** Measure consume-rate improvement from timing fix BEFORE changing gating logic. This isolates timing impact from heuristic impact.
+
+**Bot lineup:**
+- Zealot (Bolstering Prayer / relic)
+- Psyker (Telekine Shield / dome variant preferred)
+- Arbites (Nuncio-Aquila drone)
+- Any 4th bot
+
+**Steps:**
+1. Launch Solo Play, start mission
+2. Play through combat encounters (~10 min)
+3. After mission: `bb-log summary` on latest log
+4. Compare `charge consumed` vs `finished without charge consume` ratios to pre-fix baseline:
+   - Force field: was ~13% → target: >50%
+   - Drone: was ~21% → target: >50%
+   - Relic: was 100% → should remain 100%
+5. Record results in `docs/VALIDATION_TRACKER.md` as a new run entry
+
+**Commit:**
+```bash
+git add docs/VALIDATION_TRACKER.md
+git commit -m "docs: record Tier 3 timing fix validation run (#3)"
+```
+
+---
+
+### Task 3: Extend build_context() with ally and corruption fields
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua:62-161`
 - Modify: `tests/test_helper.lua:29-60`
 
-**Step 1: Write failing tests for new context fields**
+**Step 1: Add new field defaults to make_context()**
 
-Add to `tests/heuristics_spec.lua` (or a new file if preferred) tests that verify the new fields exist in `make_context()` output:
-
-Add to `tests/test_helper.lua` inside `make_context()`, after `target_is_super_armor = false`:
+In `tests/test_helper.lua`, add inside `make_context()` after `target_is_super_armor = false`:
 
 ```lua
 allies_in_coherency = 0,
 avg_ally_toughness_pct = 1,
-corruption_pct = 0,
+max_ally_corruption_pct = 0,
 ```
 
-**Step 2: Run tests to verify existing tests still pass**
+**Step 2: Add new field defaults to build_context()**
 
-Run: `make test`
-Expected: PASS (new defaults don't break anything)
-
-**Step 3: Add ally coherency + toughness + corruption to build_context()**
-
-In `heuristics.lua`, add three new fields to the context initializer (after `target_is_super_armor`, line 83):
+In `heuristics.lua`, add to the context initializer (after `target_is_super_armor = false`, line 83):
 
 ```lua
 allies_in_coherency = 0,
 avg_ally_toughness_pct = 1,
-corruption_pct = 0,
+max_ally_corruption_pct = 0,
 ```
 
-Then add the following block after the `unit_data_extension` / warp_charge block (after line 114), before the perception_extension block:
+**Step 3: Add coherency + corruption data collection**
+
+In `heuristics.lua`, add after the `unit_data_extension` / warp_charge block (after line 114), before the perception_extension block:
 
 ```lua
 local coherency_extension = ScriptUnit.has_extension(unit, "coherency_system")
@@ -96,9 +117,12 @@ if coherency_extension and coherency_extension.in_coherence_units then
     local in_coherence_units = coherency_extension:in_coherence_units()
     local ally_count = 0
     local ally_toughness_sum = 0
+    local max_corruption = 0
     for ally_unit, _ in pairs(in_coherence_units) do
-        local ally_breed = _enemy_breed(ally_unit)
-        local is_dog = ally_breed and ally_breed.name and string.find(ally_breed.name, "companion", 1, true)
+        local ally_breed_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+        local ally_breed = ally_breed_data and ally_breed_data:breed()
+        local is_dog = ally_breed and ally_breed.name
+            and string.find(ally_breed.name, "companion", 1, true)
         if not is_dog then
             ally_count = ally_count + 1
             local ally_toughness_ext = ScriptUnit.has_extension(ally_unit, "toughness_system")
@@ -108,23 +132,25 @@ if coherency_extension and coherency_extension.in_coherence_units then
             else
                 ally_toughness_sum = ally_toughness_sum + 1
             end
+            local ally_health_ext = ScriptUnit.has_extension(ally_unit, "health_system")
+            if ally_health_ext and ally_health_ext.permanent_damage_taken_percent then
+                local corruption = ally_health_ext:permanent_damage_taken_percent() or 0
+                if corruption > max_corruption then
+                    max_corruption = corruption
+                end
+            end
         end
     end
     context.allies_in_coherency = ally_count
     context.avg_ally_toughness_pct = ally_count > 0 and (ally_toughness_sum / ally_count) or 1
-end
-
-if health_extension and health_extension.permanent_damage_taken_percent then
-    context.corruption_pct = health_extension:permanent_damage_taken_percent() or 0
+    context.max_ally_corruption_pct = max_corruption
 end
 ```
-
-Note: `_enemy_breed()` is used to check breed on ally units — it calls `unit_data_extension:breed()` which works for any unit, not just enemies. The companion dog has breed name containing "companion".
 
 **Step 4: Run tests**
 
 Run: `make test`
-Expected: PASS (build_context isn't called in unit tests — they use make_context)
+Expected: PASS (build_context isn't called in unit tests — they use make_context. But schema parity is maintained by matching field defaults.)
 
 **Step 5: Run full checks**
 
@@ -135,12 +161,12 @@ Expected: PASS
 
 ```bash
 git add scripts/mods/BetterBots/heuristics.lua tests/test_helper.lua
-git commit -m "feat(heuristics): add allies_in_coherency, avg_ally_toughness_pct, corruption_pct to build_context (#3)"
+git commit -m "feat(heuristics): add allies_in_coherency, avg_ally_toughness_pct, max_ally_corruption_pct to build_context (#3)"
 ```
 
 ---
 
-### Task 3: Add zealot_relic heuristic function + tests
+### Task 4: Add zealot_relic heuristic function + tests
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua` (add function + ITEM_HEURISTICS table + evaluate_item_heuristic)
@@ -154,12 +180,6 @@ Add to `tests/heuristics_spec.lua`:
 -- zealot_relic (item-based)
 describe("zealot_relic", function()
     local eval_item = Heuristics.evaluate_item_heuristic
-
-    it("blocks with no allies in coherency", function()
-        local ok, rule = eval_item("zealot_relic", ctx({ num_nearby = 2, allies_in_coherency = 0 }))
-        assert.is_false(ok)
-        assert.matches("no_allies", rule)
-    end)
 
     it("blocks when overwhelmed and fragile", function()
         local ok, rule = eval_item("zealot_relic", ctx({
@@ -186,15 +206,23 @@ describe("zealot_relic", function()
         assert.matches("team_low_toughness", rule)
     end)
 
-    it("activates on self critical toughness", function()
+    it("activates on self critical toughness even without allies", function()
         local ok, rule = eval_item("zealot_relic", ctx({
-            num_nearby = 2, toughness_pct = 0.20, allies_in_coherency = 1,
+            num_nearby = 2, toughness_pct = 0.20, allies_in_coherency = 0,
         }))
         assert.is_true(ok)
         assert.matches("self_critical", rule)
     end)
 
-    it("holds in safe state", function()
+    it("blocks with no allies when toughness is fine", function()
+        local ok, rule = eval_item("zealot_relic", ctx({
+            num_nearby = 2, toughness_pct = 0.60, allies_in_coherency = 0,
+        }))
+        assert.is_false(ok)
+        assert.matches("no_allies", rule)
+    end)
+
+    it("holds in safe state with allies", function()
         local ok, rule = eval_item("zealot_relic", ctx({
             num_nearby = 1, allies_in_coherency = 2, avg_ally_toughness_pct = 0.80,
         }))
@@ -220,11 +248,10 @@ Expected: FAIL — `evaluate_item_heuristic` does not exist yet
 Add after the `_can_activate_broker_rage` function (after line 555) in `heuristics.lua`:
 
 ```lua
--- Item-ability heuristics (keyed by ability name, not template name)
+-- Item-ability heuristics (keyed by ability name, not template name).
+-- Unknown items default to false — item abilities are expensive, no accidental activation.
+
 local function _can_activate_zealot_relic(context)
-    if context.allies_in_coherency == 0 then
-        return false, "zealot_relic_block_no_allies"
-    end
     if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
         return false, "zealot_relic_block_overwhelmed"
     end
@@ -233,6 +260,9 @@ local function _can_activate_zealot_relic(context)
     end
     if context.toughness_pct < 0.25 and context.num_nearby < 3 then
         return true, "zealot_relic_self_critical"
+    end
+    if context.allies_in_coherency == 0 then
+        return false, "zealot_relic_block_no_allies"
     end
     return false, "zealot_relic_hold"
 end
@@ -258,7 +288,7 @@ local function evaluate_item_heuristic(ability_name, context)
 end
 ```
 
-Add `evaluate_item_heuristic` to the return table (line 730+):
+Add `evaluate_item_heuristic` to the return table:
 
 ```lua
 evaluate_item_heuristic = evaluate_item_heuristic,
@@ -278,7 +308,7 @@ git commit -m "feat(heuristics): add zealot_relic item heuristic + ITEM_HEURISTI
 
 ---
 
-### Task 4: Add force_field heuristic function + tests
+### Task 5: Add force_field heuristic function + tests
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua`
@@ -403,7 +433,7 @@ git commit -m "feat(heuristics): add force_field item heuristic for all 3 varian
 
 ---
 
-### Task 5: Add drone heuristic function + tests
+### Task 6: Add drone heuristic function + tests
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua`
@@ -515,7 +545,7 @@ git commit -m "feat(heuristics): add adamant_area_buff_drone item heuristic (#3)
 
 ---
 
-### Task 6: Add stimm_field heuristic function + tests
+### Task 7: Add stimm_field heuristic function + tests
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua`
@@ -544,7 +574,7 @@ describe("broker_ability_stimm_field", function()
     it("activates on ally corruption", function()
         local ok, rule = eval_item("broker_ability_stimm_field", ctx({
             num_nearby = 2, allies_in_coherency = 1,
-            avg_ally_corruption_pct = 0.40,
+            max_ally_corruption_pct = 0.40,
         }))
         assert.is_true(ok)
         assert.matches("corruption", rule)
@@ -553,7 +583,7 @@ describe("broker_ability_stimm_field", function()
     it("does not activate on low corruption", function()
         local ok, rule = eval_item("broker_ability_stimm_field", ctx({
             num_nearby = 2, allies_in_coherency = 1,
-            avg_ally_corruption_pct = 0.20,
+            max_ally_corruption_pct = 0.20,
         }))
         assert.is_false(ok)
         assert.matches("hold", rule)
@@ -595,7 +625,7 @@ local function _can_activate_stimm_field(context)
     if context.allies_in_coherency == 0 then
         return false, "stimm_block_no_allies"
     end
-    if (context.avg_ally_corruption_pct or 0) > 0.30 and context.allies_in_coherency >= 1 then
+    if (context.max_ally_corruption_pct or 0) > 0.30 and context.allies_in_coherency >= 1 then
         return true, "stimm_corruption_heal"
     end
     if context.target_ally_needs_aid and context.num_nearby >= 2 then
@@ -603,34 +633,6 @@ local function _can_activate_stimm_field(context)
     end
     return false, "stimm_hold"
 end
-```
-
-Also add `avg_ally_corruption_pct` to `build_context()` — iterate coherency allies and average their corruption. Add to context initializer:
-
-```lua
-avg_ally_corruption_pct = 0,
-```
-
-Add to the coherency block (inside the ally iteration loop, after toughness):
-
-```lua
-local ally_health_ext = ScriptUnit.has_extension(ally_unit, "health_system")
-if ally_health_ext and ally_health_ext.permanent_damage_taken_percent then
-    ally_corruption_sum = ally_corruption_sum
-        + (ally_health_ext:permanent_damage_taken_percent() or 0)
-end
-```
-
-Initialize `ally_corruption_sum = 0` alongside `ally_toughness_sum`. Set context after loop:
-
-```lua
-context.avg_ally_corruption_pct = ally_count > 0 and (ally_corruption_sum / ally_count) or 0
-```
-
-Also add to `test_helper.lua` `make_context()`:
-
-```lua
-avg_ally_corruption_pct = 0,
 ```
 
 Add to `ITEM_HEURISTICS`:
@@ -647,20 +649,20 @@ Expected: PASS
 **Step 5: Commit**
 
 ```bash
-git add scripts/mods/BetterBots/heuristics.lua tests/heuristics_spec.lua tests/test_helper.lua
+git add scripts/mods/BetterBots/heuristics.lua tests/heuristics_spec.lua
 git commit -m "feat(heuristics): add broker_ability_stimm_field item heuristic with corruption detection (#3)"
 ```
 
 ---
 
-### Task 7: Wire item heuristics into item_fallback.lua
+### Task 8: Wire item heuristics into item_fallback.lua + debug.lua
 
 **Files:**
-- Modify: `scripts/mods/BetterBots/item_fallback.lua:410-433` (replace `can_use_item_fallback`)
-- Modify: `scripts/mods/BetterBots/item_fallback.lua:1-17` (add wire dependency)
-- Modify: `scripts/mods/BetterBots/BetterBots.lua:118-122` (wire evaluate_item_heuristic)
+- Modify: `scripts/mods/BetterBots/item_fallback.lua:1-17,410-433,451,779-802`
+- Modify: `scripts/mods/BetterBots/debug.lua:12,356-359,416`
+- Modify: `scripts/mods/BetterBots/BetterBots.lua:118-129`
 
-**Step 1: Add evaluate_item_heuristic as a late-bound ref in item_fallback.lua**
+**Step 1: Add evaluate_item_heuristic as late-bound ref in item_fallback.lua**
 
 At the top of `item_fallback.lua`, after `_fallback_state_snapshot` (line 17), add:
 
@@ -668,7 +670,7 @@ At the top of `item_fallback.lua`, after `_fallback_state_snapshot` (line 17), a
 local _evaluate_item_heuristic
 ```
 
-In the `wire()` function (line 793), add:
+In the `wire()` function (line 793+), add:
 
 ```lua
 _evaluate_item_heuristic = refs.evaluate_item_heuristic
@@ -681,16 +683,15 @@ Replace the entire `can_use_item_fallback` function (lines 410-433) with:
 ```lua
 local function can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
     if not ability_extension:can_use_ability("combat_ability") then
-        return false
+        return false, "item_cooldown_not_ready"
     end
 
     if not _evaluate_item_heuristic then
-        return false
+        return false, "item_heuristics_not_wired"
     end
 
     local context = _build_context(unit, blackboard)
-    local can_activate, rule = _evaluate_item_heuristic(ability_name, context)
-    return can_activate, rule
+    return _evaluate_item_heuristic(ability_name, context)
 end
 ```
 
@@ -705,10 +706,29 @@ if not can_use_item_fallback(unit, ability_extension, ability_name) then
 to:
 
 ```lua
-if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
+local can_use, item_rule = can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+if not can_use then
 ```
 
-**Step 4: Wire evaluate_item_heuristic in BetterBots.lua**
+**Step 4: Update debug.lua /bb_decide**
+
+In `debug.lua`, update the item fallback branch (lines 356-359):
+
+Change:
+```lua
+can_activate = _can_use_item_fallback(unit, ability_extension, ability_name)
+rule = can_activate and "item_fallback_ready" or "item_fallback_blocked"
+context = _build_context(unit, blackboard)
+```
+
+To:
+```lua
+can_activate, rule = _can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+rule = rule or (can_activate and "item_fallback_ready" or "item_fallback_blocked")
+context = _build_context(unit, blackboard)
+```
+
+**Step 5: Wire evaluate_item_heuristic in BetterBots.lua**
 
 In `BetterBots.lua`, in the `ItemFallback.wire()` call (line 118-122), add:
 
@@ -716,25 +736,24 @@ In `BetterBots.lua`, in the `ItemFallback.wire()` call (line 118-122), add:
 evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
 ```
 
-**Step 5: Run checks**
+**Step 6: Run checks**
 
 Run: `make check`
 Expected: PASS
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
-git add scripts/mods/BetterBots/item_fallback.lua scripts/mods/BetterBots/BetterBots.lua
+git add scripts/mods/BetterBots/item_fallback.lua scripts/mods/BetterBots/debug.lua scripts/mods/BetterBots/BetterBots.lua
 git commit -m "feat(item_fallback): replace coarse gate with per-ability item heuristics (#3)"
 ```
 
 ---
 
-### Task 8: Remove zealot_relic special cases
+### Task 9: Remove zealot_relic special case
 
 **Files:**
-- Modify: `scripts/mods/BetterBots/BetterBots.lua:211-222` (remove zealot_relic branch in `_can_activate_ability`)
-- Modify: `scripts/mods/BetterBots/item_fallback.lua` (confirm zealot_relic branch already removed in Task 7)
+- Modify: `scripts/mods/BetterBots/BetterBots.lua:211-222`
 
 **Step 1: Remove zealot_relic special case from _can_activate_ability**
 
@@ -755,7 +774,7 @@ In `BetterBots.lua`, delete lines 211-222:
 	end
 ```
 
-Note: zealot_relic goes through the item_fallback path (template_name == "none" in BT), so this branch in `_can_activate_ability` was dead code for the BT path. It only triggered if zealot_relic somehow had a template_name, which it doesn't. Removing it is safe.
+Note: zealot_relic goes through the item_fallback path (template_name == "none" in BT), so this branch was only reachable if zealot_relic somehow had a template_name, which it doesn't. Removing it is safe.
 
 **Step 2: Run checks**
 
@@ -771,7 +790,7 @@ git commit -m "refactor: remove zealot_relic special case from condition hook (#
 
 ---
 
-### Task 9: Run full check + review
+### Task 10: Full check + doc updates
 
 **Step 1: Run full quality gate**
 
@@ -786,30 +805,30 @@ Expected: All tests pass. Count should be ~101 + ~30 new = ~131.
 **Step 3: Review diff**
 
 Run: `git diff main --stat`
-Review the changes are scoped to the expected files.
+Verify changes are scoped to expected files.
 
 **Step 4: Update docs**
 
 Update `docs/KNOWN_ISSUES.md`:
-- Change "Tier 3 item fallback timing mismatch" to note timing values have been corrected
-- Update heuristic count (now covers Tier 3 abilities too)
+- Note timing values have been corrected in ITEM_SEQUENCE_PROFILES
+- Note item heuristics now replace coarse `enemies_in_proximity > 0` gate
+- Update heuristic count
 
 Update `docs/VALIDATION_TRACKER.md`:
-- Add placeholder for Tier 3 heuristic validation run
-- Note timing fix applied
+- Add placeholder for Tier 3 heuristic validation run (separate from timing run in Task 2)
 
 **Step 5: Commit docs**
 
 ```bash
 git add docs/KNOWN_ISSUES.md docs/VALIDATION_TRACKER.md
-git commit -m "docs: update known issues and validation tracker for Tier 3 timing fix (#3)"
+git commit -m "docs: update known issues and validation tracker for Tier 3 heuristics (#3)"
 ```
 
 ---
 
-### Task 10: In-game validation (manual)
+### Task 11: Validate heuristics in-game (manual)
 
-This is the manual verification step — not automatable.
+**Purpose:** Measure heuristic decision quality AFTER timing fix is already validated. This is a separate run from Task 2.
 
 **Bot lineup:**
 - Zealot (Bolstering Prayer / relic)
@@ -817,12 +836,21 @@ This is the manual verification step — not automatable.
 - Arbites (Nuncio-Aquila drone)
 - Any 4th bot
 
-**Verify:**
-1. Launch Solo Play, start mission
-2. Confirm `BetterBots loaded` in chat
-3. Play through combat encounters
-4. After mission: `bb-log summary` on latest log
-5. Check for `charge consumed` events for each Tier 3 ability
-6. Check `fallback item finished without charge consume` — ratio should be much better than ~13%/~21%
-7. Check heuristic hold/activate rules in debug log
-8. Record results in VALIDATION_TRACKER.md
+**Steps:**
+1. Enable debug logging in mod settings
+2. Launch Solo Play, start mission
+3. Play through combat encounters (~10 min)
+4. Use `/bb_decide` during combat to verify heuristic rule names appear (not generic "ready/blocked")
+5. After mission: `bb-log summary` on latest log
+6. Check heuristic activate/hold rules fire correctly:
+   - zealot_relic: `team_low_toughness`, `self_critical` vs `hold`, `no_allies`
+   - force_field: `pressure`, `ranged_pressure` vs `safe`, `hold`
+   - drone: `team_horde`, `monster_fight` vs `no_allies`, `low_value`
+7. Verify consume rates remain at improved levels from Task 2
+8. Record results in `docs/VALIDATION_TRACKER.md`
+
+**Commit:**
+```bash
+git add docs/VALIDATION_TRACKER.md
+git commit -m "docs: record Tier 3 heuristic validation run (#3)"
+```
