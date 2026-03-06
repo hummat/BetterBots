@@ -81,6 +81,9 @@ local function build_context(unit, blackboard)
 		target_is_elite_special = false,
 		target_is_monster = false,
 		target_is_super_armor = false,
+		allies_in_coherency = 0,
+		avg_ally_toughness_pct = 1,
+		max_ally_corruption_pct = 0,
 	}
 
 	local perception_component = blackboard and blackboard.perception
@@ -111,6 +114,38 @@ local function build_context(unit, blackboard)
 		if warp_charge_component and warp_charge_component.current_percentage ~= nil then
 			context.peril_pct = warp_charge_component.current_percentage
 		end
+	end
+
+	local coherency_extension = ScriptUnit.has_extension(unit, "coherency_system")
+	if coherency_extension and coherency_extension.in_coherence_units then
+		local in_coherence_units = coherency_extension:in_coherence_units()
+		local ally_count = 0
+		local ally_toughness_sum = 0
+		local max_corruption = 0
+		for ally_unit, _ in pairs(in_coherence_units) do
+			local ally_breed_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+			local ally_breed = ally_breed_data and ally_breed_data:breed()
+			local is_dog = ally_breed and ally_breed.name and string.find(ally_breed.name, "companion", 1, true)
+			if not is_dog then
+				ally_count = ally_count + 1
+				local ally_toughness_ext = ScriptUnit.has_extension(ally_unit, "toughness_system")
+				if ally_toughness_ext and ally_toughness_ext.current_toughness_percent then
+					ally_toughness_sum = ally_toughness_sum + (ally_toughness_ext:current_toughness_percent() or 1)
+				else
+					ally_toughness_sum = ally_toughness_sum + 1
+				end
+				local ally_health_ext = ScriptUnit.has_extension(ally_unit, "health_system")
+				if ally_health_ext and ally_health_ext.permanent_damage_taken_percent then
+					local corruption = ally_health_ext:permanent_damage_taken_percent() or 0
+					if corruption > max_corruption then
+						max_corruption = corruption
+					end
+				end
+			end
+		end
+		context.allies_in_coherency = ally_count
+		context.avg_ally_toughness_pct = ally_count > 0 and (ally_toughness_sum / ally_count) or 1
+		context.max_ally_corruption_pct = max_corruption
 	end
 
 	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
