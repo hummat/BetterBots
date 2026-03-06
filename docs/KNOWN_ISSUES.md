@@ -72,5 +72,5 @@
 2. Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).
 3. Replace heuristic item matching with explicit per-template mapping table.
 4. Reduce debug-log noise for expected transient `invalid action_input` states.
-5. ~~Add smarter per-ability trigger policies~~ DONE (#2) — validate thresholds in-game.
+5. ~~Add smarter per-ability trigger policies~~ Code complete (#2) — needs in-game validation.
 6. Track upstream status of the Tertium4Or5 nil-guard fix and remove local compatibility note once upstreamed.

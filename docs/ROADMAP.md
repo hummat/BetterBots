@@ -19,7 +19,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Category | Status |
 |---|-------|----------|--------|
-| 2 | Per-career threat heuristics | ability-quality | **DONE** — 13 per-template functions, 80 tests. Needs in-game validation. Ready to implement — all tactics docs + perception APIs documented. |
+| 2 | Per-career threat heuristics | ability-quality | **Code complete** — 13 testable per-template functions (15 total, 2 N/A), 80 tests. Needs in-game validation. All tactics docs + perception APIs documented. |
 | 3 | Tier 3 item-ability reliability | tier: 3 | Root cause identified — timing mismatch between `ITEM_SEQUENCE_PROFILES` and engine action durations. Fix values known (see `docs/KNOWN_ISSUES.md`). |
 | 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
 | 11 | Ability suppression / impulse control | ability-quality | Unblocked — character state APIs found (`movement_state`, `lunge_character_state`, etc.). Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
