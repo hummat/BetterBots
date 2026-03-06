@@ -840,6 +840,22 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("blocks self_critical when num_nearby too high", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 3, toughness_pct = 0.20, allies_in_coherency = 0,
+			}))
+			assert.is_false(ok)
+			assert.matches("no_allies", rule)
+		end)
+
+		it("does not block overwhelmed at exact threshold", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 5, toughness_pct = 0.30, allies_in_coherency = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
 		it("returns false for unknown item ability", function()
 			local ok, rule = eval_item("unknown_ability_xyz", ctx({ num_nearby = 5 }))
 			assert.is_false(ok)
@@ -905,6 +921,22 @@ describe("heuristics", function()
 		it("holds in moderate state", function()
 			local ok, rule = eval_item("psyker_force_field", ctx({
 				num_nearby = 2, toughness_pct = 0.60, target_enemy = true,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("activates on ally aid even when toughness is high", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 1, toughness_pct = 0.95, target_ally_needs_aid = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("does not block safe at exact boundary", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 4, toughness_pct = 0.80, target_enemy = true,
 			}))
 			assert.is_false(ok)
 			assert.matches("hold", rule)

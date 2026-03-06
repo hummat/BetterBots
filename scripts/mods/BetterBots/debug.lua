@@ -75,6 +75,9 @@ local function context_snapshot(context)
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,
 		target_is_super_armor = context.target_is_super_armor,
+		allies_in_coherency = context.allies_in_coherency,
+		avg_ally_toughness_pct = context.avg_ally_toughness_pct,
+		max_ally_corruption_pct = context.max_ally_corruption_pct,
 	}
 end
 

@@ -650,7 +650,7 @@ local function _can_activate_stimm_field(context)
 	if context.allies_in_coherency == 0 then
 		return false, "stimm_block_no_allies"
 	end
-	if (context.max_ally_corruption_pct or 0) > 0.30 and context.allies_in_coherency >= 1 then
+	if context.max_ally_corruption_pct > 0.30 and context.allies_in_coherency >= 1 then
 		return true, "stimm_corruption_heal"
 	end
 	if context.target_ally_needs_aid and context.num_nearby >= 2 then

@@ -413,7 +413,7 @@ local function can_use_item_fallback(unit, ability_extension, ability_name, blac
 		return false, "item_cooldown_not_ready"
 	end
 
-	if not _evaluate_item_heuristic then
+	if not _evaluate_item_heuristic or not _build_context then
 		return false, "item_heuristics_not_wired"
 	end
 
