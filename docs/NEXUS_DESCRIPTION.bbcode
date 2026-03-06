@@ -1,6 +1,6 @@
 [size=4][b]BetterBots — Bot Combat Abilities for Solo Play[/b][/size]
 
-Aims to bring VT2-level bot ability usage to Darktide. This first beta covers stance, dash, charge, shout, and stealth abilities — with item-based abilities (relics, shields) experimental and grenades planned.
+Aims to bring VT2-level bot ability usage to Darktide. Covers stance, dash, charge, shout, and stealth abilities with smart per-ability trigger heuristics — item-based abilities (relics, shields) are experimental and grenades are planned.
 
 Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects the missing metadata so the existing infrastructure handles the rest.
 
@@ -33,11 +33,13 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 [*]Arbites: Nuncio-Aquila — works sometimes
 [/list]
 
+[b]Smart trigger conditions (new in v0.2.0):[/b]
+Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, and ally state. Each ability has specific activate and hold rules grounded in community tactics. 12 of 13 trigger functions validated in-game.
+
 [size=3][b]What doesn't work yet[/b][/size]
 [list]
 [*]Grenades / blitz abilities (different architecture needed)
 [*]Hive Scum: Stimm Field (item-based, same challenge as above)
-[*]Smart trigger conditions (bots currently use abilities whenever enemies are nearby and cooldown is ready)
 [/list]
 
 [size=3][b]Requirements[/b][/size]
@@ -61,7 +63,7 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 
 [size=3][b]Known limitations[/b][/size]
 [list]
-[*]Abilities fire whenever enemies are nearby — no per-career smart heuristics yet
+[*]Psyker Scrier's Gaze can cause warp overcharge explosions (bot has no vent ability)
 [*]Item-based abilities (force field, drone) have low success rates in sustained combat
 [*]Mods are disabled after every Darktide update — re-patch required
 [*]Hive Scum abilities are untested (DLC required)
