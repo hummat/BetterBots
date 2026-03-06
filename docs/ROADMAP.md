@@ -19,10 +19,10 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Category | Status |
 |---|-------|----------|--------|
-| 2 | Per-career threat heuristics | ability-quality | Research complete (6 tactics docs). Ready for implementation. |
-| 3 | Tier 3 item-ability reliability | tier: 3 | Force field and drone need improved consume ratios. |
+| 2 | Per-career threat heuristics | ability-quality | **DONE** — 13 per-template functions, 80 tests. Needs in-game validation. Ready to implement — all tactics docs + perception APIs documented. |
+| 3 | Tier 3 item-ability reliability | tier: 3 | Root cause identified — timing mismatch between `ITEM_SEQUENCE_PROFILES` and engine action durations. Fix values known (see `docs/KNOWN_ISSUES.md`). |
 | 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
-| 11 | Ability suppression / impulse control | ability-quality | Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
+| 11 | Ability suppression / impulse control | ability-quality | Unblocked — character state APIs found (`movement_state`, `lunge_character_state`, etc.). Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
 
 ### P2: Later — Planned, not urgent
 
@@ -30,18 +30,18 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 12 | Stance early cancellation | Cancel stance when all enemies die or bot needs to sprint. |
+| 12 | Stance early cancellation | Researched — complex. Stances have no release input (`transition = "stay"`). Needs template injection or `stop_action()` + buff cleanup. |
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
-| 15 | Suppress dodge during ability hold | Prevent dodge from interrupting charge/hold phases. |
+| 15 | Suppress dodge during ability hold | Unblocked — `movement_state.is_dodging` + `Dodge.is_dodging()` available. Prevent dodge from interrupting charge/hold phases. |
 | 21 | Hazard avoidance during abilities | Don't stance in fire/gas/bomber puddles. |
 
 **Ability scope expansion:**
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | Blitz / grenade support | 18 internal defs across 6 classes. `adamant_whistle` only blitz with `ability_template`. |
+| 4 | Blitz / grenade support | Inventory extracted — all 18 templates mapped, all need item-based fallback, no `ability_template` on any. `adamant_whistle` only blitz with `ability_template`. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
-| 8 | Hive Scum ability support | Focus + Rage (Tier 1), Stimm Field (Tier 3). DLC-blocked for testing. |
+| 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs validation run. Stimm Field (Tier 3) DLC-blocked for testing. |
 
 **General bot behavior:**
 
@@ -51,7 +51,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
-| 20 | Don't interrupt own revive | Raise combat interrupt threshold during active revive. |
+| 20 | Don't interrupt own revive | Ready — fix is ~5 LOC: check `current_interaction_unit ~= nil` in ability condition. |
 
 ### P3: Backlog — Nice to have, no timeline
 

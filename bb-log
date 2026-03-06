@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# bb-log — BetterBots log analysis tool
+# Usage: bb-log [command] [log-index]
+#   commands: activations, rules, holds, summary, errors, tail, list, raw <pattern>
+#   log-index: 0=latest (default), 1=second-latest, etc.
+set -euo pipefail
+
+LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
+
+get_log() {
+    local idx="${1:-0}"
+    local file
+    file=$(ls -1t "$LOG_DIR"/console-*.log 2>/dev/null | sed -n "$((idx + 1))p")
+    if [[ -z "$file" ]]; then
+        echo "No log found at index $idx" >&2
+        exit 1
+    fi
+    echo "$file"
+}
+
+cmd="${1:-summary}"
+log_idx="${2:-0}"
+
+case "$cmd" in
+    list)
+        ls -1t "$LOG_DIR"/console-*.log 2>/dev/null | head -10 | nl -v0 -ba
+        exit 0
+        ;;
+    tail)
+        log=$(get_log "$log_idx")
+        echo "Tailing: $(basename "$log")"
+        tail -f "$log" | grep --line-buffered -E "BetterBots|Script Error|Lua Stack"
+        ;;
+esac
+
+log=$(get_log "$log_idx")
+echo "Log: $(basename "$log")"
+echo "Lines: $(wc -l < "$log")"
+echo ""
+
+case "$cmd" in
+    activations)
+        rg "fallback queued|charge consumed" "$log"
+        ;;
+    rules)
+        echo "=== Activation rules ==="
+        rg "fallback queued" "$log" | sed 's/.*rule=\([^,]*\),.*/\1/' | sort | uniq -c | sort -rn
+        echo ""
+        echo "=== Charge consumes ==="
+        rg "charge consumed" "$log" | sed 's/.*for \([^ ]*\) .*/\1/' | sort | uniq -c | sort -rn
+        ;;
+    holds)
+        echo "=== Active holds (nearby > 0) ==="
+        rg "fallback held" "$log" | grep -v "nearby=0)" | sed 's/.*rule=\([^,]*\),.*/\1/' | sort | uniq -c | sort -rn
+        ;;
+    errors)
+        rg "Script Error|Lua Stack|<<Crash>>" "$log" || echo "(no errors found)"
+        ;;
+    summary)
+        total_queued=$(rg -c "fallback queued" "$log" 2>/dev/null || echo 0)
+        total_consumed=$(rg -c "charge consumed" "$log" 2>/dev/null || echo 0)
+        total_held_active=$(rg "fallback held" "$log" 2>/dev/null | grep -vc "nearby=0)" 2>/dev/null || echo 0)
+        total_held_idle=$(rg "fallback held" "$log" 2>/dev/null | grep -c "nearby=0)" 2>/dev/null || echo 0)
+        total_errors=$(rg -c "Script Error" "$log" 2>/dev/null || echo 0)
+
+        echo "Queued: $total_queued | Consumed: $total_consumed | Held (combat): $total_held_active | Held (idle): $total_held_idle | Errors: $total_errors"
+        echo ""
+
+        echo "=== Activations by rule ==="
+        rg "fallback queued" "$log" 2>/dev/null | sed 's/.*rule=\([^,]*\),.*/\1/' | sort | uniq -c | sort -rn || echo "(none)"
+        echo ""
+
+        echo "=== Consumes by ability ==="
+        rg "charge consumed" "$log" 2>/dev/null | sed 's/.*for \([^ ]*\) .*/\1/' | sort | uniq -c | sort -rn || echo "(none)"
+        echo ""
+
+        echo "=== Top holds (combat) ==="
+        rg "fallback held" "$log" 2>/dev/null | grep -v "nearby=0)" | sed 's/.*rule=\([^,]*\),.*/\1/' | sort | uniq -c | sort -rn | head -10 || echo "(none)"
+        ;;
+    raw)
+        pattern="${3:-BetterBots}"
+        rg "$pattern" "$log"
+        ;;
+    *)
+        echo "Unknown command: $cmd"
+        echo "Usage: bb-log [activations|rules|holds|summary|errors|tail|list|raw] [log-index]"
+        exit 1
+        ;;
+esac

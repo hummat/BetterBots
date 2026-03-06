@@ -1,55 +1,50 @@
-# Status Snapshot (March 5, 2026)
+# Status Snapshot (March 6, 2026)
+
+## What's shipped
+
+### v0.1.0 (2026-03-05)
+- Tier 1 + Tier 2 ability activation for all 6 classes
+- Tier 3 item-based abilities: zealot relic (stable), force field (~13%), drone (~21%)
+- Generic trigger: `enemies_in_proximity() > 0`
+- Runtime diagnostics (condition/enter/charge trace hooks, debug logging)
+- Published on Nexus Mods
+
+### Post-v0.1.0 (unreleased)
+- **Refactored** into sub-modules: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25/#26)
+- **Per-career threat heuristics** (#2): 13 per-template heuristic functions replacing generic `enemies_in_proximity() > 0`
+  - Veteran: VoC (squad_leader) + Executioner's Stance (ranger) branching via `class_tag` + Stealth
+  - Zealot: Dash (distance/super_armor/priority gates) + Invisibility (emergency/overwhelm/ally)
+  - Psyker: Shout (peril-gated) + Stance (peril window + threat)
+  - Ogryn: Charge (gap-close/ally rescue) + Taunt (survivability-gated) + Gunlugger (ranged focus)
+  - Arbites: Stance (toughness/monster) + Charge (density/elite) + Shout (emergency)
+  - Hive Scum: Focus + Rage (toughness-reactive)
+- **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
+- **Unit tests**: 95 tests via busted (heuristics, meta_data, resolve_decision)
+- **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
+
+## Current Tier Status
+
+| Tier | Status | Notes |
+|------|--------|-------|
+| 1 | PASS (5/5 testable) | Broker variants DLC-blocked |
+| 2 | PASS (6/6 testable) | `adamant_shout` N/A (cut content) |
+| 3 | PARTIAL | `zealot_relic` PASS, `force_field` ~13%, `drone` ~21% |
 
 ## Evidence Source
 
-- Latest analyzed log:
-  `/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs/console-2026-03-05-14.57.34-ff2ae36c-e683-46b6-9b33-2885b60f2153.log`
-- Newer validation logs are tracked in `docs/VALIDATION_TRACKER.md`:
-  - `console-2026-03-05-14.44.43-...` (Tier 1 evidence + crash before nil-account guard)
-  - `console-2026-03-05-14.57.34-...` (Tier 2 completion evidence, no new crash signature observed)
-- This file contains multiple play segments and hot-reloads.
-- Note: Darktide console log timestamps are UTC, not local timezone.
-- Ongoing manual run evidence and PASS/PARTIAL/UNKNOWN matrix now live in `docs/VALIDATION_TRACKER.md`.
+- Latest analyzed log: `console-2026-03-05-14.57.34-...`
+- Full evidence matrix: `docs/VALIDATION_TRACKER.md`
+- Log timestamps are UTC, not local timezone
 
-## Confirmed Working In This Log
+## Known Blockers
 
-1. Startup patching is active across reloads.
-   - `BetterBots loaded`
-   - `patched bt_bot_conditions.can_activate_ability`
-   - `patched bt_conditions.can_activate_ability`
+1. **Tier 3 reliability** (#3): Force field and drone consume ratios remain low
+2. **Heuristic validation**: Per-career heuristics implemented but not yet validated in-game — thresholds may need tuning
 
-2. Zealot relic item path is repeatedly successful.
-   - In latest extraction: 5 consumes, 0 no-charge completions.
-
-3. Psyker force-field and Arbites Nuncio-Aquila can both succeed, but are still intermittent.
-   - `psyker_force_field_dome`: 9 consumes vs 60 no-charge completions (current rolling-log snapshot).
-   - `adamant_area_buff_drone`: 10 consumes vs 66 no-charge completions (current rolling-log snapshot).
-   - Post-timing-patch window also shows new consumes for both, confirming runtime patch activation.
-
-## Partial / Experimental
-
-1. Psyker force-field and Nuncio-Aquila remain unstable in sustained combat.
-   - Frequent pattern:
-     - `fallback item queued ... aim/place...`
-     - `fallback item continuing charge confirmation ... lost combat-ability wield ...`
-     - `fallback item finished without charge consume ...`
-   - Overall in this file, no-charge outcomes still dominate.
-
-2. Weapon-switch lock hook behavior is validated in latest runs.
-   - Repeated lock evidence exists for relic, force-field, and Nuncio-Aquila (`blocked weapon switch while keeping ...`).
-   - Locking helps prevent immediate cancel but does not by itself solve item ability reliability.
-
-## Known Log Noise
-
-1. Frequent `fallback blocked ... invalid action_input=...` appears during combat.
-   - This is expected when inputs are transiently invalid (cooldown/state windows), but it is noisy.
-
-2. Non-mod engine/nav errors can coexist in the same file:
-   - `ERROR [BotNavigationExtension] Can't path, AStar was cancelled...`
-   - These are not BetterBots Lua tracebacks.
-
-## Current Conclusion
-
-1. Tier 1 and Tier 2 validation are complete for currently testable abilities (see `docs/VALIDATION_TRACKER.md` matrix).
-2. Tier 3 remains the active blocker: relic is strong, force-field is still the primary instability hotspot, and Nuncio-Aquila is still unreliable despite multiple confirmed consumes.
-3. Remaining work is reliability hardening for item abilities, not broad Tier 2 activation coverage.
+## Next Steps
+- Close issue #2 on GitHub
+- Validate heuristic thresholds in-game (all classes)
+- Ability suppression / impulse control (#11)
+- Stabilize Tier 3 item sequences (#3)
+- Per-ability toggle settings (#6)
+- Investigate grenade/blitz approach (#4)

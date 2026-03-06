@@ -53,22 +53,32 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 
-**Useful grep recipes:**
+**Preferred: use `bb-log`** (project root):
+```bash
+bb-log summary        # one-shot overview: counts + top rules + top holds
+bb-log activations    # raw fallback queued + charge consumed lines
+bb-log rules          # activation counts by rule + consume counts by ability
+bb-log holds          # non-idle hold rules (nearby > 0)
+bb-log errors         # Script Error / Lua Stack / Crash lines
+bb-log tail           # real-time monitoring (grep BetterBots + errors)
+bb-log list           # show 10 most recent log files with indices
+bb-log raw <pattern>  # arbitrary rg pattern against log
+bb-log <cmd> 1        # use second-latest log (0=latest, default)
+```
+
+**Manual grep recipes** (if bb-log unavailable):
 ```bash
 LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
-LATEST=$(ls -1t "$LOG_DIR" | head -n 1)
-
-# All BetterBots output (excluding load messages)
-rg "BetterBots DEBUG:" "$LOG_DIR/$LATEST" | grep -v "patch\|logging\|loaded\|metadata\|GameplayState\|condition"
-
-# Only combat activity (excludes nearby=0 idle traces)
-rg "BetterBots DEBUG:" "$LOG_DIR/$LATEST" | grep -v "nearby=0\|patch\|logging\|loaded\|metadata\|GameplayState\|condition"
+LATEST=$(ls -1t "$LOG_DIR"/console-*.log | head -n 1)
 
 # Activations only
-rg "fallback queued|charge consumed" "$LOG_DIR/$LATEST"
+rg "fallback queued|charge consumed" "$LATEST"
+
+# Active holds (combat, not idle)
+rg "fallback held" "$LATEST" | grep -v "nearby=0)"
 
 # Errors only
-rg "Script Error|Lua Stack" "$LOG_DIR/$LATEST"
+rg "Script Error|Lua Stack" "$LATEST"
 ```
 
 **Common mistake:** Do NOT grep for `"decision:"` or `"-> true"` — those patterns don't exist in the log. The actual format is `"fallback queued/held/blocked"` with rule names inline.
@@ -107,6 +117,34 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. If decision logic is unclear, run `/bb_decide` once around the event.
 5. If still unclear, run `/bb_brain` once and inspect the dump.
 6. Correlate with log lines (`fallback held/queued`, `charge consumed`, `invalid action_input`).
+
+### Reading context dumps (deep verification)
+
+When debug logging is enabled, BetterBots emits a **one-shot context dump** the first time each ability template is activated in a session. These are written via `mod:dump()` (table → log) and contain the full decision context at the moment of activation.
+
+**What to look for in a dump:**
+
+| Field | Meaning | Trust level |
+|-------|---------|-------------|
+| `rule` | Which heuristic branch fired (e.g. `ogryn_gunlugger_high_threat`) | High — directly from code |
+| `activation_input` | The action_input queued (e.g. `stance_pressed`) | High |
+| `challenge_rating_sum` | Aggregate threat score from perception | High — use for tuning |
+| `num_nearby` / `elite_count` / `special_count` | Threat composition | High |
+| `target_enemy_distance` | Distance to selected target | High |
+| `health_pct` / `toughness_pct` / `peril_pct` | Bot survival state | High |
+| `target_enemy` | Breed name of selected target | **Medium** — can disagree with aggregates (see below) |
+| `target_enemy_type` | `melee` or `ranged` classification | **Medium** — same caveat |
+
+**Perception field inconsistency:** `target_enemy` and `target_enemy_type` reflect the bot's *selected* target (single unit from the BT targeting system), while `challenge_rating_sum`, `num_nearby`, and type counts reflect the *broadphase proximity scan* (all enemies within range). These two sources can disagree — e.g. a poxwalker may be the selected target while the aggregate CR and type counts reflect a nearby Chaos Ogryn. When tuning heuristics, **trust the aggregate fields over the single-target label**.
+
+**Verification workflow with dumps:**
+
+1. Enable debug logging in mod settings.
+2. Play through combat encounters.
+3. After the session, grep for `one-shot context dump` to find dump entries.
+4. For each dump, find the matching `fallback queued` (activation) and `charge consumed` (confirmation) lines nearby in the log.
+5. Check whether the `rule` and context fields match what you'd expect for that combat situation.
+6. If they don't match, the heuristic thresholds may need tuning — the dump gives you the exact values to adjust against.
 
 ## Automated testing
 

@@ -18,21 +18,28 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 
 ## Testing
 
-No automated tests — this is a Lua mod running inside Darktide's engine. Verify by:
-1. Launching the game with SoloPlay + Tertium4Or5 mods active
-2. Checking for `BetterBots loaded` and `injected meta_data for ...` in the game chat
-3. Observing bot behavior during combat encounters
+**Automated** (outside the game):
+- `make test` — 95 unit tests via busted (heuristics, meta_data, resolve_decision)
+- `make check` — full quality gate (format + lint + lsp + test)
+
+**In-game** (manual verification):
+1. Launch with SoloPlay + Tertium5/6 mods active
+2. Check for `BetterBots loaded` in game chat
+3. After mission: `bb-log summary` to verify activations and hold rules
+4. See `docs/VALIDATION_TRACKER.md` for structured run entries and the heuristic validation matrix
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 ## Debugging
 
 See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
+- **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
 - `mod:dtf(table, name, depth)` — export table as JSON to `./dump/`
 - `mod:pcall(func)` — safe call with stack trace via `Script.callstack()`
 - `mod:command(name, desc, func)` — register `/name` chat commands for runtime debugging
+- In-game: `/bb_state`, `/bb_decide`, `/bb_brain` for live bot diagnostics
 - Hot-reload: `Ctrl+Shift+R` (requires DMF Developer Mode)
 - Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/DEBUGGING.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
 - **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
@@ -81,7 +88,7 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 1. **Tier 1 (whitelist removal):** Templates that already have `ability_meta_data` — just need the `else return false` removed. These work end-to-end with no other changes.
 2. **Tier 2 (meta_data injection):** Templates that exist but lack `ability_meta_data`. We inject it at load time (same pattern Tertium4Or5 uses for `attack_meta_data`).
-3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` to pass all templates with valid `ability_meta_data` through, using `enemies_in_proximity() > 0` as the generic trigger.
+3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` with per-template heuristics (13 functions in `heuristics.lua`). Each ability has specific activate/block conditions based on health, toughness, peril, enemy composition, distance, and ally state. Unknown templates fall back to `enemies_in_proximity() > 0`.
 
 ### Ability tiers
 
@@ -144,6 +151,8 @@ Local clone: `../Darktide-Source-Code/`
 | Modify input queueing or action sequences | `docs/BOT_INPUT_SYSTEM.md` |
 | Assess what works / what's broken | `docs/VALIDATION_TRACKER.md` + `docs/KNOWN_ISSUES.md` |
 | Work on Tier 3 item abilities | `docs/BOT_INPUT_SYSTEM.md` + `docs/RELATED_MODS.md` |
+| Work on grenade/blitz support | `docs/GRENADE_INVENTORY.md` + `docs/BOT_INPUT_SYSTEM.md` |
+| Gate ability activation on bot state | `docs/CHARACTER_STATE_API.md` |
 | Integrate with or reference other mods | `docs/RELATED_MODS.md` |
 | Plan work or prioritize issues | `docs/ROADMAP.md` + `docs/STATUS.md` |
 | Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
@@ -176,6 +185,10 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 - `docs/BOT_INPUT_SYSTEM.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
 - `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots are veterans, zero talents, weapon templates
 
+**API references** (from decompiled source):
+- `docs/GRENADE_INVENTORY.md` — all 18 grenade/blitz templates, input patterns, implementation approach
+- `docs/CHARACTER_STATE_API.md` — character state detection components, fields, access patterns
+
 **Project management:**
 `docs/DEBUGGING.md`, `docs/LOGGING.md`, `docs/ARCHITECTURE.md`, `docs/VALIDATION_TRACKER.md`, `docs/KNOWN_ISSUES.md`, `docs/RELATED_MODS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`
 
@@ -183,8 +196,18 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 
 ```
 BetterBots.mod                              # DMF entry point
+bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
-  BetterBots.lua                            # Core logic
+  BetterBots.lua                            # Main: hooks, condition patch, fallback queue
+  heuristics.lua                            # 13 per-template heuristic functions + build_context()
+  meta_data.lua                             # ability_meta_data injection
+  item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
+  debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
+tests/
+  test_helper.lua                           # make_context(), mock factories, engine stubs
+  heuristics_spec.lua                       # 80 tests for all 13 heuristic functions
+  meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
+  resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
 ```
