@@ -194,10 +194,10 @@ local function _can_activate_veteran_combat_ability(
 )
 	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
 	if class_tag == "squad_leader" then
-		if context.num_nearby >= 4 then
+		if context.num_nearby >= 3 then
 			return true, "veteran_voc_surrounded"
 		end
-		if context.toughness_pct < 0.45 and context.num_nearby >= 2 then
+		if context.toughness_pct < 0.50 and context.num_nearby >= 2 then
 			return true, "veteran_voc_low_toughness"
 		end
 		if context.toughness_pct < 0.25 and context.num_nearby >= 1 then
@@ -206,7 +206,7 @@ local function _can_activate_veteran_combat_ability(
 		if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) <= 9 then
 			return true, "veteran_voc_ally_aid"
 		end
-		if context.toughness_pct > 0.80 and context.num_nearby <= 2 then
+		if context.toughness_pct > 0.85 and context.num_nearby <= 1 then
 			return false, "veteran_voc_block_safe_state"
 		end
 
@@ -244,10 +244,10 @@ local function _can_activate_veteran_stealth(context)
 	if context.num_nearby == 0 then
 		return false, "veteran_stealth_block_no_enemies"
 	end
-	if context.toughness_pct < 0.15 and context.num_nearby >= 3 then
+	if context.toughness_pct < 0.25 and context.num_nearby >= 2 then
 		return true, "veteran_stealth_critical_toughness"
 	end
-	if context.health_pct < 0.35 and context.num_nearby >= 2 then
+	if context.health_pct < 0.40 and context.num_nearby >= 1 then
 		return true, "veteran_stealth_low_health"
 	end
 	if
@@ -257,7 +257,7 @@ local function _can_activate_veteran_stealth(context)
 	then
 		return true, "veteran_stealth_ally_aid"
 	end
-	if context.num_nearby >= 7 and context.toughness_pct < 0.40 then
+	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
 		return true, "veteran_stealth_overwhelmed"
 	end
 
@@ -290,6 +290,9 @@ local function _can_activate_zealot_dash(context)
 	if context.target_is_elite_special and target_distance and target_distance > 5 and target_distance < 20 then
 		return true, "zealot_dash_elite_special_gap"
 	end
+	if context.num_nearby >= 2 and target_distance and target_distance > 4 and target_distance < 15 then
+		return true, "zealot_dash_combat_gap_close"
+	end
 
 	return false, "zealot_dash_hold"
 end
@@ -298,10 +301,10 @@ local function _can_activate_zealot_invisibility(context)
 	if context.num_nearby == 0 then
 		return false, "zealot_stealth_block_no_enemies"
 	end
-	if (context.toughness_pct < 0.20 and context.num_nearby >= 3) or context.health_pct < 0.25 then
+	if (context.toughness_pct < 0.30 and context.num_nearby >= 2) or context.health_pct < 0.30 then
 		return true, "zealot_stealth_emergency"
 	end
-	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+	if context.num_nearby >= 4 and context.toughness_pct < 0.60 then
 		return true, "zealot_stealth_overwhelmed"
 	end
 	if
@@ -328,7 +331,7 @@ local function _can_activate_psyker_shout(context)
 	if context.toughness_pct < 0.20 and context.num_nearby >= 1 then
 		return true, "psyker_shout_low_toughness"
 	end
-	if context.priority_target_enemy and context.target_enemy_distance and context.target_enemy_distance <= 15 then
+	if context.priority_target_enemy and context.target_enemy_distance and context.target_enemy_distance <= 20 then
 		return true, "psyker_shout_priority_target"
 	end
 	if context.peril_pct and context.peril_pct < 0.30 and context.num_nearby < 3 and context.toughness_pct > 0.50 then
@@ -362,8 +365,14 @@ local function _can_activate_psyker_stance(context)
 	then
 		return true, "psyker_stance_target_window"
 	end
-	if context.challenge_rating_sum >= 5.0 and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85)) then
+	if
+		context.challenge_rating_sum >= 4.0
+		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+	then
 		return true, "psyker_stance_threat_window"
+	end
+	if bot_no_peril and context.num_nearby >= 3 then
+		return true, "psyker_stance_combat_density"
 	end
 
 	return false, "psyker_stance_hold"
@@ -380,10 +389,10 @@ local function _can_activate_ogryn_charge(context)
 	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 6 then
 		return true, "ogryn_charge_ally_aid"
 	end
-	if context.opportunity_target_enemy and target_distance and target_distance >= 8 and target_distance <= 18 then
+	if context.opportunity_target_enemy and target_distance and target_distance >= 6 and target_distance <= 20 then
 		return true, "ogryn_charge_opportunity_target"
 	end
-	if context.num_nearby >= 4 and context.toughness_pct < 0.20 then
+	if context.num_nearby >= 3 and context.toughness_pct < 0.30 then
 		return true, "ogryn_charge_escape"
 	end
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_ally_needs_aid then
@@ -403,10 +412,10 @@ local function _can_activate_ogryn_taunt(context)
 	if context.target_ally_needs_aid and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
 		return true, "ogryn_taunt_ally_aid"
 	end
-	if context.num_nearby >= 4 and context.toughness_pct > 0.40 and context.health_pct > 0.30 then
+	if context.num_nearby >= 3 and context.toughness_pct > 0.35 and context.health_pct > 0.25 then
 		return true, "ogryn_taunt_horde_control"
 	end
-	if context.challenge_rating_sum >= 5.0 and context.num_nearby >= 3 and context.toughness_pct > 0.35 then
+	if context.challenge_rating_sum >= 4.0 and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
 		return true, "ogryn_taunt_high_threat"
 	end
 	if context.num_nearby <= 2 and context.challenge_rating_sum < 1.5 then
@@ -418,13 +427,13 @@ end
 
 local function _can_activate_ogryn_gunlugger(context)
 	local target_distance = context.target_enemy_distance
-	if context.num_nearby >= 3 then
+	if context.num_nearby >= 4 then
 		return false, "ogryn_gunlugger_block_melee_pressure"
 	end
 	if target_distance and target_distance < 4 then
 		return false, "ogryn_gunlugger_block_target_too_close"
 	end
-	if context.challenge_rating_sum < 2.0 then
+	if context.challenge_rating_sum < 1.5 then
 		return false, "ogryn_gunlugger_block_low_threat"
 	end
 	if context.urgent_target_enemy and context.num_nearby <= 1 and target_distance and target_distance > 5 then
@@ -434,11 +443,11 @@ local function _can_activate_ogryn_gunlugger(context)
 		context.target_enemy_type == "ranged"
 		and target_distance
 		and target_distance > 5
-		and (context.elite_count + context.special_count) >= 2
+		and (context.elite_count + context.special_count) >= 1
 	then
 		return true, "ogryn_gunlugger_ranged_pack"
 	end
-	if context.challenge_rating_sum >= 6.0 and target_distance and target_distance > 5 and context.num_nearby <= 2 then
+	if context.challenge_rating_sum >= 4.0 and target_distance and target_distance > 5 and context.num_nearby <= 2 then
 		return true, "ogryn_gunlugger_high_threat"
 	end
 
@@ -450,7 +459,7 @@ local function _can_activate_adamant_stance(context)
 	if context.toughness_pct < 0.30 then
 		return true, "adamant_stance_low_toughness"
 	end
-	if context.num_nearby >= 3 and context.toughness_pct < 0.60 then
+	if context.num_nearby >= 2 and context.toughness_pct < 0.70 then
 		return true, "adamant_stance_surrounded"
 	end
 	if context.target_is_monster and target_distance and target_distance < 8 then
@@ -491,8 +500,15 @@ local function _can_activate_adamant_shout(context)
 	if context.toughness_pct < 0.25 and context.num_nearby >= 2 then
 		return true, "adamant_shout_low_toughness"
 	end
-	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+	if context.num_nearby >= 4 and context.toughness_pct < 0.60 then
 		return true, "adamant_shout_density"
+	end
+	if
+		(context.elite_count + context.special_count) >= 1
+		and context.num_nearby >= 2
+		and context.toughness_pct < 0.50
+	then
+		return true, "adamant_shout_elite_pressure"
 	end
 
 	return false, "adamant_shout_hold"
@@ -502,13 +518,13 @@ local function _can_activate_broker_focus(context)
 	if context.num_nearby == 0 then
 		return false, "broker_focus_block_no_enemies"
 	end
-	if context.toughness_pct < 0.40 then
+	if context.toughness_pct < 0.50 then
 		return true, "broker_focus_low_toughness"
 	end
 	if context.target_enemy_type == "ranged" and context.num_nearby >= 2 then
 		return true, "broker_focus_ranged_pressure"
 	end
-	if context.num_nearby >= 5 then
+	if context.num_nearby >= 4 then
 		return true, "broker_focus_density"
 	end
 
@@ -519,7 +535,7 @@ local function _can_activate_broker_rage(context)
 	if context.num_nearby == 0 then
 		return false, "broker_rage_block_no_enemies"
 	end
-	if context.toughness_pct < 0.40 then
+	if context.toughness_pct < 0.50 then
 		return true, "broker_rage_low_toughness"
 	end
 	if context.num_nearby >= 3 and context.melee_count >= 2 then
@@ -528,7 +544,7 @@ local function _can_activate_broker_rage(context)
 	if (context.elite_count + context.monster_count) >= 1 and context.num_nearby >= 1 then
 		return true, "broker_rage_elite_pressure"
 	end
-	if context.num_nearby >= 6 then
+	if context.num_nearby >= 5 then
 		return true, "broker_rage_density"
 	end
 	if context.target_enemy_type == "ranged" and context.num_nearby <= 2 then

@@ -121,6 +121,16 @@ describe("heuristics", function()
 			assert.matches("elite_special_gap", rule)
 		end)
 
+		it("activates on combat gap close with multiple enemies", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy = "unit",
+				target_enemy_distance = 8,
+				num_nearby = 2,
+			}))
+			assert.is_true(ok)
+			assert.matches("combat_gap_close", rule)
+		end)
+
 		it("holds when conditions not met", function()
 			local ok, rule = evaluate(T, ctx({
 				target_enemy = "unit",
@@ -305,6 +315,16 @@ describe("heuristics", function()
 			assert.matches("target_window", rule)
 		end)
 
+		it("activates at peril 0 with combat density", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 3,
+				peril_pct = 0,
+				challenge_rating_sum = 2.0,
+			}))
+			assert.is_true(ok)
+			assert.matches("combat_density", rule)
+		end)
+
 		it("still blocks at peril 0 with low threat", function()
 			local ok, rule = evaluate(T, ctx({
 				num_nearby = 1,
@@ -428,7 +448,7 @@ describe("heuristics", function()
 		local T = "ogryn_gunlugger_stance"
 
 		it("blocks under melee pressure", function()
-			local ok, rule = evaluate(T, ctx({ num_nearby = 3, target_enemy_distance = 10 }))
+			local ok, rule = evaluate(T, ctx({ num_nearby = 4, target_enemy_distance = 10 }))
 			assert.is_false(ok)
 			assert.matches("melee_pressure", rule)
 		end)
@@ -447,7 +467,7 @@ describe("heuristics", function()
 			local ok, rule = evaluate(T, ctx({
 				num_nearby = 1,
 				target_enemy_distance = 10,
-				challenge_rating_sum = 1.5,
+				challenge_rating_sum = 1.0,
 			}))
 			assert.is_false(ok)
 			assert.matches("low_threat", rule)
@@ -562,6 +582,16 @@ describe("heuristics", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 5, toughness_pct = 0.45 }))
 			assert.is_true(ok)
 			assert.matches("density", rule)
+		end)
+
+		it("activates on elite pressure", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 2,
+				elite_count = 1,
+				toughness_pct = 0.45,
+			}))
+			assert.is_true(ok)
+			assert.matches("elite_pressure", rule)
 		end)
 
 		it("holds when safe", function()
@@ -699,7 +729,7 @@ describe("heuristics", function()
 			end)
 
 			it("blocks in safe state", function()
-				local ok, rule = evaluate(T, ctx({ toughness_pct = 0.85, num_nearby = 2 }), voc_opts())
+				local ok, rule = evaluate(T, ctx({ toughness_pct = 0.90, num_nearby = 1 }), voc_opts())
 				assert.is_false(ok)
 				assert.matches("voc_block_safe_state", rule)
 			end)
