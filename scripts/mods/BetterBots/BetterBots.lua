@@ -145,7 +145,8 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		_debug_log(
 			"none:" .. ability_component_name,
 			fixed_t,
-			"blocked " .. ability_component_name .. " (template_name=none)"
+			"blocked " .. ability_component_name .. " (template_name=none)",
+			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 		)
 		return false
 	end
@@ -206,13 +207,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		)
 		return false
 	end
-
-	_debug_log(
-		"bt_gate:" .. ability_template_name,
-		fixed_t,
-		"bt gate evaluated " .. ability_template_name .. " (component=" .. tostring(ability_component_name) .. ")",
-		0.75
-	)
 
 	if ability_template_name == "zealot_relic" then
 		local can_activate =
@@ -398,17 +392,19 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	)
 
 	if not can_activate then
-		_debug_log(
-			"fallback_decision_block:" .. ability_template_name,
-			fixed_t,
-			"fallback held "
-				.. ability_template_name
-				.. " (rule="
-				.. tostring(rule)
-				.. ", nearby="
-				.. tostring(context.num_nearby)
-				.. ")"
-		)
+		if context.num_nearby > 0 then
+			_debug_log(
+				"fallback_decision_block:" .. ability_template_name,
+				fixed_t,
+				"fallback held "
+					.. ability_template_name
+					.. " (rule="
+					.. tostring(rule)
+					.. ", nearby="
+					.. tostring(context.num_nearby)
+					.. ")"
+			)
+		end
 		return
 	end
 

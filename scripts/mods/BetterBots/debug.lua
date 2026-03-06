@@ -156,14 +156,16 @@ local function _bot_blackboard(unit)
 end
 
 local function log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
+	if not can_activate then
+		return
+	end
+
 	_debug_log(
 		"decision:" .. ability_template_name,
 		fixed_t,
 		"decision "
 			.. ability_template_name
-			.. " -> "
-			.. tostring(can_activate)
-			.. " (rule="
+			.. " -> true (rule="
 			.. tostring(rule)
 			.. ", nearby="
 			.. tostring(context.num_nearby)

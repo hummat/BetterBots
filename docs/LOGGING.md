@@ -59,15 +59,27 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots DEBUG: logging enabled (force=...)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
-- `decision ... -> true/false`
+- `decision ... -> true` (BT condition path activation — only `true` results are logged)
 - `enter ability node ...`
 - `fallback queued ...` (template fallback queued)
+- `fallback held ...` (heuristic withheld ability — only logged when `num_nearby > 0`)
 - `fallback blocked ...` (template fallback rejected)
 - `fallback item queued ...` (item fallback queued wield/cast/unwield input)
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
+
+## Intentionally suppressed (noise reduction)
+
+The following were removed/throttled to reduce chat spam during testing:
+
+- **`bt gate evaluated`** — removed entirely; redundant with decision log
+- **`decision -> false`** — suppressed; BT-path false decisions are no longer logged
+- **`fallback held` with `nearby=0`** — suppressed; idle holds produce no log output
+- **`blocked (template_name=none)` in BT path** — throttled to 20s (was 2s); expected for item abilities
+
+**Observability impact:** Idle-state bot decisions (no enemies nearby) are completely invisible in new logs. `bb-log summary` `held_idle` counter will show 0 for runs after this change. This is acceptable for combat-focused heuristic tuning but means idle behavior issues won't appear in logs. Re-enable by reverting the guards in `debug.lua:log_ability_decision` and `BetterBots.lua:_fallback_try_queue_combat_ability` if needed.
 
 ## Interpreting failures
 
