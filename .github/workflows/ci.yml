@@ -51,8 +51,9 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq luarocks
 
-          # luacheck via luarocks
+          # luacheck + busted via luarocks
           sudo luarocks install luacheck
+          sudo luarocks install busted
 
           # stylua from GitHub release
           STYLUA_VERSION="2.0.2"

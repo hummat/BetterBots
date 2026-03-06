@@ -1,5 +1,5 @@
 LUA_FILES := $(shell find scripts -name '*.lua')
-BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
+BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
 
 .PHONY: deps lint format format-check lsp-check check test release package
 
@@ -18,12 +18,14 @@ format-check:
 lsp-check:
 	lua-language-server --configpath=.luarc.json --check=. --check_format=pretty --logpath=/tmp/luals-betterbots
 
-check: format-check lint lsp-check
+check: format-check lint lsp-check test
 
 test:
 	@if [ -d tests ]; then \
 		if [ -n "$(BUSTED_BIN)" ]; then \
-			lua "$(BUSTED_BIN)"; \
+			"$(BUSTED_BIN)"; \
+		elif [ -n "$$(ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)" ]; then \
+			lua "$$(ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)"; \
 		else \
 			echo "No busted runner found on PATH or in /usr/lib/luarocks."; \
 			exit 1; \
@@ -36,9 +38,7 @@ package:
 	@rm -f BetterBots.zip
 	@cd .. && zip -9 BetterBots/BetterBots.zip \
 		BetterBots/BetterBots.mod \
-		BetterBots/scripts/mods/BetterBots/BetterBots.lua \
-		BetterBots/scripts/mods/BetterBots/BetterBots_data.lua \
-		BetterBots/scripts/mods/BetterBots/BetterBots_localization.lua
+		BetterBots/scripts/mods/BetterBots/*.lua
 	@echo "Created BetterBots.zip"
 	@unzip -l BetterBots.zip
 

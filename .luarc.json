@@ -13,6 +13,9 @@
 		"checkThirdParty": false,
 		"library": [
 			"scripts"
+		],
+		"ignoreDir": [
+			"tests"
 		]
 	},
 	"format": {

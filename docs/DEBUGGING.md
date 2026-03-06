@@ -41,6 +41,38 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 - `<<Lua Stack>>` — stack traces
 - `<<Crash>>` — engine crashes
 
+**BetterBots-specific log patterns (for grep/rg):**
+
+| Pattern | What it means |
+|---------|---------------|
+| `fallback queued` | Ability input was sent to the action queue (activation attempt) |
+| `fallback held` | Heuristic decided NOT to activate (with rule name + nearby count) |
+| `fallback blocked` | Ability on cooldown or action_input invalid (post-activation spam) |
+| `charge consumed` | Ability charge was spent (confirmed activation) |
+| `one-shot context dump` | First-time context dump for a template (debug-only) |
+| `fallback item queued` | Tier 3 item-ability input sent |
+| `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
+
+**Useful grep recipes:**
+```bash
+LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
+LATEST=$(ls -1t "$LOG_DIR" | head -n 1)
+
+# All BetterBots output (excluding load messages)
+rg "BetterBots DEBUG:" "$LOG_DIR/$LATEST" | grep -v "patch\|logging\|loaded\|metadata\|GameplayState\|condition"
+
+# Only combat activity (excludes nearby=0 idle traces)
+rg "BetterBots DEBUG:" "$LOG_DIR/$LATEST" | grep -v "nearby=0\|patch\|logging\|loaded\|metadata\|GameplayState\|condition"
+
+# Activations only
+rg "fallback queued|charge consumed" "$LOG_DIR/$LATEST"
+
+# Errors only
+rg "Script Error|Lua Stack" "$LOG_DIR/$LATEST"
+```
+
+**Common mistake:** Do NOT grep for `"decision:"` or `"-> true"` — those patterns don't exist in the log. The actual format is `"fallback queued/held/blocked"` with rule names inline.
+
 ## Current BetterBots debug pattern
 
 ```lua
@@ -80,101 +112,30 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 
 ### What's testable outside the game
 
-The heuristic functions (`_can_activate_zealot_dash`, `_can_activate_ogryn_charge`, etc.) are **pure functions** that take a context table and return a boolean + rule name. They have zero engine dependencies. These can be extracted and unit tested.
+The sub-module split (heuristics.lua, meta_data.lua, etc.) created clean test seams. The 13 `_can_activate_*` heuristic functions are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature.
 
-### Architecture: extract to `heuristics.lua`
+### Test structure
 
 ```
-scripts/mods/BetterBots/
-  BetterBots.lua           # Hooks, engine integration, state machines
-  heuristics.lua           # NEW: pure decision functions + data tables
-  BetterBots_data.lua
-  BetterBots_localization.lua
-
 tests/
-  heuristics_spec.lua      # Decision logic tests
-  meta_data_spec.lua       # Table structure tests
-  helpers/
-    mock_env.lua           # Shared DMF/engine mocks
+  test_helper.lua           # make_context(), mock factories, engine stubs
+  heuristics_spec.lua       # 80 tests: all 13 heuristic functions
+  meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
+  resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
 ```
 
-Move to `heuristics.lua`:
-- All `_can_activate_*` functions (13 functions, each with 3-7 branches)
-- `TIER2_META_DATA` table
-- `META_DATA_OVERRIDES` table
-- `_breed_has_super_armor()` logic + related cache
-- `_is_tagged()`, `_resolve_veteran_class_tag()`
-- `TEMPLATE_HEURISTICS` dispatch table
+### Running tests
 
-### Test framework: busted
-
-```lua
--- tests/heuristics_spec.lua
-local heuristics = require("heuristics")
-
-describe("zealot_dash", function()
-    it("blocks when no target", function()
-        local ctx = { target_enemy = nil, num_nearby = 5, toughness_pct = 0.5 }
-        local result, rule = heuristics.can_activate_zealot_dash(ctx)
-        assert.is_false(result)
-        assert.equals("zealot_dash_block_no_target", rule)
-    end)
-
-    it("activates for priority target at range", function()
-        local ctx = {
-            target_enemy = {},
-            target_enemy_distance = 8,
-            target_is_super_armor = false,
-            priority_target_enemy = {},
-            toughness_pct = 0.5,
-            num_nearby = 2,
-        }
-        local result, rule = heuristics.can_activate_zealot_dash(ctx)
-        assert.is_true(result)
-    end)
-end)
+```bash
+make test      # runs busted (auto-detected)
+make check     # runs format + lint + lsp + test (full quality gate)
 ```
 
-### What to test (priority order)
+Tests are enforced by CI — `make check` depends on `test`, and CI installs busted via luarocks.
 
-| Priority | What | Why |
-|----------|------|-----|
-| High | All 13 `_can_activate_*` functions | Each has 3-7 branches with numeric thresholds. Boundary-value testing catches off-by-one bugs. |
-| High | `TIER2_META_DATA` completeness | Every template must have required fields. |
-| Medium | `_inject_missing_ability_meta_data()` | Pass mock AbilityTemplates, verify mutations. |
-| Medium | `_resolve_veteran_class_tag()` | Pattern matching with fallback chain. |
-| Low | Item-ability state machine | Too coupled to engine. Test in-game only. |
+### Engine stubs
 
-### CI integration
-
-```yaml
-# .github/workflows/ci.yml (add to existing)
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: leafo/gh-actions-lua@v12
-        with:
-          luaVersion: "luajit-2.1"
-      - uses: leafo/gh-actions-luarocks@v4
-      - run: luarocks install busted
-      - run: busted --output=utfTerminal
-```
-
-Use `luajit-2.1` to match Darktide's runtime. `make test` already detects busted — it just needs a `tests/` directory.
-
-### `.busted` config
-
-```lua
-return {
-    default = {
-        lpath = "./scripts/mods/BetterBots/?.lua;./tests/helpers/?.lua",
-        ROOT = { "tests" },
-        pattern = "_spec",
-        output = "utfTerminal",
-    },
-}
-```
+Phase 1 tests need no engine stubs for the pure heuristic functions. The `resolve_decision` tests use a minimal `ScriptUnit` stub (returns nil for all extensions, so `build_context` produces default zeros). See `test_helper.setup_engine_stubs()`.
 
 ## What CANNOT be tested outside the game
 

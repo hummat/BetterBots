@@ -34,7 +34,7 @@ See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
 - `mod:pcall(func)` — safe call with stack trace via `Script.callstack()`
 - `mod:command(name, desc, func)` — register `/name` chat commands for runtime debugging
 - Hot-reload: `Ctrl+Shift+R` (requires DMF Developer Mode)
-- Console logs: `tail -f` on `console_logs/console-*.log`, grep for `BetterBots\|Script Error`
+- Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/DEBUGGING.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
 - **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
 
 ## Local static checks
@@ -129,11 +129,29 @@ Local clone: `../Darktide-Source-Code/`
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
 
-## MANDATORY: Consult local docs before implementation
+## MANDATORY: Read relevant docs before acting
 
-Before starting any implementation work on ability activation, trigger logic, or class-specific behavior, you MUST read the relevant local documentation first. Do not guess from memory or make assumptions about game internals — the decompiled source and our docs are the ground truth.
+**General rule:** Before performing ANY task in this project — implementation, debugging, log analysis, validation, planning — check the doc index below and read the relevant docs first. Do not guess from memory. The docs are the ground truth for game internals, log formats, mod conventions, and validation status. This applies to all tasks, not just code changes.
 
-**Required reading order for ability work:**
+### Doc index by activity
+
+| You're about to... | Read first |
+|---------------------|------------|
+| Write or modify ability heuristics | `docs/CLASS_<name>.md` + `docs/CLASS_<name>_TACTICS.md` for the class |
+| Analyze game logs | `docs/DEBUGGING.md` (log patterns, grep recipes, file locations) |
+| Analyze logging code | `docs/LOGGING.md` (log format, throttle keys, output levels) |
+| Modify bot behavior (targeting, movement, weapons) | Relevant `docs/BOT_*.md` file(s) |
+| Modify input queueing or action sequences | `docs/BOT_INPUT_SYSTEM.md` |
+| Assess what works / what's broken | `docs/VALIDATION_TRACKER.md` + `docs/KNOWN_ISSUES.md` |
+| Work on Tier 3 item abilities | `docs/BOT_INPUT_SYSTEM.md` + `docs/RELATED_MODS.md` |
+| Integrate with or reference other mods | `docs/RELATED_MODS.md` |
+| Plan work or prioritize issues | `docs/ROADMAP.md` + `docs/STATUS.md` |
+| Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
+| Understand the module architecture | `docs/ARCHITECTURE.md` |
+| Write or modify tests | `docs/DEBUGGING.md` (automated testing section) |
+
+### Required reading order for ability work
+
 1. This file (architecture overview)
 2. The relevant `docs/CLASS_*.md` (template names, input patterns, tiers)
 3. The relevant `docs/CLASS_*_TACTICS.md` (when/how to use each ability, proposed bot rules)
@@ -142,19 +160,15 @@ Before starting any implementation work on ability activation, trigger logic, or
 
 Do not write trigger heuristics without first reading the tactics doc for that class.
 
-## Class ability references
+### Full doc listing
 
-Per-class docs with internal template names, input patterns, cooldowns, and bot implementation tiers:
-- `docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
+**Per-class ability references** (template names, input patterns, cooldowns, tiers):
+`docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
 
-Per-class tactical heuristics with community-sourced USE WHEN / DON'T USE / proposed bot rules:
-- `docs/CLASS_VETERAN_TACTICS.md`, `docs/CLASS_ZEALOT_TACTICS.md`, `docs/CLASS_PSYKER_TACTICS.md`, `docs/CLASS_OGRYN_TACTICS.md`, `docs/CLASS_ARBITES_TACTICS.md`, `docs/CLASS_HIVE_SCUM_TACTICS.md`
+**Per-class tactical heuristics** (community-sourced USE WHEN / DON'T USE / proposed bot rules):
+`docs/CLASS_VETERAN_TACTICS.md`, `docs/CLASS_ZEALOT_TACTICS.md`, `docs/CLASS_PSYKER_TACTICS.md`, `docs/CLASS_OGRYN_TACTICS.md`, `docs/CLASS_ARBITES_TACTICS.md`, `docs/CLASS_HIVE_SCUM_TACTICS.md`
 
-Consult these when working on class-specific ability logic, adding new ability support, or tuning bot trigger heuristics.
-
-## Bot system reference docs
-
-Deep-dive documentation of Darktide's bot internals from decompiled source:
+**Bot system internals** (from decompiled source):
 - `docs/BOT_BEHAVIOR_TREE.md` — full BT node hierarchy, all conditions, blackboard schema
 - `docs/BOT_COMBAT_ACTIONS.md` — melee/shoot/ability action node lifecycles, utility scoring
 - `docs/BOT_PERCEPTION_TARGETING.md` — target selection scoring formula, gestalt weights, proximity
@@ -162,7 +176,8 @@ Deep-dive documentation of Darktide's bot internals from decompiled source:
 - `docs/BOT_INPUT_SYSTEM.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
 - `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots are veterans, zero talents, weapon templates
 
-Consult these when modifying bot behavior beyond ability activation (e.g., targeting heuristics, movement during abilities, weapon switching).
+**Project management:**
+`docs/DEBUGGING.md`, `docs/LOGGING.md`, `docs/ARCHITECTURE.md`, `docs/VALIDATION_TRACKER.md`, `docs/KNOWN_ISSUES.md`, `docs/RELATED_MODS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`
 
 ## Mod file structure
 
