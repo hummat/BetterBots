@@ -13,7 +13,7 @@ while reviving allies (`ogryn_helping_hand`). Innate dodge-stagger (`ogryn_dodge
 
 **Archetype base talents** (always active):
 - `ogryn_base_tank_passive` -- Tough Skin
-- `ogryn_charge` -- Bull Rush (default combat ability)
+- `ogryn_charge` -- Indomitable (default combat ability; internal name "Bull Rush")
 - `ogryn_dodge_stagger` -- stagger nearby enemies on dodge
 - `ogryn_grenade_box` -- Big Box of Hurt (default blitz)
 - `ogryn_helping_hand` -- uninterruptible revives
@@ -26,7 +26,9 @@ while reviving allies (`ogryn_helping_hand`). Innate dodge-stagger (`ogryn_dodge
 The Ogryn has **three** mutually exclusive combat ability paths selected via the talent tree. All
 use `ability_type = "combat_ability"` and are bound to `combat_ability_pressed`.
 
-### 1. Bull Rush / Indomitable (Charge path) -- `ogryn_charge`
+### 1. Indomitable (Charge path) -- `ogryn_charge`
+
+> **Note:** Internal/decompiled name is "Bull Rush" (`ogryn_charge`). Live UI uses "Indomitable".
 
 **Template:** `ogryn_charge` (ability template), `ogryn_charge` (lunge template)
 **Ability group:** `ogryn_charge`
@@ -64,10 +66,10 @@ hold) to lunge forward. This is a **charge/dash** type -- not instant.
 
 | Talent | Mechanism | Changes | Cooldown |
 |--------|-----------|---------|----------|
-| `ogryn_charge_applies_bleed` | Passive buff `ogryn_charge_bleed` (no ability swap) | Applies 5 bleed stacks to hit enemies during lunge | 30s |
-| `ogryn_longer_charge` | Swaps ability to `ogryn_charge_increased_distance` | Distance 24m, only monsters stop the charge (ignores super_armor/resistant), extended timing anim | 30s |
-| `ogryn_charge_toughness` | Passive buff `ogryn_bull_rush_hits_replenish_toughness` (no ability swap) | Restores 10% toughness per enemy hit during charge | 30s |
-| `ogryn_charge_trample` | Passive buff `ogryn_charge_trample` (no ability swap) | Each enemy hit during charge grants +2.5% damage buff (stacks to 20, 10s duration, refreshes) | N/A |
+| `ogryn_charge_applies_bleed` | **Pulverise** (buff `ogryn_charge_bleed`, no ability swap) | Applies 5 bleed stacks to hit enemies during lunge | 30s |
+| `ogryn_longer_charge` | Augmented **Indomitable** (swaps to `ogryn_charge_increased_distance`) | Distance 24m, only monsters stop the charge (ignores super_armor/resistant), extended timing anim | 30s |
+| `ogryn_charge_toughness` | **Stomping Boots** (buff `ogryn_bull_rush_hits_replenish_toughness`, no ability swap) | Restores 10% toughness per enemy hit during charge | 30s |
+| `ogryn_charge_trample` | **Trample** (buff `ogryn_charge_trample`, no ability swap) | Each enemy hit during charge grants +2.5% damage buff (stacks to 20, 10s duration, refreshes) | N/A |
 
 > **Note:** `ogryn_charge_bleed`, `ogryn_charge_cooldown_reduction`, and `ogryn_charge_damage` exist
 > as player abilities in `ogryn_abilities.lua` with their own lunge templates, but no talent in the
@@ -327,7 +329,7 @@ Stacks are consumed when taking damage.
 ### Combat Ability Row (choose one)
 | Talent | Internal ID | Effect |
 |--------|-------------|--------|
-| Bull Rush | `ogryn_charge` | Charge forward, 30s CD, +25% speed/attack speed for 5s after |
+| Indomitable | `ogryn_charge` | Charge forward, 30s CD, +25% speed/attack speed for 5s after |
 | Loyal Protector | `ogryn_taunt_shout` | AoE taunt in 12m, 50s CD, 3 pulses over 6s |
 | Point-Blank Barrage | `ogryn_special_ammo` | Ranged stance, 80s CD, 10s duration, +25% attack speed, +65% reload |
 
@@ -348,12 +350,12 @@ Stacks are consumed when taking damage.
 
 ### Combat Ability Modifiers (Tier 6)
 
-**Bull Rush modifiers:**
+**Indomitable modifiers:**
 | Talent | Internal ID | Effect |
 |--------|-------------|--------|
-| Bleed on Charge | `ogryn_charge_applies_bleed` | Hit enemies take 5 bleed stacks |
-| Longer Charge | `ogryn_longer_charge` | 24m distance, only monsters stop you |
-| Toughness on Hit | `ogryn_charge_toughness` | +10% toughness per enemy hit |
+| Pulverise | `ogryn_charge_applies_bleed` | Hit enemies take 5 bleed stacks |
+| Augmented Indomitable | `ogryn_longer_charge` | 24m distance, only monsters stop you |
+| Stomping Boots | `ogryn_charge_toughness` | +10% toughness per enemy hit |
 | Trample | `ogryn_charge_trample` | +2.5% damage per enemy hit (stacks 20, 10s) |
 
 **Barrage modifiers:**
@@ -390,7 +392,7 @@ Stacks are consumed when taking damage.
 
 ## Practical Usage (from community guides)
 
-### When to use Bull Rush
+### When to use Indomitable (charge)
 - Close distance to ranged specials (Trappers, Gunners, Snipers) that threaten the team
 - Reach and rescue downed allies through a horde
 - Escape being surrounded -- the charge grants dodge frames and passes through enemies
@@ -440,7 +442,7 @@ Stacks are consumed when taking damage.
 
 ### Implementation priority
 1. **Point-Blank Barrage** (Tier 1): Already has `ability_meta_data`, single-press activation. Easiest to implement.
-2. **Bull Rush / Indomitable (charge path)** (Tier 2): Needs injected metadata with both `aim_pressed` and `aim_released` inputs. Charge direction targeting required.
+2. **Indomitable (charge path)** (Tier 2): Needs injected metadata with both `aim_pressed` and `aim_released` inputs. Charge direction targeting required.
 3. **Loyal Protector (taunt path)** (Tier 2): Needs injected metadata with `shout_pressed` and `shout_released`. No directional targeting needed (AoE around self).
 4. **Grenades** (Tier 3): No ability template -- requires different approach entirely (inventory item manipulation).
 
