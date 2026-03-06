@@ -5,3 +5,7 @@ read_globals = {
 	"get_mod",
 	"ScriptUnit",
 }
+
+files["tests/**"] = {
+	std = "+busted",
+}

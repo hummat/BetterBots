@@ -1,0 +1,7 @@
+return {
+	default = {
+		ROOT = { "tests" },
+		pattern = "_spec",
+		lpath = "scripts/mods/BetterBots/?.lua;tests/?.lua",
+	},
+}
