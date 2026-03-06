@@ -18,7 +18,7 @@ format-check:
 lsp-check:
 	lua-language-server --configpath=.luarc.json --check=. --check_format=pretty --logpath=/tmp/luals-betterbots
 
-check: format-check lint lsp-check
+check: format-check lint lsp-check test
 
 test:
 	@if [ -d tests ]; then \
@@ -36,9 +36,7 @@ package:
 	@rm -f BetterBots.zip
 	@cd .. && zip -9 BetterBots/BetterBots.zip \
 		BetterBots/BetterBots.mod \
-		BetterBots/scripts/mods/BetterBots/BetterBots.lua \
-		BetterBots/scripts/mods/BetterBots/BetterBots_data.lua \
-		BetterBots/scripts/mods/BetterBots/BetterBots_localization.lua
+		BetterBots/scripts/mods/BetterBots/*.lua
 	@echo "Created BetterBots.zip"
 	@unzip -l BetterBots.zip
 

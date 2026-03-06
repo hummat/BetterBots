@@ -21,9 +21,7 @@ jobs:
         run: |
           zip -9 BetterBots.zip \
             BetterBots.mod \
-            scripts/mods/BetterBots/BetterBots.lua \
-            scripts/mods/BetterBots/BetterBots_data.lua \
-            scripts/mods/BetterBots/BetterBots_localization.lua
+            scripts/mods/BetterBots/*.lua
 
       - name: Generate changelog
         uses: orhun/git-cliff-action@v4
