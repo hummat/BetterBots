@@ -979,6 +979,14 @@ describe("heuristics", function()
 			assert.matches("monster", rule)
 		end)
 
+		it("activates on monster fight even with few enemies", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 1, allies_in_coherency = 1, target_is_monster = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("monster", rule)
+		end)
+
 		it("activates when overwhelmed", function()
 			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
 				num_nearby = 6, allies_in_coherency = 1, toughness_pct = 0.40,
@@ -1000,12 +1008,6 @@ describe("heuristics", function()
 	describe("broker_ability_stimm_field", function()
 		local eval_item = Heuristics.evaluate_item_heuristic
 
-		it("blocks with no enemies", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({ num_nearby = 0 }))
-			assert.is_false(ok)
-			assert.matches("no_enemies", rule)
-		end)
-
 		it("blocks with no allies", function()
 			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
 				num_nearby = 3, allies_in_coherency = 0,
@@ -1018,6 +1020,15 @@ describe("heuristics", function()
 			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
 				num_nearby = 2, allies_in_coherency = 1,
 				max_ally_corruption_pct = 0.40,
+			}))
+			assert.is_true(ok)
+			assert.matches("corruption", rule)
+		end)
+
+		it("activates on ally corruption during lull", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 0, allies_in_coherency = 2,
+				max_ally_corruption_pct = 0.50,
 			}))
 			assert.is_true(ok)
 			assert.matches("corruption", rule)

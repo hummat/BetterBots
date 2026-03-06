@@ -628,14 +628,14 @@ local function _can_activate_drone(context)
 	if context.allies_in_coherency == 0 then
 		return false, "drone_block_no_allies"
 	end
+	if context.target_is_monster and context.allies_in_coherency >= 1 then
+		return true, "drone_monster_fight"
+	end
 	if context.num_nearby <= 2 then
 		return false, "drone_block_low_value"
 	end
 	if context.allies_in_coherency >= 2 and context.num_nearby >= 4 then
 		return true, "drone_team_horde"
-	end
-	if context.target_is_monster and context.allies_in_coherency >= 1 then
-		return true, "drone_monster_fight"
 	end
 	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
 		return true, "drone_overwhelmed"
@@ -644,13 +644,10 @@ local function _can_activate_drone(context)
 end
 
 local function _can_activate_stimm_field(context)
-	if context.num_nearby == 0 then
-		return false, "stimm_block_no_enemies"
-	end
 	if context.allies_in_coherency == 0 then
 		return false, "stimm_block_no_allies"
 	end
-	if context.max_ally_corruption_pct > 0.30 and context.allies_in_coherency >= 1 then
+	if context.max_ally_corruption_pct > 0.30 then
 		return true, "stimm_corruption_heal"
 	end
 	if context.target_ally_needs_aid and context.num_nearby >= 2 then

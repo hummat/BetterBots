@@ -437,8 +437,10 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		return
 	end
 
-	if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
-		return
+	if not state.item_stage then
+		if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
+			return
+		end
 	end
 
 	local inventory_component = unit_data_extension:read_component("inventory")
