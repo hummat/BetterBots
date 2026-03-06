@@ -787,6 +787,66 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- zealot_relic (item-based)
+	describe("zealot_relic", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		it("blocks when overwhelmed and fragile", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 5, toughness_pct = 0.20, allies_in_coherency = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("overwhelmed", rule)
+		end)
+
+		it("does not block overwhelmed if toughness ok", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 6, toughness_pct = 0.50, allies_in_coherency = 2,
+				avg_ally_toughness_pct = 0.30,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("activates on team low toughness", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 1, allies_in_coherency = 2, avg_ally_toughness_pct = 0.30,
+			}))
+			assert.is_true(ok)
+			assert.matches("team_low_toughness", rule)
+		end)
+
+		it("activates on self critical toughness even without allies", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 2, toughness_pct = 0.20, allies_in_coherency = 0,
+			}))
+			assert.is_true(ok)
+			assert.matches("self_critical", rule)
+		end)
+
+		it("blocks with no allies when toughness is fine", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 2, toughness_pct = 0.60, allies_in_coherency = 0,
+			}))
+			assert.is_false(ok)
+			assert.matches("no_allies", rule)
+		end)
+
+		it("holds in safe state with allies", function()
+			local ok, rule = eval_item("zealot_relic", ctx({
+				num_nearby = 1, allies_in_coherency = 2, avg_ally_toughness_pct = 0.80,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("returns false for unknown item ability", function()
+			local ok, rule = eval_item("unknown_ability_xyz", ctx({ num_nearby = 5 }))
+			assert.is_false(ok)
+			assert.matches("unknown_item", rule)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()

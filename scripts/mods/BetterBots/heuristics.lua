@@ -589,6 +589,22 @@ local function _can_activate_broker_rage(context)
 	return false, "broker_rage_hold"
 end
 
+local function _can_activate_zealot_relic(context)
+	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
+		return false, "zealot_relic_block_overwhelmed"
+	end
+	if context.avg_ally_toughness_pct < 0.40 and context.allies_in_coherency >= 2 and context.num_nearby < 2 then
+		return true, "zealot_relic_team_low_toughness"
+	end
+	if context.toughness_pct < 0.25 and context.num_nearby < 3 then
+		return true, "zealot_relic_self_critical"
+	end
+	if context.allies_in_coherency == 0 then
+		return false, "zealot_relic_block_no_allies"
+	end
+	return false, "zealot_relic_hold"
+end
+
 local TEMPLATE_HEURISTICS = {
 	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_veteran_stealth(context)
@@ -641,6 +657,10 @@ local TEMPLATE_HEURISTICS = {
 	broker_punk_rage = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_broker_rage(context)
 	end,
+}
+
+local ITEM_HEURISTICS = {
+	zealot_relic = _can_activate_zealot_relic,
 }
 
 local function _evaluate_template_heuristic(
@@ -762,6 +782,14 @@ local function evaluate_heuristic(template_name, context, opts)
 	return fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
 end
 
+local function evaluate_item_heuristic(ability_name, context)
+	local fn = ITEM_HEURISTICS[ability_name]
+	if not fn then
+		return false, "unknown_item_ability"
+	end
+	return fn(context)
+end
+
 return {
 	init = function(deps)
 		_fixed_time = deps.fixed_time
@@ -772,5 +800,6 @@ return {
 	build_context = build_context,
 	resolve_decision = resolve_decision,
 	evaluate_heuristic = evaluate_heuristic,
+	evaluate_item_heuristic = evaluate_item_heuristic,
 	enemy_breed = _enemy_breed,
 }
