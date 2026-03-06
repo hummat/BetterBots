@@ -964,6 +964,60 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- broker_ability_stimm_field (item-based)
+	describe("broker_ability_stimm_field", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		it("blocks with no enemies", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({ num_nearby = 0 }))
+			assert.is_false(ok)
+			assert.matches("no_enemies", rule)
+		end)
+
+		it("blocks with no allies", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 3, allies_in_coherency = 0,
+			}))
+			assert.is_false(ok)
+			assert.matches("no_allies", rule)
+		end)
+
+		it("activates on ally corruption", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 2, allies_in_coherency = 1,
+				max_ally_corruption_pct = 0.40,
+			}))
+			assert.is_true(ok)
+			assert.matches("corruption", rule)
+		end)
+
+		it("does not activate on low corruption", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 2, allies_in_coherency = 1,
+				max_ally_corruption_pct = 0.20,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("activates on ally aid with pressure", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 3, allies_in_coherency = 1,
+				target_ally_needs_aid = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("holds in safe state", function()
+			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
+				num_nearby = 2, allies_in_coherency = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()

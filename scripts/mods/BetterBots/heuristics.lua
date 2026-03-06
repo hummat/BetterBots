@@ -643,6 +643,22 @@ local function _can_activate_drone(context)
 	return false, "drone_hold"
 end
 
+local function _can_activate_stimm_field(context)
+	if context.num_nearby == 0 then
+		return false, "stimm_block_no_enemies"
+	end
+	if context.allies_in_coherency == 0 then
+		return false, "stimm_block_no_allies"
+	end
+	if (context.max_ally_corruption_pct or 0) > 0.30 and context.allies_in_coherency >= 1 then
+		return true, "stimm_corruption_heal"
+	end
+	if context.target_ally_needs_aid and context.num_nearby >= 2 then
+		return true, "stimm_ally_aid"
+	end
+	return false, "stimm_hold"
+end
+
 local TEMPLATE_HEURISTICS = {
 	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_veteran_stealth(context)
@@ -703,6 +719,7 @@ local ITEM_HEURISTICS = {
 	psyker_force_field_improved = _can_activate_force_field,
 	psyker_force_field_dome = _can_activate_force_field,
 	adamant_area_buff_drone = _can_activate_drone,
+	broker_ability_stimm_field = _can_activate_stimm_field,
 }
 
 local function _evaluate_template_heuristic(
