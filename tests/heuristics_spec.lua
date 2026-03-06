@@ -284,6 +284,36 @@ describe("heuristics", function()
 			assert.is_true(ok)
 			assert.matches("threat_window", rule)
 		end)
+
+		it("bypasses peril gate when peril is 0 (bot no warp attacks)", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 3,
+				peril_pct = 0,
+				challenge_rating_sum = 6.0,
+			}))
+			assert.is_true(ok)
+			assert.matches("threat_window", rule)
+		end)
+
+		it("bypasses peril gate for target window at peril 0", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 2,
+				peril_pct = 0,
+				opportunity_target_enemy = "opp_unit",
+			}))
+			assert.is_true(ok)
+			assert.matches("target_window", rule)
+		end)
+
+		it("still blocks at peril 0 with low threat", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 1,
+				peril_pct = 0,
+				challenge_rating_sum = 2.0,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
 	end)
 
 	-- ogryn_charge

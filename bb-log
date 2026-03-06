@@ -19,7 +19,11 @@ get_log() {
 }
 
 cmd="${1:-summary}"
-log_idx="${2:-0}"
+if [[ "${cmd}" == "raw" ]]; then
+    log_idx="${3:-0}"
+else
+    log_idx="${2:-0}"
+fi
 
 case "$cmd" in
     list)

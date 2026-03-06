@@ -348,17 +348,21 @@ local function _can_activate_psyker_stance(context)
 	if context.health_pct < 0.25 then
 		return false, "psyker_stance_block_low_health"
 	end
-	if context.peril_pct < 0.20 or context.peril_pct > 0.90 then
+
+	-- Bots don't use warp attacks, so peril stays at 0. Bypass peril gate
+	-- and use threat-only conditions. Revisit when blitz support (#4) lands.
+	local bot_no_peril = context.peril_pct == 0
+
+	if not bot_no_peril and (context.peril_pct < 0.20 or context.peril_pct > 0.90) then
 		return false, "psyker_stance_block_peril_window"
 	end
 	if
 		(context.opportunity_target_enemy or context.urgent_target_enemy)
-		and context.peril_pct >= 0.35
-		and context.peril_pct <= 0.85
+		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
 	then
 		return true, "psyker_stance_target_window"
 	end
-	if context.challenge_rating_sum >= 5.0 and context.peril_pct >= 0.35 and context.peril_pct <= 0.85 then
+	if context.challenge_rating_sum >= 5.0 and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85)) then
 		return true, "psyker_stance_threat_window"
 	end
 
