@@ -847,6 +847,70 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- force_field (item-based)
+	describe("force_field", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		it("blocks with no threats", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({ num_nearby = 0 }))
+			assert.is_false(ok)
+			assert.matches("no_threats", rule)
+		end)
+
+		it("blocks when safe", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 2, toughness_pct = 0.90,
+			}))
+			assert.is_false(ok)
+			assert.matches("safe", rule)
+		end)
+
+		it("activates under pressure", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 4, toughness_pct = 0.30,
+			}))
+			assert.is_true(ok)
+			assert.matches("pressure", rule)
+		end)
+
+		it("activates on ally aid", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 1, target_ally_needs_aid = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("activates on ranged pressure without num_nearby gate", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 0, target_enemy_type = "ranged", toughness_pct = 0.40,
+				target_enemy = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("ranged", rule)
+		end)
+
+		it("all variants use same heuristic", function()
+			local c = ctx({ num_nearby = 4, toughness_pct = 0.30 })
+			local ok1, rule1 = eval_item("psyker_force_field", c)
+			local ok2, rule2 = eval_item("psyker_force_field_improved", c)
+			local ok3, rule3 = eval_item("psyker_force_field_dome", c)
+			assert.is_true(ok1)
+			assert.is_true(ok2)
+			assert.is_true(ok3)
+			assert.are.equal(rule1, rule2)
+			assert.are.equal(rule2, rule3)
+		end)
+
+		it("holds in moderate state", function()
+			local ok, rule = eval_item("psyker_force_field", ctx({
+				num_nearby = 2, toughness_pct = 0.60, target_enemy = true,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()

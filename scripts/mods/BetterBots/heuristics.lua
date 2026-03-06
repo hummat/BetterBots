@@ -605,6 +605,25 @@ local function _can_activate_zealot_relic(context)
 	return false, "zealot_relic_hold"
 end
 
+local function _can_activate_force_field(context)
+	if context.num_nearby == 0 and not context.target_enemy then
+		return false, "force_field_block_no_threats"
+	end
+	if context.target_ally_needs_aid then
+		return true, "force_field_ally_aid"
+	end
+	if context.toughness_pct > 0.80 then
+		return false, "force_field_block_safe"
+	end
+	if context.num_nearby >= 3 and context.toughness_pct < 0.40 then
+		return true, "force_field_pressure"
+	end
+	if context.target_enemy_type == "ranged" and context.toughness_pct < 0.60 then
+		return true, "force_field_ranged_pressure"
+	end
+	return false, "force_field_hold"
+end
+
 local TEMPLATE_HEURISTICS = {
 	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_veteran_stealth(context)
@@ -661,6 +680,9 @@ local TEMPLATE_HEURISTICS = {
 
 local ITEM_HEURISTICS = {
 	zealot_relic = _can_activate_zealot_relic,
+	psyker_force_field = _can_activate_force_field,
+	psyker_force_field_improved = _can_activate_force_field,
+	psyker_force_field_dome = _can_activate_force_field,
 }
 
 local function _evaluate_template_heuristic(
