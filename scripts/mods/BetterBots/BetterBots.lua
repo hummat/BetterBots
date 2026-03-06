@@ -119,6 +119,7 @@ ItemFallback.wire({
 	build_context = Heuristics.build_context,
 	context_snapshot = Debug.context_snapshot,
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
+	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
 })
 
 Debug.wire({

@@ -354,8 +354,8 @@ local function register_commands()
 
 				local can_activate, rule, context
 				if ability_template_name == "none" then
-					can_activate = _can_use_item_fallback(unit, ability_extension, ability_name)
-					rule = can_activate and "item_fallback_ready" or "item_fallback_blocked"
+					can_activate, rule = _can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+					rule = rule or (can_activate and "item_fallback_ready" or "item_fallback_blocked")
 					context = _build_context(unit, blackboard)
 				else
 					local conditions =

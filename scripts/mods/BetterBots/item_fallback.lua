@@ -14,6 +14,7 @@ local _ITEM_DEFAULT_START_DELAY_S
 local _build_context
 local _context_snapshot
 local _fallback_state_snapshot
+local _evaluate_item_heuristic
 
 local LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY = {
 	zealot_relic = true,
@@ -407,29 +408,17 @@ local function _current_weapon_supports_action_input(unit_data_extension, Weapon
 	return supports_input and true or false, weapon_template_name
 end
 
-local function can_use_item_fallback(unit, ability_extension, ability_name)
+local function can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
 	if not ability_extension:can_use_ability("combat_ability") then
-		return false
+		return false, "item_cooldown_not_ready"
 	end
 
-	local perception_extension = ScriptUnit.extension(unit, "perception_system")
-	local _, num_nearby = perception_extension:enemies_in_proximity()
-	if num_nearby <= 0 then
-		return false
+	if not _evaluate_item_heuristic then
+		return false, "item_heuristics_not_wired"
 	end
 
-	if ability_name == "zealot_relic" then
-		local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
-		local can_activate = conditions
-			and conditions._can_activate_zealot_relic
-			and conditions._can_activate_zealot_relic(unit)
-
-		if not can_activate then
-			return false
-		end
-	end
-
-	return true
+	local context = _build_context(unit, blackboard)
+	return _evaluate_item_heuristic(ability_name, context)
 end
 
 local function try_queue_item(unit, unit_data_extension, ability_extension, state, fixed_t, combat_ability, blackboard)
@@ -448,7 +437,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		return
 	end
 
-	if not can_use_item_fallback(unit, ability_extension, ability_name) then
+	if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
 		return
 	end
 
@@ -794,6 +783,7 @@ return {
 		_build_context = refs.build_context
 		_context_snapshot = refs.context_snapshot
 		_fallback_state_snapshot = refs.fallback_state_snapshot
+		_evaluate_item_heuristic = refs.evaluate_item_heuristic
 	end,
 	try_queue_item = try_queue_item,
 	can_use_item_fallback = can_use_item_fallback,
