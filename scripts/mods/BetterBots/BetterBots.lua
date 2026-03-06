@@ -209,19 +209,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return false
 	end
 
-	if ability_template_name == "zealot_relic" then
-		local can_activate =
-			conditions._can_activate_zealot_relic(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		Debug.log_ability_decision(
-			ability_template_name,
-			fixed_t,
-			can_activate,
-			"zealot_relic_vanilla",
-			Heuristics.build_context(unit, blackboard)
-		)
-		return can_activate
-	end
-
 	local can_activate, rule, context = Heuristics.resolve_decision(
 		ability_template_name,
 		conditions,
