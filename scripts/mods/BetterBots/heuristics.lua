@@ -624,6 +624,25 @@ local function _can_activate_force_field(context)
 	return false, "force_field_hold"
 end
 
+local function _can_activate_drone(context)
+	if context.allies_in_coherency == 0 then
+		return false, "drone_block_no_allies"
+	end
+	if context.num_nearby <= 2 then
+		return false, "drone_block_low_value"
+	end
+	if context.allies_in_coherency >= 2 and context.num_nearby >= 4 then
+		return true, "drone_team_horde"
+	end
+	if context.target_is_monster and context.allies_in_coherency >= 1 then
+		return true, "drone_monster_fight"
+	end
+	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+		return true, "drone_overwhelmed"
+	end
+	return false, "drone_hold"
+end
+
 local TEMPLATE_HEURISTICS = {
 	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_veteran_stealth(context)
@@ -683,6 +702,7 @@ local ITEM_HEURISTICS = {
 	psyker_force_field = _can_activate_force_field,
 	psyker_force_field_improved = _can_activate_force_field,
 	psyker_force_field_dome = _can_activate_force_field,
+	adamant_area_buff_drone = _can_activate_drone,
 }
 
 local function _evaluate_template_heuristic(

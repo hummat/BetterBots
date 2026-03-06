@@ -911,6 +911,59 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- adamant_area_buff_drone (item-based)
+	describe("adamant_area_buff_drone", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		it("blocks with no allies", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 5, allies_in_coherency = 0,
+			}))
+			assert.is_false(ok)
+			assert.matches("no_allies", rule)
+		end)
+
+		it("blocks with few enemies", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 2, allies_in_coherency = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("low_value", rule)
+		end)
+
+		it("activates on team horde", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 5, allies_in_coherency = 2,
+			}))
+			assert.is_true(ok)
+			assert.matches("team_horde", rule)
+		end)
+
+		it("activates on monster fight with ally", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 3, allies_in_coherency = 1, target_is_monster = true,
+			}))
+			assert.is_true(ok)
+			assert.matches("monster", rule)
+		end)
+
+		it("activates when overwhelmed", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 6, allies_in_coherency = 1, toughness_pct = 0.40,
+			}))
+			assert.is_true(ok)
+			assert.matches("overwhelmed", rule)
+		end)
+
+		it("holds in moderate state", function()
+			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
+				num_nearby = 3, allies_in_coherency = 1,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()
