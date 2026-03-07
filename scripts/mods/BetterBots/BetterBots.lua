@@ -831,7 +831,7 @@ mod:hook_require(
 					end
 				end
 
-				if unit and id == "weapon_action" and action_input ~= "wield" and action_input ~= "reload" then
+				if unit and id == "weapon_action" and action_input ~= "wield" then
 					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
 					if ude then
 						local warp = ude:read_component("warp_charge")

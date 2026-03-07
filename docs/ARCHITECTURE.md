@@ -55,9 +55,9 @@ Grenade abilities are still out of scope.
     - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
     - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
 14. Warp weapon peril block (#27):
-    - blocks `weapon_action` inputs (except `wield` and `reload`) for warp weapons at ≥97% peril
+    - blocks `weapon_action` inputs (except `wield`) for warp weapons at ≥97% peril
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
-    - allows venting (`reload`) through so bots can actively quell peril
+    - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
 
 ## Why item fallback is needed
 
