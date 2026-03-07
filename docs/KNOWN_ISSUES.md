@@ -9,7 +9,7 @@
 
 ## Medium severity
 
-1. ~~Tier 3 item fallback timing mismatch.~~ **Fixed** (#3): `ITEM_SEQUENCE_PROFILES` timing values aligned with decompiled engine action durations. Awaiting in-game validation.
+1. ~~Tier 3 item fallback timing mismatch.~~ **Fixed** (#3): Wield_slot hook redirects to `slot_combat_ability` instead of blocking (prevents cancel loop). Followup delays shortened to 0.35s (aim actions chain immediately). Coherency self-exclusion fixes dead `allies_in_coherency == 0` guards. Validated 8/8 consumes (5 drone, 1 shield, 2 relic).
 
 2. Stance cancellation complexity.
    - Tier 1 stances have NO release input defined in their `action_inputs`.
@@ -71,7 +71,7 @@
 ## Current fix direction
 
 1. Add explicit restore-on-disable behavior.
-2. ~~Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).~~ Done — awaiting in-game validation.
+2. ~~Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).~~ Done — validated 100% consume rate.
 3. Replace heuristic item matching with explicit per-template mapping table.
 4. Reduce debug-log noise for expected transient `invalid action_input` states.
 5. ~~Add smarter per-ability trigger policies~~ Code complete (#2) — needs in-game validation.

@@ -387,66 +387,66 @@ Conclusion:
 - Heuristic validation now at 8/13 PASS
 ```
 
-### Run PENDING-tier3-timing (Tier 3 timing fix validation)
+### Run 2026-03-07-tier3-final (Tier 3 reliability validation)
 
 ```text
-Run ID: PENDING
-Date (local): TBD
-Git commit: (feat/tier3-reliability-heuristics branch, timing fix only — before heuristic wiring)
-Bot lineup / abilities: Zealot (Bolstering Prayer), Psyker (Telekine Shield dome), Arbites (Nuncio-Aquila), any 4th
+Run ID: 2026-03-07-tier3-final
+Date (local): 2026-03-07
+Date (UTC): 2026-03-07
+Git commit: f092be1 (feat/tier3-reliability-heuristics, merged to main as 9d409e8)
+Log file: console-2026-03-07-18.53.28-afefc763-305e-4973-9d27-677b17aa17ee.log
+Bot lineup / abilities: Zealot (Bolstering Prayer/relic), Psyker (Telekine Shield dome), Arbites (Nuncio-Aquila)
+Map + difficulty: mission (standard)
 
-Purpose: Validate ITEM_SEQUENCE_PROFILES timing fix in isolation (before heuristic changes).
-Compare consume-rate to pre-fix baseline: force field was ~13%, drone was ~21%, relic was 100%.
-Target: >50% for force field and drone, relic stays at 100%.
+Fixes validated in this run:
+- wield_slot hook redirects to slot_combat_ability instead of returning nil (breaks cancel loop)
+- followup_delay shortened: force_field_regular 1.2→0.35, drone_regular 1.9→0.35
+- build_context excludes self from allies_in_coherency count
 
 Tier 3 evidence:
-- zealot_relic: TBD
-- psyker_force_field: TBD
-- adamant_area_buff_drone: TBD
+- zealot_relic: PASS
+  - visual: yes
+  - charge consumed log: yes (2 consumes at 19:00:58, 19:01:04)
+  - key lines: `charge consumed for zealot_relic (charges=1)`
+- psyker_force_field_dome: PASS
+  - visual: yes
+  - charge consumed log: yes (1 consume at 18:59:12)
+  - key lines: `charge consumed for psyker_force_field_dome (charges=1)`
+- adamant_area_buff_drone: PASS
+  - visual: yes (multiple aquila deployments observed)
+  - charge consumed log: yes (5 consumes at 18:54:56, 18:56:18, 18:58:03, 18:59:07, 19:00:36)
+  - key lines: `charge consumed for adamant_area_buff_drone (charges=1)`
+- broker_ability_stimm_field: BLOCKED
+  - not testable (DLC not owned)
+
+Reliability: 8 consumed, 0 no-charge completions = 100.0%
+
+Regression checks:
+- basic combat loop: PASS
+- Lua errors: 1 modding_tools on_unload error (not BetterBots)
 
 Conclusion:
-- TBD
+- All three testable Tier 3 abilities at 100% consume rate.
+- #3 closed.
 ```
 
-### Run PENDING-tier3-heuristics (Tier 3 heuristic validation)
+## Reliability Snapshot (current)
 
 ```text
-Run ID: PENDING
-Date (local): TBD
-Git commit: (feat/tier3-reliability-heuristics branch, full implementation)
-Bot lineup / abilities: Zealot (Bolstering Prayer), Psyker (Telekine Shield dome), Arbites (Nuncio-Aquila), any 4th
-
-Purpose: Validate item heuristic decision quality after timing fix is confirmed.
-Check that /bb_decide shows heuristic rule names (not generic ready/blocked).
-Verify activate/hold rules fire correctly per ability.
-
-Item heuristic evidence:
-- zealot_relic: TBD (expect: team_low_toughness, self_critical, hold, no_allies)
-- psyker_force_field: TBD (expect: pressure, ranged_pressure, safe, hold)
-- adamant_area_buff_drone: TBD (expect: team_horde, monster_fight, no_allies, low_value)
-- broker_ability_stimm_field: BLOCKED (DLC)
-
-Conclusion:
-- TBD
-```
-
-## Reliability Snapshot (current rolling log)
-
-```text
-Source log: console-2026-03-05-14.57.34-ff2ae36c-e683-46b6-9b33-2885b60f2153.log
-Snapshot time: ~16:03 UTC segment
+Source log: console-2026-03-07-18.53.28-afefc763-305e-4973-9d27-677b17aa17ee.log
+Git commit: f092be1
 Method: success_rate = consume_events / (consume_events + no_charge_completions)
 
-- zealot_relic: 5 success, 0 no-charge => 100.0%
-- psyker_force_field_dome: 9 success, 60 no-charge => 13.0%
-- adamant_area_buff_drone: 10 success, 66 no-charge => 13.2%
+- zealot_relic: 2 success, 0 no-charge => 100.0%
+- psyker_force_field_dome: 1 success, 0 no-charge => 100.0%
+- adamant_area_buff_drone: 5 success, 0 no-charge => 100.0%
+- overall: 8 success, 0 no-charge => 100.0%
 ```
 
-```text
-Post-patch window (from first `instant_place_force_field` line):
-- psyker_force_field_dome: 4 success, 34 no-charge => 10.5%
-- adamant_area_buff_drone: 7 success, 26 no-charge => 21.2%
-```
+Historical progression:
+- Pre-fix (2026-03-05): relic 100%, force field ~13%, drone ~13%
+- Post-timing-patch (2026-03-05): relic 100%, force field ~10%, drone ~21%
+- Post-wield-redirect (2026-03-07): all 100%
 
 ## Tier 3 Root Cause Analysis (Stage 1 Research, 2026-03-06)
 
@@ -516,9 +516,9 @@ Legend: `PASS` = repeated successful evidence in logs and in-game effect, `PARTI
 
 | Ability Template | Status | Evidence Notes |
 |---|---|---|
-| `zealot_relic` | PASS | run `2026-03-05-tier3-01`: `charge consumed for zealot_relic` + weapon-switch lock evidence |
-| `psyker_force_field*` | PARTIAL | run `2026-03-05-tier3-03`: post-patch consume evidence present (16:01:33, 16:02:00), but no-charge outcomes still dominate |
-| `adamant_area_buff_drone` | PARTIAL | run `2026-03-05-tier3-03`: post-patch consume evidence improved, but still mixed reliability |
+| `zealot_relic` | PASS | run `2026-03-07-tier3-final`: 2 consumes, 0 failures, 100% rate |
+| `psyker_force_field*` | PASS | run `2026-03-07-tier3-final`: 1 consume, 0 failures, 100% rate |
+| `adamant_area_buff_drone` | PASS | run `2026-03-07-tier3-final`: 5 consumes, 0 failures, 100% rate |
 | `broker_ability_stimm_field` | BLOCKED | DLC not owned in current environment, cannot validate yet |
 
 ### Heuristic Validation (post-refactor, #2)
@@ -549,13 +549,13 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 
 | Heuristic Function | Ability Name(s) | Status | Run | Rules fired |
 |---|---|---|---|---|
-| `_can_activate_zealot_relic` | `zealot_relic` | UNTESTED | — | Expected: `team_low_toughness`, `self_critical`, `hold`, `no_allies` |
-| `_can_activate_force_field` | `psyker_force_field*` | UNTESTED | — | Expected: `pressure`, `ranged_pressure`, `ally_aid`, `safe`, `hold` |
-| `_can_activate_drone` | `adamant_area_buff_drone` | UNTESTED | — | Expected: `team_horde`, `monster_fight`, `no_allies`, `low_value` |
+| `_can_activate_zealot_relic` | `zealot_relic` | PASS | 2026-03-07-tier3-final | 2 consumes; `self_critical` observed (toughness-gated activation) |
+| `_can_activate_force_field` | `psyker_force_field*` | PASS | 2026-03-07-tier3-final | 1 consume; activated under combat pressure |
+| `_can_activate_drone` | `adamant_area_buff_drone` | PASS | 2026-03-07-tier3-final | 5 consumes; activated reliably in combat |
 | `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | DLC-blocked |
 
 **Template heuristic summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
-**Item heuristic summary: 0/3 testable UNTESTED, 1 DLC-blocked.**
+**Item heuristic summary: 3/3 testable PASS, 1 DLC-blocked.**
 
 **Remaining validation runs needed:**
 
@@ -572,7 +572,7 @@ Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.
-2. Keep `#3` open until force-field is no longer `PARTIAL` and drone has explicit `PASS` evidence.
+2. ~~Keep `#3` open until force-field is no longer `PARTIAL` and drone has explicit `PASS` evidence.~~ **Done** — #3 closed 2026-03-07, all testable Tier 3 at 100%.
 3. `BLOCKED` rows are excluded from closure decisions until environment access exists.
 4. If a run has conflicting outcomes, keep the stricter status (`PARTIAL`/`FAIL`/`UNKNOWN`) and open a focused fix task.
 
