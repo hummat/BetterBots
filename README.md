@@ -122,6 +122,7 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style
 - [Roadmap](docs/ROADMAP.md)
 - [Validation Tracker](docs/VALIDATION_TRACKER.md)
 - [Related Mods](docs/RELATED_MODS.md)
+- [Meta Builds Research](docs/META_BUILDS_RESEARCH.md)
 
 ### Bot system internals (from decompiled source)
 

@@ -155,6 +155,7 @@ Local clone: `../Darktide-Source-Code/`
 | Gate ability activation on bot state | `docs/CHARACTER_STATE_API.md` |
 | Integrate with or reference other mods | `docs/RELATED_MODS.md` |
 | Plan work or prioritize issues | `docs/ROADMAP.md` + `docs/STATUS.md` |
+| Understand meta builds, weapon/ability popularity | `docs/META_BUILDS_RESEARCH.md` |
 | Update Nexus mod page or release text | `docs/NEXUS_DESCRIPTION.bbcode` |
 | Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
 | Understand the module architecture | `docs/ARCHITECTURE.md` |
@@ -189,6 +190,7 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 **API references** (from decompiled source):
 - `docs/GRENADE_INVENTORY.md` — all 18 grenade/blitz templates, input patterns, implementation approach
 - `docs/CHARACTER_STATE_API.md` — character state detection components, fields, access patterns
+- `docs/META_BUILDS_RESEARCH.md` — endgame meta builds per class, weapon/ability rankings, community build database
 
 **Project management:**
 `docs/DEBUGGING.md`, `docs/LOGGING.md`, `docs/ARCHITECTURE.md`, `docs/VALIDATION_TRACKER.md`, `docs/KNOWN_ISSUES.md`, `docs/RELATED_MODS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`
