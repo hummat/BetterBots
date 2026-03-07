@@ -9,12 +9,38 @@ local _ITEM_WIELD_TIMEOUT_S
 local _ITEM_SEQUENCE_RETRY_S
 local _ITEM_CHARGE_CONFIRM_TIMEOUT_S
 local _ITEM_DEFAULT_START_DELAY_S
+local _event_log
+local _bot_slot_for_unit
 
 -- Late-bound cross-module refs, set via wire()
 local _build_context
 local _context_snapshot
 local _fallback_state_snapshot
 local _evaluate_item_heuristic
+
+local function _emit_item_event(event_type, unit, ability_name, state, fixed_t, extra)
+	if not _event_log or not _event_log.is_enabled() then
+		return
+	end
+
+	local ev = {
+		t = fixed_t,
+		event = event_type,
+		bot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
+		ability = ability_name,
+		stage = state.item_stage,
+		profile = state.item_profile_name,
+		attempt_id = state.attempt_id,
+	}
+
+	if extra then
+		for k, v in pairs(extra) do
+			ev[k] = v
+		end
+	end
+
+	_event_log.emit(ev)
+end
 
 local LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY = {
 	zealot_relic = true,
@@ -360,6 +386,14 @@ local function _queue_item_start_input(unit, ability_name, state, fixed_t, black
 		"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_start_input)
 	)
 
+	if _event_log and _event_log.is_enabled() then
+		state.attempt_id = _event_log.next_attempt_id()
+		_emit_item_event("queued", unit, ability_name, state, fixed_t, {
+			input = state.item_start_input,
+			source = "item",
+		})
+	end
+
 	state.item_attempt_t = fixed_t
 	state.item_charge_confirmed = false
 
@@ -367,10 +401,12 @@ local function _queue_item_start_input(unit, ability_name, state, fixed_t, black
 		state.item_stage = "waiting_followup"
 		state.item_wait_t = fixed_t + (state.item_followup_delay or 0.2)
 		state.item_stage_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = state.item_start_input })
 	else
 		state.item_stage = "waiting_unwield"
 		state.item_wait_t = fixed_t + state.item_unwield_delay
 		state.item_stage_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = state.item_start_input })
 	end
 
 	local context = _build_context(unit, blackboard)
@@ -474,6 +510,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					fixed_t,
 					"fallback item blocked " .. ability_name .. " (wield timeout)"
 				)
+				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "wield_timeout" })
 				_schedule_item_sequence_retry(state, fixed_t, false)
 			end
 
@@ -494,6 +531,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 						.. tostring(weapon_template_name)
 						.. ")"
 				)
+				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "unsupported_template" })
 				_schedule_item_sequence_retry(state, fixed_t, false)
 				return
 			end
@@ -510,6 +548,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 			state.item_stage = "waiting_start"
 			state.item_wait_t = fixed_t + (sequence.start_delay_after_wield or _ITEM_DEFAULT_START_DELAY_S)
 			state.item_stage_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+			_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = state.item_start_input })
 
 			_debug_log(
 				"fallback_item_profile:" .. ability_name .. ":" .. weapon_template_name,
@@ -543,6 +582,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					.. tostring(wielded_slot)
 					.. ")"
 			)
+			_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "lost_wield_before_start" })
 			_schedule_item_sequence_retry(state, fixed_t, true)
 			return
 		end
@@ -568,6 +608,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 						.. tostring(current_template_name)
 						.. ")"
 				)
+				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "start_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
 
@@ -594,6 +635,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					.. tostring(wielded_slot)
 					.. ")"
 			)
+			_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "lost_wield_before_followup" })
 			_schedule_item_sequence_retry(state, fixed_t, true)
 			return
 		end
@@ -619,6 +661,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 						.. tostring(current_template_name)
 						.. ")"
 				)
+				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "followup_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
 
@@ -641,6 +684,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		state.item_stage = "waiting_unwield"
 		state.item_wait_t = fixed_t + (state.item_unwield_delay or 0.3)
 		state.item_stage_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = state.item_followup_input })
 		return
 	end
 
@@ -656,6 +700,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					.. ")"
 			)
 			_transition_to_charge_confirmation(state, fixed_t)
+			_emit_item_event("item_stage", unit, ability_name, state, fixed_t)
 			return
 		end
 
@@ -680,6 +725,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 						.. tostring(current_template_name)
 						.. ")"
 				)
+				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "unwield_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
 
@@ -700,6 +746,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		end
 
 		_transition_to_charge_confirmation(state, fixed_t)
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t)
 		return
 	end
 
@@ -732,6 +779,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	if wielded_slot == "slot_combat_ability" then
 		state.item_stage = "waiting_wield"
 		state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "combat_ability" })
 		return
 	end
 
@@ -759,6 +807,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	_queue_weapon_action_input(state, "combat_ability")
 	state.item_stage = "waiting_wield"
 	state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
+	_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "combat_ability" })
 
 	_debug_log(
 		"fallback_item_wield:" .. ability_name,
@@ -780,6 +829,8 @@ return {
 		_ITEM_SEQUENCE_RETRY_S = deps.ITEM_SEQUENCE_RETRY_S
 		_ITEM_CHARGE_CONFIRM_TIMEOUT_S = deps.ITEM_CHARGE_CONFIRM_TIMEOUT_S
 		_ITEM_DEFAULT_START_DELAY_S = deps.ITEM_DEFAULT_START_DELAY_S
+		_event_log = deps.event_log
+		_bot_slot_for_unit = deps.bot_slot_for_unit
 	end,
 	wire = function(refs)
 		_build_context = refs.build_context

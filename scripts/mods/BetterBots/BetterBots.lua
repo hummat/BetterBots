@@ -107,6 +107,8 @@ ItemFallback.init({
 	ITEM_SEQUENCE_RETRY_S = 1.0,
 	ITEM_CHARGE_CONFIRM_TIMEOUT_S = 1.2,
 	ITEM_DEFAULT_START_DELAY_S = 0.2,
+	event_log = EventLog,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
 Debug.init({
