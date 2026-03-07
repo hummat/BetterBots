@@ -18,11 +18,11 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does seven things:
+`scripts/mods/BetterBots/BetterBots.lua` does eleven things:
 
-1. Injects missing `ability_meta_data` for Tier 2 templates.
+1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
-3. Replaces `can_activate_ability` so templates with valid metadata can pass.
+3. Replaces `can_activate_ability` on both `bt_bot_conditions` and `bt_conditions` so templates with valid metadata can pass.
 4. Adds a fallback in `BotBehaviorExtension:update`:
    - template fallback: queue ability action input directly on `combat_ability_action`
    - item fallback: queue explicit `weapon_action` sequence (`combat_ability` wield + cast follow-ups + unwind)
@@ -33,11 +33,21 @@ Grenade abilities are still out of scope.
 6. Adds queue-level weapon-switch protection for item abilities:
    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`
    - block bot `weapon_action:wield` while protected item abilities are active/in-sequence
-7. Structured JSONL event logging (`event_log.lua`):
-   - opt-in via mod setting (`enable_event_log`)
-   - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`
-   - events carry `attempt_id` for cross-event correlation (decision → queued → consumed)
-   - buffered with periodic flush (15s or 500 events); survives hot-reload via load-time recovery
+7. Adds `wield_slot` redirect for item abilities:
+   - redirects non-combat-ability wield calls back to `slot_combat_ability` during item sequences (prevents cancel loop)
+8. Guards against overheat crash:
+   - prevents crash when bots wield plasma guns with nested threshold config
+9. Guards against perils achievement crash:
+   - skips `WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement` when `account_id` is nil (bot crash guard)
+10. Per-template heuristics (via `heuristics.lua`):
+    - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
+    - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
+    - `enemy_breed` export for breed classification
+11. Structured JSONL event logging (`event_log.lua`):
+    - opt-in via mod setting (`enable_event_log`)
+    - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`
+    - events carry `attempt_id` for cross-event correlation (decision → queued → consumed)
+    - buffered with periodic flush (15s or 500 events); survives hot-reload via load-time recovery
 
 ## Why item fallback is needed
 
@@ -75,6 +85,54 @@ Key design:
 - **False-decision compression**: Tracks skip counts per (bot, ability) to weight false decisions without flooding the file.
 
 Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/LOGGING.md` for event schema.
+
+## Performance analysis
+
+### Current overhead: negligible
+
+The mod piggybacks on data the engine already computes. There are no new per-frame scans, raycasts, or pathfinding queries.
+
+**Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
+
+| Path | Cost | Notes |
+|---|---|---|
+| `build_context()` | ~1 iteration over proximity list + coherency allies | Cached per unit per `fixed_t` — runs once per bot per frame regardless of how many call sites invoke it |
+| Heuristic evaluation | ~20 arithmetic comparisons | Pure comparisons on pre-built context table, no allocations, no engine calls |
+| `_can_activate_ability` (BT condition) | 1 `require` (cached) + `build_context` + heuristic | Only fires when BT priority selector reaches the ability node — usually short-circuited by higher-priority nodes |
+| `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, or state guard) |
+| Event logging (`emit`) | 1 table append per event | Buffered; flush to disk every 15s or 500 events. Off by default. |
+| Debug logging (`_debug_log`) | 1 string concat for key + 1 table lookup | Message body only built when debug enabled, but key argument is always evaluated |
+
+**What the mod does NOT do per frame:**
+- No new perception scans — reads `perception_extension:enemies_in_proximity()` which the engine already computed
+- No raycasts or line-of-sight checks
+- No pathfinding or navmesh queries
+- No table allocations in the heuristic path (context is reused via cache)
+
+### Known minor waste
+
+`_debug_log` key strings (e.g. `"none:" .. ability_component_name`) are concatenated even when debug is disabled, because Lua evaluates all function arguments before the call. This produces ~90 throwaway strings/sec. Negligible but could be gated behind `if _debug_enabled() then` if profiling ever shows string GC pressure.
+
+### Growth vectors to watch
+
+When implementing these issues, verify the change doesn't add per-frame engine calls:
+
+| Issue | Risk | What to watch |
+|---|---|---|
+| #4 Grenade/blitz support | **Low** | Same architecture — one more heuristic per bot. Context cache shared. |
+| #13 Navmesh validation for charges | **Medium-High** | Navmesh queries (`GwNavQueries`) are expensive. Must not run every frame — gate behind heuristic returning true, then validate once before queueing. Cache negative results with a cooldown. |
+| #15 Suppress dodge during ability hold | **Low** | One additional condition check in an existing hook. No new per-frame hook needed. |
+| #22 Utility-based ability scoring | **Low-Medium** | If it replaces if/else heuristics with a scoring pass over all abilities, context build is still cached. Scoring itself would be cheap. Risk is if it queries additional engine state per ability. |
+| #23 Smart melee attack selection | **Medium** | Could require reading weapon template data per frame. Keep reads cached and avoid per-frame `rawget` chains on large template tables. |
+| New per-frame hooks (general) | **Medium** | DMF hook dispatch has non-trivial cost (closure call + argument forwarding + chain-call). Currently 5 hooks on per-frame paths — acceptable. Consolidate logic into fewer hook sites rather than adding one hook per feature if count grows past ~10. |
+
+### Rules for new per-frame code
+
+1. **No new engine queries without caching.** If you need navmesh, raycast, or LoS data, cache results per unit per frame (same pattern as `build_context`).
+2. **Gate expensive checks behind cheap ones.** A navmesh query should only run after the heuristic already returned true and all other cheap conditions passed.
+3. **Prefer extending `build_context` over adding parallel data-gathering.** New signals (e.g. character state, weapon slot) should be fields on the existing context table, benefiting from the frame cache.
+4. **Count your hooks.** Each `mod:hook` / `mod:hook_safe` on a per-frame system adds dispatch overhead. Before adding a new one, check if the logic can live inside an existing hook.
+5. **Event logging volume.** If a new event type fires every frame per bot (not just on state transitions), consider sampling or skip-counting like `emit_decision` does for false results.
 
 ## Key constraints
 

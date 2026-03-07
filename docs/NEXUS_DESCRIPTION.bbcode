@@ -14,7 +14,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 [*]Psyker: Scrier's Gaze
 [*]Ogryn: Point-Blank Barrage
 [*]Arbites: Castigator's Stance
-[*]Hive Scum: Enhanced Desperado / Rampage
+[*]Hive Scum: Enhanced Desperado / Rampage (untested — DLC required)
 [/list]
 
 [b]Dash / shout / stealth abilities (reliable):[/b]
@@ -34,7 +34,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 [/list]
 
 [b]Smart trigger conditions:[/b]
-Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 16 of 17 trigger functions validated in-game (12 combat + 4 item).
+Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
 
 [size=3][b]What doesn't work yet[/b][/size]
 [list]
@@ -65,10 +65,10 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 
 [size=3][b]Known limitations[/b][/size]
 [list]
-[*]Psyker Scrier's Gaze can cause warp overcharge explosions (bot has no vent ability)
+[*]Psyker Scrier's Gaze can cause warp overcharge explosions (stance builds peril continuously, bot does not cancel the stance before critical threshold)
 [*]Item-based abilities use a heuristic wield/use/unwield sequence — new or changed weapon templates may not be recognized
 [*]Mods are disabled after every Darktide update — re-patch required
-[*]Hive Scum abilities are untested (DLC required)
+[*]Hive Scum abilities (Enhanced Desperado, Rampage, Stimm Field) are untested — DLC required for validation
 [/list]
 
 [size=3][b]Source[/b][/size]

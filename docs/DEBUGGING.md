@@ -87,7 +87,7 @@ rg "fallback held" "$LATEST" | grep -v "nearby=0)"
 rg "Script Error|Lua Stack" "$LATEST"
 ```
 
-**Common mistake:** Do NOT grep for `"decision:"` or `"-> true"` — those patterns don't exist in the log. The actual format is `"fallback queued/held/blocked"` with rule names inline.
+**Common mistake:** Do NOT grep for `"decision:"` — that pattern doesn't exist in the log. The `"-> true"` pattern does appear in debug decision lines (e.g. `decision veteran_combat_ability -> true (rule=...)`). For activation evidence, prefer `"fallback queued"` / `"charge consumed"` which are unambiguous.
 
 ## Current BetterBots debug pattern
 
@@ -156,17 +156,17 @@ When debug logging is enabled, BetterBots emits a **one-shot context dump** the 
 
 ### What's testable outside the game
 
-The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) created clean test seams. The 13 `_can_activate_*` heuristic functions are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature. The `event_log` module is independently testable (buffer, flush, lifecycle, false-decision compression).
+The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) created clean test seams. The 18 `_can_activate_*` heuristic functions (13 combat + 5 item) are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature. The `event_log` module is independently testable (buffer, flush, lifecycle, false-decision compression).
 
 ### Test structure
 
 ```
 tests/
   test_helper.lua           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua       # 80 tests: all 13 heuristic functions
+  heuristics_spec.lua       # 117 tests: all 18 heuristic functions (13 combat + 5 item)
   meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
   resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
-  event_log_spec.lua        # 16 tests: buffer, flush, lifecycle, false-decision compression
+  event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
 ```
 
 ### Running tests

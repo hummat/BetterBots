@@ -48,7 +48,7 @@ BLOCK IF peril_pct < 0.30 AND num_nearby < 3 AND toughness_pct > 0.50
 
 ---
 
-## Scrier's Gaze (`psyker_stance`)
+## Scrier's Gaze (`psyker_overcharge_stance`)
 
 **Cooldown:** 25s (starts after buff expires) | **Role:** Damage burst stance
 
@@ -79,7 +79,7 @@ BLOCK IF health_pct < 0.25
 
 ## Telekine Shield (`psyker_force_field`)
 
-**Cooldown:** 45s | **Role:** Deployable shield (Tier 3 item-based, ~13% reliability)
+**Cooldown:** 45s | **Role:** Deployable shield (Tier 3 item-based, 100% reliability post-fix)
 
 ### USE WHEN
 - `num_nearby >= 3 AND toughness_pct < 0.40` — under pressure

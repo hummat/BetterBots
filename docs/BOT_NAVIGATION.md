@@ -525,7 +525,7 @@ until the threat expires.
 ### Movement State and Ability Activation
 
 The `can_activate_ability` condition in the BT is evaluated **above** the combat/follow
-selector (BT indices 47-57), meaning it runs before any movement decisions. There are no
+selector (source lines 47-57 in `bot_behavior_tree.lua`), meaning it runs before any movement decisions. There are no
 navigation-state gates in the ability condition -- it does not check whether the bot is in
 a transition, moving, or stationary.
 

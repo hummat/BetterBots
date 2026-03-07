@@ -11,7 +11,7 @@ Use `docs/VALIDATION_TRACKER.md` as the canonical run log and matrix.
 - SoloPlay enabled
 - BetterBots loaded after `dmf`
 - DMF `Echo` output set to `Log` or `Log & Chat`
-- Optional: Tertium4Or5 for deterministic bot loadouts
+- Optional: Tertium 5 or Tertium 6 for deterministic bot loadouts
 
 ## Acceptance criteria
 

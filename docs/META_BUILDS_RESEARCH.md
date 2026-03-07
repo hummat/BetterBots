@@ -311,10 +311,10 @@ Charge variants: `ogryn_charge_cooldown_reduction`, `ogryn_charge_damage`, `ogry
 | Ability | Template | Meta Tier | Input | Role |
 |---------|----------|-----------|-------|------|
 | **Break the Line** | `adamant_charge` | S | `aim_pressed` -> `aim_released` | Forward dash + cone stagger. +25% damage, +50% impact for 6s. |
-| **Nuncio-Aquila** | `adamant_shout` / `adamant_shout_improved` | A | `shout_pressed` -> `shout_released` | Damage reduction, toughness regen, revive speed in AoE. |
+| **Nuncio-Aquila** | `adamant_area_buff_drone` (no `ability_template` — Tier 3 item) | A | wield/use sequence | Damage reduction, toughness regen, revive speed in AoE. |
 | **Castigator's Stance** | `adamant_stance` | B | `stance_pressed` | Emergency toughness. Long CD, selfish. Melee-focused. |
 
-Drone: `adamant_area_buff_drone` (no `ability_template` -- Tier 3 item, ~21% reliability)
+Drone: `adamant_area_buff_drone` (no `ability_template` -- Tier 3 item, 100% reliability post-fix)
 
 ### Blitz/Grenades
 
@@ -531,8 +531,8 @@ Bots should default to the #1 meta ability per class. For classes where BetterBo
 | Class | Meta #1 | BetterBots tier | Status |
 |-------|---------|----------------|--------|
 | Veteran | Voice of Command | Tier 1 | PASS -- heuristic exists |
-| Zealot | Chorus (Relic) | Tier 3 | PASS but item-based, reliability issues |
-| Psyker | Dome (Force Field) | Tier 3 | ~13% reliability |
+| Zealot | Chorus (Relic) | Tier 3 | PASS (100% post-fix) |
+| Psyker | Dome (Force Field) | Tier 3 | PASS (100% post-fix) |
 | Ogryn | Taunt | Tier 2 | PASS -- heuristic exists |
 | Arbites | Break the Line (Charge) | Tier 2 | PASS -- heuristic exists |
 | Hive Scum | Desperado (Focus) | Tier 1 | DLC-blocked |

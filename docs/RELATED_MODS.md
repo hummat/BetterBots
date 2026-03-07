@@ -99,7 +99,28 @@ Maps bot slot number → mod setting dropdown → cached profile. Falls back to 
 
 ---
 
-## 3. fancy_bots (Aussiemon) — MEDIUM
+## 3. Tertium 6 (KristopherPrime) — MEDIUM
+
+**What it does:** Fork of Tertium 5 (temporary, pending upstream update). Supports all 6 classes including Arbites and Hive Scum. Adds player character + 5 bots. Named "temporary" by author.
+
+**Source:** [Nexus Mods #725](https://www.nexusmods.com/warhammer40kdarktide/mods/725)
+
+### Key findings
+
+- Fixes the Arbites/Hive Scum crash in Tertium 5's `fetch_all_profiles` path
+- Same `attack_meta_data` injection approach as Tertium 5
+- No ability-related code — strictly weapons + profiles
+- Recommended alternative when Tertium 5 crashes on newer classes
+
+### Relevance to BetterBots
+
+- Drop-in replacement for Tertium 5 when testing Arbites/Hive Scum bots
+- No conflicts with BetterBots
+- Monitors same mod settings pattern for bot slot → profile mapping
+
+---
+
+## 4. fancy_bots (Aussiemon) — MEDIUM
 
 **What it does:** Replaces bot cosmetics with custom or randomized outfits.
 
@@ -130,7 +151,7 @@ Critical reference for Tier 3 item-based abilities if they require manipulating 
 
 ---
 
-## 4. bot_spawner (Aussiemon) — LOW
+## 5. bot_spawner (Aussiemon) — LOW
 
 **What it does:** Spawns/despawns bots on demand via keybind or chat command.
 
@@ -149,7 +170,7 @@ Useful API reference for testing. Not directly needed for ability activation.
 
 ---
 
-## 5. SoloPlay — LOW
+## 6. SoloPlay — LOW
 
 **What it does:** Enables solo play sessions with configurable mission, difficulty, and modifiers.
 
@@ -167,7 +188,7 @@ Confirms SoloPlay is purely session infrastructure — BetterBots has clean sepa
 
 ---
 
-## 6. VT2 Decompiled Source — Bot Ability System — MEDIUM-HIGH
+## 7. VT2 Decompiled Source — Bot Ability System — MEDIUM-HIGH
 
 **What it is:** Vermintide 2's decompiled bot behavior tree and ability activation code. VT2 shares the same BT architecture as Darktide. Bots already use career skills in VT2 — analyzing how reveals patterns directly applicable to BetterBots.
 
@@ -252,7 +273,7 @@ No `bot_queue_action_input` — VT2 uses direct flag-based input. Darktide's que
 
 ---
 
-## 7. Bot Improvements - Combat (Grimalackt, VT2) — HIGH
+## 8. Bot Improvements - Combat (Grimalackt, VT2) — HIGH
 
 **What it does:** Comprehensive VT2 bot behavior overhaul. Hooks `BTConditions.can_activate` per-career to replace vanilla ability triggers with threat-value-based heuristics. Also improves melee attack selection, revive behavior, elite pinging, boss engagement, and line-of-fire reactions.
 
@@ -328,7 +349,7 @@ Hooks `BTBotMeleeAction._choose_attack` with utility-based scoring:
 
 ---
 
-## 8. Bot Improvements - Impulse Control (Squatting-Bear, VT2) — LOW-MEDIUM
+## 9. Bot Improvements - Impulse Control (Squatting-Bear, VT2) — LOW-MEDIUM
 
 **What it does:** Prevents bots from wasting consumables and abilities at bad times. Suppresses charge/dash abilities when not near enemies, prevents item waste.
 

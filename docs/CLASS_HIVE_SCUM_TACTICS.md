@@ -35,7 +35,7 @@ BLOCK IF active_stance_already_on
 
 ---
 
-## Rampage (`broker_rage`)
+## Rampage (`broker_punk_rage`)
 
 **Cooldown:** 30s (paused during stance) | **Role:** Melee burst + toughness recovery + stun immunity
 

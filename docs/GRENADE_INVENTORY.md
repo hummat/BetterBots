@@ -5,7 +5,7 @@
 
 ## Summary
 
-18 total grenade/blitz weapon templates exist across all classes. **All 18 lack an `ability_template` field**, meaning none can be activated through the standard `bt_bot_conditions.can_activate_ability` BT path. All require an item-based fallback approach (wield -> use -> unwield), similar to Tier 3 combat abilities.
+19 total grenade/blitz weapon templates exist across all classes. **All lack an `ability_template` field** (except `adamant_whistle`), meaning none can be activated through the standard `bt_bot_conditions.can_activate_ability` BT path. All require an item-based fallback approach (wield -> use -> unwield), similar to Tier 3 combat abilities.
 
 The BT node `activate_grenade_ability` exists at priority 9 with component `grenade_ability_action`, but it relies on `ability_meta_data` lookup via `ability_template` -- a field none of these templates define.
 
@@ -29,7 +29,7 @@ Generated via `grenade_weapon_template_generator`. Default wield time ~1.5s. All
 | `ogryn_grenade_frag` | `ogryn_grenade_frag.lua` | Ogryn |
 | `ogryn_grenade_friend_rock` | `ogryn_grenade_friend_rock.lua` | Ogryn |
 | `smoke_grenade` | `smoke_grenade.lua` | Veteran |
-| `tox_grenade` | `tox_grenade.lua` | Zealot |
+| `tox_grenade` | `tox_grenade.lua` | Hive Scum (via `broker_tox_grenade`) |
 
 **Input sequence:**
 1. `action_one_pressed` -- begins aim/hold (`aim_hold` action)
@@ -42,7 +42,7 @@ Generated via `grenade_handleless_weapon_template_generator`. Faster wield time 
 | Template name | File | Class |
 |---|---|---|
 | `quick_flash_grenade` | `quick_flash_grenade.lua` | Hive Scum |
-| `shock_grenade` | `shock_grenade.lua` | Veteran |
+| `shock_grenade` | `shock_grenade.lua` | Zealot (via `zealot_shock_grenade`) |
 | `krak_grenade` | `krak_grenade.lua` | Veteran |
 
 ### Mine (1)
@@ -51,9 +51,9 @@ Place-down mechanic instead of throw. Uses `action_one_pressed` to place.
 
 | Template name | File | Class |
 |---|---|---|
-| `shock_mine` | `shock_mine.lua` | Hive Scum |
+| `shock_mine` | `shock_mine.lua` | Arbites (via `adamant_shock_mine`) |
 
-### Class-Specific Blitz Abilities (5)
+### Class-Specific Blitz Abilities (6)
 
 Each has a unique action hierarchy and input pattern. These are the most complex to support.
 
@@ -63,6 +63,7 @@ Each has a unique action hierarchy and input pattern. These are the most complex
 | `psyker_chain_lightning` | `psyker_chain_lightning.lua` | Psyker | Custom chain | `chain_lightning` | Warp charge gated |
 | `psyker_smite` | `psyker_smite.lua` | Psyker | Custom chain | `smite_targeting` | Warp charge gated, channeled |
 | `psyker_throwing_knives` | `psyker_throwing_knives.lua` | Psyker | `throw_pressed` (`grenade_ability_pressed`) | `spawn_projectile` | Multiple charges |
+| `broker_missile_launcher` | `missile_launcher` (inventory item) | Hive Scum | Custom | `spawn_projectile` | Boom Bringer — burst damage at range |
 | `zealot_throwing_knives` | `zealot_throwing_knives.lua` | Zealot | `throw_pressed` (`grenade_ability_pressed`) | `spawn_projectile` | Multiple charges |
 
 **Psyker blitz notes:** `psyker_chain_lightning` and `psyker_smite` have custom action hierarchies with warp charge costs. Activation requires checking `warp_charge.current_percentage` via `unit_data_extension:read_component("warp_charge")` to avoid self-damage from overcharge.

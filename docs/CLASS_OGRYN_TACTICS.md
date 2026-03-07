@@ -22,7 +22,7 @@
 ```
 IF priority_target_enemy AND target_dist > 4 THEN activate (HIGH)
 IF target_ally_needs_aid AND ally_dist > 6 THEN activate (HIGH)
-IF opportunity_target AND target_dist >= 8 AND target_dist <= 18 THEN activate (MEDIUM)
+IF opportunity_target AND target_dist >= 8 AND target_dist <= 18 THEN activate (MEDIUM)  -- 18m requires ogryn_charge_increased_distance talent (base: 12m)
 IF num_nearby >= 4 AND toughness_pct < 0.20 THEN activate (MEDIUM)
 BLOCK IF target_dist < 4
 BLOCK IF target_enemy == nil
@@ -60,7 +60,7 @@ BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 
 ---
 
-## Point-Blank Barrage (`ogryn_ranged_stance`)
+## Point-Blank Barrage (`ogryn_gunlugger_stance`)
 
 **Cooldown:** 80s | **Role:** Ranged DPS stance
 

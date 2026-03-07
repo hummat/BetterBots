@@ -1,7 +1,7 @@
 LUA_FILES := $(shell find scripts -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
 
-.PHONY: deps lint format format-check lsp-check check test release package
+.PHONY: deps lint format format-check lsp-check check test doc-check release package
 
 deps:
 	git config core.hooksPath scripts/hooks
@@ -18,7 +18,10 @@ format-check:
 lsp-check:
 	lua-language-server --configpath=.luarc.json --check=. --check_format=pretty --logpath=/tmp/luals-betterbots
 
-check: format-check lint lsp-check test
+doc-check:
+	@scripts/doc-check.sh
+
+check: format-check lint lsp-check test doc-check
 
 test:
 	@if [ -d tests ]; then \

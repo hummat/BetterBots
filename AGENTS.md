@@ -52,6 +52,7 @@ Use project-local tooling configs before handing off changes:
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
+- `make doc-check` → verify doc claims against code (function counts, test counts, issue states)
 - `make check` → runs all of the above
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
@@ -88,16 +89,18 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 1. **Tier 1 (whitelist removal):** Templates that already have `ability_meta_data` — just need the `else return false` removed. These work end-to-end with no other changes.
 2. **Tier 2 (meta_data injection):** Templates that exist but lack `ability_meta_data`. We inject it at load time (same pattern Tertium4Or5 uses for `attack_meta_data`).
-3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` with per-template heuristics (13 functions in `heuristics.lua`). Each ability has specific activate/block conditions based on health, toughness, peril, enemy composition, distance, and ally state. Unknown templates fall back to `enemies_in_proximity() > 0`.
+3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` with per-template heuristics (18 functions in `heuristics.lua`). Each ability has specific activate/block conditions based on health, toughness, peril, enemy composition, distance, and ally state. Unknown templates fall back to `enemies_in_proximity() > 0`.
 
 ### Ability tiers
 
 | Tier | Status | Examples | What's needed |
 |------|--------|----------|---------------|
-| 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance, Broker Focus/Rage | Whitelist removal only |
+| 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance | Whitelist removal only |
+| 1 | Untested (DLC) | Broker Focus/Rage | Whitelist removal only — DLC-blocked for validation |
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
-| 3 | Partial | Zealot Relic (stable), Psyker Force Field (~13%), Arbites Drone (~21%) | Item-based fallback (wield/use/unwield sequence) |
-| 3 | Not addressed | All grenades, Psyker Smite/Assail/Chain Lightning, Hive Scum Stimm Field | No `ability_template` field → needs different approach |
+| 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence) |
+| 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
+| 3 | Not addressed | All grenades, Psyker Smite/Assail/Chain Lightning | No `ability_template` field → needs different approach |
 
 ### Decompiled source repo (Aussiemon/Darktide-Source-Code)
 
@@ -136,9 +139,20 @@ Local clone: `../Darktide-Source-Code/`
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
 
-## MANDATORY: Read relevant docs before acting
+## MANDATORY: Read relevant docs before acting, update them after
 
-**General rule:** Before performing ANY task in this project — implementation, debugging, log analysis, validation, planning — check the doc index below and read the relevant docs first. Do not guess from memory. The docs are the ground truth for game internals, log formats, mod conventions, and validation status. This applies to all tasks, not just code changes.
+**Read first:** Before performing ANY task in this project — implementation, debugging, log analysis, validation, planning — check the doc index below and read the relevant docs first. Do not guess from memory. The docs are the ground truth for game internals, log formats, mod conventions, and validation status. This applies to all tasks, not just code changes.
+
+**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale function counts and test counts automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
+
+| You just... | Update |
+|---|---|
+| Added/removed a `_can_activate_*` function | Function count in this file + `docs/DEBUGGING.md` |
+| Added/removed/moved tests | Per-file test counts in this file + `docs/DEBUGGING.md` |
+| Changed tier status or validation result | Tier table in this file + `docs/VALIDATION_TRACKER.md` + `docs/STATUS.md` |
+| Closed a GitHub issue | Remove from active tables in `docs/ROADMAP.md` + `docs/STATUS.md` |
+| Added a new hook or module | `docs/ARCHITECTURE.md` |
+| Changed debug commands or log patterns | `docs/DEBUGGING.md` |
 
 ### Doc index by activity
 
@@ -159,6 +173,7 @@ Local clone: `../Darktide-Source-Code/`
 | Update Nexus mod page or release text | `docs/NEXUS_DESCRIPTION.bbcode` |
 | Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
 | Understand the module architecture | `docs/ARCHITECTURE.md` |
+| Add per-frame logic, hooks, or engine queries | `docs/ARCHITECTURE.md` (Performance section) |
 | Write or modify tests | `docs/DEBUGGING.md` (automated testing section) |
 
 ### Required reading order for ability work
@@ -188,7 +203,7 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 - `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots are veterans, zero talents, weapon templates
 
 **API references** (from decompiled source):
-- `docs/GRENADE_INVENTORY.md` — all 18 grenade/blitz templates, input patterns, implementation approach
+- `docs/GRENADE_INVENTORY.md` — all 19 grenade/blitz templates, input patterns, implementation approach
 - `docs/CHARACTER_STATE_API.md` — character state detection components, fields, access patterns
 - `docs/META_BUILDS_RESEARCH.md` — endgame meta builds per class, weapon/ability rankings, community build database
 
@@ -205,7 +220,7 @@ BetterBots.mod                              # DMF entry point
 bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
   BetterBots.lua                            # Main: hooks, condition patch, fallback queue
-  heuristics.lua                            # 13 per-template heuristic functions + build_context()
+  heuristics.lua                            # 18 per-template heuristic functions + build_context()
   meta_data.lua                             # ability_meta_data injection
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
@@ -214,8 +229,8 @@ scripts/mods/BetterBots/
   BetterBots_localization.lua               # Display strings
 tests/
   test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # 80 tests for all 13 heuristic functions
+  heuristics_spec.lua                       # 117 tests for all 18 heuristic functions
   meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
-  event_log_spec.lua                        # 16 tests for event buffering/flush/lifecycle
+  event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
 ```

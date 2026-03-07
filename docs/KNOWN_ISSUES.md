@@ -28,7 +28,7 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics: 16/17 validated (12 template + 4 item), thresholds loosened for testing.
+5. Per-career heuristics: 15/18 validated (12 combat + 3 item), 1 N/A, 2 DLC-blocked. Thresholds loosened for testing.
    - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
    - Item heuristics added (#3): zealot_relic, psyker_force_field (3 variants), adamant_area_buff_drone, broker_ability_stimm_field. Replace coarse `enemies_in_proximity > 0` gate with per-ability rules using coherency, toughness, corruption, and ally state.
    - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
@@ -79,5 +79,5 @@
 2. ~~Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).~~ Done — validated 100% consume rate.
 3. Replace heuristic item matching with explicit per-template mapping table.
 4. Reduce debug-log noise for expected transient `invalid action_input` states.
-5. ~~Add smarter per-ability trigger policies~~ Code complete (#2) — needs in-game validation.
+5. ~~Add smarter per-ability trigger policies~~ Done (#2, closed) — 15/18 validated in-game (12 combat + 3 item).
 6. Track upstream status of the Tertium4Or5 nil-guard fix and remove local compatibility note once upstreamed.

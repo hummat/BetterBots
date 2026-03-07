@@ -4,12 +4,23 @@
 
 Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvements - Combat). Start with ability activation (already shipped), then add smart trigger heuristics, safety guards, and general behavior improvements.
 
-## What's shipped (v0.1.0)
+## What's shipped
 
+### v0.1.0 (2026-03-05)
 - Tier 1 + Tier 2 ability activation for all 6 classes (whitelist removal + meta_data injection)
-- Tier 3 item-based abilities: zealot relic (stable), force field (~13%), drone (~21%)
+- Tier 3 item-based abilities (zealot relic, force field, drone — initial implementation)
 - Runtime diagnostics (condition/enter/charge trace hooks, debug logging)
 - Generic trigger: `enemies_in_proximity() > 0`
+
+### v0.2.0 (2026-03-06)
+- Sub-module refactor: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25)
+- Per-career threat heuristics (#2): 18 functions (13 combat + 5 item) with per-ability activate/hold rules
+- 142 unit tests via busted
+
+### v0.3.0 (2026-03-07)
+- Tier 3 reliability fix (#3): all testable item abilities at 100% consume rate
+- Structured JSONL event logging (#29) with `bb-log events` analysis subcommands
+- Item heuristics: per-ability rules for relic, force field, drone, stimm field
 
 ## Priority tiers
 
@@ -19,8 +30,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Category | Status |
 |---|-------|----------|--------|
-| 2 | Per-career threat heuristics | ability-quality | **Code complete** — 13 testable per-template functions (15 total, 2 N/A), 80 tests. Needs in-game validation. All tactics docs + perception APIs documented. |
-| 3 | Tier 3 item-ability reliability | tier: 3 | Root cause identified — timing mismatch between `ITEM_SEQUENCE_PROFILES` and engine action durations. Fix values known (see `docs/KNOWN_ISSUES.md`). |
+| 27 | Psyker Scrier's Gaze overcharge | bug | Bot activates stance, peril builds passively, bot explodes. Needs stance cancellation (#12) or peril ceiling. |
 | 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
 | 11 | Ability suppression / impulse control | ability-quality | Unblocked — character state APIs found (`movement_state`, `lunge_character_state`, etc.). Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
 
@@ -41,7 +51,8 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 |---|-------|-------|
 | 4 | Blitz / grenade support | Inventory extracted — all 18 templates mapped, all need item-based fallback, no `ability_template` on any. `adamant_whistle` only blitz with `ability_template`. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
-| 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs validation run. Stimm Field (Tier 3) DLC-blocked for testing. |
+| 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
+| 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
 
 **General bot behavior:**
 
@@ -84,8 +95,8 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 
 ## Milestones
 
-1. **M1 (shipped):** Tier 1 + Tier 2 abilities activate in solo play. v0.1.0 on Nexus.
-2. **M2:** Per-career threat heuristics (#2) + ability suppression (#11). Bots use abilities intelligently instead of spamming.
-3. **M3:** Tier 3 reliability improved (#3) + grenade spike (#4). Full ability coverage.
-4. **M4:** General bot behavior improvements (#16-#20). Beyond abilities.
+1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
+2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
+3. **M3:** Ability quality — suppression (#11), charge rescue (#10), stance cancellation (#12). Fix Psyker overcharge (#27).
+4. **M4:** Grenade/blitz support (#4) + general bot behavior improvements (#16-#20). Beyond abilities.
 5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

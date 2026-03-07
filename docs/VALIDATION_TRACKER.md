@@ -493,7 +493,7 @@ Legend: `PASS` = repeated successful evidence in logs and in-game effect, `PARTI
 | Ability Template | Status | Evidence Notes |
 |---|---|---|
 | `veteran_combat_ability` | PASS | run `2026-03-05-tier1-01`: `charge consumed for veteran_combat_ability_shout` |
-| `veteran_stealth_combat_ability` | UNKNOWN | not explicitly tracked in current status docs |
+| `veteran_stealth_combat_ability` | PASS | run H-03: 2 consumes (`veteran_combat_ability_stealth`), `stealth_hold` (37) |
 | `psyker_overcharge_stance` | PASS | runs `2026-03-05-tier1-01` + `H-02b`: `charge consumed for psyker_overcharge_stance` (2 in H-02b) |
 | `ogryn_gunlugger_stance` | PASS | run `2026-03-05-tier1-01`: `charge consumed for ogryn_ranged_stance` |
 | `adamant_stance` | PASS | run `2026-03-05-tier1-01`: `charge consumed for adamant_stance` |
