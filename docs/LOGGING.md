@@ -91,3 +91,38 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
+
+## Structured event log (JSONL)
+
+Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)`.
+
+### Output
+
+`./dump/betterbots_events_<timestamp>.jsonl` — one JSON object per line.
+
+### Event types
+
+| Event | When | Key fields |
+|-------|------|-----------|
+| `session_start` | First bot update tick | version, bots[] |
+| `decision` | Every heuristic eval | result, rule, source, bot, ctx, skipped_since_last |
+| `queued` | Action input sent | input, source, rule, attempt_id |
+| `item_stage` | Item state transition | stage, profile, input, attempt_id |
+| `consumed` | Charge spent | charges, attempt_id |
+| `blocked` | Item sequence failure | reason, stage, profile, attempt_id |
+| `snapshot` | Every 30s per bot | cooldown_ready, charges, ctx, item_stage |
+
+### Correlation
+
+Events carry `attempt_id` (monotonic per session) to link decision → queued → consumed chains. `bot` field is the player slot index.
+
+### Analysis
+
+```bash
+bb-log events summary    # counts + approval rate + per-bot consumes
+bb-log events rules      # hit rates per ability+rule
+bb-log events trace N    # timeline for bot slot N
+bb-log events holds      # false decision distribution
+bb-log events items      # item sequence success/fail
+bb-log events raw FILTER # passthrough to jq
+```
