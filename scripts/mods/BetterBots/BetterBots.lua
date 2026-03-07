@@ -190,6 +190,14 @@ Debug.wire({
 
 -- Condition hook: replaces bt_bot_conditions.can_activate_ability
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	local ability_component_name = action_data.ability_component_name
+
+	-- Fast path: keep running ability nodes alive (e.g. charge mid-lunge)
+	if ability_component_name == scratchpad.ability_component_name then
+		return true
+	end
+
+	-- Guards below only apply to NEW activations
 	local behavior = blackboard and blackboard.behavior
 	if behavior and behavior.current_interaction_unit ~= nil then
 		return false
@@ -203,12 +211,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 			"ability suppressed (" .. tostring(suppress_reason) .. ")"
 		)
 		return false
-	end
-
-	local ability_component_name = action_data.ability_component_name
-
-	if ability_component_name == scratchpad.ability_component_name then
-		return true
 	end
 
 	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
@@ -316,15 +318,6 @@ end
 
 -- Fallback queue: runs every BotBehaviorExtension.update tick
 local function _fallback_try_queue_combat_ability(unit, blackboard)
-	local behavior = blackboard and blackboard.behavior
-	if behavior and behavior.current_interaction_unit ~= nil then
-		return
-	end
-
-	if _is_suppressed(unit) then
-		return
-	end
-
 	local ability_component_name = "combat_ability_action"
 	local fixed_t = _fixed_time()
 	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
@@ -446,6 +439,22 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	if state.next_try_t and fixed_t < state.next_try_t then
+		return
+	end
+
+	-- Guards: only block NEW activations (after state machine cleanup above)
+	local behavior = blackboard and blackboard.behavior
+	if behavior and behavior.current_interaction_unit ~= nil then
+		return
+	end
+
+	local suppressed, suppress_reason = _is_suppressed(unit)
+	if suppressed then
+		_debug_log(
+			"fallback_suppress:" .. tostring(suppress_reason),
+			fixed_t,
+			"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
+		)
 		return
 	end
 
@@ -620,11 +629,12 @@ end)
 local function _try_patch_conditions_now(module_path, patched_set, patch_label)
 	local ok, conditions_or_err = pcall(require, module_path)
 	if not ok then
-		_debug_log(
-			"condition_patch_require_failed:" .. patch_label,
-			0,
-			"require failed for " .. patch_label .. " (" .. tostring(conditions_or_err) .. ")",
-			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+		mod:echo(
+			"BetterBots WARNING: condition patch failed for "
+				.. patch_label
+				.. " ("
+				.. tostring(conditions_or_err)
+				.. ")"
 		)
 		return
 	end
@@ -821,7 +831,7 @@ mod:hook_require(
 					end
 				end
 
-				if unit and id == "weapon_action" and action_input ~= "wield" then
+				if unit and id == "weapon_action" and action_input ~= "wield" and action_input ~= "reload" then
 					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
 					if ude then
 						local warp = ude:read_component("warp_charge")

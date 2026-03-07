@@ -11,7 +11,7 @@
 
 ### Post-v0.1.0 (unreleased)
 - **Refactored** into sub-modules: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25/#26)
-- **Per-career threat heuristics** (#2): 18 per-template heuristic functions (13 combat + 5 item) replacing generic `enemies_in_proximity() > 0`
+- **Per-career threat heuristics** (#2): 18 per-template heuristic functions (14 combat + 4 item) replacing generic `enemies_in_proximity() > 0`
   - Veteran: VoC (squad_leader) + Executioner's Stance (ranger) branching via `class_tag` + Stealth
   - Zealot: Dash (distance/super_armor/priority gates) + Invisibility (emergency/overwhelm/ally)
   - Psyker: Shout (peril-gated) + Stance (peril window + threat)
@@ -23,6 +23,7 @@
 - **Unit tests**: 142 tests via busted (heuristics, meta_data, resolve_decision, event_log)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 - **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
+- **Safety guards**: revive/interaction protection (#20), ability suppression during dodging/falling/lunging/jumping/ladder (#11), warp weapon peril block at ≥97% preventing Scrier's Gaze explosions (#27)
 
 ## Current Tier Status
 
@@ -40,11 +41,9 @@
 
 ## Known Blockers
 
-1. **Psyker Scrier's Gaze overcharge** (#27): Bot activates stance, peril builds passively, bot explodes. Needs stance cancellation or peril ceiling.
-2. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
+1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- Ability suppression / impulse control (#11)
 - Charge/dash to rescue disabled ally (#10)
 - Per-ability toggle settings (#6)
 - Investigate grenade/blitz approach (#4)

@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does eleven things:
+`scripts/mods/BetterBots/BetterBots.lua` does fourteen things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -48,6 +48,16 @@ Grenade abilities are still out of scope.
     - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`
     - events carry `attempt_id` for cross-event correlation (decision → queued → consumed)
     - buffered with periodic flush (15s or 500 events); survives hot-reload via load-time recovery
+12. Revive/interaction protection (#20):
+    - blocks ability activation when `blackboard.behavior.current_interaction_unit ~= nil`
+    - applied in both BT condition hook and fallback path (after in-progress state machines)
+13. Ability suppression / impulse control (#11):
+    - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
+    - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
+14. Warp weapon peril block (#27):
+    - blocks `weapon_action` inputs (except `wield` and `reload`) for warp weapons at ≥97% peril
+    - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
+    - allows venting (`reload`) through so bots can actively quell peril
 
 ## Why item fallback is needed
 

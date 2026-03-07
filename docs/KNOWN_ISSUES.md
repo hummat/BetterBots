@@ -35,10 +35,7 @@
    - Meta builds research (`docs/META_BUILDS_RESEARCH.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
    - Use `/bb_decide` to inspect live decisions during play.
 
-6. Psyker Scrier's Gaze causes warp overcharge explosions.
-   - Discovered in H-02b: bot activates stance at peril=0, stance builds peril passively, bot has no vent ability (Venting Shriek is a different ability slot) and explodes.
-   - The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance.
-   - Mitigations: (a) block stance activation if bot lacks a peril vent ability, (b) lower peril ceiling for activation, (c) tie into stance cancellation (#12) to exit early when peril is critical.
+6. ~~Psyker Scrier's Gaze causes warp overcharge explosions.~~ **Fixed** (#27): Warp weapon attacks blocked at ≥97% peril via `bot_queue_action_input` hook. Vent/reload inputs pass through. Root cause: stance itself doesn't explode — explosions only happen when additional peril is generated (warp weapon attacks) while at 100%.
 
 7. Structured event log (JSONL) working directory.
    - Darktide's CWD is `binaries/`, so `./dump/` resolves to `<game-root>/binaries/dump/`.

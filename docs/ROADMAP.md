@@ -14,7 +14,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 
 ### v0.2.0 (2026-03-06)
 - Sub-module refactor: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25)
-- Per-career threat heuristics (#2): 18 functions (13 combat + 5 item) with per-ability activate/hold rules
+- Per-career threat heuristics (#2): 18 functions (14 combat + 4 item) with per-ability activate/hold rules
 - 142 unit tests via busted
 
 ### v0.3.0 (2026-03-07)
@@ -30,9 +30,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Category | Status |
 |---|-------|----------|--------|
-| 27 | Psyker Scrier's Gaze overcharge | bug | Bot activates stance, peril builds passively, bot explodes. Needs stance cancellation (#12) or peril ceiling. |
 | 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
-| 11 | Ability suppression / impulse control | ability-quality | Unblocked — character state APIs found (`movement_state`, `lunge_character_state`, etc.). Don't charge off ledges, don't ability during nav transitions, don't stance when retreating. |
 
 ### P2: Later — Planned, not urgent
 
@@ -62,7 +60,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
-| 20 | Don't interrupt own revive | Ready — fix is ~5 LOC: check `current_interaction_unit ~= nil` in ability condition. |
+| ~~20~~ | ~~Don't interrupt own revive~~ | ~~Done — `current_interaction_unit` check in both activation paths.~~ |
 
 ### P3: Backlog — Nice to have, no timeline
 
@@ -97,6 +95,6 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
-3. **M3:** Ability quality — suppression (#11), charge rescue (#10), stance cancellation (#12). Fix Psyker overcharge (#27).
+3. **M3 (in progress):** Ability quality — ~~suppression (#11)~~, charge rescue (#10), stance cancellation (#12). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~
 4. **M4:** Grenade/blitz support (#4) + general bot behavior improvements (#16-#20). Beyond abilities.
 5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

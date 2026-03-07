@@ -77,6 +77,7 @@ done
 
 # ── 4. GitHub issue state vs docs ────────────────────────────────────────────
 
+# NOTE: In CI, ensure GH_TOKEN or GITHUB_TOKEN is exported for issue state checks.
 if command -v gh >/dev/null 2>&1 && gh api user --jq .login >/dev/null 2>&1; then
   closed_issues=$(gh issue list --state closed --limit 100 --json number --jq '.[].number' 2>/dev/null || true)
 
@@ -139,7 +140,7 @@ if ((errors > 0)); then
   exit 1
 elif ((warnings > 0)); then
   echo "doc-check: $warnings warning(s), 0 errors"
-  exit 0
+  exit 1
 else
   echo "doc-check: all checks passed"
   exit 0
