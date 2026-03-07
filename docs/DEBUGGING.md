@@ -64,7 +64,12 @@ bb-log tail           # real-time monitoring (grep BetterBots + errors)
 bb-log list           # show 10 most recent log files with indices
 bb-log raw <pattern>  # arbitrary rg pattern against log
 bb-log <cmd> 1        # use second-latest log (0=latest, default)
-bb-log events [cmd]   # JSONL event log analysis (requires jq); see docs/LOGGING.md
+bb-log events summary # JSONL: event counts + approval rate + per-bot consumes
+bb-log events rules   # JSONL: true/false decision counts by ability+rule
+bb-log events trace N # JSONL: timeline for bot slot N
+bb-log events holds   # JSONL: false decision distribution
+bb-log events items   # JSONL: item stage transitions + blocks
+bb-log events raw 'jq-filter'  # JSONL: raw jq passthrough
 ```
 
 **Manual grep recipes** (if bb-log unavailable):
@@ -151,7 +156,7 @@ When debug logging is enabled, BetterBots emits a **one-shot context dump** the 
 
 ### What's testable outside the game
 
-The sub-module split (heuristics.lua, meta_data.lua, etc.) created clean test seams. The 13 `_can_activate_*` heuristic functions are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature.
+The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) created clean test seams. The 13 `_can_activate_*` heuristic functions are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature. The `event_log` module is independently testable (buffer, flush, lifecycle, false-decision compression).
 
 ### Test structure
 
@@ -161,12 +166,13 @@ tests/
   heuristics_spec.lua       # 80 tests: all 13 heuristic functions
   meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
   resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
+  event_log_spec.lua        # 16 tests: buffer, flush, lifecycle, false-decision compression
 ```
 
 ### Running tests
 
 ```bash
-make test      # runs busted (auto-detected)
+make test      # runs busted (auto-detected) — 142 tests
 make check     # runs format + lint + lsp + test (full quality gate)
 ```
 

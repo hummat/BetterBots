@@ -154,6 +154,7 @@ scripts/mods/BetterBots/          # Mod source
   heuristics.lua                  #   13 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
+  event_log.lua                   #   Structured JSONL event logging
   debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings

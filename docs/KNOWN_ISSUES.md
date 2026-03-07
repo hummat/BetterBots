@@ -40,7 +40,12 @@
    - The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance.
    - Mitigations: (a) block stance activation if bot lacks a peril vent ability, (b) lower peril ceiling for activation, (c) tie into stance cancellation (#12) to exit early when peril is critical.
 
-7. Debug log noise reduced — idle-state decisions now invisible.
+7. Structured event log (JSONL) working directory.
+   - Darktide's CWD is `binaries/`, so `./dump/` resolves to `<game-root>/binaries/dump/`.
+   - `bb-log events` expects `EVENTS_DIR=./dump` relative to CWD — run from `binaries/` or adjust the path.
+   - Hot-reload (`Ctrl+Shift+R`) resets module state; load-time recovery re-enables logging if bots are alive, but unflushed buffer from before reload is lost.
+
+8. Debug log noise reduced — idle-state decisions now invisible.
    - `decision -> false`, `fallback held (nearby=0)`, and `bt gate evaluated` are suppressed.
    - Idle hold counts in `bb-log summary` will show 0 for new runs.
    - See `docs/LOGGING.md` for details and how to re-enable.
