@@ -22,6 +22,8 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 
+local PERIL_CRITICAL_THRESHOLD = 0.97
+
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
@@ -51,6 +53,49 @@ local function _debug_log(key, fixed_t, message, min_interval_s)
 
 	_last_debug_log_t_by_key[key] = t
 	mod:echo("BetterBots DEBUG: " .. message)
+end
+
+local _SUPPRESSED_STATES = {
+	jumping = true,
+	ladder_climbing = true,
+	ladder_top_entering = true,
+	ladder_top_leaving = true,
+	ladder_bottom_entering = true,
+	ladder_bottom_leaving = true,
+}
+
+local function _is_suppressed(unit)
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return false
+	end
+
+	local movement = unit_data_extension:read_component("movement_state")
+	if movement then
+		if movement.is_dodging then
+			return true, "dodging"
+		end
+		if movement.method == "falling" then
+			return true, "falling"
+		end
+	end
+
+	local lunge = unit_data_extension:read_component("lunge_character_state")
+	if lunge and (lunge.is_lunging or lunge.is_aiming) then
+		return true, "lunging"
+	end
+
+	local character_state = unit_data_extension:read_component("character_state")
+	if character_state and _SUPPRESSED_STATES[character_state.state_name] then
+		return true, character_state.state_name
+	end
+
+	local locomotion = unit_data_extension:read_component("locomotion")
+	if locomotion and locomotion.parent_unit ~= nil then
+		return true, "moving_platform"
+	end
+
+	return false
 end
 
 local function _equipped_combat_ability(unit)
@@ -145,6 +190,21 @@ Debug.wire({
 
 -- Condition hook: replaces bt_bot_conditions.can_activate_ability
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	local behavior = blackboard and blackboard.behavior
+	if behavior and behavior.current_interaction_unit ~= nil then
+		return false
+	end
+
+	local suppressed, suppress_reason = _is_suppressed(unit)
+	if suppressed then
+		_debug_log(
+			"suppress:" .. tostring(suppress_reason),
+			_fixed_time(),
+			"ability suppressed (" .. tostring(suppress_reason) .. ")"
+		)
+		return false
+	end
+
 	local ability_component_name = action_data.ability_component_name
 
 	if ability_component_name == scratchpad.ability_component_name then
@@ -256,6 +316,15 @@ end
 
 -- Fallback queue: runs every BotBehaviorExtension.update tick
 local function _fallback_try_queue_combat_ability(unit, blackboard)
+	local behavior = blackboard and blackboard.behavior
+	if behavior and behavior.current_interaction_unit ~= nil then
+		return
+	end
+
+	if _is_suppressed(unit) then
+		return
+	end
+
 	local ability_component_name = "combat_ability_action"
 	local fixed_t = _fixed_time()
 	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
@@ -749,6 +818,28 @@ mod:hook_require(
 								.. ")"
 						)
 						return nil
+					end
+				end
+
+				if unit and id == "weapon_action" and action_input ~= "wield" then
+					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
+					if ude then
+						local warp = ude:read_component("warp_charge")
+						if warp and warp.current_percentage >= PERIL_CRITICAL_THRESHOLD then
+							local tweaks = ude:read_component("weapon_tweak_templates")
+							if tweaks and tweaks.warp_charge_template_name ~= "none" then
+								_debug_log(
+									"peril_block:" .. tostring(action_input),
+									_fixed_time(),
+									"blocked "
+										.. tostring(action_input)
+										.. " (peril="
+										.. string.format("%.0f%%", warp.current_percentage * 100)
+										.. ", warp weapon)"
+								)
+								return nil
+							end
+						end
 					end
 				end
 
