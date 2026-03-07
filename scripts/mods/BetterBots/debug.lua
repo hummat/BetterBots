@@ -75,6 +75,9 @@ local function context_snapshot(context)
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,
 		target_is_super_armor = context.target_is_super_armor,
+		allies_in_coherency = context.allies_in_coherency,
+		avg_ally_toughness_pct = context.avg_ally_toughness_pct,
+		max_ally_corruption_pct = context.max_ally_corruption_pct,
 	}
 end
 
@@ -354,8 +357,8 @@ local function register_commands()
 
 				local can_activate, rule, context
 				if ability_template_name == "none" then
-					can_activate = _can_use_item_fallback(unit, ability_extension, ability_name)
-					rule = can_activate and "item_fallback_ready" or "item_fallback_blocked"
+					can_activate, rule = _can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+					rule = rule or (can_activate and "item_fallback_ready" or "item_fallback_blocked")
 					context = _build_context(unit, blackboard)
 				else
 					local conditions =

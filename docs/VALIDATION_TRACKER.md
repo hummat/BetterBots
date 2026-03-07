@@ -387,6 +387,49 @@ Conclusion:
 - Heuristic validation now at 8/13 PASS
 ```
 
+### Run PENDING-tier3-timing (Tier 3 timing fix validation)
+
+```text
+Run ID: PENDING
+Date (local): TBD
+Git commit: (feat/tier3-reliability-heuristics branch, timing fix only — before heuristic wiring)
+Bot lineup / abilities: Zealot (Bolstering Prayer), Psyker (Telekine Shield dome), Arbites (Nuncio-Aquila), any 4th
+
+Purpose: Validate ITEM_SEQUENCE_PROFILES timing fix in isolation (before heuristic changes).
+Compare consume-rate to pre-fix baseline: force field was ~13%, drone was ~21%, relic was 100%.
+Target: >50% for force field and drone, relic stays at 100%.
+
+Tier 3 evidence:
+- zealot_relic: TBD
+- psyker_force_field: TBD
+- adamant_area_buff_drone: TBD
+
+Conclusion:
+- TBD
+```
+
+### Run PENDING-tier3-heuristics (Tier 3 heuristic validation)
+
+```text
+Run ID: PENDING
+Date (local): TBD
+Git commit: (feat/tier3-reliability-heuristics branch, full implementation)
+Bot lineup / abilities: Zealot (Bolstering Prayer), Psyker (Telekine Shield dome), Arbites (Nuncio-Aquila), any 4th
+
+Purpose: Validate item heuristic decision quality after timing fix is confirmed.
+Check that /bb_decide shows heuristic rule names (not generic ready/blocked).
+Verify activate/hold rules fire correctly per ability.
+
+Item heuristic evidence:
+- zealot_relic: TBD (expect: team_low_toughness, self_critical, hold, no_allies)
+- psyker_force_field: TBD (expect: pressure, ranged_pressure, safe, hold)
+- adamant_area_buff_drone: TBD (expect: team_horde, monster_fight, no_allies, low_value)
+- broker_ability_stimm_field: BLOCKED (DLC)
+
+Conclusion:
+- TBD
+```
+
 ## Reliability Snapshot (current rolling log)
 
 ```text
@@ -500,7 +543,19 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 | `_can_activate_broker_focus` | `broker_focus` | UNTESTED | — | DLC-blocked |
 | `_can_activate_broker_rage` | `broker_punk_rage` | UNTESTED | — | DLC-blocked |
 
-**Summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
+### Item Heuristic Validation (#3)
+
+Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not yet validated in-game.
+
+| Heuristic Function | Ability Name(s) | Status | Run | Rules fired |
+|---|---|---|---|---|
+| `_can_activate_zealot_relic` | `zealot_relic` | UNTESTED | — | Expected: `team_low_toughness`, `self_critical`, `hold`, `no_allies` |
+| `_can_activate_force_field` | `psyker_force_field*` | UNTESTED | — | Expected: `pressure`, `ranged_pressure`, `ally_aid`, `safe`, `hold` |
+| `_can_activate_drone` | `adamant_area_buff_drone` | UNTESTED | — | Expected: `team_horde`, `monster_fight`, `no_allies`, `low_value` |
+| `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | DLC-blocked |
+
+**Template heuristic summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
+**Item heuristic summary: 0/3 testable UNTESTED, 1 DLC-blocked.**
 
 **Remaining validation runs needed:**
 

@@ -81,6 +81,9 @@ local function build_context(unit, blackboard)
 		target_is_elite_special = false,
 		target_is_monster = false,
 		target_is_super_armor = false,
+		allies_in_coherency = 0,
+		avg_ally_toughness_pct = 1,
+		max_ally_corruption_pct = 0,
 	}
 
 	local perception_component = blackboard and blackboard.perception
@@ -111,6 +114,40 @@ local function build_context(unit, blackboard)
 		if warp_charge_component and warp_charge_component.current_percentage ~= nil then
 			context.peril_pct = warp_charge_component.current_percentage
 		end
+	end
+
+	local coherency_extension = ScriptUnit.has_extension(unit, "coherency_system")
+	if coherency_extension and coherency_extension.in_coherence_units then
+		local in_coherence_units = coherency_extension:in_coherence_units()
+		local ally_count = 0
+		local ally_toughness_sum = 0
+		local max_corruption = 0
+		for ally_unit, _ in pairs(in_coherence_units) do
+			if ally_unit ~= unit then
+				local ally_breed_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+				local ally_breed = ally_breed_data and ally_breed_data:breed()
+				local is_dog = ally_breed and ally_breed.name and string.find(ally_breed.name, "companion", 1, true)
+				if not is_dog then
+					ally_count = ally_count + 1
+					local ally_toughness_ext = ScriptUnit.has_extension(ally_unit, "toughness_system")
+					if ally_toughness_ext and ally_toughness_ext.current_toughness_percent then
+						ally_toughness_sum = ally_toughness_sum + (ally_toughness_ext:current_toughness_percent() or 1)
+					else
+						ally_toughness_sum = ally_toughness_sum + 1
+					end
+					local ally_health_ext = ScriptUnit.has_extension(ally_unit, "health_system")
+					if ally_health_ext and ally_health_ext.permanent_damage_taken_percent then
+						local corruption = ally_health_ext:permanent_damage_taken_percent() or 0
+						if corruption > max_corruption then
+							max_corruption = corruption
+						end
+					end
+				end
+			end
+		end
+		context.allies_in_coherency = ally_count
+		context.avg_ally_toughness_pct = ally_count > 0 and (ally_toughness_sum / ally_count) or 1
+		context.max_ally_corruption_pct = max_corruption
 	end
 
 	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
@@ -554,6 +591,73 @@ local function _can_activate_broker_rage(context)
 	return false, "broker_rage_hold"
 end
 
+local function _can_activate_zealot_relic(context)
+	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
+		return false, "zealot_relic_block_overwhelmed"
+	end
+	if context.avg_ally_toughness_pct < 0.40 and context.allies_in_coherency >= 2 and context.num_nearby < 2 then
+		return true, "zealot_relic_team_low_toughness"
+	end
+	if context.toughness_pct < 0.25 and context.num_nearby < 3 then
+		return true, "zealot_relic_self_critical"
+	end
+	if context.allies_in_coherency == 0 then
+		return false, "zealot_relic_block_no_allies"
+	end
+	return false, "zealot_relic_hold"
+end
+
+local function _can_activate_force_field(context)
+	if context.num_nearby == 0 and not context.target_enemy then
+		return false, "force_field_block_no_threats"
+	end
+	if context.target_ally_needs_aid then
+		return true, "force_field_ally_aid"
+	end
+	if context.toughness_pct > 0.80 then
+		return false, "force_field_block_safe"
+	end
+	if context.num_nearby >= 3 and context.toughness_pct < 0.40 then
+		return true, "force_field_pressure"
+	end
+	if context.target_enemy_type == "ranged" and context.toughness_pct < 0.60 then
+		return true, "force_field_ranged_pressure"
+	end
+	return false, "force_field_hold"
+end
+
+local function _can_activate_drone(context)
+	if context.allies_in_coherency == 0 then
+		return false, "drone_block_no_allies"
+	end
+	if context.target_is_monster and context.allies_in_coherency >= 1 then
+		return true, "drone_monster_fight"
+	end
+	if context.num_nearby <= 2 then
+		return false, "drone_block_low_value"
+	end
+	if context.allies_in_coherency >= 2 and context.num_nearby >= 4 then
+		return true, "drone_team_horde"
+	end
+	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+		return true, "drone_overwhelmed"
+	end
+	return false, "drone_hold"
+end
+
+local function _can_activate_stimm_field(context)
+	if context.allies_in_coherency == 0 then
+		return false, "stimm_block_no_allies"
+	end
+	if context.max_ally_corruption_pct > 0.30 then
+		return true, "stimm_corruption_heal"
+	end
+	if context.target_ally_needs_aid and context.num_nearby >= 2 then
+		return true, "stimm_ally_aid"
+	end
+	return false, "stimm_hold"
+end
+
 local TEMPLATE_HEURISTICS = {
 	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_veteran_stealth(context)
@@ -606,6 +710,15 @@ local TEMPLATE_HEURISTICS = {
 	broker_punk_rage = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_broker_rage(context)
 	end,
+}
+
+local ITEM_HEURISTICS = {
+	zealot_relic = _can_activate_zealot_relic,
+	psyker_force_field = _can_activate_force_field,
+	psyker_force_field_improved = _can_activate_force_field,
+	psyker_force_field_dome = _can_activate_force_field,
+	adamant_area_buff_drone = _can_activate_drone,
+	broker_ability_stimm_field = _can_activate_stimm_field,
 }
 
 local function _evaluate_template_heuristic(
@@ -727,6 +840,14 @@ local function evaluate_heuristic(template_name, context, opts)
 	return fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
 end
 
+local function evaluate_item_heuristic(ability_name, context)
+	local fn = ITEM_HEURISTICS[ability_name]
+	if not fn then
+		return false, "unknown_item_ability"
+	end
+	return fn(context)
+end
+
 return {
 	init = function(deps)
 		_fixed_time = deps.fixed_time
@@ -737,5 +858,6 @@ return {
 	build_context = build_context,
 	resolve_decision = resolve_decision,
 	evaluate_heuristic = evaluate_heuristic,
+	evaluate_item_heuristic = evaluate_item_heuristic,
 	enemy_breed = _enemy_breed,
 }

@@ -14,6 +14,7 @@ local _ITEM_DEFAULT_START_DELAY_S
 local _build_context
 local _context_snapshot
 local _fallback_state_snapshot
+local _evaluate_item_heuristic
 
 local LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY = {
 	zealot_relic = true,
@@ -41,18 +42,18 @@ local ITEM_SEQUENCE_PROFILES = {
 		start_input = "ability_pressed",
 		start_delay_after_wield = 0,
 		followup_input = "ability_released",
-		followup_delay = 0.08,
+		followup_delay = 0.6,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.35,
+		unwield_delay = 0.7,
 	},
 	force_field_regular = {
 		required_inputs = { "aim_force_field", "place_force_field", "unwield_to_previous" },
 		start_input = "aim_force_field",
 		start_delay_after_wield = 0.05,
 		followup_input = "place_force_field",
-		followup_delay = 0.12,
+		followup_delay = 0.35,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.9,
+		unwield_delay = 1.6,
 		charge_confirm_timeout = 2.2,
 	},
 	force_field_instant = {
@@ -62,7 +63,7 @@ local ITEM_SEQUENCE_PROFILES = {
 		followup_input = "instant_place_force_field",
 		followup_delay = 0.12,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.8,
+		unwield_delay = 0.5,
 		charge_confirm_timeout = 2.0,
 	},
 	drone_regular = {
@@ -70,9 +71,9 @@ local ITEM_SEQUENCE_PROFILES = {
 		start_input = "aim_drone",
 		start_delay_after_wield = 0.05,
 		followup_input = "release_drone",
-		followup_delay = 0.24,
+		followup_delay = 0.35,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 1.0,
+		unwield_delay = 2.3,
 		charge_confirm_timeout = 2.2,
 	},
 	drone_instant = {
@@ -82,7 +83,7 @@ local ITEM_SEQUENCE_PROFILES = {
 		followup_input = "instant_release_drone",
 		followup_delay = 0.1,
 		unwield_input = "unwield_to_previous",
-		unwield_delay = 0.9,
+		unwield_delay = 1.1,
 		charge_confirm_timeout = 2.0,
 	},
 }
@@ -407,29 +408,17 @@ local function _current_weapon_supports_action_input(unit_data_extension, Weapon
 	return supports_input and true or false, weapon_template_name
 end
 
-local function can_use_item_fallback(unit, ability_extension, ability_name)
+local function can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
 	if not ability_extension:can_use_ability("combat_ability") then
-		return false
+		return false, "item_cooldown_not_ready"
 	end
 
-	local perception_extension = ScriptUnit.extension(unit, "perception_system")
-	local _, num_nearby = perception_extension:enemies_in_proximity()
-	if num_nearby <= 0 then
-		return false
+	if not _evaluate_item_heuristic or not _build_context then
+		return false, "item_heuristics_not_wired"
 	end
 
-	if ability_name == "zealot_relic" then
-		local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
-		local can_activate = conditions
-			and conditions._can_activate_zealot_relic
-			and conditions._can_activate_zealot_relic(unit)
-
-		if not can_activate then
-			return false
-		end
-	end
-
-	return true
+	local context = _build_context(unit, blackboard)
+	return _evaluate_item_heuristic(ability_name, context)
 end
 
 local function try_queue_item(unit, unit_data_extension, ability_extension, state, fixed_t, combat_ability, blackboard)
@@ -448,8 +437,10 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		return
 	end
 
-	if not can_use_item_fallback(unit, ability_extension, ability_name) then
-		return
+	if not state.item_stage then
+		if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
+			return
+		end
 	end
 
 	local inventory_component = unit_data_extension:read_component("inventory")
@@ -794,6 +785,7 @@ return {
 		_build_context = refs.build_context
 		_context_snapshot = refs.context_snapshot
 		_fallback_state_snapshot = refs.fallback_state_snapshot
+		_evaluate_item_heuristic = refs.evaluate_item_heuristic
 	end,
 	try_queue_item = try_queue_item,
 	can_use_item_fallback = can_use_item_fallback,

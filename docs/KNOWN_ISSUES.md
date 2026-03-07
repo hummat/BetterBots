@@ -9,13 +9,7 @@
 
 ## Medium severity
 
-1. Tier 3 item fallback timing mismatch.
-   - Root cause: `ITEM_SEQUENCE_PROFILES` timing values are out of sync with actual engine action durations.
-   - Drone `release_drone`: 0.6s `buffer_time` + 1.3s action `total_time` = 1.9s real time, but mod's `followup_delay` is only 0.24s (regular) / 0.1s (instant).
-   - Force field: 0.6s `buffer_time` + 0.6s action = 1.2s, closer to mod's timing but still off.
-   - The state machine advances to the next stage before the engine finishes processing the current input.
-   - Fix: Adjust `followup_delay` and `unwield_delay` values to match decompiled action durations + buffer times.
-   - Drone fix values: regular `followup_delay` ~1.9s, `unwield_delay` ~2.3s; instant `followup_delay` 0.1s (has `dont_queue=true`), `unwield_delay` ~1.1s.
+1. ~~Tier 3 item fallback timing mismatch.~~ **Fixed** (#3): `ITEM_SEQUENCE_PROFILES` timing values aligned with decompiled engine action durations. Awaiting in-game validation.
 
 2. Stance cancellation complexity.
    - Tier 1 stances have NO release input defined in their `action_inputs`.
@@ -34,9 +28,11 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics: 12/13 validated, thresholds loosened for testing.
+5. Per-career heuristics: 16/17 validated (12 template + 4 item), thresholds loosened for testing.
    - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
+   - Item heuristics added (#3): zealot_relic, psyker_force_field (3 variants), adamant_area_buff_drone, broker_ability_stimm_field. Replace coarse `enemies_in_proximity > 0` gate with per-ability rules using coherency, toughness, corruption, and ally state.
    - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
+   - Meta builds research (`docs/META_BUILDS_RESEARCH.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
    - Use `/bb_decide` to inspect live decisions during play.
 
 6. Psyker Scrier's Gaze causes warp overcharge explosions.
@@ -75,7 +71,7 @@
 ## Current fix direction
 
 1. Add explicit restore-on-disable behavior.
-2. Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).
+2. ~~Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).~~ Done — awaiting in-game validation.
 3. Replace heuristic item matching with explicit per-template mapping table.
 4. Reduce debug-log noise for expected transient `invalid action_input` states.
 5. ~~Add smarter per-ability trigger policies~~ Code complete (#2) — needs in-game validation.

@@ -119,6 +119,7 @@ ItemFallback.wire({
 	build_context = Heuristics.build_context,
 	context_snapshot = Debug.context_snapshot,
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
+	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
 })
 
 Debug.wire({
@@ -206,19 +207,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 			"blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
 		)
 		return false
-	end
-
-	if ability_template_name == "zealot_relic" then
-		local can_activate =
-			conditions._can_activate_zealot_relic(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		Debug.log_ability_decision(
-			ability_template_name,
-			fixed_t,
-			can_activate,
-			"zealot_relic_vanilla",
-			Heuristics.build_context(unit, blackboard)
-		)
-		return can_activate
 	end
 
 	local can_activate, rule, context = Heuristics.resolve_decision(
@@ -658,6 +646,33 @@ mod:hook_require(
 				return func(self, id, action_input, raw_input)
 			end
 		)
+	end
+)
+
+mod:hook_require(
+	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout",
+	function(PlayerUnitVisualLoadout)
+		mod:hook(PlayerUnitVisualLoadout, "wield_slot", function(func, slot_to_wield, player_unit, t, skip_wield_action)
+			if slot_to_wield ~= "slot_combat_ability" then
+				local should_lock, ability_name, lock_reason = ItemFallback.should_lock_weapon_switch(player_unit)
+				if should_lock then
+					local fixed_t = _fixed_time()
+					_debug_log(
+						"lock_wield_direct:" .. tostring(ability_name),
+						fixed_t,
+						"redirected wield_slot("
+							.. tostring(slot_to_wield)
+							.. ") -> slot_combat_ability while keeping "
+							.. tostring(ability_name)
+							.. " "
+							.. tostring(lock_reason)
+					)
+					return func("slot_combat_ability", player_unit, t, skip_wield_action)
+				end
+			end
+
+			return func(slot_to_wield, player_unit, t, skip_wield_action)
+		end)
 	end
 )
 
