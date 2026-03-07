@@ -11,6 +11,11 @@ return {
 				type = "checkbox",
 				default_value = false,
 			},
+			{
+				setting_id = "enable_event_log",
+				type = "checkbox",
+				default_value = false,
+			},
 		},
 	},
 }

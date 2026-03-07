@@ -5,6 +5,7 @@ local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
 local DEBUG_FORCE_ENABLED = false
+local EVENT_LOG_SETTING_ID = "enable_event_log"
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
 local META_PATCH_VERSION = "2026-03-04-tier2-v3"
 local CONDITIONS_PATCH_VERSION = "2026-03-05-conditions-v4"
@@ -76,6 +77,9 @@ assert(ItemFallback, "BetterBots: failed to load item_fallback module")
 local Debug = mod:io_dofile("BetterBots/scripts/mods/BetterBots/debug")
 assert(Debug, "BetterBots: failed to load debug module")
 
+local EventLog = mod:io_dofile("BetterBots/scripts/mods/BetterBots/event_log")
+assert(EventLog, "BetterBots: failed to load event_log module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -112,6 +116,11 @@ Debug.init({
 	equipped_combat_ability_name = _equipped_combat_ability_name,
 	fallback_state_by_unit = _fallback_state_by_unit,
 	last_charge_event_by_unit = _last_charge_event_by_unit,
+})
+
+EventLog.init({
+	mod = mod,
+	context_snapshot = Debug.context_snapshot,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -710,6 +719,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		local brain = self._brain
 		local blackboard = brain and brain._blackboard or nil
 		_fallback_try_queue_combat_ability(unit, blackboard)
+		EventLog.try_flush(_fixed_time())
 	end)
 end)
 
@@ -722,6 +732,12 @@ function mod.on_game_state_changed(status, state)
 			_decision_context_cache_by_unit[unit] = nil
 		end
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
+		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
+		EventLog.start_session(_fixed_time())
+	end
+
+	if status == "exit" and state == "GameplayStateRun" then
+		EventLog.end_session()
 	end
 end
 

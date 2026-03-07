@@ -8,4 +8,7 @@ return {
 	enable_debug_logs = {
 		en = "Enable debug logs",
 	},
+	enable_event_log = {
+		en = "Enable event log (JSONL)",
+	},
 }
