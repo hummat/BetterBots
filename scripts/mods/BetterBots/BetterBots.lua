@@ -660,14 +660,14 @@ mod:hook_require(
 					_debug_log(
 						"lock_wield_direct:" .. tostring(ability_name),
 						fixed_t,
-						"blocked direct wield_slot("
+						"redirected wield_slot("
 							.. tostring(slot_to_wield)
-							.. ") while keeping "
+							.. ") -> slot_combat_ability while keeping "
 							.. tostring(ability_name)
 							.. " "
 							.. tostring(lock_reason)
 					)
-					return nil
+					return func("slot_combat_ability", player_unit, t, skip_wield_action)
 				end
 			end
 
