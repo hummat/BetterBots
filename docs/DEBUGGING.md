@@ -64,6 +64,7 @@ bb-log tail           # real-time monitoring (grep BetterBots + errors)
 bb-log list           # show 10 most recent log files with indices
 bb-log raw <pattern>  # arbitrary rg pattern against log
 bb-log <cmd> 1        # use second-latest log (0=latest, default)
+bb-log events [cmd]   # JSONL event log analysis (requires jq); see docs/LOGGING.md
 ```
 
 **Manual grep recipes** (if bb-log unavailable):

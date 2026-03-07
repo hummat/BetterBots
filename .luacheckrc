@@ -4,6 +4,7 @@ max_line_length = 120
 read_globals = {
 	"get_mod",
 	"ScriptUnit",
+	"cjson",
 }
 
 files["tests/**"] = {

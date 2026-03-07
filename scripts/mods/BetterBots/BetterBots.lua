@@ -5,6 +5,7 @@ local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
 local DEBUG_FORCE_ENABLED = false
+local EVENT_LOG_SETTING_ID = "enable_event_log"
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
 local META_PATCH_VERSION = "2026-03-04-tier2-v3"
 local CONDITIONS_PATCH_VERSION = "2026-03-05-conditions-v4"
@@ -16,6 +17,9 @@ local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _session_start_emitted = false
+local _SNAPSHOT_INTERVAL_S = 30
+local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 
 local ARMOR_TYPES = ArmorSettings.types
@@ -76,6 +80,9 @@ assert(ItemFallback, "BetterBots: failed to load item_fallback module")
 local Debug = mod:io_dofile("BetterBots/scripts/mods/BetterBots/debug")
 assert(Debug, "BetterBots: failed to load debug module")
 
+local EventLog = mod:io_dofile("BetterBots/scripts/mods/BetterBots/event_log")
+assert(EventLog, "BetterBots: failed to load event_log module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -103,6 +110,8 @@ ItemFallback.init({
 	ITEM_SEQUENCE_RETRY_S = 1.0,
 	ITEM_CHARGE_CONFIRM_TIMEOUT_S = 1.2,
 	ITEM_DEFAULT_START_DELAY_S = 0.2,
+	event_log = EventLog,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
 Debug.init({
@@ -112,6 +121,11 @@ Debug.init({
 	equipped_combat_ability_name = _equipped_combat_ability_name,
 	fallback_state_by_unit = _fallback_state_by_unit,
 	last_charge_event_by_unit = _last_charge_event_by_unit,
+})
+
+EventLog.init({
+	mod = mod,
+	context_snapshot = Debug.context_snapshot,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -222,6 +236,20 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	)
 
 	Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
+
+	if EventLog.is_enabled() then
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit_decision(
+			fixed_t,
+			bot_slot,
+			_equipped_combat_ability_name(unit),
+			ability_template_name,
+			can_activate,
+			rule,
+			"bt",
+			context
+		)
+	end
 
 	return can_activate
 end
@@ -379,6 +407,20 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		ability_extension
 	)
 
+	if EventLog.is_enabled() then
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit_decision(
+			fixed_t,
+			bot_slot,
+			_equipped_combat_ability_name(unit),
+			ability_template_name,
+			can_activate,
+			rule,
+			"fallback",
+			context
+		)
+	end
+
 	if not can_activate then
 		if context.num_nearby > 0 then
 			_debug_log(
@@ -398,6 +440,23 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
+
+	if EventLog.is_enabled() then
+		local attempt_id = EventLog.next_attempt_id()
+		state.attempt_id = attempt_id
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit({
+			t = fixed_t,
+			event = "queued",
+			bot = bot_slot,
+			ability = _equipped_combat_ability_name(unit),
+			template = ability_template_name,
+			input = action_input,
+			source = "fallback",
+			rule = rule,
+			attempt_id = attempt_id,
+		})
+	end
 
 	state.action_input_extension = action_input_extension
 	state.active = true
@@ -463,6 +522,24 @@ mod:hook_require("scripts/settings/ability/ability_templates/ability_templates",
 	MetaData.inject(AbilityTemplates)
 end)
 
+-- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
+-- under a .thresholds subtable instead of flat top-level keys. The vanilla
+-- Overheat.slot_percentage divides by overheat_configuration[threshold_type] without
+-- a nil check, crashing the BT when bots wield these weapons.
+mod:hook_require("scripts/utilities/overheat", function(Overheat)
+	local _orig_slot_percentage = Overheat.slot_percentage
+	Overheat.slot_percentage = function(unit, slot_name, threshold_type)
+		local vis_ext = ScriptUnit.has_extension(unit, "visual_loadout_system")
+		if vis_ext then
+			local cfg = Overheat.configuration(vis_ext, slot_name)
+			if cfg and not cfg[threshold_type] then
+				return 0
+			end
+		end
+		return _orig_slot_percentage(unit, slot_name, threshold_type)
+	end
+end)
+
 mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
 	_install_condition_patch(conditions, _patched_bt_bot_conditions, "bt_bot_conditions")
 end)
@@ -503,11 +580,7 @@ mod:hook_require(
 		mod:hook_safe(
 			BtBotActivateAbilityAction,
 			"enter",
-			function(_self, _unit, _breed, _blackboard, scratchpad, action_data, _t)
-				if not _debug_enabled() then
-					return
-				end
-
+			function(_self, unit, _breed, _blackboard, scratchpad, action_data, _t)
 				local ability_component_name = action_data and action_data.ability_component_name or "?"
 				local activation_data = scratchpad and scratchpad.activation_data
 				local action_input = activation_data and activation_data.action_input or "?"
@@ -521,6 +594,29 @@ mod:hook_require(
 						.. " action_input="
 						.. tostring(action_input)
 				)
+
+				if EventLog.is_enabled() and unit then
+					local state = _fallback_state_by_unit[unit]
+					if not state then
+						state = {}
+						_fallback_state_by_unit[unit] = state
+					end
+					local attempt_id = EventLog.next_attempt_id()
+					state.attempt_id = attempt_id
+					local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+					local ability_comp = unit_data_ext and unit_data_ext:read_component(ability_component_name)
+					local template_name = ability_comp and ability_comp.template_name or "?"
+					EventLog.emit({
+						t = fixed_t,
+						event = "queued",
+						bot = Debug.bot_slot_for_unit(unit),
+						ability = _equipped_combat_ability_name(unit),
+						template = template_name,
+						input = action_input,
+						source = "bt",
+						attempt_id = attempt_id,
+					})
+				end
 			end
 		)
 	end
@@ -551,6 +647,19 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				ability_name = ability_name,
 				fixed_t = fixed_t,
 			}
+
+			if EventLog.is_enabled() then
+				local bot_slot = Debug.bot_slot_for_unit(unit)
+				local fb_state = _fallback_state_by_unit[unit]
+				EventLog.emit({
+					t = fixed_t,
+					event = "consumed",
+					bot = bot_slot,
+					ability = ability_name,
+					charges = optional_num_charges or 1,
+					attempt_id = fb_state and fb_state.attempt_id or nil,
+				})
+			end
 		end
 
 		if not _debug_enabled() then
@@ -709,7 +818,53 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 
 		local brain = self._brain
 		local blackboard = brain and brain._blackboard or nil
+
+		if EventLog.is_enabled() and not _session_start_emitted then
+			local bots = Debug.collect_alive_bots()
+			if bots and #bots > 0 then
+				_session_start_emitted = true
+				local bot_info = {}
+				for i, bot_entry in ipairs(bots) do
+					local p = bot_entry.player
+					bot_info[i] = {
+						slot = type(p.slot) == "function" and p:slot() or nil,
+						archetype = type(p.archetype_name) == "function" and p:archetype_name() or nil,
+						ability = _equipped_combat_ability_name(bot_entry.unit),
+					}
+				end
+				EventLog.emit({
+					t = _fixed_time(),
+					event = "session_start",
+					version = META_PATCH_VERSION,
+					bots = bot_info,
+				})
+			end
+		end
+
 		_fallback_try_queue_combat_ability(unit, blackboard)
+		EventLog.try_flush(_fixed_time())
+
+		if EventLog.is_enabled() then
+			local fixed_t = _fixed_time()
+			local last_snap = _last_snapshot_t_by_unit[unit]
+			if not last_snap or fixed_t - last_snap >= _SNAPSHOT_INTERVAL_S then
+				_last_snapshot_t_by_unit[unit] = fixed_t
+				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+				local bot_slot = Debug.bot_slot_for_unit(unit)
+				local fb_state = _fallback_state_by_unit[unit]
+				EventLog.emit({
+					t = fixed_t,
+					event = "snapshot",
+					bot = bot_slot,
+					ability = _equipped_combat_ability_name(unit),
+					cooldown_ready = ability_extension and ability_extension:can_use_ability("combat_ability") or false,
+					charges = ability_extension and ability_extension:remaining_ability_charges("combat_ability")
+						or nil,
+					ctx = Debug.context_snapshot(Heuristics.build_context(unit, blackboard)),
+					item_stage = fb_state and fb_state.item_stage or nil,
+				})
+			end
+		end
 	end)
 end)
 
@@ -722,10 +877,32 @@ function mod.on_game_state_changed(status, state)
 			_decision_context_cache_by_unit[unit] = nil
 		end
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
+		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
+		EventLog.start_session(_fixed_time())
+		_session_start_emitted = false
+		for unit in pairs(_last_snapshot_t_by_unit) do
+			_last_snapshot_t_by_unit[unit] = nil
+		end
+	end
+
+	if status == "exit" and state == "GameplayStateRun" then
+		EventLog.end_session()
 	end
 end
 
 Debug.register_commands()
+
+-- Re-enable EventLog after hot-reload if we're mid-session.
+-- on_game_state_changed only fires on transitions, not on mod reload,
+-- so a Ctrl+Shift+R during GameplayStateRun leaves EventLog dead.
+if mod:get(EVENT_LOG_SETTING_ID) == true then
+	local bots = Debug.collect_alive_bots()
+	if bots and #bots > 0 then
+		EventLog.set_enabled(true)
+		EventLog.start_session(_fixed_time())
+		_session_start_emitted = false
+	end
+end
 
 mod:echo("BetterBots loaded")
 if _debug_enabled() then

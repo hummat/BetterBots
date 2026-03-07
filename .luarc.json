@@ -6,7 +6,8 @@
 	"diagnostics": {
 		"globals": [
 			"get_mod",
-			"ScriptUnit"
+			"ScriptUnit",
+			"cjson"
 		]
 	},
 	"workspace": {

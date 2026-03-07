@@ -151,6 +151,27 @@ local function _collect_alive_bots()
 	return bots
 end
 
+local function bot_slot_for_unit(unit)
+	local manager_table = rawget(_G, "Managers")
+	local player_manager = manager_table and manager_table.player
+	if not player_manager then
+		return nil
+	end
+
+	local players = player_manager:players()
+	if not players then
+		return nil
+	end
+
+	for _, player in pairs(players) do
+		if player and not player:is_human_controlled() and player.player_unit == unit then
+			return type(player.slot) == "function" and player:slot() or nil
+		end
+	end
+
+	return nil
+end
+
 local function _bot_blackboard(unit)
 	local behavior_extension = ScriptUnit.has_extension(unit, "behavior_system")
 	local brain = behavior_extension and behavior_extension._brain
@@ -426,4 +447,6 @@ return {
 	fmt_seconds = fmt_seconds,
 	enemy_unit_label = enemy_unit_label,
 	bot_blackboard = _bot_blackboard,
+	bot_slot_for_unit = bot_slot_for_unit,
+	collect_alive_bots = _collect_alive_bots,
 }
