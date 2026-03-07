@@ -1,12 +1,35 @@
 #!/usr/bin/env bash
 # bb-log — BetterBots log analysis tool
 # Usage: bb-log [command] [log-index]
-#   commands: activations, rules, holds, summary, errors, tail, list, raw <pattern>
+#   commands: activations, rules, holds, summary, errors, tail, list, raw <pattern>, events
 #   log-index: 0=latest (default), 1=second-latest, etc.
 set -euo pipefail
 
+require_jq() {
+    if ! command -v jq &>/dev/null; then
+        echo "Error: jq is required for 'events' subcommands. Install with your package manager." >&2
+        exit 1
+    fi
+}
+
 LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
 ERROR_LINE_PATTERN="<<Script Error>>|<<Lua Stack>>|<<Crash>>"
+
+EVENTS_DIR="./dump"
+
+get_events_file() {
+    local idx="${1:-0}"
+    local file
+    file=$(find "$EVENTS_DIR" -maxdepth 1 -type f -name 'betterbots_events_*.jsonl' -printf '%T@ %p\n' \
+        | sort -rn \
+        | cut -d' ' -f2- \
+        | sed -n "$((idx + 1))p")
+    if [[ -z "$file" ]]; then
+        echo "No events file found at index $idx" >&2
+        exit 1
+    fi
+    echo "$file"
+}
 
 list_logs() {
     find "$LOG_DIR" -maxdepth 1 -type f -name 'console-*.log' -printf '%T@ %p\n' \
@@ -42,6 +65,71 @@ case "$cmd" in
         log=$(get_log "$log_idx")
         echo "Tailing: $(basename "$log")"
         tail -f "$log" | grep --line-buffered -E "BetterBots|${ERROR_LINE_PATTERN}"
+        ;;
+    events)
+        require_jq
+        events_cmd="${2:-summary}"
+        events_idx="${3:-0}"
+        events_file=$(get_events_file "$events_idx")
+        echo "Events: $(basename "$events_file")"
+        echo "Lines: $(wc -l < "$events_file")"
+        echo ""
+
+        case "$events_cmd" in
+            summary)
+                echo "=== Event counts ==="
+                jq -r '.event' "$events_file" | sort | uniq -c | sort -rn
+                echo ""
+                echo "=== Decision approval rate ==="
+                jq -r 'select(.event=="decision") | .result' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                echo ""
+                echo "=== Consumes per bot ==="
+                jq -r 'select(.event=="consumed") | "bot=\(.bot) ability=\(.ability)"' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                ;;
+            rules)
+                echo "=== True decisions by rule ==="
+                jq -r 'select(.event=="decision" and .result==true) | "\(.ability) \(.rule)"' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                echo ""
+                echo "=== False decisions by rule ==="
+                jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule)"' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                ;;
+            trace)
+                bot_slot="${3:?Usage: bb-log events trace <bot-slot> [file-index]}"
+                events_idx="${4:-0}"
+                events_file=$(get_events_file "$events_idx")
+                jq -c "select(.bot==$bot_slot)" "$events_file"
+                ;;
+            holds)
+                echo "=== False decision distribution ==="
+                jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule) (bot=\(.bot))"' "$events_file" \
+                    | sort | uniq -c | sort -rn | head -20
+                ;;
+            items)
+                echo "=== Item stage transitions ==="
+                jq -r 'select(.event=="item_stage") | "\(.ability) \(.stage) profile=\(.profile)"' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                echo ""
+                echo "=== Item blocks ==="
+                jq -r 'select(.event=="blocked") | "\(.ability) \(.reason) profile=\(.profile)"' "$events_file" \
+                    | sort | uniq -c | sort -rn
+                ;;
+            raw)
+                filter="${3:-.}"
+                events_idx="${4:-0}"
+                events_file=$(get_events_file "$events_idx")
+                jq -c "$filter" "$events_file"
+                ;;
+            *)
+                echo "Unknown events subcommand: $events_cmd"
+                echo "Usage: bb-log events [summary|rules|trace|holds|items|raw] [index]"
+                exit 1
+                ;;
+        esac
+        exit 0
         ;;
 esac
 
@@ -112,8 +200,9 @@ case "$cmd" in
         ;;
     *)
         echo "Unknown command: $cmd"
-        echo "Usage: bb-log [activations|rules|holds|summary|errors|tail|list|raw] [log-index]"
+        echo "Usage: bb-log [activations|rules|holds|summary|errors|tail|list|raw|events] [log-index]"
         echo "       bb-log raw <pattern> [log-index]"
+        echo "       bb-log events [summary|rules|trace|holds|items|raw] [file-index]"
         exit 1
         ;;
 esac
