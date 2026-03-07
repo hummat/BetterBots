@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 95 unit tests via busted (heuristics, meta_data, resolve_decision)
+- `make test` — 142 unit tests via busted (heuristics, meta_data, resolve_decision, event_log)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -33,7 +33,7 @@ Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 ## Debugging
 
 See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
-- **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts. **Always use this instead of raw rg/grep on log files.**
+- **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
 - `mod:dtf(table, name, depth)` — export table as JSON to `./dump/`
@@ -146,7 +146,7 @@ Local clone: `../Darktide-Source-Code/`
 |---------------------|------------|
 | Write or modify ability heuristics | `docs/CLASS_<name>.md` + `docs/CLASS_<name>_TACTICS.md` for the class |
 | Analyze game logs | `docs/DEBUGGING.md` (log patterns, grep recipes, file locations) |
-| Analyze logging code | `docs/LOGGING.md` (log format, throttle keys, output levels) |
+| Analyze logging code | `docs/LOGGING.md` (log format, throttle keys, output levels, JSONL event log) |
 | Modify bot behavior (targeting, movement, weapons) | Relevant `docs/BOT_*.md` file(s) |
 | Modify input queueing or action sequences | `docs/BOT_INPUT_SYSTEM.md` |
 | Assess what works / what's broken | `docs/VALIDATION_TRACKER.md` + `docs/KNOWN_ISSUES.md` |
@@ -208,6 +208,7 @@ scripts/mods/BetterBots/
   heuristics.lua                            # 13 per-template heuristic functions + build_context()
   meta_data.lua                             # ability_meta_data injection
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
+  event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
@@ -216,4 +217,5 @@ tests/
   heuristics_spec.lua                       # 80 tests for all 13 heuristic functions
   meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
+  event_log_spec.lua                        # 16 tests for event buffering/flush/lifecycle
 ```

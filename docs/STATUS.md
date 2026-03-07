@@ -19,8 +19,10 @@
   - Arbites: Stance (toughness/monster) + Charge (density/elite) + Shout (emergency)
   - Hive Scum: Focus + Rage (toughness-reactive)
 - **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
-- **Unit tests**: 95 tests via busted (heuristics, meta_data, resolve_decision)
+- **Structured event logging** (#28): opt-in JSONL event log (`event_log.lua`) with decision/queued/consumed/snapshot events, `attempt_id` correlation, buffered flush, hot-reload recovery
+- **Unit tests**: 142 tests via busted (heuristics, meta_data, resolve_decision, event_log)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
+- **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
 
 ## Current Tier Status
 

@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does six things:
+`scripts/mods/BetterBots/BetterBots.lua` does seven things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates.
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -33,6 +33,11 @@ Grenade abilities are still out of scope.
 6. Adds queue-level weapon-switch protection for item abilities:
    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`
    - block bot `weapon_action:wield` while protected item abilities are active/in-sequence
+7. Structured JSONL event logging (`event_log.lua`):
+   - opt-in via mod setting (`enable_event_log`)
+   - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`
+   - events carry `attempt_id` for cross-event correlation (decision → queued → consumed)
+   - buffered with periodic flush (15s or 500 events); survives hot-reload via load-time recovery
 
 ## Why item fallback is needed
 
@@ -57,6 +62,19 @@ Detailed per-class ability breakdowns (internal IDs, input patterns, cooldowns, 
 - `CLASS_VETERAN.md`, `CLASS_ZEALOT.md`, `CLASS_PSYKER.md`, `CLASS_OGRYN.md`, `CLASS_ARBITES.md`, `CLASS_HIVE_SCUM.md`
 
 Each doc classifies abilities into the tiers above and includes implementation guidance for bot activation.
+
+## Structured event logging
+
+`event_log.lua` provides machine-readable JSONL output parallel to the text debug log. It is a standalone module with no engine dependencies beyond `Mods.lua.io`, `Mods.lua.os`, and `cjson`.
+
+Key design:
+- **Buffer + flush**: Events accumulate in a Lua table, flushed to disk every 15s or 500 events.
+- **Wall-clock filenames**: Uses `os.time()` (not simulation `fixed_t`) for unique filenames across missions.
+- **attempt_id correlation**: Monotonic counter links decision → queued → consumed chains across both BT and fallback activation paths.
+- **Hot-reload recovery**: On `Ctrl+Shift+R`, module state resets but DMF doesn't re-fire `on_game_state_changed`. Load-time code detects alive bots and re-enables logging.
+- **False-decision compression**: Tracks skip counts per (bot, ability) to weight false decisions without flooding the file.
+
+Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/LOGGING.md` for event schema.
 
 ## Key constraints
 

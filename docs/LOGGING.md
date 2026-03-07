@@ -94,11 +94,15 @@ The following were removed/throttled to reduce chat spam during testing:
 
 ## Structured event log (JSONL)
 
-Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)`.
+Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)` (`enable_event_log` in code).
 
 ### Output
 
 `./dump/betterbots_events_<timestamp>.jsonl` — one JSON object per line.
+
+**Filename timestamp** uses wall-clock `os.time()` (epoch seconds), not simulation `fixed_t` which resets each mission. This prevents filename collisions across runs.
+
+**Working directory caveat:** Darktide's CWD is `binaries/`, so files land in `<game-root>/binaries/dump/`. The `bb-log events` command expects `EVENTS_DIR=./dump` relative to CWD — run it from the `binaries/` directory or adjust the path.
 
 ### Event types
 
@@ -111,6 +115,12 @@ Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)
 | `consumed` | Charge spent | charges, attempt_id |
 | `blocked` | Item sequence failure | reason, stage, profile, attempt_id |
 | `snapshot` | Every 30s per bot | cooldown_ready, charges, ctx, item_stage |
+
+### Hot-reload behavior
+
+`Ctrl+Shift+R` resets all module-local state (buffer, file path, enabled flag). DMF does **not** re-fire `on_game_state_changed` for the current state, so the normal `start_session` path doesn't trigger.
+
+**Recovery:** At load time, BetterBots checks if the event log setting is enabled and bots are alive. If so, it re-enables logging and starts a new session file. This means a hot-reload mid-mission produces a new JSONL file (previous buffer is lost if not yet flushed).
 
 ### Correlation
 
