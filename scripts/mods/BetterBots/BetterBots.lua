@@ -892,6 +892,18 @@ end
 
 Debug.register_commands()
 
+-- Re-enable EventLog after hot-reload if we're mid-session.
+-- on_game_state_changed only fires on transitions, not on mod reload,
+-- so a Ctrl+Shift+R during GameplayStateRun leaves EventLog dead.
+if mod:get(EVENT_LOG_SETTING_ID) == true then
+	local bots = Debug.collect_alive_bots()
+	if bots and #bots > 0 then
+		EventLog.set_enabled(true)
+		EventLog.start_session(_fixed_time())
+		_session_start_emitted = false
+	end
+end
+
 mod:echo("BetterBots loaded")
 if _debug_enabled() then
 	mod:echo("BetterBots DEBUG: logging enabled (force=" .. tostring(DEBUG_FORCE_ENABLED) .. ")")
