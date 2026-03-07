@@ -232,6 +232,20 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 
 	Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
 
+	if EventLog.is_enabled() then
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit_decision(
+			fixed_t,
+			bot_slot,
+			_equipped_combat_ability_name(unit),
+			ability_template_name,
+			can_activate,
+			rule,
+			"bt",
+			context
+		)
+	end
+
 	return can_activate
 end
 
@@ -388,6 +402,20 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		ability_extension
 	)
 
+	if EventLog.is_enabled() then
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit_decision(
+			fixed_t,
+			bot_slot,
+			_equipped_combat_ability_name(unit),
+			ability_template_name,
+			can_activate,
+			rule,
+			"fallback",
+			context
+		)
+	end
+
 	if not can_activate then
 		if context.num_nearby > 0 then
 			_debug_log(
@@ -407,6 +435,23 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
+
+	local attempt_id = EventLog.next_attempt_id()
+	state.attempt_id = attempt_id
+	if EventLog.is_enabled() then
+		local bot_slot = Debug.bot_slot_for_unit(unit)
+		EventLog.emit({
+			t = fixed_t,
+			event = "queued",
+			bot = bot_slot,
+			ability = _equipped_combat_ability_name(unit),
+			template = ability_template_name,
+			input = action_input,
+			source = "fallback",
+			rule = rule,
+			attempt_id = attempt_id,
+		})
+	end
 
 	state.action_input_extension = action_input_extension
 	state.active = true
@@ -560,6 +605,19 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				ability_name = ability_name,
 				fixed_t = fixed_t,
 			}
+		end
+
+		if EventLog.is_enabled() then
+			local bot_slot = Debug.bot_slot_for_unit(unit)
+			local fb_state = _fallback_state_by_unit[unit]
+			EventLog.emit({
+				t = fixed_t,
+				event = "consumed",
+				bot = bot_slot,
+				ability = ability_name,
+				charges = optional_num_charges or 1,
+				attempt_id = fb_state and fb_state.attempt_id or nil,
+			})
 		end
 
 		if not _debug_enabled() then
