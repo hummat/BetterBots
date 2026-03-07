@@ -69,64 +69,76 @@ case "$cmd" in
     events)
         require_jq
         events_cmd="${2:-summary}"
-        events_idx="${3:-0}"
-        events_file=$(get_events_file "$events_idx")
-        echo "Events: $(basename "$events_file")"
-        echo "Lines: $(wc -l < "$events_file")"
-        echo ""
 
+        # trace and raw use $3 for their own argument, not as file index;
+        # defer file resolution to each subcommand to avoid argument collision
         case "$events_cmd" in
-            summary)
-                echo "=== Event counts ==="
-                jq -r '.event' "$events_file" | sort | uniq -c | sort -rn
-                echo ""
-                echo "=== Decision approval rate ==="
-                jq -r 'select(.event=="decision") | .result' "$events_file" \
-                    | sort | uniq -c | sort -rn
-                echo ""
-                echo "=== Consumes per bot ==="
-                jq -r 'select(.event=="consumed") | "bot=\(.bot) ability=\(.ability)"' "$events_file" \
-                    | sort | uniq -c | sort -rn
-                ;;
-            rules)
-                echo "=== True decisions by rule ==="
-                jq -r 'select(.event=="decision" and .result==true) | "\(.ability) \(.rule)"' "$events_file" \
-                    | sort | uniq -c | sort -rn
-                echo ""
-                echo "=== False decisions by rule ==="
-                jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule)"' "$events_file" \
-                    | sort | uniq -c | sort -rn
-                ;;
             trace)
                 bot_slot="${3:?Usage: bb-log events trace <bot-slot> [file-index]}"
-                events_idx="${4:-0}"
-                events_file=$(get_events_file "$events_idx")
+                if ! [[ "$bot_slot" =~ ^[0-9]+$ ]]; then
+                    echo "Error: bot-slot must be a number, got '$bot_slot'" >&2
+                    exit 1
+                fi
+                events_file=$(get_events_file "${4:-0}")
+                echo "Events: $(basename "$events_file")"
                 jq -c "select(.bot==$bot_slot)" "$events_file"
-                ;;
-            holds)
-                echo "=== False decision distribution ==="
-                jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule) (bot=\(.bot))"' "$events_file" \
-                    | sort | uniq -c | sort -rn | head -20
-                ;;
-            items)
-                echo "=== Item stage transitions ==="
-                jq -r 'select(.event=="item_stage") | "\(.ability) \(.stage) profile=\(.profile)"' "$events_file" \
-                    | sort | uniq -c | sort -rn
-                echo ""
-                echo "=== Item blocks ==="
-                jq -r 'select(.event=="blocked") | "\(.ability) \(.reason) profile=\(.profile)"' "$events_file" \
-                    | sort | uniq -c | sort -rn
                 ;;
             raw)
                 filter="${3:-.}"
-                events_idx="${4:-0}"
-                events_file=$(get_events_file "$events_idx")
+                events_file=$(get_events_file "${4:-0}")
+                echo "Events: $(basename "$events_file")"
                 jq -c "$filter" "$events_file"
                 ;;
             *)
-                echo "Unknown events subcommand: $events_cmd"
-                echo "Usage: bb-log events [summary|rules|trace|holds|items|raw] [index]"
-                exit 1
+                events_file=$(get_events_file "${3:-0}")
+                echo "Events: $(basename "$events_file")"
+                echo "Lines: $(wc -l < "$events_file")"
+                echo ""
+
+                case "$events_cmd" in
+                    summary)
+                        echo "=== Event counts ==="
+                        jq -r '.event' "$events_file" | sort | uniq -c | sort -rn
+                        echo ""
+                        echo "=== Decision approval rate ==="
+                        jq -r 'select(.event=="decision") | .result' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        echo ""
+                        echo "=== Consumes per bot ==="
+                        jq -r 'select(.event=="consumed") | "bot=\(.bot) ability=\(.ability)"' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        ;;
+                    rules)
+                        echo "=== True decisions by rule ==="
+                        jq -r 'select(.event=="decision" and .result==true) | "\(.ability) \(.rule)"' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        echo ""
+                        echo "=== False decisions by rule ==="
+                        jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule)"' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        ;;
+                    holds)
+                        echo "=== False decision distribution ==="
+                        jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule) (bot=\(.bot))"' "$events_file" \
+                            | sort | uniq -c | sort -rn | head -20
+                        ;;
+                    items)
+                        echo "=== Item stage transitions ==="
+                        jq -r 'select(.event=="item_stage") | "\(.ability) \(.stage) profile=\(.profile)"' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        echo ""
+                        echo "=== Item blocks ==="
+                        jq -r 'select(.event=="blocked") | "\(.ability) \(.reason) profile=\(.profile)"' "$events_file" \
+                            | sort | uniq -c | sort -rn
+                        ;;
+                    *)
+                        echo "Unknown events subcommand: $events_cmd"
+                        echo "Usage: bb-log events [summary|rules|trace|holds|items|raw] [file-index]"
+                        echo "       bb-log events trace <bot-slot> [file-index]"
+                        echo "       bb-log events raw [jq-filter] [file-index]"
+                        exit 1
+                        ;;
+                esac
                 ;;
         esac
         exit 0

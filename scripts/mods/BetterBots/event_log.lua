@@ -31,7 +31,8 @@ end
 
 local function _open_file(fixed_t)
 	_ensure_dump_dir()
-	local timestamp = tostring(math.floor(fixed_t or 0))
+	-- Use wall-clock time for unique filenames; fixed_t is sim time that resets each mission
+	local timestamp = _os and tostring(_os.time()) or tostring(math.floor(fixed_t or 0))
 	_file_path = "./dump/betterbots_events_" .. timestamp .. ".jsonl"
 end
 

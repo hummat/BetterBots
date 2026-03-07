@@ -441,9 +441,9 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
 
-	local attempt_id = EventLog.next_attempt_id()
-	state.attempt_id = attempt_id
 	if EventLog.is_enabled() then
+		local attempt_id = EventLog.next_attempt_id()
+		state.attempt_id = attempt_id
 		local bot_slot = Debug.bot_slot_for_unit(unit)
 		EventLog.emit({
 			t = fixed_t,
@@ -522,6 +522,24 @@ mod:hook_require("scripts/settings/ability/ability_templates/ability_templates",
 	MetaData.inject(AbilityTemplates)
 end)
 
+-- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
+-- under a .thresholds subtable instead of flat top-level keys. The vanilla
+-- Overheat.slot_percentage divides by overheat_configuration[threshold_type] without
+-- a nil check, crashing the BT when bots wield these weapons.
+mod:hook_require("scripts/utilities/overheat", function(Overheat)
+	local _orig_slot_percentage = Overheat.slot_percentage
+	Overheat.slot_percentage = function(unit, slot_name, threshold_type)
+		local vis_ext = ScriptUnit.has_extension(unit, "visual_loadout_system")
+		if vis_ext then
+			local cfg = Overheat.configuration(vis_ext, slot_name)
+			if cfg and not cfg[threshold_type] then
+				return 0
+			end
+		end
+		return _orig_slot_percentage(unit, slot_name, threshold_type)
+	end
+end)
+
 mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
 	_install_condition_patch(conditions, _patched_bt_bot_conditions, "bt_bot_conditions")
 end)
@@ -562,11 +580,7 @@ mod:hook_require(
 		mod:hook_safe(
 			BtBotActivateAbilityAction,
 			"enter",
-			function(_self, _unit, _breed, _blackboard, scratchpad, action_data, _t)
-				if not _debug_enabled() then
-					return
-				end
-
+			function(_self, unit, _breed, _blackboard, scratchpad, action_data, _t)
 				local ability_component_name = action_data and action_data.ability_component_name or "?"
 				local activation_data = scratchpad and scratchpad.activation_data
 				local action_input = activation_data and activation_data.action_input or "?"
@@ -580,6 +594,29 @@ mod:hook_require(
 						.. " action_input="
 						.. tostring(action_input)
 				)
+
+				if EventLog.is_enabled() and unit then
+					local state = _fallback_state_by_unit[unit]
+					if not state then
+						state = {}
+						_fallback_state_by_unit[unit] = state
+					end
+					local attempt_id = EventLog.next_attempt_id()
+					state.attempt_id = attempt_id
+					local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+					local ability_comp = unit_data_ext and unit_data_ext:read_component(ability_component_name)
+					local template_name = ability_comp and ability_comp.template_name or "?"
+					EventLog.emit({
+						t = fixed_t,
+						event = "queued",
+						bot = Debug.bot_slot_for_unit(unit),
+						ability = _equipped_combat_ability_name(unit),
+						template = template_name,
+						input = action_input,
+						source = "bt",
+						attempt_id = attempt_id,
+					})
+				end
 			end
 		)
 	end
@@ -610,19 +647,19 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				ability_name = ability_name,
 				fixed_t = fixed_t,
 			}
-		end
 
-		if EventLog.is_enabled() then
-			local bot_slot = Debug.bot_slot_for_unit(unit)
-			local fb_state = _fallback_state_by_unit[unit]
-			EventLog.emit({
-				t = fixed_t,
-				event = "consumed",
-				bot = bot_slot,
-				ability = ability_name,
-				charges = optional_num_charges or 1,
-				attempt_id = fb_state and fb_state.attempt_id or nil,
-			})
+			if EventLog.is_enabled() then
+				local bot_slot = Debug.bot_slot_for_unit(unit)
+				local fb_state = _fallback_state_by_unit[unit]
+				EventLog.emit({
+					t = fixed_t,
+					event = "consumed",
+					bot = bot_slot,
+					ability = ability_name,
+					charges = optional_num_charges or 1,
+					attempt_id = fb_state and fb_state.attempt_id or nil,
+				})
+			end
 		end
 
 		if not _debug_enabled() then
