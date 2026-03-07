@@ -17,6 +17,9 @@ local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _session_start_emitted = false
+local _SNAPSHOT_INTERVAL_S = 30
+local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 
 local ARMOR_TYPES = ArmorSettings.types
@@ -778,8 +781,53 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 
 		local brain = self._brain
 		local blackboard = brain and brain._blackboard or nil
+
+		if EventLog.is_enabled() and not _session_start_emitted then
+			local bots = Debug.collect_alive_bots()
+			if bots and #bots > 0 then
+				_session_start_emitted = true
+				local bot_info = {}
+				for i, bot_entry in ipairs(bots) do
+					local p = bot_entry.player
+					bot_info[i] = {
+						slot = type(p.slot) == "function" and p:slot() or nil,
+						archetype = type(p.archetype_name) == "function" and p:archetype_name() or nil,
+						ability = _equipped_combat_ability_name(bot_entry.unit),
+					}
+				end
+				EventLog.emit({
+					t = _fixed_time(),
+					event = "session_start",
+					version = META_PATCH_VERSION,
+					bots = bot_info,
+				})
+			end
+		end
+
 		_fallback_try_queue_combat_ability(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
+
+		if EventLog.is_enabled() then
+			local fixed_t = _fixed_time()
+			local last_snap = _last_snapshot_t_by_unit[unit]
+			if not last_snap or fixed_t - last_snap >= _SNAPSHOT_INTERVAL_S then
+				_last_snapshot_t_by_unit[unit] = fixed_t
+				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+				local bot_slot = Debug.bot_slot_for_unit(unit)
+				local fb_state = _fallback_state_by_unit[unit]
+				EventLog.emit({
+					t = fixed_t,
+					event = "snapshot",
+					bot = bot_slot,
+					ability = _equipped_combat_ability_name(unit),
+					cooldown_ready = ability_extension and ability_extension:can_use_ability("combat_ability") or false,
+					charges = ability_extension and ability_extension:remaining_ability_charges("combat_ability")
+						or nil,
+					ctx = Debug.context_snapshot(Heuristics.build_context(unit, blackboard)),
+					item_stage = fb_state and fb_state.item_stage or nil,
+				})
+			end
+		end
 	end)
 end)
 
@@ -794,6 +842,10 @@ function mod.on_game_state_changed(status, state)
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
 		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
 		EventLog.start_session(_fixed_time())
+		_session_start_emitted = false
+		for unit in pairs(_last_snapshot_t_by_unit) do
+			_last_snapshot_t_by_unit[unit] = nil
+		end
 	end
 
 	if status == "exit" and state == "GameplayStateRun" then
