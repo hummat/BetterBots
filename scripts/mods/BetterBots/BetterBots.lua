@@ -649,6 +649,33 @@ mod:hook_require(
 	end
 )
 
+mod:hook_require(
+	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout",
+	function(PlayerUnitVisualLoadout)
+		mod:hook(PlayerUnitVisualLoadout, "wield_slot", function(func, slot_to_wield, player_unit, t, skip_wield_action)
+			if slot_to_wield ~= "slot_combat_ability" then
+				local should_lock, ability_name, lock_reason = ItemFallback.should_lock_weapon_switch(player_unit)
+				if should_lock then
+					local fixed_t = _fixed_time()
+					_debug_log(
+						"lock_wield_direct:" .. tostring(ability_name),
+						fixed_t,
+						"blocked direct wield_slot("
+							.. tostring(slot_to_wield)
+							.. ") while keeping "
+							.. tostring(ability_name)
+							.. " "
+							.. tostring(lock_reason)
+					)
+					return nil
+				end
+			end
+
+			return func(slot_to_wield, player_unit, t, skip_wield_action)
+		end)
+	end
+)
+
 mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
 	mod:hook(
 		WeaponSystem,
