@@ -548,7 +548,49 @@ Bots distribute around targets during boss fights (flanking if breed has `bots_s
 
 ---
 
-### 16. What BetterBots Changes (Summary)
+### 16. Why the Ability Infrastructure Was Built but Never Activated
+
+The surprising finding from decompiling Darktide's source is how much bot ability infrastructure Fatshark built and never turned on. The BT nodes, action queuing, ability extension — all work end-to-end. Only a hardcoded whitelist in `can_activate_ability` and missing metadata on some templates prevent bots from using abilities. There is no single explanation for this gap; five factors converged.
+
+#### 1. Vermintide 2 codebase inheritance
+
+Both games run on the same Stingray engine (heavily modified in-house). Vermintide 2 bots use career abilities — support was added post-launch and [documented in a Dec 2018 dev blog](https://www.vermintide.com/news/2018/12/17/dev-blog-how-bots-work-in-vermintide-2). The BT node pattern (`BtBotActivateAbilityAction`), the action input queue, and the condition-guard architecture are standard engine infrastructure that carried over. A Fatshark developer confirmed on Discord that Darktide uses "an upgraded version of the same engine," though "nothing lifted from Vermintide will work on it without significant rewriting." The architecture transferred; the ability-specific logic needed rewriting that was never completed.
+
+#### 2. The catastrophic launch forced triage (Nov 2022 – late 2023)
+
+Darktide launched in a widely criticized unfinished state. In January 2023, CEO Martin Wahlund issued a [public apology](https://www.shacknews.com/article/133824/warhammer-40000-darktide-launch-apology), pausing all new content to focus on the crafting system, progression loop, and stability. Seasonal content was scrapped, the Xbox release delayed indefinitely, and cosmetic releases suspended. Solo mode — described as being in "final stages of testing" 10 days before launch — was deprioritized to "not a priority" by March 2023. Bot abilities are solo-mode infrastructure, so they were shelved along with it.
+
+#### 3. The ability system was a moving target
+
+The [Class Overhaul (Patch 13, Oct 2023)](https://www.playdarktide.com/news/dev-blog-class-overhaul) completely redesigned abilities, adding talent trees with 3 blitz abilities, 3 combat abilities, and 3 keystones per class. This overhaul was reportedly in development since before launch. Writing bot heuristics for the old ability system would have been discarded. After the overhaul, new classes kept arriving (Arbites in 2025, Hive Scum as DLC), each requiring new bot profiles. The ability template landscape never stabilized enough to justify bot ability work.
+
+#### 4. Intentional design philosophy: bots as placeholders
+
+This is the only area with direct developer statements:
+
+> "Verm bots aren't designed to be team mates but placeholders for team mates. It's easy to make great bots that can carry. It's hard to make average ones. But average is the goal."
+> — Hedge (Fatshark CM), [Steam forums](https://steamcommunity.com/app/1361210/discussions/0/5792223132453708488/)
+
+> "We don't spend a great deal of time with bot AI, our main focus is coop over anything else. [...] It's harder getting them in to the ideal 'less than ideal but not harrowingly bad' state honestly."
+> — Fatshark developer, [Steam forums](https://steamcommunity.com/app/1361210/discussions/0/3737376536261988606/)
+
+Community members report that bots are "intentionally weak as to not create incentive to forgo the random matchmaking." The whitelist is not a forgotten TODO — it is a deliberate gate that says "these abilities are safe for bots; the rest we haven't QA'd and don't want to risk."
+
+#### 5. Dedicated server architecture complications
+
+Vermintide 2 used peer-to-peer networking — the host ran bots locally using the host's characters. Darktide runs on dedicated servers, raising the question of whose equipment the bots use and where the AI computation runs. Fatshark acknowledged that solo mode would require "hosting locally your own instance with bots" which "will increase performance cost." Running bot AI server-side for a single player is not cost-effective; running it client-side requires architectural changes that were never prioritized.
+
+#### Synthesis
+
+The infrastructure exists because it is standard engine engineering. When you build a behavior tree with ability activation nodes, you build them generically — `BtBotActivateAbilityAction` works for any ability template. The condition guard is just a lookup table. Building the scaffolding is cheap; populating it for each ability with QA'd heuristics and metadata is expensive.
+
+It was never activated because everything conspired against it: a launch crisis that deprioritized solo-mode features, an ability system redesigned 11 months post-launch, a design philosophy that actively resists capable bots, and a server architecture that made solo play harder than in VT2. The three unused difficulty tiers in bot code (`low_bot`/`medium_bot`/`high_bot`) and the dead mule-item pickup system (section 10) suggest even more ambitious plans that were similarly abandoned.
+
+**What Fatshark has never addressed:** No developer has directly explained why `can_activate_ability` has a whitelist that only allows two templates, acknowledged the built-but-unused infrastructure publicly, or published any technical documentation about the bot BT architecture. Solo mode remains undelivered as of early 2026, over three years after being promised at launch.
+
+---
+
+### 17. What BetterBots Changes (Summary)
 
 For context, here is what BetterBots modifies relative to vanilla:
 
@@ -604,14 +646,15 @@ What a DMF mod can and cannot fix. DMF hooks can replace/wrap any Lua function a
 
 | Feature | Effort | Issue | Notes |
 |---|---|---|---|
-| ADS for Tertium 5/6 bots | Low | — | Inject `bot_gestalts` into custom profiles (vanilla already has ADS) |
-| Mule item pickup | Low | — | One-line metadata injection, everything else activates automatically |
-| Player weapon ranged `attack_meta_data` | Medium-High | — | Inject per-weapon-family metadata so bots can fire non-standard weapons (plasma, etc.). Without this, Tertium 5/6 bots silently fail to shoot weapons that don't match hardcoded fallback names. |
+| ADS for Tertium 5/6 bots | Low | #35 | Inject `bot_gestalts` into custom profiles (vanilla already has ADS) |
+| Mule item pickup | Low | #32 | One-line metadata injection, everything else activates automatically |
+| Player weapon ranged `attack_meta_data` | Medium-High | #31 | Inject per-weapon-family metadata so bots can fire non-standard weapons (plasma, etc.). Without this, Tertium 5/6 bots silently fail to shoot weapons that don't match hardcoded fallback names. |
 | Player weapon melee `attack_meta_data` | Medium | #23 | Inject metadata with heavy/charged attack entries + timing. Enables heavy attacks, armor-penetrating swings, charged strikes for player weapons. |
-| Weapon special actions | Medium | — | Queue `special_action` input + build decision logic (when to parry vs block) |
+| Weapon special actions | Medium | #33 | Queue `special_action` input + build decision logic (when to parry vs block) |
 | Grenade/blitz support | High | #4 | 19 templates, item-based fallback needed for most; `adamant_whistle` is easiest |
 | Healing item management | High | #24 | Inventory gate is the hard part; use sequence is proven (Tier 3 pattern) |
 | Bot tagging | Medium | #16 | SmartTagSystem integration; solo-play only unless RPC handling is solved |
+| Poxburster targeting | Low-Medium | #34 | Re-enable with safe distance gate (>8m shoot, <5m suppress) |
 | Bot warp venting | Medium | #30 | BT vent node exists; translate `reload` → `vent` in action input hook |
 
 **Cannot fix (engine constraints):**

@@ -44,7 +44,10 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- Charge/dash to rescue disabled ally (#10)
-- Per-ability toggle settings (#6)
-- Investigate grenade/blitz approach (#4)
+- Charge/dash to rescue disabled ally (#10) — P1
+- Per-ability toggle settings (#6) — P2
+- Fix ADS for T5/T6 bots (#35) + player weapon ranged metadata (#31) — P2, low/medium effort
+- Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
+- Poxburster targeting (#34) — P2
+- Bot warp venting (#30) — P2

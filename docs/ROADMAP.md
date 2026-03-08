@@ -50,7 +50,14 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 4 | Blitz / grenade support | Inventory extracted — all 18 templates mapped, all need item-based fallback, no `ability_template` on any. `adamant_whistle` only blitz with `ability_template`. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
-| 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
+| 30 | Bot warp charge venting | Piggyback on BT vent node: bridge `Overheat.slot_percentage` for warp weapons + translate `reload` → `vent`. |
+
+**Bot weapon/equipment fixes:**
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 31 | Player weapon ranged `attack_meta_data` | Plasma gun (and other non-standard fire paths) silently fail with T5/T6 weapons. Inject per-family metadata. |
+| 35 | Fix ADS for T5/T6 bots | Custom profiles lack `bot_gestalts` → fallback disables ADS. One-liner hook. |
 
 **General bot behavior:**
 
@@ -60,6 +67,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
+| 34 | Poxburster targeting | Re-enable with safe distance gate (>8m shoot, <5m suppress). |
 | ~~20~~ | ~~Don't interrupt own revive~~ | ~~Done — `current_interaction_unit` check in both activation paths.~~ |
 
 ### P3: Backlog — Nice to have, no timeline
@@ -69,8 +77,11 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 7 | Revive-with-ability | Inject ability BT node before revive (stealth/taunt/shout to protect revive). |
 | 14 | Ability cooldown staggering | Team-level coordination: don't stack all abilities simultaneously. |
 | 22 | Utility-based ability scoring | Replace boolean conditions with spline-interpolated utility curves (90+ considerations in VT2). Architectural upgrade. |
-| 23 | Smart melee attack selection | Armor-aware attack choice (+utility for penetrating vs carapace). |
+| 23 | Smart melee attack selection | Armor-aware attack choice (+utility for penetrating vs carapace). Also covers player weapon melee `attack_meta_data` injection. |
 | 24 | Healing item management | Don't waste medicae, distribute healing to wounded allies, stim usage. |
+| 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
+| 32 | Mule item pickup | Set `bots_mule_pickup = true` on scripture/grimoire templates. Dead code activation. |
+| 33 | Weapon special actions | Parry, bayonet, etc. Input mechanism trivial; decision logic is the work. |
 
 ## Design principles
 
@@ -96,5 +107,5 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
 3. **M3 (in progress):** Ability quality — ~~suppression (#11)~~, charge rescue (#10), stance cancellation (#12). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~
-4. **M4:** Grenade/blitz support (#4) + general bot behavior improvements (#16-#20). Beyond abilities.
+4. **M4:** Grenade/blitz support (#4) + bot weapon/equipment fixes (#31, #35) + general bot behavior (#16-#19, #34). Beyond abilities.
 5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
