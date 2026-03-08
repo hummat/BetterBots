@@ -56,6 +56,7 @@ Use project-local tooling configs before handing off changes:
 - `make check` → runs all of the above
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
+  - **Post-release:** prepare a Nexus changelog entry (version + summary of user-facing changes) and add it via the Nexus "Add new changelog" form
 
 Notes:
 
@@ -143,6 +144,8 @@ Local clone: `../Darktide-Source-Code/`
 
 **Read first:** Before performing ANY task in this project — implementation, debugging, log analysis, validation, planning — check the doc index below and read the relevant docs first. Do not guess from memory. The docs are the ground truth for game internals, log formats, mod conventions, and validation status. This applies to all tasks, not just code changes.
 
+**GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time. Use `gh issue view <number> --comments` to get the complete picture.
+
 **Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale function counts and test counts automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
@@ -153,6 +156,7 @@ Local clone: `../Darktide-Source-Code/`
 | Closed a GitHub issue | Remove from active tables in `docs/ROADMAP.md` + `docs/STATUS.md` |
 | Added a new hook or module | `docs/ARCHITECTURE.md` |
 | Changed debug commands or log patterns | `docs/DEBUGGING.md` |
+| Released a new version (`make release`) | Add changelog entry on Nexus (version + user-facing summary) |
 
 ### Doc index by activity
 
@@ -169,6 +173,7 @@ Local clone: `../Darktide-Source-Code/`
 | Work on grenade/blitz support | `docs/GRENADE_INVENTORY.md` + `docs/BOT_INPUT_SYSTEM.md` |
 | Gate ability activation on bot state | `docs/CHARACTER_STATE_API.md` |
 | Integrate with or reference other mods | `docs/RELATED_MODS.md` |
+| Implement or fix a GitHub issue | Full issue + all comments (`gh issue view <N> --comments`) |
 | Plan work or prioritize issues | `docs/ROADMAP.md` + `docs/STATUS.md` |
 | Understand meta builds, weapon/ability popularity | `docs/META_BUILDS_RESEARCH.md` |
 | Update Nexus mod page or release text | `docs/NEXUS_DESCRIPTION.bbcode` |

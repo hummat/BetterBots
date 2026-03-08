@@ -4,6 +4,20 @@ Aims to bring VT2-level bot ability usage to Darktide. Covers stance, dash, char
 
 Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects the missing metadata so the existing infrastructure handles the rest.
 
+[size=3][b]Why does this infrastructure exist?[/b][/size]
+
+The bot ability system — behavior tree nodes, action queuing, ability extension — all work end-to-end in vanilla Darktide. So why did Fatshark build it and never turn it on?
+
+[list]
+[*][b]Vermintide 2 inheritance:[/b] Both games share the same engine. VT2 bots use career abilities ([url=https://www.vermintide.com/news/2018/12/17/dev-blog-how-bots-work-in-vermintide-2]dev blog[/url]) — the architecture carried over, but the ability-specific logic was never rewritten for Darktide's templates.
+[*][b]Launch triage:[/b] Darktide launched in Nov 2022 in an unfinished state. In Jan 2023, Fatshark [url=https://www.shacknews.com/article/133824/warhammer-40000-darktide-launch-apology]paused all new content[/url] to fix crafting, progression, and stability. Solo mode — and bot abilities with it — was shelved from "final stages of testing" to "not a priority."
+[*][b]Ability system redesign:[/b] The [url=https://www.playdarktide.com/news/dev-blog-class-overhaul]Class Overhaul (Oct 2023)[/url] completely reworked abilities, adding talent trees with 3 combat abilities per class. Writing bot heuristics for a system in flux would have been thrown away.
+[*][b]Design philosophy:[/b] Fatshark wants bots as matchmaking placeholders, not capable teammates. A developer stated: [i]"It's easy to make great bots that can carry. It's hard to make average ones. But average is the goal."[/i]
+[*][b]Server architecture:[/b] VT2 was peer-to-peer (host runs bots locally). Darktide uses dedicated servers — solo play requires local hosting with added performance cost, which was never implemented officially.
+[/list]
+
+BetterBots picks up where Fatshark left off: we populate the condition tables, inject the missing metadata, and add per-ability decision logic so the existing engine infrastructure can do what it was designed to do.
+
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
 [size=3][b]What works[/b][/size]
@@ -36,10 +50,45 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 [b]Smart trigger conditions:[/b]
 Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
 
-[size=3][b]What doesn't work yet[/b][/size]
+[size=3][b]Roadmap[/b][/size]
+
+See the [url=https://github.com/hummat/BetterBots/blob/main/docs/ROADMAP.md]full roadmap[/url] for details.
+
+[b]Ability activation[/b]
 [list]
-[*]Grenades / blitz abilities (different architecture needed)
-[*]Hive Scum: Stimm Field (item-based, same challenge as above)
+[*][color=green]✓[/color] Stance, dash, charge, shout, stealth abilities (all 6 classes)
+[*][color=green]✓[/color] Item-based abilities (relic, force field, drone)
+[*][color=green]✓[/color] Smart per-ability trigger heuristics
+[*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
+[*]Grenade / blitz support
+[*]Per-ability toggle settings
+[*]Hive Scum validation (DLC-blocked)
+[/list]
+
+[b]Bot combat behavior[/b]
+[list]
+[*]Charge/dash to rescue disabled allies
+[*]Bot sprinting
+[*]Daemonhost avoidance
+[*]Bot pinging of elites/specials
+[*]Boss engagement discipline
+[*]Poxburster targeting
+[*]Stop chasing distant specials
+[/list]
+
+[b]Bot weapon/equipment fixes[/b]
+[list]
+[*]Fix ADS for Tertium 5/6 bots
+[*]Fix ranged weapons (plasma gun etc.) for Tertium 5/6
+[*]Bot warp charge venting
+[/list]
+
+[b]Long-term[/b]
+[list]
+[*]Utility-based ability scoring
+[*]Smart melee attack selection
+[*]Healing item management
+[*]Weapon special actions (parry, bayonet)
 [/list]
 
 [size=3][b]Requirements[/b][/size]
@@ -71,6 +120,7 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 [*]Hive Scum abilities (Enhanced Desperado, Rampage, Stimm Field) are untested — DLC required for validation
 [/list]
 
-[size=3][b]Source[/b][/size]
+[size=3][b]Source & feedback[/b][/size]
 
 [url=https://github.com/hummat/BetterBots]GitHub[/url] — MIT License
+[url=https://github.com/hummat/BetterBots/issues]Issue tracker[/url] — bug reports and feature requests welcome

@@ -35,10 +35,38 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 **Smart trigger conditions (new in v0.2.0):**
 Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 12 of 13 ability-specific trigger functions validated in-game.
 
-## What doesn't work yet
+## Roadmap
 
-- Grenades / blitz abilities (different architecture needed)
-- Hive Scum: Stimm Field (item-based, same challenge as above)
+See the [full roadmap](docs/ROADMAP.md) for details and GitHub issue links.
+
+**Ability activation**
+- [x] Stance, dash, charge, shout, stealth abilities (all 6 classes)
+- [x] Item-based abilities (relic, force field, drone)
+- [x] Smart per-ability trigger heuristics
+- [x] Safety guards (revive protection, suppression, warp peril block)
+- [ ] Grenade / blitz support
+- [ ] Per-ability toggle settings
+- [ ] Hive Scum validation (DLC-blocked)
+
+**Bot combat behavior**
+- [ ] Charge/dash to rescue disabled allies
+- [ ] Bot sprinting
+- [ ] Daemonhost avoidance
+- [ ] Bot pinging of elites/specials
+- [ ] Boss engagement discipline
+- [ ] Poxburster targeting
+- [ ] Stop chasing distant specials
+
+**Bot weapon/equipment fixes**
+- [ ] Fix ADS for Tertium 5/6 bots
+- [ ] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
+- [ ] Bot warp charge venting
+
+**Long-term**
+- [ ] Utility-based ability scoring
+- [ ] Smart melee attack selection
+- [ ] Healing item management
+- [ ] Weapon special actions (parry, bayonet)
 
 See [Status Snapshot](docs/STATUS.md) and [Validation Tracker](docs/VALIDATION_TRACKER.md) for detailed evidence.
 
