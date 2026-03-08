@@ -161,6 +161,7 @@ Local clone: `../Darktide-Source-Code/`
 | Write or modify ability heuristics | `docs/CLASS_<name>.md` + `docs/CLASS_<name>_TACTICS.md` for the class |
 | Analyze game logs | `docs/DEBUGGING.md` (log patterns, grep recipes, file locations) |
 | Analyze logging code | `docs/LOGGING.md` (log format, throttle keys, output levels, JSONL event log) |
+| Understand what vanilla bots can/cannot do | `docs/BOT_VANILLA_CAPABILITIES.md` |
 | Modify bot behavior (targeting, movement, weapons) | Relevant `docs/BOT_*.md` file(s) |
 | Modify input queueing or action sequences | `docs/BOT_INPUT_SYSTEM.md` |
 | Assess what works / what's broken | `docs/VALIDATION_TRACKER.md` + `docs/KNOWN_ISSUES.md` |
@@ -195,6 +196,7 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 `docs/CLASS_VETERAN_TACTICS.md`, `docs/CLASS_ZEALOT_TACTICS.md`, `docs/CLASS_PSYKER_TACTICS.md`, `docs/CLASS_OGRYN_TACTICS.md`, `docs/CLASS_ARBITES_TACTICS.md`, `docs/CLASS_HIVE_SCUM_TACTICS.md`
 
 **Bot system internals** (from decompiled source):
+- `docs/BOT_VANILLA_CAPABILITIES.md` — exhaustive inventory of what vanilla bots can/cannot do, with source references
 - `docs/BOT_BEHAVIOR_TREE.md` — full BT node hierarchy, all conditions, blackboard schema
 - `docs/BOT_COMBAT_ACTIONS.md` — melee/shoot/ability action node lifecycles, utility scoring
 - `docs/BOT_PERCEPTION_TARGETING.md` — target selection scoring formula, gestalt weights, proximity
