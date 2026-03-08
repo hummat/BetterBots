@@ -172,7 +172,7 @@ tests/
 ### Running tests
 
 ```bash
-make test      # runs busted (auto-detected) — 142 tests
+make test      # runs busted (auto-detected) — 160 tests
 make check     # runs format + lint + lsp + test (full quality gate)
 ```
 

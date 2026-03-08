@@ -42,6 +42,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
 | 15 | Suppress dodge during ability hold | Unblocked — `movement_state.is_dodging` + `Dodge.is_dodging()` available. Prevent dodge from interrupting charge/hold phases. |
 | 21 | Hazard avoidance during abilities | Don't stance in fire/gas/bomber puddles. |
+| 37 | Objective-aware ability activation | Protect allies during revive/interaction with defensive abilities (taunt, shout, stealth). |
 
 **Ability scope expansion:**
 
@@ -57,7 +58,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | # | Issue | Notes |
 |---|-------|-------|
 | 31 | Player weapon ranged `attack_meta_data` | Plasma gun (and other non-standard fire paths) silently fail with T5/T6 weapons. Inject per-family metadata. |
-| 35 | Fix ADS for T5/T6 bots | Custom profiles lack `bot_gestalts` → fallback disables ADS. One-liner hook. |
+| ~~35~~ | ~~Fix ADS for T5/T6 bots~~ | ~~Done — inject default `bot_gestalts` in `_init_blackboard_components` hook.~~ |
 
 **General bot behavior:**
 
@@ -67,8 +68,8 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
-| 34 | Poxburster targeting | Re-enable with safe distance gate (>8m shoot, <5m suppress). |
-| 36 | Bot sprinting | Hook `_update_movement` to set sprint input. Suppress near Daemonhosts (#17). Low effort, high visibility. |
+| ~~34~~ | ~~Poxburster targeting~~ | ~~Done — breed patch + close-range suppression (<5m).~~ |
+| ~~36~~ | ~~Bot sprinting~~ | ~~Done — sprint module with catch-up/rescue/traversal + daemonhost safety.~~ |
 | ~~20~~ | ~~Don't interrupt own revive~~ | ~~Done — `current_interaction_unit` check in both activation paths.~~ |
 
 ### P3: Backlog — Nice to have, no timeline
@@ -108,5 +109,5 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
 3. **M3 (in progress):** Ability quality — ~~suppression (#11)~~, charge rescue (#10), stance cancellation (#12). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~
-4. **M4:** Grenade/blitz support (#4) + bot weapon/equipment fixes (#31, #35) + general bot behavior (#16-#19, #34). Beyond abilities.
+4. **M4:** Grenade/blitz support (#4) + bot weapon/equipment fixes (#31, ~~#35~~) + general bot behavior (#16-#19, ~~#34~~, ~~#36~~). Beyond abilities.
 5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

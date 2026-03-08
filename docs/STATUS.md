@@ -1,4 +1,4 @@
-# Status Snapshot (March 7, 2026)
+# Status Snapshot (March 8, 2026)
 
 ## What's shipped
 
@@ -20,10 +20,13 @@
   - Hive Scum: Focus + Rage (toughness-reactive)
 - **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
 - **Structured event logging** (#29): opt-in JSONL event log (`event_log.lua`) with decision/queued/consumed/snapshot events, `attempt_id` correlation, buffered flush, hot-reload recovery
-- **Unit tests**: 142 tests via busted (heuristics, meta_data, resolve_decision, event_log)
+- **Unit tests**: 160 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 - **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
 - **Safety guards**: revive/interaction protection (#20), ability suppression during dodging/falling/lunging/jumping/ladder (#11), warp weapon peril block at ≥97% preventing Scrier's Gaze explosions (#27)
+- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, added close-range (<5m) suppression
+- **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
+- **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
 
 ## Current Tier Status
 
@@ -44,11 +47,10 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- Charge/dash to rescue disabled ally (#10) — P1
+- Charge/dash to rescue disabled ally (#10) — P1, closes M3
 - Per-ability toggle settings (#6) — P2
-- Fix ADS for T5/T6 bots (#35) + player weapon ranged metadata (#31) — P2, low/medium effort
+- Player weapon ranged metadata (#31) — P2, medium effort
 - Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
-- Bot sprinting (#36) — P2, low effort, high visibility
-- Poxburster targeting (#34) — P2
 - Bot warp venting (#30) — P2
+- Objective-aware ability activation (#37) — P2

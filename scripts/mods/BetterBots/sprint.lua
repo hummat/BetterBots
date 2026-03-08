@@ -1,0 +1,146 @@
+local _mod
+local _debug_log
+local _fixed_time
+
+local SPRINT_FOLLOW_DISTANCE = 12
+local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
+
+local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
+
+local function _is_near_daemonhost(unit)
+	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
+	if not perception_extension then
+		return false
+	end
+
+	local enemies, num_enemies = perception_extension:enemies_in_proximity()
+	if num_enemies == 0 then
+		return false
+	end
+
+	local unit_position = POSITION_LOOKUP[unit]
+	if not unit_position then
+		return false
+	end
+
+	for i = 1, num_enemies do
+		local enemy_unit = enemies[i]
+		local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
+		if unit_data_ext then
+			local breed = unit_data_ext:breed()
+			if breed and DAEMONHOST_BREED_NAMES[breed.name] then
+				local enemy_pos = POSITION_LOOKUP[enemy_unit]
+				if enemy_pos then
+					local dist_sq = Vector3.distance_squared(unit_position, enemy_pos)
+					if dist_sq < DAEMONHOST_SAFE_RANGE_SQ then
+						return true
+					end
+				end
+			end
+		end
+	end
+
+	return false
+end
+
+local function _should_sprint(self, unit, _input)
+	-- Must be moving forward (Sprint.check requires move.y >= 0.7)
+	local move = self._move
+	if not move or move.y < 0.7 then
+		return false, "not_moving_forward"
+	end
+
+	-- Never sprint near daemonhosts — triggers aggro via sprint_flat_bonus
+	if _is_near_daemonhost(unit) then
+		return false, "daemonhost_nearby"
+	end
+
+	-- Get follow distance from group extension
+	local group_extension = self._group_extension
+	if group_extension then
+		local bot_group_data = group_extension:bot_group_data()
+		local follow_unit = bot_group_data and bot_group_data.follow_unit
+		if follow_unit and ALIVE[follow_unit] then
+			local unit_position = POSITION_LOOKUP[unit]
+			local follow_position = POSITION_LOOKUP[follow_unit]
+			if unit_position and follow_position then
+				local dist_sq = Vector3.distance_squared(unit_position, follow_position)
+				if dist_sq > SPRINT_FOLLOW_DISTANCE * SPRINT_FOLLOW_DISTANCE then
+					return true, "catch_up"
+				end
+			end
+		end
+	end
+
+	-- Get perception for enemy count and ally needs
+	local behavior_extension = ScriptUnit.has_extension(unit, "behavior_system")
+	local brain = behavior_extension and behavior_extension._brain
+	local blackboard = brain and brain._blackboard
+	local perception = blackboard and blackboard.perception
+
+	-- Sprint to rescue allies
+	if perception then
+		local needs_aid = perception.target_ally_needs_aid
+		local need_type = perception.target_ally_need_type
+		if needs_aid and need_type ~= "in_need_of_attention_look" and need_type ~= "in_need_of_attention_stop" then
+			return true, "ally_rescue"
+		end
+	end
+
+	-- Sprint during pure traversal (no enemies)
+	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
+	if perception_extension then
+		local _, num_enemies = perception_extension:enemies_in_proximity()
+		if num_enemies == 0 then
+			return true, "traversal"
+		end
+	end
+
+	return false, "enemies_nearby"
+end
+
+local function on_update_movement(func, self, unit, input, dt, t)
+	func(self, unit, input, dt, t)
+
+	local should, reason = _should_sprint(self, unit, input)
+
+	if should then
+		input.hold_to_sprint = true
+		input.sprinting = true
+	end
+
+	-- Debug log on state change (sprint start/stop)
+	local prev = _last_sprint_state_by_unit[unit]
+	if should ~= prev then
+		_last_sprint_state_by_unit[unit] = should
+		local fixed_t = _fixed_time and _fixed_time() or 0
+		_debug_log(
+			"sprint:" .. tostring(unit),
+			fixed_t,
+			"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(reason) .. ")"
+		)
+	end
+end
+
+local Sprint = {}
+
+Sprint.init = function(deps)
+	_mod = deps.mod
+	_debug_log = deps.debug_log
+	_fixed_time = deps.fixed_time
+end
+
+Sprint.register_hook = function()
+	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
+		_mod:hook(BotUnitInput, "_update_movement", on_update_movement)
+	end)
+end
+
+Sprint.should_sprint = _should_sprint
+Sprint.is_near_daemonhost = _is_near_daemonhost
+
+return Sprint

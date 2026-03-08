@@ -5,6 +5,9 @@ read_globals = {
 	"get_mod",
 	"ScriptUnit",
 	"cjson",
+	"ALIVE",
+	"POSITION_LOOKUP",
+	"Vector3",
 }
 
 files["tests/**"] = {

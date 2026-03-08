@@ -7,7 +7,10 @@
 		"globals": [
 			"get_mod",
 			"ScriptUnit",
-			"cjson"
+			"cjson",
+			"ALIVE",
+			"POSITION_LOOKUP",
+			"Vector3"
 		]
 	},
 	"workspace": {
