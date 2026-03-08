@@ -651,8 +651,10 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_sh
 	mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
 		if scratchpad and not _ads_logged_scratchpads[scratchpad] then
 			_ads_logged_scratchpads[scratchpad] = true
-			local gestalt = scratchpad.ranged_gestalt or "?"
-			_debug_log("ads_confirmed", 0, "bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
+			if _debug_enabled() then
+				local gestalt = scratchpad.ranged_gestalt or "?"
+				mod:echo("BetterBots DEBUG: bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
+			end
 		end
 	end)
 end)

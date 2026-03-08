@@ -10,6 +10,7 @@ local DAEMONHOST_BREED_NAMES = {
 }
 
 local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
+local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 
 -- Check for daemonhosts using side.ai_target_units (all enemy units on the
 -- opposing side). enemies_in_proximity() is unsuitable: it only returns
@@ -136,18 +137,25 @@ local function on_update_movement(func, self, unit, input, dt, t)
 	input.hold_to_sprint = true
 	input.sprinting = should
 
-	-- Debug log only for interesting sprint reasons (catch_up, ally_rescue, daemonhost)
+	-- Debug log for interesting sprint transitions (catch_up, ally_rescue, daemonhost).
+	-- Also log the STOP that follows an interesting START so traces are paired.
 	local prev = _last_sprint_state_by_unit[unit]
 	if should ~= prev then
 		_last_sprint_state_by_unit[unit] = should
-		if reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby" then
+		local dominated_start = not should and _last_interesting_start_by_unit[unit]
+		local dominated_reason = dominated_start or reason
+		if reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby" or dominated_start then
 			local fixed_t = _fixed_time and _fixed_time() or 0
 			_debug_log(
 				"sprint:" .. tostring(unit),
 				fixed_t,
-				"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(reason) .. ")"
+				"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")"
 			)
 		end
+		_last_interesting_start_by_unit[unit] = should
+				and (reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby")
+				and reason
+			or nil
 	end
 end
 
