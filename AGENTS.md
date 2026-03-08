@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 160 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- `make test` — 165 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -241,7 +241,7 @@ scripts/mods/BetterBots/
   BetterBots_localization.lua               # Display strings
 tests/
   test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # 117 tests for all 18 heuristic functions
+  heuristics_spec.lua                       # 122 tests for all 18 heuristic functions
   meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle

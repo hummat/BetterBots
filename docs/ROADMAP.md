@@ -22,15 +22,14 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Structured JSONL event logging (#29) with `bb-log events` analysis subcommands
 - Item heuristics: per-ability rules for relic, force field, drone, stimm field
 
+### v0.4.0 (2026-03-08)
+- Poxburster targeting (#34), ADS fix (#35), bot sprinting (#36)
+- Charge/dash rescue aim (#10): rescue triggers + aim correction for zealot dash, ogryn charge, arbites charge
+- 165 unit tests, M3 complete
+
 ## Priority tiers
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P1: next`, `P2: later`, `P3: backlog`.
-
-### P1: Next — High value, unblocked
-
-| # | Issue | Category | Status |
-|---|-------|----------|--------|
-| 10 | Charge/dash to rescue disabled ally | ability-quality | Bull Rush / Break the Line / Dash to reach grabbed/netted allies. |
 
 ### P2: Later — Planned, not urgent
 
@@ -58,7 +57,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | # | Issue | Notes |
 |---|-------|-------|
 | 31 | Player weapon ranged `attack_meta_data` | Plasma gun (and other non-standard fire paths) silently fail with T5/T6 weapons. Inject per-family metadata. |
-| ~~35~~ | ~~Fix ADS for T5/T6 bots~~ | ~~Done — inject default `bot_gestalts` in `_init_blackboard_components` hook.~~ |
+| 41 | Weapon/enemy-aware ADS vs hip-fire | Static `killshot` gestalt for all weapons. Need per-weapon gestalt + enemy-aware fire cadence. |
 
 **General bot behavior:**
 
@@ -68,9 +67,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
-| ~~34~~ | ~~Poxburster targeting~~ | ~~Done — breed patch + close-range suppression (<5m).~~ |
-| ~~36~~ | ~~Bot sprinting~~ | ~~Done — sprint module with catch-up/rescue/traversal + daemonhost safety.~~ |
-| ~~20~~ | ~~Don't interrupt own revive~~ | ~~Done — `current_interaction_unit` check in both activation paths.~~ |
 
 ### P3: Backlog — Nice to have, no timeline
 
@@ -108,7 +104,7 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
-3. **M3 (in progress):** Ability quality + bot fixes — ~~suppression (#11)~~, charge rescue (#10). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~ ~~Poxburster targeting (#34).~~ ~~ADS fix (#35).~~ ~~Bot sprinting (#36).~~
-4. **M4:** Ability polish — stance cancellation (#12), navmesh validation (#13), suppress dodge (#15), hazard avoidance (#21), warp venting (#30), objective-aware activation (#37), per-ability toggles (#6), Hive Scum support (#8).
+3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
+4. **M4:** Ability polish — stance cancellation (#12), navmesh validation (#13), suppress dodge (#15), hazard avoidance (#21), warp venting (#30), objective-aware activation (#37), per-ability toggles (#6), Hive Scum support (#8), ADS awareness (#41).
 5. **M5:** Scope expansion — grenade/blitz support (#4), ranged meta_data injection (#31), bot behavior (#16-#19), heal deferral (#39).
 6. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

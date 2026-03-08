@@ -78,6 +78,7 @@ local function build_context(unit, blackboard)
 		urgent_target_enemy = nil,
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
+		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
 		target_is_super_armor = false,
@@ -96,6 +97,7 @@ local function build_context(unit, blackboard)
 		context.urgent_target_enemy = perception_component.urgent_target_enemy
 		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
 		context.target_ally_distance = perception_component.target_ally_distance
+		context.target_ally_unit = perception_component.target_ally
 	end
 
 	local health_extension = ScriptUnit.has_extension(unit, "health_system")
@@ -312,6 +314,9 @@ local function _can_activate_zealot_dash(context)
 	if context.target_is_super_armor then
 		return false, "zealot_dash_block_super_armor"
 	end
+	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+		return true, "zealot_dash_ally_aid"
+	end
 	if context.priority_target_enemy and target_distance and target_distance > 4 then
 		return true, "zealot_dash_priority_target"
 	end
@@ -516,6 +521,9 @@ local function _can_activate_adamant_charge(context)
 	local target_distance = context.target_enemy_distance
 	if target_distance and target_distance < 3 then
 		return false, "adamant_charge_block_target_too_close"
+	end
+	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+		return true, "adamant_charge_ally_aid"
 	end
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_is_elite_special then
 		return false, "adamant_charge_block_no_pressure"

@@ -37,6 +37,15 @@ local DEFAULT_RANGED_GESTALT = "killshot"
 local DEFAULT_MELEE_GESTALT = "linesman"
 local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
 
+-- Rescue aim (#10): when a charge/dash activates for ally rescue, store the
+-- ally unit so the enter hook can aim the bot toward it before the lunge fires.
+local RESCUE_CHARGE_RULES = {
+	ogryn_charge_ally_aid = true,
+	zealot_dash_ally_aid = true,
+	adamant_charge_ally_aid = true,
+}
+local _rescue_intent = setmetatable({}, { __mode = "k" })
+
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
@@ -319,6 +328,14 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		ability_extension
 	)
 
+	if can_activate and rule and RESCUE_CHARGE_RULES[rule] then
+		local perception = blackboard and blackboard.perception
+		local ally_unit = perception and perception.target_ally
+		if ally_unit then
+			_rescue_intent[unit] = ally_unit
+		end
+	end
+
 	Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
 
 	if EventLog.is_enabled() then
@@ -538,6 +555,29 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
+	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
+	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
+	if rule and RESCUE_CHARGE_RULES[rule] then
+		local perception = blackboard and blackboard.perception
+		local ally_unit = perception and perception.target_ally
+		if ally_unit then
+			local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+			if ally_pos then
+				local input_ext = ScriptUnit.has_extension(unit, "input_system")
+				local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+				if bot_input then
+					bot_input:set_aiming(true)
+					bot_input:set_aim_position(ally_pos)
+					_debug_log(
+						"rescue_aim:" .. tostring(unit),
+						fixed_t,
+						"rescue aim (fallback): directed charge toward disabled ally"
+					)
+				end
+			end
+		end
+	end
+
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
 
@@ -715,10 +755,34 @@ _try_patch_conditions_now(
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)
-		mod:hook_safe(
+		mod:hook(
 			BtBotActivateAbilityAction,
 			"enter",
-			function(_self, unit, _breed, _blackboard, scratchpad, action_data, _t)
+			function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
+				-- Rescue aim (#10): aim the bot toward the disabled ally before
+				-- the original enter() reads first_person_component.rotation for
+				-- the lunge direction.
+				local ally_unit = _rescue_intent[unit]
+				if ally_unit then
+					_rescue_intent[unit] = nil
+					local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+					if ally_pos then
+						local input_ext = ScriptUnit.has_extension(unit, "input_system")
+						local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+						if bot_input then
+							bot_input:set_aiming(true)
+							bot_input:set_aim_position(ally_pos)
+							_debug_log(
+								"rescue_aim:" .. tostring(unit),
+								_fixed_time(),
+								"rescue aim: directed charge toward disabled ally"
+							)
+						end
+					end
+				end
+
+				func(self, unit, breed, blackboard, scratchpad, action_data, t)
+
 				local ability_component_name = action_data and action_data.ability_component_name or "?"
 				local activation_data = scratchpad and scratchpad.activation_data
 				local action_input = activation_data and activation_data.action_input or "?"

@@ -142,6 +142,39 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("activates for ally rescue at range", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy = "unit",
+				target_enemy_distance = 8,
+				target_ally_needs_aid = true,
+				target_ally_distance = 10,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("blocks ally rescue when ally too close", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy = "unit",
+				target_enemy_distance = 8,
+				target_ally_needs_aid = true,
+				target_ally_distance = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("blocks ally rescue when target too close", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy = "unit",
+				target_enemy_distance = 2,
+				target_ally_needs_aid = true,
+				target_ally_distance = 10,
+			}))
+			assert.is_false(ok)
+			assert.matches("too_close", rule)
+		end)
+
 		it("shares logic with targeted dash variants", function()
 			for _, variant in ipairs({
 				"zealot_targeted_dash",
@@ -565,6 +598,27 @@ describe("heuristics", function()
 			}))
 			assert.is_true(ok)
 			assert.matches("elite_special", rule)
+		end)
+
+		it("activates for ally rescue at range", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy_distance = 6,
+				target_ally_needs_aid = true,
+				target_ally_distance = 10,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("blocks ally rescue when ally too close", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 1,
+				target_enemy_distance = 6,
+				target_ally_needs_aid = true,
+				target_ally_distance = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
 		end)
 	end)
 

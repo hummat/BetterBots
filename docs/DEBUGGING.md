@@ -168,7 +168,7 @@ The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) create
 ```
 tests/
   test_helper.lua           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua       # 117 tests: all 18 heuristic functions (14 combat + 4 item)
+  heuristics_spec.lua       # 122 tests: all 18 heuristic functions (14 combat + 4 item)
   meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
   resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
   event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
