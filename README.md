@@ -50,15 +50,15 @@ See the [full roadmap](docs/ROADMAP.md) for details and GitHub issue links.
 
 **Bot combat behavior**
 - [ ] Charge/dash to rescue disabled allies
-- [ ] Bot sprinting
+- [x] Bot sprinting
 - [ ] Daemonhost avoidance
 - [ ] Bot pinging of elites/specials
 - [ ] Boss engagement discipline
-- [ ] Poxburster targeting
+- [x] Poxburster targeting
 - [ ] Stop chasing distant specials
 
 **Bot weapon/equipment fixes**
-- [ ] Fix ADS for Tertium 5/6 bots
+- [x] Fix ADS for Tertium 5/6 bots
 - [ ] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
 - [ ] Bot warp charge venting
 
