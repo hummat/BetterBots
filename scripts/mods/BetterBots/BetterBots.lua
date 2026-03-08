@@ -524,14 +524,6 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		ability_extension
 	)
 
-	if can_activate and rule and RESCUE_CHARGE_RULES[rule] then
-		local perception = blackboard and blackboard.perception
-		local ally_unit = perception and perception.target_ally
-		if ally_unit then
-			_rescue_intent[unit] = ally_unit
-		end
-	end
-
 	if EventLog.is_enabled() then
 		local bot_slot = Debug.bot_slot_for_unit(unit)
 		EventLog.emit_decision(
@@ -561,6 +553,29 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			)
 		end
 		return
+	end
+
+	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
+	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
+	if rule and RESCUE_CHARGE_RULES[rule] then
+		local perception = blackboard and blackboard.perception
+		local ally_unit = perception and perception.target_ally
+		if ally_unit then
+			local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+			if ally_pos then
+				local input_ext = ScriptUnit.has_extension(unit, "input_system")
+				local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+				if bot_input then
+					bot_input:set_aiming(true)
+					bot_input:set_aim_position(ally_pos)
+					_debug_log(
+						"rescue_aim:" .. tostring(unit),
+						fixed_t,
+						"rescue aim (fallback): directed charge toward disabled ally"
+					)
+				end
+			end
+		end
 	end
 
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
@@ -752,9 +767,11 @@ mod:hook_require(
 					_rescue_intent[unit] = nil
 					local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 					if ally_pos then
-						local bot_unit_input = ScriptUnit.has_extension(unit, "input_system")
-						if bot_unit_input and bot_unit_input.set_aim_position then
-							bot_unit_input:set_aim_position(ally_pos)
+						local input_ext = ScriptUnit.has_extension(unit, "input_system")
+						local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+						if bot_input then
+							bot_input:set_aiming(true)
+							bot_input:set_aim_position(ally_pos)
 							_debug_log(
 								"rescue_aim:" .. tostring(unit),
 								_fixed_time(),
