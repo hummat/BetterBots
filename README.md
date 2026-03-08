@@ -27,13 +27,13 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Psyker: Venting Shriek (shout)
 - Arbites: Break the Line (charge)
 
-**Item-based abilities (experimental):**
-- Zealot: Bolstering Prayer (relic) — works well
-- Psyker: Telekine Shield — works sometimes
-- Arbites: Nuncio-Aquila — works sometimes
+**Item-based abilities (reliable):**
+- Zealot: Bolstering Prayer (relic) — activates when allies need toughness
+- Psyker: Telekine Shield (all 3 variants) — deploys under sustained fire
+- Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
 
-**Smart trigger conditions (new in v0.2.0):**
-Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 12 of 13 ability-specific trigger functions validated in-game.
+**Smart trigger conditions:**
+Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
 
 ## Roadmap
 
@@ -49,7 +49,7 @@ See the [full roadmap](docs/ROADMAP.md) for details and GitHub issue links.
 - [ ] Hive Scum validation (DLC-blocked)
 
 **Bot combat behavior**
-- [ ] Charge/dash to rescue disabled allies
+- [x] Charge/dash to rescue disabled allies
 - [x] Bot sprinting
 - [ ] Daemonhost avoidance
 - [ ] Bot pinging of elites/specials
@@ -179,7 +179,7 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 BetterBots.mod                    # DMF entry point
 scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Main: hooks, condition patch, fallback queue
-  heuristics.lua                  #   13 per-ability trigger functions + context builder
+  heuristics.lua                  #   18 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
   event_log.lua                   #   Structured JSONL event logging

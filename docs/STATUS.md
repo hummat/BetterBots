@@ -9,24 +9,24 @@
 - Runtime diagnostics (condition/enter/charge trace hooks, debug logging)
 - Published on Nexus Mods
 
-### Post-v0.1.0 (unreleased)
+### v0.2.0 (2026-03-06)
 - **Refactored** into sub-modules: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25/#26)
-- **Per-career threat heuristics** (#2): 18 per-template heuristic functions (14 combat + 4 item) replacing generic `enemies_in_proximity() > 0`
-  - Veteran: VoC (squad_leader) + Executioner's Stance (ranger) branching via `class_tag` + Stealth
-  - Zealot: Dash (distance/super_armor/priority gates) + Invisibility (emergency/overwhelm/ally)
-  - Psyker: Shout (peril-gated) + Stance (peril window + threat)
-  - Ogryn: Charge (gap-close/ally rescue) + Taunt (survivability-gated) + Gunlugger (ranged focus)
-  - Arbites: Stance (toughness/monster) + Charge (density/elite) + Shout (emergency)
-  - Hive Scum: Focus + Rage (toughness-reactive)
+- **Per-career threat heuristics** (#2): 18 per-template heuristic functions (14 combat + 4 item)
 - **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
-- **Structured event logging** (#29): opt-in JSONL event log (`event_log.lua`) with decision/queued/consumed/snapshot events, `attempt_id` correlation, buffered flush, hot-reload recovery
+
+### v0.3.0 (2026-03-07)
+- **Tier 3 reliability** (#3): all testable item abilities at 100% consume rate
+- **Structured event logging** (#29): opt-in JSONL event log with `bb-log events` analysis
+- **Item heuristics**: per-ability rules for relic, force field, drone, stimm field
+- **Safety guards**: revive/interaction protection (#20), ability suppression (#11), warp weapon peril block (#27)
+
+### v0.4.0 (2026-03-08)
+- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, close-range (<5m) suppression
+- **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
+- **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
+- **Charge/dash rescue aim** (#10): zealot dash, ogryn charge, and arbites charge aim toward disabled allies. 14 rescue activations confirmed in-game.
 - **Unit tests**: 165 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
-- **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
-- **Safety guards**: revive/interaction protection (#20), ability suppression during dodging/falling/lunging/jumping/ladder (#11), warp weapon peril block at ≥97% preventing Scrier's Gaze explosions (#27)
-- **Poxburster targeting** (#34, closed): removed `not_bot_target` breed flag, added close-range (<5m) suppression. Validated in-game.
-- **ADS fix for T5/T6 bots** (#35, closed): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them. Validated: gestalt injection + ADS confirmed in logs.
-- **Bot sprinting** (#36, closed): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety. Validated in-game.
 
 ## Current Tier Status
 
@@ -47,9 +47,9 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- ~~Charge/dash to rescue disabled ally (#10) — closed, M3 complete~~
 - Per-ability toggle settings (#6) — P2
 - Player weapon ranged metadata (#31) — P2, medium effort
+- Weapon/enemy-aware ADS (#41) — P2
 - Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Bot warp venting (#30) — P2
