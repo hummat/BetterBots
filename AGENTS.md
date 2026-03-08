@@ -181,6 +181,8 @@ Local clone: `../Darktide-Source-Code/`
 | Understand the module architecture | `docs/ARCHITECTURE.md` |
 | Add per-frame logic, hooks, or engine queries | `docs/ARCHITECTURE.md` (Performance section) |
 | Write or modify tests | `docs/DEBUGGING.md` (automated testing section) |
+| Understand backend/progression/economy systems | `docs/BACKEND_PROGRESSION.md` |
+| Explore local co-op / LAN / multiplayer modding | `docs/LOCAL_MULTIPLAYER.md` |
 
 ### Required reading order for ability work
 
@@ -213,6 +215,8 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 - `docs/GRENADE_INVENTORY.md` — all 19 grenade/blitz templates, input patterns, implementation approach
 - `docs/CHARACTER_STATE_API.md` — character state detection components, fields, access patterns
 - `docs/META_BUILDS_RESEARCH.md` — endgame meta builds per class, weapon/ability rankings, community build database
+- `docs/BACKEND_PROGRESSION.md` — backend API architecture, progression systems, local backend feasibility
+- `docs/LOCAL_MULTIPLAYER.md` — local co-op feasibility, engine networking, VT2 comparison
 
 **Project management:**
 `docs/DEBUGGING.md`, `docs/LOGGING.md`, `docs/ARCHITECTURE.md`, `docs/VALIDATION_TRACKER.md`, `docs/KNOWN_ISSUES.md`, `docs/RELATED_MODS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`
