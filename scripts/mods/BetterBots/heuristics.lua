@@ -78,6 +78,7 @@ local function build_context(unit, blackboard)
 		urgent_target_enemy = nil,
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
+		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
 		target_is_super_armor = false,
@@ -96,6 +97,7 @@ local function build_context(unit, blackboard)
 		context.urgent_target_enemy = perception_component.urgent_target_enemy
 		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
 		context.target_ally_distance = perception_component.target_ally_distance
+		context.target_ally_unit = perception_component.target_ally
 	end
 
 	local health_extension = ScriptUnit.has_extension(unit, "health_system")
