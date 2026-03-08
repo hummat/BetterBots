@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does fourteen things:
+`scripts/mods/BetterBots/BetterBots.lua` does seventeen things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -58,6 +58,16 @@ Grenade abilities are still out of scope.
     - blocks `weapon_action` inputs (except `wield`) for warp weapons at ≥97% peril
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
+15. Poxburster targeting (#34):
+    - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
+    - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
+16. ADS fix for T5/T6 bots (#35):
+    - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
+    - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
+17. Bot sprinting (#36, via `sprint.lua`):
+    - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
+    - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
+    - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
 
 ## Why item fallback is needed
 

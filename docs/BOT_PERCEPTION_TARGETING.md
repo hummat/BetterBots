@@ -33,7 +33,7 @@ The reevaluation timer is set to **t + 0.3s** after each full evaluation (source
 ### What Gets Tracked
 
 The bot iterates over `side.ai_target_units` -- all enemy units registered as targetable on the opposing side. A target is valid if:
-- `breed.not_bot_target` is **false** (only `chaos_poxwalker_bomber` sets this true)
+- `breed.not_bot_target` is **false** (vanilla: only `chaos_poxwalker_bomber` sets this true; **BetterBots #34 patches this to nil** and adds distance-based close-range suppression instead)
 - The enemy is in `aggroed_minion_target_units` (has been aggroed/alerted), **OR** is a player breed (PvP-relevant, not typical gameplay)
 
 ### Blackboard Output

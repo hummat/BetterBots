@@ -24,6 +24,19 @@ local _super_armor_breed_flag_by_name = {}
 
 local PERIL_CRITICAL_THRESHOLD = 0.97
 
+-- Poxburster targeting (#34): bots ignore poxbursters entirely due to
+-- not_bot_target on breed data. We patch the breed to re-enable targeting
+-- and suppress only at close range to avoid detonation.
+local POXBURSTER_SUPPRESS_DIST = 5
+local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
+local _poxburster_breed_patched = false
+
+-- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
+-- "none" gestalt which disables aim-down-sights. Inject safe defaults.
+local DEFAULT_RANGED_GESTALT = "killshot"
+local DEFAULT_MELEE_GESTALT = "linesman"
+local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
+
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
@@ -128,6 +141,9 @@ assert(Debug, "BetterBots: failed to load debug module")
 local EventLog = mod:io_dofile("BetterBots/scripts/mods/BetterBots/event_log")
 assert(EventLog, "BetterBots: failed to load event_log module")
 
+local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
+assert(Sprint, "BetterBots: failed to load sprint module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -171,6 +187,12 @@ Debug.init({
 EventLog.init({
 	mod = mod,
 	context_snapshot = Debug.context_snapshot,
+})
+
+Sprint.init({
+	mod = mod,
+	debug_log = _debug_log,
+	fixed_time = _fixed_time,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -596,9 +618,30 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 end
 
 -- Hook registrations (all game-system hooks stay in main)
+
+-- Poxburster breed patch (#34): remove not_bot_target so bots can target poxbursters.
+-- Close-range suppression is handled by the perception post-processing hook below.
+mod:hook_require("scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed", function(breed_data)
+	if breed_data.not_bot_target then
+		breed_data.not_bot_target = nil
+		_poxburster_breed_patched = true
+		_debug_log("poxburster_patch", 0, "patched poxburster breed: removed not_bot_target")
+	end
+end)
+
+-- Eagerly patch if breed was already loaded before our hook_require fired.
+local _pox_ok, _pox_breed = pcall(require, "scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed")
+if _pox_ok and _pox_breed and _pox_breed.not_bot_target and not _poxburster_breed_patched then
+	_pox_breed.not_bot_target = nil
+	_poxburster_breed_patched = true -- luacheck: ignore 311 (read in hook_require callback above)
+	_debug_log("poxburster_patch_eager", 0, "patched poxburster breed (eager): removed not_bot_target")
+end
+
 mod:hook_require("scripts/settings/ability/ability_templates/ability_templates", function(AbilityTemplates)
 	MetaData.inject(AbilityTemplates)
 end)
+
+Sprint.register_hook()
 
 -- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
 -- under a .thresholds subtable instead of flat top-level keys. The vanilla
@@ -910,7 +953,90 @@ mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(Weap
 	)
 end)
 
+-- Poxburster close-range suppression (#34): after target selection runs, if
+-- the chosen target is a poxburster within detonation range, clear it so bots
+-- don't chase or shoot at point-blank distance. Also clears opportunity/urgent/
+-- priority target slots if a close poxburster was selected there.
+local function _is_close_poxburster(unit, self_position)
+	if not unit then
+		return false
+	end
+
+	local data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not data_ext then
+		return false
+	end
+
+	local breed = data_ext:breed()
+	if not breed or breed.name ~= POXBURSTER_BREED_NAME then
+		return false
+	end
+
+	local pos = POSITION_LOOKUP[unit]
+	if not pos then
+		return false
+	end
+
+	return Vector3.distance(self_position, pos) < POXBURSTER_SUPPRESS_DIST
+end
+
+mod:hook_require("scripts/extension_systems/perception/bot_perception_extension", function(BotPerceptionExtension)
+	mod:hook_safe(
+		BotPerceptionExtension,
+		"_update_target_enemy",
+		function(_self, self_unit, self_position, perception_component)
+			if _is_close_poxburster(perception_component.target_enemy, self_position) then
+				perception_component.target_enemy = nil
+				perception_component.target_enemy_distance = math.huge
+				perception_component.target_enemy_type = "none"
+
+				_debug_log(
+					"poxburster_suppress:" .. tostring(self_unit),
+					_fixed_time(),
+					"suppressed poxburster target (too close)"
+				)
+			end
+
+			if _is_close_poxburster(perception_component.opportunity_target_enemy, self_position) then
+				perception_component.opportunity_target_enemy = nil
+			end
+
+			if _is_close_poxburster(perception_component.urgent_target_enemy, self_position) then
+				perception_component.urgent_target_enemy = nil
+			end
+
+			if _is_close_poxburster(perception_component.priority_target_enemy, self_position) then
+				perception_component.priority_target_enemy = nil
+			end
+		end
+	)
+end)
+
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+	-- ADS fix (#35): inject default gestalts for T5/T6 profiles that lack bot_gestalts.
+	-- Without this, _gestalts_or_default falls back to "none" which disables ADS.
+	mod:hook(
+		BotBehaviorExtension,
+		"_init_blackboard_components",
+		function(func, self, blackboard, physics_world, gestalts_or_nil)
+			if not gestalts_or_nil or not gestalts_or_nil.ranged then
+				gestalts_or_nil = gestalts_or_nil or {}
+				gestalts_or_nil.ranged = gestalts_or_nil.ranged or DEFAULT_RANGED_GESTALT
+				gestalts_or_nil.melee = gestalts_or_nil.melee or DEFAULT_MELEE_GESTALT
+				local unit = self._unit
+				if unit and not _gestalt_injected_units[unit] then
+					_gestalt_injected_units[unit] = true
+					_debug_log(
+						"gestalt_inject:" .. tostring(unit),
+						0,
+						"injected default bot_gestalts (ranged=killshot, melee=linesman)"
+					)
+				end
+			end
+			return func(self, blackboard, physics_world, gestalts_or_nil)
+		end
+	)
+
 	mod:hook_safe(BotBehaviorExtension, "update", function(self, unit)
 		local player = self._player
 		if not player or player:is_human_controlled() then
