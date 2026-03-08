@@ -49,5 +49,6 @@
 - Fix ADS for T5/T6 bots (#35) + player weapon ranged metadata (#31) — P2, low/medium effort
 - Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
+- Bot sprinting (#36) — P2, low effort, high visibility
 - Poxburster targeting (#34) — P2
 - Bot warp venting (#30) — P2

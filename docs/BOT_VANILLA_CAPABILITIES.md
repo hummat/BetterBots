@@ -31,6 +31,7 @@ What Darktide bots can and cannot do out of the box (v1.10, Feb 2026). Source-ve
 | Ammo pickup | Full | When ammo % below threshold and player has more |
 | Mule item carry | **No** | Architecture exists but `bots_mule_pickup` never set on any pickup template |
 | Weapon switching | Full | Auto-switches melee/ranged based on target type |
+| Sprinting | **No** | `BotUnitInput` never sets sprint input — bots walk everywhere |
 | Navigation / following | Full | GwNav A* pathfinding, fan formation, teleport at 40m |
 | Cover seeking | Partial | Seeks cover from ranged enemies within 40m LoS |
 | Tagging / pinging | **No** | No BT logic; responds to player tags for targeting only |
@@ -632,11 +633,12 @@ What a DMF mod can and cannot fix. DMF hooks can replace/wrap any Lua function a
 | 8 | **Poxburster targeting** | **Likely yes** | Medium | Bound by Duty disabled Poxburster targeting. Likely a breed tag check or target filter in perception/shoot conditions. Hook the filter to re-enable targeting at safe range thresholds. | Filter location not yet identified — needs deeper investigation of perception system breed exclusions |
 | 9 | **Bot class variety** | **Yes** | High | Hook bot profile selection to inject non-Veteran profiles. Already done by Tertium 5/6 mods — proven approach. | Profiles need valid archetype/weapon/talent data; crash risk with incomplete profiles (Tertium 5 crash on Arbites/Hive Scum archetypes documented) |
 | 10 | **Player weapon `attack_meta_data`** | **Yes** | High | Inject `attack_meta_data` into player weapon templates via `require()` mutation (same pattern as `ability_meta_data`). Maps correct action input names per weapon family. Fixes silent fire failure for non-standard weapons (plasma, etc.) and enables heavy melee attacks for player weapons. | Need to map correct input names per weapon family (~15 families); some weapons have unique fire paths (plasma: charge-then-auto-fire) |
-| 11 | **Cover seeking improvement** | **Partial** | Medium | Cover candidate selection uses `SpawnPointQueries` (Lua wrapper around GwNav). Could hook to add position scoring or fallback positions when no spawn points exist. | GwNav queries are C++ — can call existing Lua wrappers but can't add new query types; navmesh geometry is fixed |
-| 12 | **Block during revive** | **No** | High | Interaction and weapon action are exclusive state machines in the character state system. Cannot queue weapon inputs (`block`) during active interaction (`revive`). | Architectural incompatibility — ECS state components enforce exclusivity. Would need C++ changes to allow parallel states. |
-| 13 | **New bot animations** | **No** | High | N/A — animation state machines are compiled assets loaded by C++ engine. | Cannot add new `anim_event` strings or state machine transitions via Lua |
-| 14 | **New ECS components** | **No** | High | N/A — component schemas are defined in C++ and registered at engine init. | Cannot extend `unit_data_extension` with new component types |
-| 15 | **Navmesh changes** | **No** | High | N/A — navmesh is baked per-level by the level editor. | Cannot modify navmesh geometry, add nav tags, or create new traversal links at runtime |
+| 11 | **Sprinting** | **Yes** | High | `BotUnitInput` never sets `input.sprint`. Hook `_update_movement` to set `input.sprint = true` under appropriate conditions. `Sprint.check()` handles all validation (cooldowns, weapon blocks, `prevent_sprint` flags, forward movement). | Decision logic needed (when to sprint vs walk); must suppress near Daemonhosts (`sprint_flat_bonus` anger in `chaos_daemonhost_passive_action.lua`) |
+| 12 | **Cover seeking improvement** | **Partial** | Medium | Cover candidate selection uses `SpawnPointQueries` (Lua wrapper around GwNav). Could hook to add position scoring or fallback positions when no spawn points exist. | GwNav queries are C++ — can call existing Lua wrappers but can't add new query types; navmesh geometry is fixed |
+| 13 | **Block during revive** | **No** | High | Interaction and weapon action are exclusive state machines in the character state system. Cannot queue weapon inputs (`block`) during active interaction (`revive`). | Architectural incompatibility — ECS state components enforce exclusivity. Would need C++ changes to allow parallel states. |
+| 14 | **New bot animations** | **No** | High | N/A — animation state machines are compiled assets loaded by C++ engine. | Cannot add new `anim_event` strings or state machine transitions via Lua |
+| 15 | **New ECS components** | **No** | High | N/A — component schemas are defined in C++ and registered at engine init. | Cannot extend `unit_data_extension` with new component types |
+| 16 | **Navmesh changes** | **No** | High | N/A — navmesh is baked per-level by the level editor. | Cannot modify navmesh geometry, add nav tags, or create new traversal links at runtime |
 
 ### What this means for BetterBots scope
 
@@ -654,6 +656,7 @@ What a DMF mod can and cannot fix. DMF hooks can replace/wrap any Lua function a
 | Grenade/blitz support | High | #4 | 19 templates, item-based fallback needed for most; `adamant_whistle` is easiest |
 | Healing item management | High | #24 | Inventory gate is the hard part; use sequence is proven (Tier 3 pattern) |
 | Bot tagging | Medium | #16 | SmartTagSystem integration; solo-play only unless RPC handling is solved |
+| Bot sprinting | Low | #36 | Hook `_update_movement` to set sprint input; suppress near Daemonhosts |
 | Poxburster targeting | Low-Medium | #34 | Re-enable with safe distance gate (>8m shoot, <5m suppress) |
 | Bot warp venting | Medium | #30 | BT vent node exists; translate `reload` → `vent` in action input hook |
 

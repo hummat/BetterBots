@@ -68,6 +68,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 | 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
 | 34 | Poxburster targeting | Re-enable with safe distance gate (>8m shoot, <5m suppress). |
+| 36 | Bot sprinting | Hook `_update_movement` to set sprint input. Suppress near Daemonhosts (#17). Low effort, high visibility. |
 | ~~20~~ | ~~Don't interrupt own revive~~ | ~~Done — `current_interaction_unit` check in both activation paths.~~ |
 
 ### P3: Backlog — Nice to have, no timeline
