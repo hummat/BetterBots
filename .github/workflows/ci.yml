@@ -69,4 +69,6 @@ jobs:
           ln -sf /opt/lua-language-server/bin/lua-language-server /usr/local/bin/lua-language-server
 
       - name: Run checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: make check

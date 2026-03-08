@@ -78,7 +78,7 @@ done
 # ── 4. GitHub issue state vs docs ────────────────────────────────────────────
 
 # NOTE: In CI, ensure GH_TOKEN or GITHUB_TOKEN is exported for issue state checks.
-if command -v gh >/dev/null 2>&1 && gh api user --jq .login >/dev/null 2>&1; then
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   closed_issues=$(gh issue list --state closed --limit 100 --json number --jq '.[].number' 2>/dev/null || true)
 
   if [[ -n "$closed_issues" ]]; then
@@ -129,7 +129,7 @@ if command -v gh >/dev/null 2>&1 && gh api user --jq .login >/dev/null 2>&1; the
 
   ok "GitHub issue state cross-check done"
 else
-  warn "gh CLI not available or not authenticated — skipping issue state checks"
+  echo " info: gh CLI not available or not authenticated — skipping issue state checks"
 fi
 
 # ── 5. Summary ───────────────────────────────────────────────────────────────
