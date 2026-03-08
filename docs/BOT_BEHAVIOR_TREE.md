@@ -356,6 +356,8 @@ Returns `true` when:
   - If already venting (`scratchpad.reloading`): overheat >= `stop_percentage` (0.1)
   - If not venting: overheat between `start_min_percentage` (0.5) and `start_max_percentage` (0.99)
 
+> **Bug:** The continuation check reads `scratchpad.reloading`, but `bt_bot_reload_action.lua:8` sets `scratchpad.is_reloading` (note the `is_` prefix). This mismatch means the hysteresis path never fires — once the bot starts venting, the "keep venting until 10%" logic is dead. See #30.
+
 #### `cant_reach_ally` (lines 484-527)
 
 Returns `true` for teleport when:

@@ -47,7 +47,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | Blitz / grenade support | Inventory extracted — all 18 templates mapped, all need item-based fallback, no `ability_template` on any. `adamant_whistle` only blitz with `ability_template`. |
+| 4 | Blitz / grenade support | Inventory extracted — 19 templates mapped. All except `adamant_whistle` need item-based fallback. `adamant_whistle` is the only blitz with `ability_template` (potential Tier 1/2). #3 resolved — Phase 1 unblocked. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
 | 30 | Bot warp charge venting | Piggyback on BT vent node: bridge `Overheat.slot_percentage` for warp weapons + translate `reload` → `vent`. |
@@ -81,7 +81,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 23 | Smart melee attack selection | Armor-aware attack choice (+utility for penetrating vs carapace). Also covers player weapon melee `attack_meta_data` injection. |
 | 24 | Healing item management | Don't waste medicae, distribute healing to wounded allies, stim usage. |
 | 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
-| 32 | Mule item pickup | Set `bots_mule_pickup = true` on scripture/grimoire templates. Dead code activation. |
+| 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch (`bot_group.lua:26` reads wrong field). Not a one-flag fix. |
 | 33 | Weapon special actions | Parry, bayonet, etc. Input mechanism trivial; decision logic is the work. |
 
 ## Design principles
