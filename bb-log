@@ -51,6 +51,7 @@ get_log() {
 cmd="${1:-summary}"
 if [[ "${cmd}" == "raw" ]]; then
     raw_pattern="${2:-BetterBots}"
+    raw_pattern="${raw_pattern//\\|/|}"  # normalize grep-style \| to rg-style |
     log_idx="${3:-0}"
 else
     log_idx="${2:-0}"

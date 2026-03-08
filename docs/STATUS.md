@@ -24,9 +24,9 @@
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 - **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
 - **Safety guards**: revive/interaction protection (#20), ability suppression during dodging/falling/lunging/jumping/ladder (#11), warp weapon peril block at ≥97% preventing Scrier's Gaze explosions (#27)
-- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, added close-range (<5m) suppression
-- **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
-- **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
+- **Poxburster targeting** (#34, closed): removed `not_bot_target` breed flag, added close-range (<5m) suppression. Validated in-game.
+- **ADS fix for T5/T6 bots** (#35, closed): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them. Validated: gestalt injection + ADS confirmed in logs.
+- **Bot sprinting** (#36, closed): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety. Validated in-game.
 
 ## Current Tier Status
 

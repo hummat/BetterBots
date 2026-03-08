@@ -108,6 +108,6 @@ See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.m
 
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
-3. **M3 (in progress):** Ability quality — ~~suppression (#11)~~, charge rescue (#10), stance cancellation (#12). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~
-4. **M4:** Grenade/blitz support (#4) + bot weapon/equipment fixes (#31, ~~#35~~) + general bot behavior (#16-#19, ~~#34~~, ~~#36~~). Beyond abilities.
+3. **M3 (in progress):** Ability quality — ~~suppression (#11)~~, charge rescue (#10), stance cancellation (#12). ~~Fix Psyker overcharge (#27).~~ ~~Don't interrupt revive (#20).~~ ~~Poxburster targeting (#34).~~ ~~ADS fix (#35).~~ ~~Bot sprinting (#36).~~
+4. **M4:** Grenade/blitz support (#4) + bot weapon/equipment fixes (#31) + general bot behavior (#16-#19). Beyond abilities.
 5. **M5 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

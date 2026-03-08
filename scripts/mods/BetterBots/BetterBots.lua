@@ -643,20 +643,16 @@ end)
 
 Sprint.register_hook()
 
--- ADS verification log (#35): one-shot per unit when a bot actually starts aiming.
--- Proves the gestalt injection results in real ADS behavior.
-local _ads_logged_units = setmetatable({}, { __mode = "k" })
+-- ADS verification log (#35): one-shot per scratchpad when a bot starts aiming.
+-- BT action nodes don't have self._unit; unit is only passed to enter()/run().
+-- Scratchpad is unique per enter/leave cycle, so we dedup on that.
+local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
 mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action", function(BtBotShootAction)
-	mod:hook_safe(BtBotShootAction, "_start_aiming", function(self, _t, scratchpad)
-		local unit = self._unit
-		if unit and not _ads_logged_units[unit] then
-			_ads_logged_units[unit] = true
-			local gestalt = scratchpad and scratchpad.ranged_gestalt or "?"
-			_debug_log(
-				"ads_confirmed:" .. tostring(unit),
-				0,
-				"bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")"
-			)
+	mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
+		if scratchpad and not _ads_logged_scratchpads[scratchpad] then
+			_ads_logged_scratchpads[scratchpad] = true
+			local gestalt = scratchpad.ranged_gestalt or "?"
+			_debug_log("ads_confirmed", 0, "bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
 		end
 	end)
 end)
@@ -1037,11 +1033,11 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		BotBehaviorExtension,
 		"_init_blackboard_components",
 		function(func, self, blackboard, physics_world, gestalts_or_nil)
+			local unit = self._unit
 			if not gestalts_or_nil or not gestalts_or_nil.ranged then
 				gestalts_or_nil = gestalts_or_nil or {}
 				gestalts_or_nil.ranged = gestalts_or_nil.ranged or DEFAULT_RANGED_GESTALT
 				gestalts_or_nil.melee = gestalts_or_nil.melee or DEFAULT_MELEE_GESTALT
-				local unit = self._unit
 				if unit and not _gestalt_injected_units[unit] then
 					_gestalt_injected_units[unit] = true
 					_debug_log(
@@ -1050,6 +1046,12 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 						"injected default bot_gestalts (ranged=killshot, melee=linesman)"
 					)
 				end
+			else
+				_debug_log(
+					"gestalt_skip:" .. tostring(unit),
+					0,
+					"bot already has gestalts (ranged=" .. tostring(gestalts_or_nil.ranged) .. ")"
+				)
 			end
 			return func(self, blackboard, physics_world, gestalts_or_nil)
 		end

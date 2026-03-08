@@ -52,6 +52,11 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `one-shot context dump` | First-time context dump for a template (debug-only) |
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
+| `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
+| `suppressed poxburster target` | Bot cleared close-range (<5m) poxburster target (#34) |
+| `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
+| `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
+| `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 
 **Preferred: use `bb-log`** (project root):
 ```bash
@@ -167,6 +172,7 @@ tests/
   meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
   resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
   event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
+  sprint_spec.lua           # 18 tests: sprint conditions + daemonhost safety
 ```
 
 ### Running tests

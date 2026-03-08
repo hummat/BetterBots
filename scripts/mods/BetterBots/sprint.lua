@@ -136,16 +136,18 @@ local function on_update_movement(func, self, unit, input, dt, t)
 	input.hold_to_sprint = true
 	input.sprinting = should
 
-	-- Debug log on state change (sprint start/stop)
+	-- Debug log only for interesting sprint reasons (catch_up, ally_rescue, daemonhost)
 	local prev = _last_sprint_state_by_unit[unit]
 	if should ~= prev then
 		_last_sprint_state_by_unit[unit] = should
-		local fixed_t = _fixed_time and _fixed_time() or 0
-		_debug_log(
-			"sprint:" .. tostring(unit),
-			fixed_t,
-			"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(reason) .. ")"
-		)
+		if reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby" then
+			local fixed_t = _fixed_time and _fixed_time() or 0
+			_debug_log(
+				"sprint:" .. tostring(unit),
+				fixed_t,
+				"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(reason) .. ")"
+			)
+		end
 	end
 end
 
