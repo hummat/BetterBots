@@ -314,6 +314,9 @@ local function _can_activate_zealot_dash(context)
 	if context.target_is_super_armor then
 		return false, "zealot_dash_block_super_armor"
 	end
+	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+		return true, "zealot_dash_ally_aid"
+	end
 	if context.priority_target_enemy and target_distance and target_distance > 4 then
 		return true, "zealot_dash_priority_target"
 	end
