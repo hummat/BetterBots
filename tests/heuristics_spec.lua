@@ -599,6 +599,27 @@ describe("heuristics", function()
 			assert.is_true(ok)
 			assert.matches("elite_special", rule)
 		end)
+
+		it("activates for ally rescue at range", function()
+			local ok, rule = evaluate(T, ctx({
+				target_enemy_distance = 6,
+				target_ally_needs_aid = true,
+				target_ally_distance = 10,
+			}))
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("blocks ally rescue when ally too close", function()
+			local ok, rule = evaluate(T, ctx({
+				num_nearby = 1,
+				target_enemy_distance = 6,
+				target_ally_needs_aid = true,
+				target_ally_distance = 2,
+			}))
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
 	end)
 
 	-- adamant_shout

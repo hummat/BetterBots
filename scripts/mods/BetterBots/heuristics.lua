@@ -522,6 +522,9 @@ local function _can_activate_adamant_charge(context)
 	if target_distance and target_distance < 3 then
 		return false, "adamant_charge_block_target_too_close"
 	end
+	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+		return true, "adamant_charge_ally_aid"
+	end
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_is_elite_special then
 		return false, "adamant_charge_block_no_pressure"
 	end
