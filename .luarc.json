@@ -10,7 +10,8 @@
 			"cjson",
 			"ALIVE",
 			"POSITION_LOOKUP",
-			"Vector3"
+			"Vector3",
+			"Managers"
 		]
 	},
 	"workspace": {

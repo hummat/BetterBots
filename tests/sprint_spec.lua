@@ -2,6 +2,7 @@
 local _extensions = {}
 local _positions = {}
 local _alive = {}
+local _sides = {}
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -29,6 +30,22 @@ _G.Vector3 = {
 		local dz = a.z - b.z
 		return dx * dx + dy * dy + dz * dz
 	end,
+}
+
+-- Mock Managers.state.extension:system("side_system") for daemonhost detection
+local _mock_side_system = nil
+
+_G.Managers = {
+	state = {
+		extension = {
+			system = function(_self, name)
+				if name == "side_system" and _mock_side_system then
+					return _mock_side_system
+				end
+				return nil
+			end,
+		},
+	},
 }
 
 local Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
@@ -95,6 +112,25 @@ local function make_group_extension(follow_unit)
 	}
 end
 
+-- Helper: set up a mock side system with enemy units for daemonhost detection
+local function setup_side_system(bot_unit, enemy_units)
+	local enemy_side = {
+		ai_target_units = enemy_units or {},
+	}
+	_mock_side_system = {
+		side_by_unit = {
+			[bot_unit] = {
+				relation_side_names = function()
+					return { "enemy" }
+				end,
+			},
+		},
+		get_side_from_name = function(_self, _name)
+			return enemy_side
+		end,
+	}
+end
+
 -- Reset all mocks between tests
 local function reset()
 	for k in pairs(_extensions) do
@@ -106,6 +142,7 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	_mock_side_system = nil
 end
 
 describe("sprint", function()
@@ -132,6 +169,7 @@ describe("sprint", function()
 			local unit = "bot1"
 			setup_perception(unit, {})
 			setup_behavior(unit, {})
+			setup_side_system(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
 			assert.is_true(ok)
@@ -143,6 +181,7 @@ describe("sprint", function()
 			local enemy = "enemy1"
 			setup_perception(unit, { enemy })
 			setup_behavior(unit, {})
+			setup_side_system(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
 			assert.is_false(ok)
@@ -156,6 +195,7 @@ describe("sprint", function()
 			_positions[follow] = pos(20, 0, 0)
 			_alive[follow] = true
 			setup_perception(unit, {})
+			setup_side_system(unit, {})
 			local self_obj = make_self({
 				group_extension = make_group_extension(follow),
 			})
@@ -172,6 +212,7 @@ describe("sprint", function()
 			_alive[follow] = true
 			setup_perception(unit, {})
 			setup_behavior(unit, {})
+			setup_side_system(unit, {})
 			local self_obj = make_self({
 				group_extension = make_group_extension(follow),
 			})
@@ -188,6 +229,7 @@ describe("sprint", function()
 				target_ally_needs_aid = true,
 				target_ally_need_type = "knocked_down",
 			})
+			setup_side_system(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
 			assert.is_true(ok)
@@ -201,6 +243,7 @@ describe("sprint", function()
 				target_ally_needs_aid = true,
 				target_ally_need_type = "in_need_of_attention_look",
 			})
+			setup_side_system(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
 			assert.is_false(ok)
@@ -214,6 +257,7 @@ describe("sprint", function()
 				target_ally_needs_aid = true,
 				target_ally_need_type = "in_need_of_attention_stop",
 			})
+			setup_side_system(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
 			assert.is_false(ok)
@@ -225,8 +269,9 @@ describe("sprint", function()
 			local dh = "daemonhost1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(10, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
 			setup_behavior(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
@@ -239,8 +284,9 @@ describe("sprint", function()
 			local dh = "mdh1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(15, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_mutator_daemonhost")
+			setup_side_system(unit, { dh })
 			setup_behavior(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
@@ -253,25 +299,30 @@ describe("sprint", function()
 			local dh = "daemonhost_far"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(25, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			setup_perception(unit, {})
 			setup_behavior(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
-			-- Daemonhost at 25m > 20m safe range, but still an enemy in proximity
-			assert.is_false(ok)
-			assert.equals("enemies_nearby", reason)
+			-- Daemonhost at 25m > 20m safe range, no aggroed enemies -> traversal
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
 		end)
 	end)
 
 	describe("is_near_daemonhost", function()
-		it("returns false with no perception extension", function()
-			assert.is_false(Sprint.is_near_daemonhost("noext"))
+		it("returns false with no side system", function()
+			_positions["bot1"] = pos(0, 0, 0)
+			assert.is_false(Sprint.is_near_daemonhost("bot1"))
 		end)
 
-		it("returns false with no enemies", function()
-			setup_perception("bot1", {})
-			assert.is_false(Sprint.is_near_daemonhost("bot1"))
+		it("returns false with no enemies on side", function()
+			local unit = "bot1"
+			_positions[unit] = pos(0, 0, 0)
+			setup_side_system(unit, {})
+			assert.is_false(Sprint.is_near_daemonhost(unit))
 		end)
 
 		it("returns true for close daemonhost", function()
@@ -279,8 +330,9 @@ describe("sprint", function()
 			local dh = "dh1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(5, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)
 
@@ -289,8 +341,9 @@ describe("sprint", function()
 			local dh = "dh1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(25, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
 			assert.is_false(Sprint.is_near_daemonhost(unit))
 		end)
 
@@ -299,8 +352,9 @@ describe("sprint", function()
 			local enemy = "poxwalker1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[enemy] = pos(3, 0, 0)
-			setup_perception(unit, { enemy })
+			_alive[enemy] = true
 			setup_breed(enemy, "chaos_poxwalker")
+			setup_side_system(unit, { enemy })
 			assert.is_false(Sprint.is_near_daemonhost(unit))
 		end)
 
@@ -309,8 +363,9 @@ describe("sprint", function()
 			local dh = "mdh1"
 			_positions[unit] = pos(0, 0, 0)
 			_positions[dh] = pos(10, 0, 0)
-			setup_perception(unit, { dh })
+			_alive[dh] = true
 			setup_breed(dh, "chaos_mutator_daemonhost")
+			setup_side_system(unit, { dh })
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)
 	end)

@@ -8,6 +8,7 @@ read_globals = {
 	"ALIVE",
 	"POSITION_LOOKUP",
 	"Vector3",
+	"Managers",
 }
 
 files["tests/**"] = {

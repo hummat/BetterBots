@@ -11,33 +11,55 @@ local DAEMONHOST_BREED_NAMES = {
 
 local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
 
+-- Check for daemonhosts using side.ai_target_units (all enemy units on the
+-- opposing side). enemies_in_proximity() is unsuitable: it only returns
+-- aggroed enemies within a 5m broadphase radius — dormant daemonhosts at
+-- the intended 20m safety range are invisible to that API.
 local function _is_near_daemonhost(unit)
-	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
-	if not perception_extension then
-		return false
-	end
-
-	local enemies, num_enemies = perception_extension:enemies_in_proximity()
-	if num_enemies == 0 then
-		return false
-	end
-
 	local unit_position = POSITION_LOOKUP[unit]
 	if not unit_position then
 		return false
 	end
 
-	for i = 1, num_enemies do
-		local enemy_unit = enemies[i]
-		local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
-		if unit_data_ext then
-			local breed = unit_data_ext:breed()
-			if breed and DAEMONHOST_BREED_NAMES[breed.name] then
-				local enemy_pos = POSITION_LOOKUP[enemy_unit]
-				if enemy_pos then
-					local dist_sq = Vector3.distance_squared(unit_position, enemy_pos)
-					if dist_sq < DAEMONHOST_SAFE_RANGE_SQ then
-						return true
+	local side_system = Managers and Managers.state and Managers.state.extension
+	if not side_system then
+		return false
+	end
+
+	local ok, ss = pcall(side_system.system, side_system, "side_system")
+	if not ok or not ss then
+		return false
+	end
+
+	local side = ss.side_by_unit and ss.side_by_unit[unit]
+	if not side then
+		return false
+	end
+
+	local enemy_side_names = side:relation_side_names("enemy")
+	if not enemy_side_names then
+		return false
+	end
+
+	for _, enemy_side_name in ipairs(enemy_side_names) do
+		local enemy_side = ss:get_side_from_name(enemy_side_name)
+		local ai_units = enemy_side and enemy_side.ai_target_units
+		if ai_units then
+			for i = 1, #ai_units do
+				local enemy_unit = ai_units[i]
+				if enemy_unit and ALIVE[enemy_unit] then
+					local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
+					if unit_data_ext then
+						local breed = unit_data_ext:breed()
+						if breed and DAEMONHOST_BREED_NAMES[breed.name] then
+							local enemy_pos = POSITION_LOOKUP[enemy_unit]
+							if enemy_pos then
+								local dist_sq = Vector3.distance_squared(unit_position, enemy_pos)
+								if dist_sq < DAEMONHOST_SAFE_RANGE_SQ then
+									return true
+								end
+							end
+						end
 					end
 				end
 			end
@@ -108,10 +130,11 @@ local function on_update_movement(func, self, unit, input, dt, t)
 
 	local should, reason = _should_sprint(self, unit, input)
 
-	if should then
-		input.hold_to_sprint = true
-		input.sprinting = true
-	end
+	-- Always set hold_to_sprint so Sprint.sprint_input uses the hold path.
+	-- Without this, the else branch sets wants_sprint = is_sprinting,
+	-- which keeps an active sprint running even after conditions change.
+	input.hold_to_sprint = true
+	input.sprinting = should
 
 	-- Debug log on state change (sprint start/stop)
 	local prev = _last_sprint_state_by_unit[unit]

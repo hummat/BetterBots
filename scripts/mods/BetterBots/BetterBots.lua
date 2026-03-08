@@ -643,6 +643,24 @@ end)
 
 Sprint.register_hook()
 
+-- ADS verification log (#35): one-shot per unit when a bot actually starts aiming.
+-- Proves the gestalt injection results in real ADS behavior.
+local _ads_logged_units = setmetatable({}, { __mode = "k" })
+mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action", function(BtBotShootAction)
+	mod:hook_safe(BtBotShootAction, "_start_aiming", function(self, _t, scratchpad)
+		local unit = self._unit
+		if unit and not _ads_logged_units[unit] then
+			_ads_logged_units[unit] = true
+			local gestalt = scratchpad and scratchpad.ranged_gestalt or "?"
+			_debug_log(
+				"ads_confirmed:" .. tostring(unit),
+				0,
+				"bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")"
+			)
+		end
+	end)
+end)
+
 -- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
 -- under a .thresholds subtable instead of flat top-level keys. The vanilla
 -- Overheat.slot_percentage divides by overheat_configuration[threshold_type] without
