@@ -24,3 +24,23 @@ if ! [[ "$msg" =~ $pattern ]]; then
   echo >&2 "  Breaking change:  feat!: remove option"
   exit 1
 fi
+
+# Warn about GitHub closing keywords that would auto-close issues.
+# Safe alternatives: "re #4", "see #4", "(#4)", or "Closes #4" on its own
+# trailer line when you actually intend to close the issue.
+closing_kw='(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#[0-9]+'
+if grep -qiP "$closing_kw" "$msg_file"; then
+  matches=$(grep -oiP "$closing_kw" "$msg_file" | head -5)
+  echo >&2 "ERROR: commit message contains GitHub closing keyword(s):"
+  echo >&2 ""
+  echo >&2 "${matches//$'\n'/$'\n'  }"
+  echo >&2 ""
+  echo >&2 "  This will auto-close the referenced issue(s) on push."
+  echo >&2 "  To reference without closing, use: re #N, see #N, or (#N)"
+  echo >&2 "  To intentionally close, set CLOSE_ISSUES=1 before committing."
+  if [[ "${CLOSE_ISSUES:-}" == "1" ]]; then
+    echo >&2 "  CLOSE_ISSUES=1 set — proceeding."
+  else
+    exit 1
+  fi
+fi
