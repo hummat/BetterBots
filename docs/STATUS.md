@@ -20,7 +20,7 @@
   - Hive Scum: Focus + Rage (toughness-reactive)
 - **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
 - **Structured event logging** (#29): opt-in JSONL event log (`event_log.lua`) with decision/queued/consumed/snapshot events, `attempt_id` correlation, buffered flush, hot-reload recovery
-- **Unit tests**: 160 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- **Unit tests**: 165 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 - **Log analysis**: `bb-log events` subcommands for JSONL analysis (summary, rules, trace, holds, items, raw)
 - **Safety guards**: revive/interaction protection (#20), ability suppression during dodging/falling/lunging/jumping/ladder (#11), warp weapon peril block at ≥97% preventing Scrier's Gaze explosions (#27)
@@ -47,7 +47,7 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- Charge/dash to rescue disabled ally (#10) — P1, closes M3
+- ~~Charge/dash to rescue disabled ally (#10) — closed, M3 complete~~
 - Per-ability toggle settings (#6) — P2
 - Player weapon ranged metadata (#31) — P2, medium effort
 - Investigate grenade/blitz approach (#4) — P2
