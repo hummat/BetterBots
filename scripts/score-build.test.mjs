@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
+import { readFileSync } from "node:fs";
 import { parsePerkString, scorePerk, scoreWeaponPerks, scoreBlessings, scoreCurios, generateScorecard } from "./score-build.mjs";
 
 describe("parsePerkString", () => {
@@ -345,5 +346,16 @@ describe("generateScorecard", () => {
     assert.equal(card.qualitative.role_coverage, null);
     assert.equal(card.qualitative.difficulty_scaling, null);
     assert.deepEqual(card.bot_flags, []);
+  });
+});
+
+describe("end-to-end", () => {
+  it("scores sample Veteran Squad Leader build", () => {
+    const build = JSON.parse(readFileSync(new URL("./sample-build.json", import.meta.url)));
+    const card = generateScorecard(build);
+    assert.equal(card.class, "veteran");
+    assert.ok(card.perk_optimality >= 3, "Veteran Squad Leader should score well on perks");
+    assert.ok(card.curio_efficiency >= 4, "DR stacking curios should score high");
+    assert.equal(card.weapons.length, 2);
   });
 });
