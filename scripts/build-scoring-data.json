@@ -267,5 +267,27 @@
       "classes": ["veteran"],
       "blessings": null
     }
+  },
+  "enemies": {
+    "crusher": { "armor": "super_armor", "hp": { "damnation": 4875, "auric": 6500 } },
+    "mauler": { "armor": "armored", "hp": { "damnation": 2775, "auric": 3700 } },
+    "bulwark": { "armor": "resistant", "hp": { "damnation": 3600, "auric": 4800 } },
+    "reaper": { "armor": "resistant", "hp": { "damnation": 3000, "auric": 4000 } },
+    "renegade_berzerker": { "armor": "armored", "hp": { "damnation": 1875, "auric": 2500 } },
+    "sniper": { "armor": "unarmored", "hp": { "damnation": 375, "auric": 500 } },
+    "pox_hound": { "armor": "disgustingly_resilient", "hp": { "damnation": 1050, "auric": 1400 } },
+    "mutant": { "armor": "berserker", "hp": { "damnation": 3000, "auric": 4000 } },
+    "plague_ogryn": { "armor": "resistant", "hp": { "damnation": 40000, "auric": 60000 } }
+  },
+  "curio_ratings": {
+    "_universal_optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"],
+    "_universal_good": ["Health", "Combat Ability Regen", "Stamina Regeneration", "Corruption Resistance"],
+    "_universal_avoid": ["Experience", "Ordo Dockets", "Curio Drop Chance"],
+    "veteran": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Combat Ability Regen"], "good": ["Stamina Regeneration", "Toughness"] },
+    "zealot": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Stamina Regeneration", "Sprint Efficiency"] },
+    "psyker": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Combat Ability Regen", "Corruption Resistance"] },
+    "ogryn": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Health", "Block Efficiency"] },
+    "arbites": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Block Efficiency", "Combat Ability Regen"] },
+    "hive scum": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Combat Ability Regen", "Stamina Regeneration"] }
   }
 }
