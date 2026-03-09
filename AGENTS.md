@@ -256,6 +256,7 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 **Game knowledge base** (`docs/knowledge/`):
 - `class-talents.md` — all 6 classes: abilities, keystones, key passives, coherency (from decompiled source)
 - `perks-curios.md` — weapon perk + curio perk T1→T4 tables (from decompiled source)
+- `buff-templates.md` — exhaustive buff template stat values for all 6 classes (from decompiled source)
 - `damage-system.md` — 13-stage damage pipeline, ADM, rending, finesse, toughness absorption
 - `enemy-stats.md` — enemy HP/armor tables by breed and difficulty
 - `build-knowledge.md` — class base stats, coherency, talent architecture, meta overview

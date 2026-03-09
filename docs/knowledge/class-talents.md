@@ -20,46 +20,58 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 |---------|-----|----------|-----------|
 | Volley Fire (stance) | 30s | 5s | +25% ranged, +25% weakspot, outlines elites/specials |
 | Voice of Command (shout) | 30s | — | 9m AoE stagger, +50% toughness, can revive downed allies |
-| Infiltrate (stealth) | 45s | buff-template | Invisibility, damage bonus on exit, reduced threat |
+| Infiltrate (stealth) | 45s | 8s | +25% move speed; exit: +30% damage 5s, 50% TDR 10s, 90% threat reduction 10s |
 
 ### Blitz/Grenades
 | Grenade | Max Charges | Notes |
 |---------|-------------|-------|
-| Frag Grenade (base) | 3 | Can be improved: +damage%, +radius%; bleed (6 stacks) |
-| Krak Grenade | 3 | Can be improved: +damage% |
-| Smoke Grenade | 3 | Can be improved: +fog duration% |
+| Frag Grenade (base) | 3 | Improved: +25% damage, +25% radius; bleed (6 stacks) |
+| Krak Grenade | 3 | Improved: +75% damage |
+| Smoke Grenade | 3 | Improved: +100% fog duration |
 | Grenade replenishment | — | +1 grenade every 60s; OR 5% chance on elite kill (aura) |
 
 ### Keystones
 | Keystone | Key Stats |
 |----------|-----------|
-| Sniper's Focus | 10 stacks (15 improved), +7.5% ranged power/stack, +1% reload/stack, 6s decay, +stacks while still |
-| Weapon Switch | Swap to ranged: crit + attack speed; swap to melee: attack speed + dodge; +20% stamina/toughness on swap |
+| Sniper's Focus | 10 stacks (15 improved), +7.5% finesse/stack, +1% reload/stack, 5s decay; at 10: +15% rending; +4% toughness replenish/stack |
+| Weapon Switch | Ranged: +2% atk speed + reload/stack (max 10), +33% crit first shot; Melee: +15% atk speed, +10% dodge dist; +20% stam/toughness on swap |
 | Focus Target (tag) | Tag stacks every 1.5s, max 4 (6 improved), increased damage to tagged; +5% toughness on tagged kill |
 
 ### Key Passives
 - Weakspot damage: +30%
 - Range damage: +10% close → +25% far
 - ADS-drain crit: +25% crit chance, −60% sway, costs 0.75 stamina/s + 0.1/shot
+- Elite damage: +15%; Big game hunter: +20% vs Ogryn/monsters
+- Crit chance: +10%; Melee crit+finesse: +10% crit, +25% finesse
+- Dodge crit: +5%/stack, 8s, max 5 (=+25% crit)
+- Bonus crit on high ammo: +10% ranged crit when ≥80% clip
 - Elite kill CDR: −6s CD (−10s improved), +1% CDR for 3s
-- Clip size: +25%
-- Ammo reserve: +40%
+- Clip size: +25%; Ammo reserve: +40%
 - Reload on elite kill: +30% speed for next reload
 - Non-empty clip reload: +25% speed
+- Wield speed: +50%; Sprint cost: −20%
+- Sprint damage: +6.25%/stack, 10s, max 4 (=+25%)
+- Kill→slot damage: +25% ranged on melee kill (6s) / +25% melee on ranged kill (6s)
+- Flanking: +30% damage
+- Rending bonus: +10%; Sniper's Focus rending: +15% at 10 stacks
+- Suppression dealt: +75%
+- Bleed on melee hit: 2 stacks; Crits apply rending debuff
 - Toughness per ally in coherency: up to 33% TDR at max allies
-- TDR above 75% toughness (conditional)
+- TDR above 75% toughness: 50% TDR (halves toughness damage)
+- All kills toughness: 5% or 10% per kill (tier-dependent)
 - Block/toughness break synergy: block broken → 33% TDR 5s; toughness broken → −50% block cost 5s
+- Movement on toughness broken: +12% speed 5s; OR stun/slowdown immune + 50% stamina 6s (20s CD)
 - Movement towards downed: +20% speed, revived allies get 33% DR for 5s
+- Attack speed: +10% melee
 - Plasma proficiency: reduced vent self-damage
 - Bolter proficiency: reduced spread/recoil/sway
 - Las crits: no ammo cost on critical hits
-- Consecutive rending: +1%/stack rending per hit, max 10 stacks
 
 ### Coherency
 - Base aura: elite kills → +0.75% ammo to coherency, 5s CD
 - Improved aura: your kills 0.75%, ally kills 1.0%
-- Alt aura: increased damage or movement speed to coherency
-- Ability grants: melee + ranged damage to allies for 8s; outlines allies 5s; max toughness boost
+- Damage aura: +7.5% damage to coherency; Movement aura: +5% move speed to coherency
+- Ability grants: melee + ranged damage to allies for 8s; outlines allies 5s; +50 flat toughness for 10s
 
 ## ZEALOT — Key Values
 
@@ -68,7 +80,7 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 |---------|-----|----------|-----------|
 | Chastise the Wicked (dash) | 30s | 3s buff | 7m dash, +25% melee, +100% rending, +50% toughness, 100% crit during dash |
 | Chastise (upgraded) | 30s | 3s + 10s | Same + +20% attack speed for 10s; OR 2 charges |
-| Zealot Stealth | 30s | buff-template | Backstab/finesse/crit/rending bonus, move speed; +50% toughness + 30% DR on exit |
+| Zealot Stealth | 30s | 3s (20s improved) | +20% move, +100% crit/rending, +150% finesse/backstab/flanking; exit: 30% DR 8s |
 | Bolstering Prayer (relic) | 60s | channel | +20% toughness/tick (0.8s) to team, +50% self toughness, +15 flat toughness/stack (×5=75 max) |
 
 ### Blitz/Grenades
@@ -82,8 +94,8 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 | Keystone | Key Stats |
 |----------|-----------|
 | Martyrdom | +10% damage per missing health segment (15% HP/step), max 5 stacks; +6% attack speed/stack; +7.5% TDR/stack; +10% CDR/stack |
-| Fanatic Rage | Enemy deaths within 25m + crits grant fury stacks, max 25, 8s; at max: +15% crit, +50% toughness |
-| Quickness | Movement builds stacks (max 20), activates on hit: attack speed + fire rate per stack; dodge grants 3 stacks |
+| Fanatic Rage | Enemy deaths within 25m + crits grant fury, max 25, 8s; at max: +15% crit, +50% toughness, −25% TDR, +2%/s regen |
+| Quickness | Movement builds stacks (max 20); per stack: +1% atk speed, +1% damage, +0.5% dodge; 6s (10s improved); dodge grants 3 |
 | Resist Death | Survive lethal: 5s immunity, 120s CD; melee ×3 leech during, up to 25% HP; can trigger ability instantly |
 
 ### Key Passives
@@ -94,21 +106,28 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 - Heavy → damage: +15% damage 5s
 - Post-push cleave: +25% cleave + impact, 5s
 - Weakspot kills: +5%/stack weakspot power, max 5, 5s (= +25%)
+- Weakspot stagger: +50% melee weakspot impact
 - Damage vs elites: +15%
 - Bleed → damage: bled enemies take +15% more
 - Crits rend: +15% rending per crit
 - Close ranged damage: +25%
-- Cleave: +50% max hit mass impact
-- Impact: +30%
+- Cleave: +50% max hit mass impact; Impact: +30%
+- Backstab damage: +25% backstab + flanking; Flanking: +30%
+- Finesse after dodge: +50% finesse, 3s
 - Uninterruptible heavies: 100% movement speed during heavies
 - Dodge improvements: +1 dodge, +25% dodge distance
-- Sprint improvements: +10% speed, −10% cost, 1s slowdown immunity
-- Toughness in melee: +2.5% base/s, +1%/s per nearby enemy (max +7.5%)
+- Sprint: +10% speed, −10% cost, 1s slowdown immunity; separate nodes: −20% cost, +5% speed
+- Weapon handling after dodge: −75% spread, −50% recoil, 3s
+- Melee after empty clip: +30% impact, +10% attack speed, 5s
+- Reload on melee kills: +6%/stack reload + wield speed, max 5 stacks
+- Toughness on heavy kill: 10%; on dodge: 15% (0.5s CD); on ranged kill: 4%
+- Toughness in melee: +2.5% base/s, +1%/s per nearby enemy (5m), cap 7.5%/s
 - Corruption resistance: ×0.5 (50% reduction)
 - Extra wounds: +2 health segments
 - Heal 20% of damage taken over 4s
 - Segment break DR: 40% on segment-breaking hit
 - Stealth CDR: monster 50%, Ogryn 30%, other 15% per kill
+- Stealth more CD more damage: −5s CD flat, +50% finesse/backstab during stealth, perfect block window on exit
 - Backstab kills: −75% threat for 5s
 - Backstab toughness: +10% ally toughness + 10% TDR for 5s
 
