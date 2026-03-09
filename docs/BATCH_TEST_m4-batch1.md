@@ -67,6 +67,9 @@ Bot lineup:
 #23 Melee attack selection: PASS/FAIL
   - evidence:
 
+#31 Ranged fire fix: PASS/FAIL
+  - evidence:
+
 Regressions: PASS/FAIL
   - notes:
 
