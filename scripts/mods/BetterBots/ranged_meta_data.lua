@@ -111,6 +111,38 @@ local function find_aim_fire_input(weapon_template)
 	return nil, nil
 end
 
+local function has_hold_start_input(weapon_template, input_name)
+	local input_def = (weapon_template.action_inputs or {})[input_name]
+	local seq = input_def and input_def.input_sequence
+	local first = seq and seq[1]
+
+	return first and first.input == "action_two_hold" and first.value == true
+end
+
+local function find_aim_action_for_fire(weapon_template, aim_fire_input)
+	if not aim_fire_input then
+		return nil, nil, nil, nil
+	end
+
+	for action_name, action in pairs(weapon_template.actions or {}) do
+		local start_input = action.start_input
+		local allowed_chain_actions = action.allowed_chain_actions or {}
+
+		if
+			start_input
+			and has_hold_start_input(weapon_template, start_input)
+			and allowed_chain_actions[aim_fire_input]
+		then
+			local unaim_input = action.stop_input
+			local unaim_action = unaim_input and find_action_for_input(weapon_template, unaim_input) or nil
+
+			return start_input, action_name, unaim_input, unaim_action
+		end
+	end
+
+	return nil, nil, nil, nil
+end
+
 local function has_keyword(weapon_template, keyword)
 	for _, kw in ipairs(weapon_template.keywords or {}) do
 		if kw == keyword then
@@ -136,10 +168,10 @@ local function build_meta_data(weapon_template)
 		end
 	end
 
-	-- Aim/aim-fire derivation deliberately omitted: action_two_hold is
-	-- overloaded (ADS on guns, charged secondary on staffs). Injecting the
-	-- wrong action causes bots to start alt-fire when they should be aiming.
-	-- See #43 for charge-weapon secondary fire support.
+	-- Aim derivation deliberately omitted: action_two_hold is overloaded
+	-- (ADS on guns, charged secondary on staffs). Injecting the wrong
+	-- action causes bots to start alt-fire when they should be aiming.
+	-- Charge weapon aim-fire override handled separately in inject() (#43).
 	--
 	-- However, when aim-fire fallback is invalid, mirror the fire input so
 	-- the bot fires correctly regardless of aim state (killshot gestalt
@@ -192,6 +224,53 @@ local function inject(WeaponTemplates)
 		end
 	end
 
+	-- #43: override broken aim metadata for charge weapons. Force staves use
+	-- action_two_hold to start charging and a hold-combo fire input for the
+	-- actual charged attack. Their hardcoded "zoom"/"zoom_shoot" fallback is
+	-- wrong, so derive the charge action and its matching aimed fire input.
+	local charge_overrides = 0
+	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
+		if type(template) == "table" and has_keyword(template, "ranged") and template.attack_meta_data then
+			local fallback = resolve_vanilla_fallback(template)
+			local aim_fire_input, aim_fire_action = find_aim_fire_input(template)
+			if aim_fire_input and not is_valid_input(template, fallback.aim_fire_action_input) then
+				local changed = false
+				local aim_input, aim_action, unaim_input, unaim_action =
+					find_aim_action_for_fire(template, aim_fire_input)
+
+				if template.attack_meta_data.aim_fire_action_input ~= aim_fire_input then
+					template.attack_meta_data.aim_fire_action_input = aim_fire_input
+					template.attack_meta_data.aim_fire_action_name = aim_fire_action
+					changed = true
+				end
+
+				if aim_input and template.attack_meta_data.aim_action_input ~= aim_input then
+					template.attack_meta_data.aim_action_input = aim_input
+					changed = true
+				end
+
+				if aim_action and template.attack_meta_data.aim_action_name ~= aim_action then
+					template.attack_meta_data.aim_action_name = aim_action
+					changed = true
+				end
+
+				if unaim_input and template.attack_meta_data.unaim_action_input ~= unaim_input then
+					template.attack_meta_data.unaim_action_input = unaim_input
+					changed = true
+				end
+
+				if unaim_action and template.attack_meta_data.unaim_action_name ~= unaim_action then
+					template.attack_meta_data.unaim_action_name = unaim_action
+					changed = true
+				end
+
+				if changed then
+					charge_overrides = charge_overrides + 1
+				end
+			end
+		end
+	end
+
 	_patched_set[WeaponTemplates] = true
 	_debug_log(
 		"ranged_meta_injection:" .. tostring(WeaponTemplates),
@@ -200,6 +279,8 @@ local function inject(WeaponTemplates)
 			.. injected
 			.. ", patched="
 			.. patched
+			.. ", charge="
+			.. charge_overrides
 			.. ", skipped="
 			.. skipped
 			.. ")"
@@ -218,4 +299,5 @@ return {
 	_find_fire_input = find_fire_input,
 	_find_aim_input = find_aim_input,
 	_find_aim_fire_input = find_aim_fire_input,
+	_find_aim_action_for_fire = find_aim_action_for_fire,
 }

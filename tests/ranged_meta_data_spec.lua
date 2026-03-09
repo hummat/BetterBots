@@ -139,9 +139,11 @@ describe("ranged_meta_data", function()
 		it("filters out hold_input entries", function()
 			local t = make_ranged_template({
 				action_inputs = {
-					trigger_explosion = { input_sequence = {
-						{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
-					} },
+					trigger_explosion = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
 				},
 				actions = {
 					action_explode = { start_input = "trigger_explosion" },
@@ -223,9 +225,11 @@ describe("ranged_meta_data", function()
 		it("finds input with hold_input and action_one_pressed", function()
 			local t = make_ranged_template({
 				action_inputs = {
-					trigger_explosion = { input_sequence = {
-						{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
-					} },
+					trigger_explosion = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
 				},
 				actions = {
 					action_explode = { start_input = "trigger_explosion" },
@@ -250,14 +254,61 @@ describe("ranged_meta_data", function()
 		end)
 	end)
 
+	describe("find_aim_action_for_fire", function()
+		it("finds the hold action that chains into the aimed fire input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					charge = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					keep_charging = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					charge_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+					shoot_charged = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					action_keep_charging = {
+						start_input = "keep_charging",
+						allowed_chain_actions = {},
+					},
+					action_charge = {
+						start_input = "charge",
+						stop_input = "charge_release",
+						allowed_chain_actions = {
+							shoot_charged = { action_name = "action_shoot_charged" },
+						},
+					},
+					action_shoot_charged = { start_input = "shoot_charged" },
+				},
+			})
+
+			local aim_input, aim_action, unaim_input, unaim_action =
+				RangedMetaData._find_aim_action_for_fire(t, "shoot_charged")
+
+			assert.equals("charge", aim_input)
+			assert.equals("action_charge", aim_action)
+			assert.equals("charge_release", unaim_input)
+			assert.is_nil(unaim_action)
+		end)
+	end)
+
 	describe("inject", function()
 		it("injects attack_meta_data for weapon with broken fire input", function()
 			local templates = {
 				forcestaff = make_ranged_template({
 					action_inputs = {
-						shoot_pressed = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 						wield = { input_sequence = {
 							{ input = "weapon_extra_pressed", value = true },
 						} },
@@ -280,9 +331,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				plasma = make_ranged_template({
 					action_inputs = {
-						shoot_charge = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 					},
 					actions = {
 						action_shoot = { kind = "shoot_hit_scan" },
@@ -303,9 +356,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				exotic = make_ranged_template({
 					action_inputs = {
-						shoot_pressed = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 						charge = { input_sequence = {
 							{ input = "action_two_hold", value = true },
 						} },
@@ -330,9 +385,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				plasma = make_ranged_template({
 					action_inputs = {
-						shoot_charge = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 					},
 					actions = {
 						action_shoot = { kind = "shoot_hit_scan" },
@@ -354,15 +411,19 @@ describe("ranged_meta_data", function()
 			local templates = {
 				lasgun = make_ranged_template({
 					action_inputs = {
-						shoot_pressed = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 						zoom = { input_sequence = {
 							{ input = "action_two_hold", value = true },
 						} },
-						zoom_shoot = { input_sequence = {
-							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
-						} },
+						zoom_shoot = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+							},
+						},
 					},
 					actions = {
 						action_shoot = { start_input = "shoot_pressed" },
@@ -434,9 +495,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				staff = make_ranged_template({
 					action_inputs = {
-						shoot_pressed = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 					},
 					actions = { rapid_left = { start_input = "shoot_pressed" } },
 				}),
@@ -453,9 +516,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				staff = make_ranged_template({
 					action_inputs = {
-						shoot_pressed = { input_sequence = {
-							{ input = "action_one_pressed", value = true },
-						} },
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
 					},
 					actions = { rapid_left = { start_input = "shoot_pressed" } },
 				}),
@@ -472,9 +537,11 @@ describe("ranged_meta_data", function()
 			local templates = {
 				broken = make_ranged_template({
 					action_inputs = {
-						reload = { input_sequence = {
-							{ input = "weapon_reload_pressed", value = true },
-						} },
+						reload = {
+							input_sequence = {
+								{ input = "weapon_reload_pressed", value = true },
+							},
+						},
 					},
 					actions = {},
 				}),
@@ -484,6 +551,124 @@ describe("ranged_meta_data", function()
 				RangedMetaData.inject(templates)
 			end)
 			assert.is_nil(templates.broken.attack_meta_data)
+		end)
+
+		it("overrides aim metadata for charge weapons (#43)", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					charge = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					trigger_explosion = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+					action_charge = {
+						start_input = "charge",
+						stop_input = "charge_release",
+						allowed_chain_actions = {
+							trigger_explosion = { action_name = "action_explode" },
+						},
+					},
+					action_charge_release = { start_input = "charge_release" },
+					action_explode = { start_input = "trigger_explosion" },
+				},
+			})
+			-- Simulate vanilla attack_meta_data with primary fire as aim_fire
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				fire_action_name = "rapid_left",
+				aim_action_name = "action_charge",
+				aim_fire_action_input = "shoot_pressed",
+				aim_fire_action_name = "rapid_left",
+				unaim_action_name = "action_vent",
+			}
+			local templates = { forcestaff = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("trigger_explosion", template.attack_meta_data.aim_fire_action_input)
+			assert.equals("action_explode", template.attack_meta_data.aim_fire_action_name)
+			assert.equals("charge", template.attack_meta_data.aim_action_input)
+			assert.equals("action_charge", template.attack_meta_data.aim_action_name)
+			assert.equals("charge_release", template.attack_meta_data.unaim_action_input)
+			assert.equals("action_charge_release", template.attack_meta_data.unaim_action_name)
+			-- Other fields unchanged
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+			assert.equals("rapid_left", template.attack_meta_data.fire_action_name)
+		end)
+
+		it("does not override aim_fire when it already matches hold_input input", function()
+			local templates = {
+				lasgun = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+						zoom = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						zoom_shoot = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { start_input = "shoot_pressed" },
+						action_zoom = { start_input = "zoom" },
+						action_shoot_zoomed = { start_input = "zoom_shoot" },
+					},
+				}),
+			}
+			-- Simulate vanilla attack_meta_data already correct
+			templates.lasgun.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				aim_fire_action_input = "zoom_shoot",
+				aim_fire_action_name = "action_shoot_zoomed",
+			}
+
+			RangedMetaData.inject(templates)
+
+			-- Unchanged — zoom_shoot matches find_aim_fire_input result
+			assert.equals("zoom_shoot", templates.lasgun.attack_meta_data.aim_fire_action_input)
+			assert.equals("action_shoot_zoomed", templates.lasgun.attack_meta_data.aim_fire_action_name)
+		end)
+
+		it("does not override aim_fire for weapons without hold_input input", function()
+			local templates = {
+				plasma = make_ranged_template({
+					action_inputs = {
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { kind = "shoot_hit_scan" },
+						action_charge_direct = { start_input = "shoot_charge" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			local meta = templates.plasma.attack_meta_data
+			assert.is_table(meta)
+			assert.equals("shoot_charge", meta.fire_action_input)
+			-- No trigger_explosion → aim_fire mirrors fire (from existing logic)
+			assert.equals("shoot_charge", meta.aim_fire_action_input)
+			assert.is_nil(meta.aim_fire_action_name)
 		end)
 	end)
 end)
