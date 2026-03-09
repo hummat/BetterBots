@@ -6,6 +6,19 @@
 //   node scripts/extract-build.mjs <url>
 //   node scripts/extract-build.mjs <url> --json        # raw JSON output
 //   node scripts/extract-build.mjs <url> --markdown     # markdown table (default)
+//
+// Finding builds:
+//   The main /builds page only shows the top 20 ranked builds (all classes).
+//   Class-specific catalogs live at path-based routes, NOT query params:
+//     https://darktide.gameslantern.com/builds/veteran    (not ?class=veteran)
+//     https://darktide.gameslantern.com/builds/zealot
+//     https://darktide.gameslantern.com/builds/psyker
+//     https://darktide.gameslantern.com/builds/ogryn
+//     https://darktide.gameslantern.com/builds/arbites
+//     https://darktide.gameslantern.com/builds/hive-scum
+//   These pages are JS-rendered — WebFetch/curl won't see the listings.
+//   To discover builds without a browser, use Google:
+//     site:darktide.gameslantern.com/builds veteran
 
 import { chromium } from "playwright";
 
