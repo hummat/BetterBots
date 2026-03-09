@@ -71,6 +71,37 @@ Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `revert
 
 Enforced by local `commit-msg` hook (install via `make deps`) and CI commit-lint on PRs.
 
+## Branching workflow
+
+### Single feature
+1. `git checkout -b feat/<issue-number>-<short-name>` from `main`
+2. Implement, commit, `make check`
+3. Test in-game (new mission, not hot-reload)
+4. Merge to `main`
+
+### Batch testing (2–4 features)
+In-game testing requires launching Darktide + Solo Play + running a mission (~5 min setup). When multiple features are ready, batch them into a single test session:
+
+1. Implement each feature in its own `feat/*` branch off `main`
+2. Create `dev/<batch-name>` from `main`
+3. Merge each `feat/*` into `dev/<batch-name>`
+4. Write a test checklist before testing (what to verify per feature)
+5. Test `dev/<batch-name>` in one in-game session
+6. If all pass: merge `dev/<batch-name>` to `main` — ships the exact tested tree
+7. If one fails: revert the broken feature from `dev/*`, retest, then ship
+
+Rules:
+- Keep batches small (2–4 features). Larger batches lose causal traceability.
+- Write the test checklist before coding, not after.
+- Ship what you tested — never merge individual `feat/*` branches after testing the integration branch.
+- `dev/*` branches are disposable — delete after merge to `main`.
+
+### Branch naming
+- `feat/<N>-<name>` — new features (N = GitHub issue number)
+- `fix/<N>-<name>` — bug fixes
+- `dev/<batch-name>` — disposable integration branch for batch testing
+- `docs/<name>` — documentation only
+
 ## Architecture
 
 ### How vanilla bot abilities work (the call chain)
@@ -179,6 +210,7 @@ Local clone: `../Darktide-Source-Code/`
 | Update Nexus mod page or release text | `docs/NEXUS_DESCRIPTION.bbcode` |
 | Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
 | Understand the module architecture | `docs/ARCHITECTURE.md` |
+| Create branches, batch test, or merge | Branching workflow section (this file) |
 | Add per-frame logic, hooks, or engine queries | `docs/ARCHITECTURE.md` (Performance section) |
 | Write or modify tests | `docs/DEBUGGING.md` (automated testing section) |
 | Understand backend/progression/economy systems | `docs/BACKEND_PROGRESSION.md` |
