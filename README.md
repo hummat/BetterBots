@@ -180,14 +180,19 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 scripts/mods/BetterBots/          # Mod source
-  BetterBots.lua                  #   Main: hooks, condition patch, fallback queue
+  BetterBots.lua                  #   Orchestrator: init, module loading, update tick
+  condition_patch.lua             #   Ability condition evaluation + vent hysteresis fix
+  ability_queue.lua               #   Fallback combat ability activation loop
+  weapon_action.lua               #   Weapon hooks: overheat bridge, vent, peril guard, _may_fire
+  poxburster.lua                  #   Poxburster targeting + close-range suppression
+  vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
   heuristics.lua                  #   18 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
-  melee_meta_data.lua              #   Armor-aware melee attack_meta_data injection
-  ranged_meta_data.lua             #   Per-family ranged attack_meta_data injection
-  event_log.lua                    #   Structured JSONL event logging
-  debug.lua                        #   Debug commands (/bb_state, /bb_decide, /bb_brain)
+  melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
+  ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
+  event_log.lua                   #   Structured JSONL event logging
+  debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
 tests/                            # Unit tests (busted)

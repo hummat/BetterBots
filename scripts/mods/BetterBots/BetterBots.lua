@@ -24,15 +24,6 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 
-local PERIL_CRITICAL_THRESHOLD = 0.97
-
--- Poxburster targeting (#34): bots ignore poxbursters entirely due to
--- not_bot_target on breed data. We patch the breed to re-enable targeting
--- and suppress only at close range to avoid detonation.
-local POXBURSTER_SUPPRESS_DIST = 5
-local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
-local _poxburster_breed_patched = false
-
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
 local DEFAULT_RANGED_GESTALT = "killshot"
@@ -41,11 +32,6 @@ local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
 
 -- Rescue aim (#10): when a charge/dash activates for ally rescue, store the
 -- ally unit so the enter hook can aim the bot toward it before the lunge fires.
-local RESCUE_CHARGE_RULES = {
-	ogryn_charge_ally_aid = true,
-	zealot_dash_ally_aid = true,
-	adamant_charge_ally_aid = true,
-}
 local _rescue_intent = setmetatable({}, { __mode = "k" })
 
 local ARMOR_TYPES = ArmorSettings.types
@@ -136,7 +122,7 @@ local function _equipped_combat_ability_name(unit)
 	return combat_ability and combat_ability.name or "unknown"
 end
 
--- Sub-modules (loaded via io_dofile, no top-level game-system require or hook side effects)
+-- Sub-modules
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
 
@@ -160,6 +146,21 @@ assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 
 local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
 assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
+
+local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
+assert(Poxburster, "BetterBots: failed to load poxburster module")
+
+local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
+assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
+
+local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
+assert(WeaponAction, "BetterBots: failed to load weapon_action module")
+
+local ConditionPatch = mod:io_dofile("BetterBots/scripts/mods/BetterBots/condition_patch")
+assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
+
+local AbilityQueue = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ability_queue")
+assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
 
 -- Init each module with its dependencies
 MetaData.init({
@@ -225,6 +226,51 @@ RangedMetaData.init({
 	debug_log = _debug_log,
 })
 
+Poxburster.init({
+	mod = mod,
+	debug_log = _debug_log,
+	fixed_time = _fixed_time,
+})
+
+VfxSuppression.init({
+	mod = mod,
+	debug_log = _debug_log,
+})
+
+WeaponAction.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+})
+
+ConditionPatch.init({
+	mod = mod,
+	debug_log = _debug_log,
+	fixed_time = _fixed_time,
+	is_suppressed = _is_suppressed,
+	equipped_combat_ability_name = _equipped_combat_ability_name,
+	patched_bt_bot_conditions = _patched_bt_bot_conditions,
+	patched_bt_conditions = _patched_bt_conditions,
+	rescue_intent = _rescue_intent,
+	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
+})
+
+AbilityQueue.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	equipped_combat_ability = _equipped_combat_ability,
+	equipped_combat_ability_name = _equipped_combat_ability_name,
+	is_suppressed = _is_suppressed,
+	fallback_state_by_unit = _fallback_state_by_unit,
+	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
+	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -240,512 +286,31 @@ Debug.wire({
 	can_use_item_fallback = ItemFallback.can_use_item_fallback,
 })
 
-local function _weapon_log_context(unit)
-	local bot_slot = Debug.bot_slot_for_unit(unit) or "?"
-	local wielded_slot = "none"
-	local weapon_template_name = "none"
-	local warp_charge_template_name = "none"
-	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
-	if unit_data_extension then
-		local inventory_component = unit_data_extension:read_component("inventory")
-		local weapon_action_component = unit_data_extension:read_component("weapon_action")
-		local weapon_tweaks_component = unit_data_extension:read_component("weapon_tweak_templates")
-		wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
-		weapon_template_name = weapon_action_component and weapon_action_component.template_name or "none"
-		warp_charge_template_name = weapon_tweaks_component and weapon_tweaks_component.warp_charge_template_name
-			or "none"
-	end
+ConditionPatch.wire({
+	Heuristics = Heuristics,
+	MetaData = MetaData,
+	Debug = Debug,
+	EventLog = EventLog,
+})
 
-	return bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name
-end
+AbilityQueue.wire({
+	Heuristics = Heuristics,
+	MetaData = MetaData,
+	ItemFallback = ItemFallback,
+	Debug = Debug,
+	EventLog = EventLog,
+})
 
--- Condition hook: replaces bt_bot_conditions.can_activate_ability
-local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
-	local ability_component_name = action_data.ability_component_name
+-- Register hooks for extracted modules
+Poxburster.register_hooks()
+VfxSuppression.register_hooks()
+WeaponAction.register_hooks({
+	should_lock_weapon_switch = ItemFallback.should_lock_weapon_switch,
+})
+ConditionPatch.register_hooks()
 
-	-- Fast path: keep running ability nodes alive (e.g. charge mid-lunge)
-	if ability_component_name == scratchpad.ability_component_name then
-		return true
-	end
-
-	-- Guards below only apply to NEW activations
-	local behavior = blackboard and blackboard.behavior
-	if behavior and behavior.current_interaction_unit ~= nil then
-		return false
-	end
-
-	local suppressed, suppress_reason = _is_suppressed(unit)
-	if suppressed then
-		_debug_log(
-			"suppress:" .. tostring(suppress_reason),
-			_fixed_time(),
-			"ability suppressed (" .. tostring(suppress_reason) .. ")"
-		)
-		return false
-	end
-
-	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
-	local ability_component = unit_data_extension:read_component(ability_component_name)
-	local ability_template_name = ability_component.template_name
-	local fixed_t = _fixed_time()
-
-	if ability_template_name == "none" then
-		_debug_log(
-			"none:" .. ability_component_name,
-			fixed_t,
-			"blocked " .. ability_component_name .. " (template_name=none)",
-			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
-		)
-		return false
-	end
-
-	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")
-	MetaData.inject(AbilityTemplates)
-
-	local ability_template = rawget(AbilityTemplates, ability_template_name)
-	if not ability_template then
-		_debug_log(
-			"missing_template:" .. ability_template_name,
-			fixed_t,
-			"blocked missing template " .. ability_template_name
-		)
-		return false
-	end
-
-	local ability_meta_data = ability_template.ability_meta_data
-	if not ability_meta_data then
-		_debug_log(
-			"missing_meta:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (no ability_meta_data)"
-		)
-		return false
-	end
-
-	local activation_data = ability_meta_data.activation
-	if not activation_data then
-		_debug_log(
-			"missing_activation:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (no activation data)"
-		)
-		return false
-	end
-
-	local action_input = activation_data.action_input
-	if not action_input then
-		_debug_log(
-			"missing_action_input:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (activation.action_input missing)"
-		)
-		return false
-	end
-
-	local used_input = activation_data.used_input
-	local ability_extension = ScriptUnit.extension(unit, "ability_system")
-	local action_input_is_valid =
-		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
-
-	if not action_input_is_valid then
-		_debug_log(
-			"invalid_input:" .. ability_template_name .. ":" .. action_input,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
-		)
-		return false
-	end
-
-	local can_activate, rule, context = Heuristics.resolve_decision(
-		ability_template_name,
-		conditions,
-		unit,
-		blackboard,
-		scratchpad,
-		condition_args,
-		action_data,
-		is_running,
-		ability_extension
-	)
-
-	if can_activate and rule and RESCUE_CHARGE_RULES[rule] then
-		local perception = blackboard and blackboard.perception
-		local ally_unit = perception and perception.target_ally
-		if ally_unit then
-			_rescue_intent[unit] = ally_unit
-		end
-	end
-
-	Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
-
-	if EventLog.is_enabled() then
-		local bot_slot = Debug.bot_slot_for_unit(unit)
-		EventLog.emit_decision(
-			fixed_t,
-			bot_slot,
-			_equipped_combat_ability_name(unit),
-			ability_template_name,
-			can_activate,
-			rule,
-			"bt",
-			context
-		)
-	end
-
-	return can_activate
-end
-
--- Fallback queue: runs every BotBehaviorExtension.update tick
-local function _fallback_try_queue_combat_ability(unit, blackboard)
-	local ability_component_name = "combat_ability_action"
-	local fixed_t = _fixed_time()
-	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
-	local ability_component = unit_data_extension:read_component(ability_component_name)
-	local ability_template_name = ability_component and ability_component.template_name
-	local state = _fallback_state_by_unit[unit]
-	if not state then
-		state = {}
-		_fallback_state_by_unit[unit] = state
-	end
-
-	if not ability_template_name or ability_template_name == "none" then
-		_debug_log(
-			"fallback_none:" .. tostring(unit),
-			fixed_t,
-			"fallback skipped "
-				.. ability_component_name
-				.. " (template_name=none, equipped="
-				.. _equipped_combat_ability_name(unit)
-				.. ")",
-			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
-		)
-
-		local ability_extension, combat_ability = _equipped_combat_ability(unit)
-		if ability_extension then
-			ItemFallback.try_queue_item(
-				unit,
-				unit_data_extension,
-				ability_extension,
-				state,
-				fixed_t,
-				combat_ability,
-				blackboard
-			)
-		end
-
-		return
-	end
-
-	if state.item_stage then
-		state.item_stage = nil
-		state.item_ability_name = nil
-		state.item_wield_deadline_t = nil
-		state.item_stage_deadline_t = nil
-		state.item_attempt_t = nil
-		state.item_charge_confirmed = nil
-		state.item_profile_name = nil
-		state.item_profile_key = nil
-		state.item_profile_count = nil
-		state.item_start_input = nil
-		state.item_wait_t = nil
-		state.item_followup_input = nil
-		state.item_followup_delay = nil
-		state.item_unwield_input = nil
-		state.item_unwield_delay = nil
-		state.item_charge_confirm_timeout = nil
-	end
-
-	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")
-	MetaData.inject(AbilityTemplates)
-
-	local ability_template = rawget(AbilityTemplates, ability_template_name)
-	if not ability_template then
-		_debug_log(
-			"fallback_missing_template:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked missing template " .. ability_template_name
-		)
-		return
-	end
-
-	local ability_meta_data = ability_template and ability_template.ability_meta_data
-	if not ability_meta_data then
-		_debug_log(
-			"fallback_missing_meta:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (no ability_meta_data)"
-		)
-		return
-	end
-
-	local activation_data = ability_meta_data and ability_meta_data.activation
-	if not activation_data then
-		_debug_log(
-			"fallback_missing_activation:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (no activation data)"
-		)
-		return
-	end
-
-	local action_input = activation_data and activation_data.action_input
-	if not action_input then
-		_debug_log(
-			"fallback_missing_action_input:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (activation.action_input missing)"
-		)
-		return
-	end
-
-	if state.active then
-		if fixed_t >= state.hold_until then
-			if state.wait_action_input and not state.wait_sent then
-				local action_input_extension = state.action_input_extension
-					or ScriptUnit.extension(unit, "action_input_system")
-				action_input_extension:bot_queue_action_input(ability_component_name, state.wait_action_input, nil)
-				state.wait_sent = true
-			end
-
-			state.active = nil
-			state.hold_until = nil
-			state.wait_action_input = nil
-			state.wait_sent = nil
-			state.next_try_t = fixed_t + 1.5
-		end
-
-		return
-	end
-
-	if state.next_try_t and fixed_t < state.next_try_t then
-		return
-	end
-
-	-- Guards: only block NEW activations (after state machine cleanup above)
-	local behavior = blackboard and blackboard.behavior
-	if behavior and behavior.current_interaction_unit ~= nil then
-		return
-	end
-
-	local suppressed, suppress_reason = _is_suppressed(unit)
-	if suppressed then
-		_debug_log(
-			"fallback_suppress:" .. tostring(suppress_reason),
-			fixed_t,
-			"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
-		)
-		return
-	end
-
-	local ability_extension = ScriptUnit.extension(unit, "ability_system")
-	local used_input = activation_data.used_input
-	local action_input_is_valid =
-		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
-
-	if not action_input_is_valid then
-		_debug_log(
-			"fallback_invalid_input:" .. ability_template_name .. ":" .. action_input,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
-		)
-		return
-	end
-
-	local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
-	local can_activate, rule, context = Heuristics.resolve_decision(
-		ability_template_name,
-		conditions,
-		unit,
-		blackboard,
-		nil,
-		nil,
-		nil,
-		false,
-		ability_extension
-	)
-
-	if EventLog.is_enabled() then
-		local bot_slot = Debug.bot_slot_for_unit(unit)
-		EventLog.emit_decision(
-			fixed_t,
-			bot_slot,
-			_equipped_combat_ability_name(unit),
-			ability_template_name,
-			can_activate,
-			rule,
-			"fallback",
-			context
-		)
-	end
-
-	if not can_activate then
-		if context.num_nearby > 0 then
-			_debug_log(
-				"fallback_decision_block:" .. ability_template_name,
-				fixed_t,
-				"fallback held "
-					.. ability_template_name
-					.. " (rule="
-					.. tostring(rule)
-					.. ", nearby="
-					.. tostring(context.num_nearby)
-					.. ")"
-			)
-		end
-		return
-	end
-
-	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
-	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
-	if rule and RESCUE_CHARGE_RULES[rule] then
-		local perception = blackboard and blackboard.perception
-		local ally_unit = perception and perception.target_ally
-		if ally_unit then
-			local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
-			if ally_pos then
-				local input_ext = ScriptUnit.has_extension(unit, "input_system")
-				local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
-				if bot_input then
-					bot_input:set_aiming(true)
-					bot_input:set_aim_position(ally_pos)
-					_debug_log(
-						"rescue_aim:" .. tostring(unit),
-						fixed_t,
-						"rescue aim (fallback): directed charge toward disabled ally"
-					)
-				end
-			end
-		end
-	end
-
-	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
-	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
-
-	if EventLog.is_enabled() then
-		local attempt_id = EventLog.next_attempt_id()
-		state.attempt_id = attempt_id
-		local bot_slot = Debug.bot_slot_for_unit(unit)
-		EventLog.emit({
-			t = fixed_t,
-			event = "queued",
-			bot = bot_slot,
-			ability = _equipped_combat_ability_name(unit),
-			template = ability_template_name,
-			input = action_input,
-			source = "fallback",
-			rule = rule,
-			attempt_id = attempt_id,
-		})
-	end
-
-	state.action_input_extension = action_input_extension
-	state.active = true
-	state.hold_until = fixed_t + (activation_data.min_hold_time or 0)
-	state.wait_action_input = ability_meta_data.wait_action and ability_meta_data.wait_action.action_input or nil
-	state.wait_sent = false
-
-	_debug_log(
-		"fallback_queue:" .. tostring(unit),
-		fixed_t,
-		"fallback queued "
-			.. ability_template_name
-			.. " input="
-			.. tostring(action_input)
-			.. " (rule="
-			.. tostring(rule)
-			.. ", nearby="
-			.. tostring(context.num_nearby)
-			.. ")"
-	)
-
-	local function _sanitize(value)
-		local fragment = tostring(value or "unknown")
-		return string.gsub(fragment, "[^%w_%-]", "_")
-	end
-
-	local dump_key = "template:" .. tostring(ability_template_name)
-	if not _fallback_queue_dumped_by_key[dump_key] and _debug_enabled() then
-		_fallback_queue_dumped_by_key[dump_key] = true
-		mod:echo("BetterBots DEBUG: one-shot context dump for " .. dump_key)
-		mod:dump({
-			fixed_t = fixed_t,
-			ability_template_name = ability_template_name,
-			ability_name = _equipped_combat_ability_name(unit),
-			activation_input = action_input,
-			rule = rule,
-			context = Debug.context_snapshot(context),
-			fallback_state = Debug.fallback_state_snapshot(state, fixed_t),
-		}, "betterbots_" .. _sanitize(dump_key), 3)
-	end
-end
-
--- Condition patch installer
-local function _install_condition_patch(conditions, patched_set, patch_label)
-	if not conditions or patched_set[conditions] then
-		return
-	end
-
-	conditions.can_activate_ability = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-		return _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
-	end
-
-	-- #30: fix should_vent_overheat hysteresis. Vanilla checks
-	-- scratchpad.reloading which is never set (BtBotReloadAction sets
-	-- scratchpad.is_reloading — key mismatch). Use is_running instead,
-	-- which correctly reflects whether the vent action is active.
-	if conditions.should_vent_overheat then
-		local Overheat = require("scripts/utilities/overheat")
-		conditions.should_vent_overheat = function(
-			unit,
-			blackboard,
-			_scratchpad, -- luacheck: ignore 212
-			condition_args,
-			_action_data, -- luacheck: ignore 212
-			is_running
-		)
-			local perception_component = blackboard.perception
-			if perception_component.target_enemy_type == "melee" then
-				return false
-			end
-			local overheat_percentage =
-				Overheat.slot_percentage(unit, "slot_secondary", condition_args.overheat_limit_type)
-			if is_running then
-				return overheat_percentage >= condition_args.stop_percentage
-			else
-				return overheat_percentage >= condition_args.start_min_percentage
-					and overheat_percentage <= condition_args.start_max_percentage
-			end
-		end
-	end
-
-	patched_set[conditions] = true
-
-	_debug_log(
-		"condition_patch:" .. patch_label .. ":" .. tostring(conditions),
-		0,
-		"patched " .. patch_label .. ".can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
-	)
-end
-
--- Hook registrations (all game-system hooks stay in main)
-
--- Poxburster breed patch (#34): remove not_bot_target so bots can target poxbursters.
--- Close-range suppression is handled by the perception post-processing hook below.
-mod:hook_require("scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed", function(breed_data)
-	if breed_data.not_bot_target then
-		breed_data.not_bot_target = nil
-		_poxburster_breed_patched = true
-		_debug_log("poxburster_patch", 0, "patched poxburster breed: removed not_bot_target")
-	end
-end)
-
--- Eagerly patch if breed was already loaded before our hook_require fired.
-local _pox_ok, _pox_breed = pcall(require, "scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed")
-if _pox_ok and _pox_breed and _pox_breed.not_bot_target and not _poxburster_breed_patched then
-	_pox_breed.not_bot_target = nil
-	_poxburster_breed_patched = true -- luacheck: ignore 311 (read in hook_require callback above)
-	_debug_log("poxburster_patch_eager", 0, "patched poxburster breed (eager): removed not_bot_target")
-end
+-- Hooks that remain in main: template injection, sprint, BT enter,
+-- charge consume, state change retry, ADS gestalt, update tick.
 
 mod:hook_require("scripts/settings/ability/ability_templates/ability_templates", function(AbilityTemplates)
 	MetaData.inject(AbilityTemplates)
@@ -758,182 +323,7 @@ end)
 
 Sprint.register_hook()
 
--- VFX/SFX bleed fix (#42): BotPlayer inherits from HumanPlayer, so
--- is_local_unit = true for all bots in Solo Play. Effect scripts and
--- CharacterStateMachineExtension gate first-person VFX/SFX on is_local_unit
--- but not is_human_controlled, causing screen particles, sound events, and
--- Wwise global state from bot abilities to bleed into the human player's view.
--- Fix: set is_local_unit = false on context tables (ability effect scripts,
--- wieldable slot scripts) and on _is_local_unit (state machine extension) for
--- bot units after init. This suppresses local-only effects (lunge screen
--- distortion, lunge sounds, shout aim indicator, targeted dash crosshair,
--- item placement previews) without touching gameplay state: the ability
--- extension's own _is_local_unit (used in action_context) stays true, and
--- character states cache their is_local_unit from extension_init_data during
--- init before hook_safe runs.
-mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
-	mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
-		local player = extension_init_data.player
-		if player and not player:is_human_controlled() then
-			local ctx = self._equipped_ability_effect_scripts_context
-			if ctx then
-				ctx.is_local_unit = false
-				_debug_log(
-					"vfx_fix_ability:" .. tostring(unit),
-					0,
-					"patched ability effect context is_local_unit=false for bot"
-				)
-			end
-		end
-	end)
-end)
-
-mod:hook_require(
-	"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
-	function(PlayerUnitVisualLoadoutExtension)
-		mod:hook_safe(PlayerUnitVisualLoadoutExtension, "init", function(self, _context, unit, extension_init_data)
-			local player = extension_init_data.player
-			if player and not player:is_human_controlled() then
-				local ctx = self._wieldable_slot_scripts_context
-				if ctx then
-					ctx.is_local_unit = false
-					_debug_log(
-						"vfx_fix_loadout:" .. tostring(unit),
-						0,
-						"patched wieldable slot scripts context is_local_unit=false for bot"
-					)
-				end
-			end
-		end)
-	end
-)
-
-mod:hook_require(
-	"scripts/extension_systems/character_state_machine/character_state_machine_extension",
-	function(CharacterStateMachineExtension)
-		mod:hook_safe(CharacterStateMachineExtension, "init", function(self, _context, unit, extension_init_data)
-			local player = extension_init_data.player
-			if player and not player:is_human_controlled() then
-				self._is_local_unit = false
-				_debug_log(
-					"vfx_fix_csm:" .. tostring(unit),
-					0,
-					"patched CharacterStateMachine _is_local_unit=false for bot"
-				)
-			end
-		end)
-	end
-)
-
--- ADS verification log (#35): one-shot per scratchpad when a bot starts aiming.
--- BT action nodes don't have self._unit; unit is only passed to enter()/run().
--- Scratchpad is unique per enter/leave cycle, so we dedup on that.
-local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
-mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action", function(BtBotShootAction)
-	mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
-		if scratchpad and not _ads_logged_scratchpads[scratchpad] then
-			_ads_logged_scratchpads[scratchpad] = true
-			if _debug_enabled() then
-				local gestalt = scratchpad.ranged_gestalt or "?"
-				mod:echo("BetterBots DEBUG: bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
-			end
-		end
-	end)
-
-	mod:hook(BtBotShootAction, "_may_fire", function(func, self, unit, scratchpad, range_squared, t)
-		if
-			not scratchpad
-			or not scratchpad.aiming_shot
-			or scratchpad.fire_action_input == scratchpad.aim_fire_action_input
-		then
-			return func(self, unit, scratchpad, range_squared, t)
-		end
-
-		-- Vanilla _may_fire() validates fire_action_input even though _fire()
-		-- dispatches aim_fire_action_input while aiming. Swap only for this
-		-- validation call so ADS/charge weapons validate the input they will
-		-- actually queue, without mutating scratchpad state across the whole
-		-- aim lifecycle.
-		local fire_action_input = scratchpad.fire_action_input
-		scratchpad.fire_action_input = scratchpad.aim_fire_action_input
-
-		local may_fire = func(self, unit, scratchpad, range_squared, t)
-
-		scratchpad.fire_action_input = fire_action_input
-
-		return may_fire
-	end)
-end)
-
--- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
--- under a .thresholds subtable instead of flat top-level keys. The vanilla
--- Overheat.slot_percentage divides by overheat_configuration[threshold_type] without
--- a nil check, crashing the BT when bots wield these weapons.
---
--- #30: warp weapons (force staffs, etc.) have no overheat_configuration at all,
--- so slot_percentage returns 0 and the BT vent node never fires. Bridge
--- warp_charge.current_percentage so should_vent_overheat triggers for peril.
-mod:hook_require("scripts/utilities/overheat", function(Overheat)
-	local _orig_slot_percentage = Overheat.slot_percentage
-	Overheat.slot_percentage = function(unit, slot_name, threshold_type)
-		local vis_ext = ScriptUnit.has_extension(unit, "visual_loadout_system")
-		if vis_ext then
-			local cfg = Overheat.configuration(vis_ext, slot_name)
-			if cfg and not cfg[threshold_type] then
-				return 0
-			end
-			if not cfg then
-				local ude = ScriptUnit.has_extension(unit, "unit_data_system")
-				if ude then
-					local tweaks = ude:read_component("weapon_tweak_templates")
-					if tweaks and tweaks.warp_charge_template_name ~= "none" then
-						local warp = ude:read_component("warp_charge")
-						if warp then
-							return warp.current_percentage
-						end
-					end
-				end
-			end
-		end
-		return _orig_slot_percentage(unit, slot_name, threshold_type)
-	end
-end)
-
-mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
-	_install_condition_patch(conditions, _patched_bt_bot_conditions, "bt_bot_conditions")
-end)
-
-mod:hook_require("scripts/extension_systems/behavior/utilities/bt_conditions", function(conditions)
-	_install_condition_patch(conditions, _patched_bt_conditions, "bt_conditions")
-end)
-
-local function _try_patch_conditions_now(module_path, patched_set, patch_label)
-	local ok, conditions_or_err = pcall(require, module_path)
-	if not ok then
-		mod:echo(
-			"BetterBots WARNING: condition patch failed for "
-				.. patch_label
-				.. " ("
-				.. tostring(conditions_or_err)
-				.. ")"
-		)
-		return
-	end
-
-	_install_condition_patch(conditions_or_err, patched_set, patch_label)
-end
-
-_try_patch_conditions_now(
-	"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions",
-	_patched_bt_bot_conditions,
-	"bt_bot_conditions"
-)
-_try_patch_conditions_now(
-	"scripts/extension_systems/behavior/utilities/bt_conditions",
-	_patched_bt_conditions,
-	"bt_conditions"
-)
-
+-- BT activate ability enter hook: rescue aim (#10) + event logging
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)
@@ -1006,6 +396,7 @@ mod:hook_require(
 	end
 )
 
+-- Charge consume tracking
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
 		if ability_type ~= "combat_ability" then
@@ -1058,6 +449,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 	end)
 end)
 
+-- State change retry: schedule fast retry when ability state transition fails
 mod:hook_require(
 	"scripts/extension_systems/ability/actions/action_character_state_change",
 	function(ActionCharacterStateChange)
@@ -1105,228 +497,8 @@ mod:hook_require(
 	end
 )
 
-mod:hook_require(
-	"scripts/extension_systems/action_input/player_unit_action_input_extension",
-	function(PlayerUnitActionInputExtension)
-		mod:hook_safe(PlayerUnitActionInputExtension, "extensions_ready", function(self, _world, unit)
-			self._betterbots_player_unit = unit
-		end)
-
-		mod:hook(
-			PlayerUnitActionInputExtension,
-			"bot_queue_action_input",
-			function(func, self, id, action_input, raw_input)
-				local unit = self._betterbots_player_unit
-				if unit and id == "weapon_action" and action_input == "wield" then
-					local should_lock, ability_name, lock_reason = ItemFallback.should_lock_weapon_switch(unit)
-					if should_lock then
-						local fixed_t = _fixed_time()
-						_debug_log(
-							"lock_wield:" .. tostring(ability_name),
-							fixed_t,
-							"blocked weapon switch while keeping "
-								.. tostring(ability_name)
-								.. " "
-								.. tostring(lock_reason)
-								.. " (raw_input="
-								.. tostring(raw_input)
-								.. ")"
-						)
-						return nil
-					end
-				end
-
-				-- #30: BtBotReloadAction queues "reload" but warp weapons have
-				-- "vent" not "reload". Translate BEFORE the peril guard so
-				-- venting is not blocked at critical peril.
-				if unit and id == "weapon_action" and action_input == "reload" then
-					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
-					if ude then
-						local tweaks = ude:read_component("weapon_tweak_templates")
-						if tweaks and tweaks.warp_charge_template_name ~= "none" then
-							_debug_log(
-								"vent_translate:" .. tostring(unit),
-								_fixed_time(),
-								"translated reload -> vent (warp weapon)"
-							)
-							action_input = "vent"
-						end
-					end
-				end
-
-				if unit and id == "weapon_action" and action_input ~= "wield" and action_input ~= "vent" then
-					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
-					if ude then
-						local warp = ude:read_component("warp_charge")
-						if warp and warp.current_percentage >= PERIL_CRITICAL_THRESHOLD then
-							local tweaks = ude:read_component("weapon_tweak_templates")
-							if tweaks and tweaks.warp_charge_template_name ~= "none" then
-								_debug_log(
-									"peril_block:" .. tostring(action_input),
-									_fixed_time(),
-									"blocked "
-										.. tostring(action_input)
-										.. " (peril="
-										.. string.format("%.0f%%", warp.current_percentage * 100)
-										.. ", warp weapon)"
-								)
-								return nil
-							end
-						end
-					end
-				end
-
-				-- DIAGNOSTIC (#43): log bot weapon actions (except wield) with
-				-- bot/template tags so charged inputs can be attributed to the
-				-- correct bot and staff family. Remove after validation.
-				if id == "weapon_action" and action_input ~= "wield" then
-					local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
-						_weapon_log_context(unit)
-					_debug_log(
-						"bot_weapon:"
-							.. tostring(bot_slot)
-							.. ":"
-							.. tostring(weapon_template_name)
-							.. ":"
-							.. tostring(action_input)
-							.. ":"
-							.. tostring(raw_input),
-						_fixed_time(),
-						"bot weapon: bot="
-							.. tostring(bot_slot)
-							.. " slot="
-							.. tostring(wielded_slot)
-							.. " weapon_template="
-							.. tostring(weapon_template_name)
-							.. " warp_template="
-							.. tostring(warp_charge_template_name)
-							.. " action="
-							.. tostring(action_input)
-							.. " raw_input="
-							.. tostring(raw_input),
-						0
-					)
-				end
-
-				return func(self, id, action_input, raw_input)
-			end
-		)
-	end
-)
-
-mod:hook_require(
-	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout",
-	function(PlayerUnitVisualLoadout)
-		mod:hook(PlayerUnitVisualLoadout, "wield_slot", function(func, slot_to_wield, player_unit, t, skip_wield_action)
-			if slot_to_wield ~= "slot_combat_ability" then
-				local should_lock, ability_name, lock_reason = ItemFallback.should_lock_weapon_switch(player_unit)
-				if should_lock then
-					local fixed_t = _fixed_time()
-					_debug_log(
-						"lock_wield_direct:" .. tostring(ability_name),
-						fixed_t,
-						"redirected wield_slot("
-							.. tostring(slot_to_wield)
-							.. ") -> slot_combat_ability while keeping "
-							.. tostring(ability_name)
-							.. " "
-							.. tostring(lock_reason)
-					)
-					return func("slot_combat_ability", player_unit, t, skip_wield_action)
-				end
-			end
-
-			return func(slot_to_wield, player_unit, t, skip_wield_action)
-		end)
-	end
-)
-
-mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
-	mod:hook(
-		WeaponSystem,
-		"queue_perils_of_the_warp_elite_kills_achievement",
-		function(func, self, player, explosion_queue_index)
-			local account_id = nil
-			if player and type(player.account_id) == "function" then
-				account_id = player:account_id()
-			end
-
-			if account_id == nil then
-				_debug_log(
-					"skip_perils_nil_account",
-					_fixed_time(),
-					"skipped perils achievement queue with nil account_id"
-				)
-				return nil
-			end
-
-			return func(self, player, explosion_queue_index)
-		end
-	)
-end)
-
--- Poxburster close-range suppression (#34): after target selection runs, if
--- the chosen target is a poxburster within detonation range, clear it so bots
--- don't chase or shoot at point-blank distance. Also clears opportunity/urgent/
--- priority target slots if a close poxburster was selected there.
-local function _is_close_poxburster(unit, self_position)
-	if not unit then
-		return false
-	end
-
-	local data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
-	if not data_ext then
-		return false
-	end
-
-	local breed = data_ext:breed()
-	if not breed or breed.name ~= POXBURSTER_BREED_NAME then
-		return false
-	end
-
-	local pos = POSITION_LOOKUP[unit]
-	if not pos then
-		return false
-	end
-
-	return Vector3.distance(self_position, pos) < POXBURSTER_SUPPRESS_DIST
-end
-
-mod:hook_require("scripts/extension_systems/perception/bot_perception_extension", function(BotPerceptionExtension)
-	mod:hook_safe(
-		BotPerceptionExtension,
-		"_update_target_enemy",
-		function(_self, self_unit, self_position, perception_component)
-			if _is_close_poxburster(perception_component.target_enemy, self_position) then
-				perception_component.target_enemy = nil
-				perception_component.target_enemy_distance = math.huge
-				perception_component.target_enemy_type = "none"
-
-				_debug_log(
-					"poxburster_suppress:" .. tostring(self_unit),
-					_fixed_time(),
-					"suppressed poxburster target (too close)"
-				)
-			end
-
-			if _is_close_poxburster(perception_component.opportunity_target_enemy, self_position) then
-				perception_component.opportunity_target_enemy = nil
-			end
-
-			if _is_close_poxburster(perception_component.urgent_target_enemy, self_position) then
-				perception_component.urgent_target_enemy = nil
-			end
-
-			if _is_close_poxburster(perception_component.priority_target_enemy, self_position) then
-				perception_component.priority_target_enemy = nil
-			end
-		end
-	)
-end)
-
+-- BotBehaviorExtension: ADS gestalt injection (#35) + main update tick
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
-	-- ADS fix (#35): inject default gestalts for T5/T6 profiles that lack bot_gestalts.
-	-- Without this, _gestalts_or_default falls back to "none" which disables ADS.
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",
@@ -1386,7 +558,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			end
 		end
 
-		_fallback_try_queue_combat_ability(unit, blackboard)
+		AbilityQueue.try_queue(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
 
 		if EventLog.is_enabled() then
@@ -1438,8 +610,6 @@ end
 Debug.register_commands()
 
 -- Re-enable EventLog after hot-reload if we're mid-session.
--- on_game_state_changed only fires on transitions, not on mod reload,
--- so a Ctrl+Shift+R during GameplayStateRun leaves EventLog dead.
 if mod:get(EVENT_LOG_SETTING_ID) == true then
 	local bots = Debug.collect_alive_bots()
 	if bots and #bots > 0 then
