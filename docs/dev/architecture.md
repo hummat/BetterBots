@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does nineteen things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -78,6 +78,12 @@ Grenade abilities are still out of scope.
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
+20. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+    - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
+    - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
+    - cross-references with `actions` via `start_input` to find correct action names
+    - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
+    - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
 
 ## Why item fallback is needed
 

@@ -6,6 +6,7 @@
 |-------|--------|-------------|--------|
 | #42 | `feat/42-vfx-sfx-bleed-fix` | Suppress bot VFX/SFX bleed to human player | needs-testing |
 | #23 | `feat/23-melee-attack-meta-data` | Smart melee attack selection (armor-aware) | needs-testing |
+| #31 | `feat/31-ranged-meta-data` | Player ranged weapon attack_meta_data injection | needs-testing |
 
 ## Test environment
 
@@ -33,6 +34,15 @@
 - [ ] Debug log shows `melee attack_meta_data patch installed (injected=N, skipped=M)` with N > 0
 - [ ] No Lua errors in console
 - [ ] Melee combat loop still functional (attack/block/push/dodge cycle)
+
+### #31 — Ranged weapon attack_meta_data injection
+
+**Acceptance criteria:**
+- [ ] Bot fires plasma gun (shoot_charge → auto-fire via charged_enough)
+- [ ] Bot fires force staff (shoot_pressed → rapid_left projectile)
+- [ ] Standard weapons still work (lasgun, autogun, bolter — no regression)
+- [ ] Debug log shows "ranged attack_meta_data patch installed (injected=N, skipped=M)"
+- [ ] No crashes or errors in console
 
 ## Regression checks
 

@@ -157,6 +157,9 @@ assert(Sprint, "BetterBots: failed to load sprint module")
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 
+local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
+assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -213,6 +216,12 @@ MeleeMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+})
+
+RangedMetaData.init({
+	mod = mod,
+	patched_weapon_templates = _patched_weapon_templates,
+	debug_log = _debug_log,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -694,6 +703,7 @@ end)
 
 mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
 	MeleeMetaData.inject(WeaponTemplates)
+	RangedMetaData.inject(WeaponTemplates)
 end)
 
 Sprint.register_hook()
