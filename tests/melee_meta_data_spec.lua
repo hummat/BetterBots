@@ -79,6 +79,21 @@ describe("melee_meta_data", function()
 		it("returns 0 for missing cleave_distribution", function()
 			assert.equals(0, MeleeMetaData._classify_arc({}))
 		end)
+
+		it("handles scalar cleave attack value", function()
+			local dp = { cleave_distribution = { attack = 5 } }
+			assert.equals(1, MeleeMetaData._classify_arc(dp))
+		end)
+
+		it("handles scalar cleave attack value below threshold", function()
+			local dp = { cleave_distribution = { attack = 1.5 } }
+			assert.equals(0, MeleeMetaData._classify_arc(dp))
+		end)
+
+		it("handles scalar cleave attack value above arc 2 threshold", function()
+			local dp = { cleave_distribution = { attack = 12 } }
+			assert.equals(2, MeleeMetaData._classify_arc(dp))
+		end)
 	end)
 
 	describe("classify_penetrating", function()
@@ -105,6 +120,55 @@ describe("melee_meta_data", function()
 
 		it("returns false for nil armored_type", function()
 			assert.is_false(MeleeMetaData._classify_penetrating(make_damage_profile(0, 1.0), nil))
+		end)
+
+		it("prefers per-target armor modifier over top-level", function()
+			local dp = {
+				armor_damage_modifier = {
+					attack = { [ARMORED] = { 0.174, 0.426 } },
+				},
+				targets = {
+					{ armor_damage_modifier = {
+						attack = { [ARMORED] = { 0.48, 1.02 } },
+					} },
+				},
+			}
+			assert.is_true(MeleeMetaData._classify_penetrating(dp, ARMORED))
+		end)
+
+		it("falls back to top-level when targets has no armor modifier", function()
+			local dp = {
+				armor_damage_modifier = {
+					attack = { [ARMORED] = { 0.4, 0.8 } },
+				},
+				targets = {
+					{ boost_curve_multiplier_finesse = 1.5 },
+				},
+			}
+			assert.is_true(MeleeMetaData._classify_penetrating(dp, ARMORED))
+		end)
+
+		it("falls back to top-level when no targets table", function()
+			local dp = make_damage_profile(0, 0.675)
+			assert.is_true(MeleeMetaData._classify_penetrating(dp, ARMORED))
+		end)
+
+		it("handles scalar armor modifier value", function()
+			local dp = {
+				armor_damage_modifier = {
+					attack = { [ARMORED] = 2 },
+				},
+			}
+			assert.is_true(MeleeMetaData._classify_penetrating(dp, ARMORED))
+		end)
+
+		it("handles scalar armor modifier value below threshold", function()
+			local dp = {
+				armor_damage_modifier = {
+					attack = { [ARMORED] = 0.3 },
+				},
+			}
+			assert.is_false(MeleeMetaData._classify_penetrating(dp, ARMORED))
 		end)
 	end)
 

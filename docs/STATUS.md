@@ -25,7 +25,7 @@
 - **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
 - **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
 - **Charge/dash rescue aim** (#10): zealot dash, ogryn charge, and arbites charge aim toward disabled allies. 14 rescue activations confirmed in-game.
-- **Unit tests**: 165 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- **Unit tests**: 194 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 
 ## Current Tier Status

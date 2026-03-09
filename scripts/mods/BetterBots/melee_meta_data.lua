@@ -16,7 +16,12 @@ local function classify_arc(damage_profile)
 	if not cleave then
 		return 0
 	end
-	local max_cleave = cleave[2] or cleave[1] or 0
+	local max_cleave
+	if type(cleave) == "number" then
+		max_cleave = cleave
+	else
+		max_cleave = cleave[2] or cleave[1] or 0
+	end
 	if max_cleave > CLEAVE_ARC_2_THRESHOLD then
 		return 2
 	elseif max_cleave > CLEAVE_ARC_1_THRESHOLD then
@@ -26,11 +31,18 @@ local function classify_arc(damage_profile)
 	end
 end
 
+local function get_armor_modifier_table(damage_profile)
+	local targets = damage_profile.targets
+	local first_target = targets and targets[1]
+	local am = first_target and first_target.armor_damage_modifier or damage_profile.armor_damage_modifier
+	return am
+end
+
 local function classify_penetrating(damage_profile, armored_type)
 	if not damage_profile or not armored_type then
 		return false
 	end
-	local am = damage_profile.armor_damage_modifier
+	local am = get_armor_modifier_table(damage_profile)
 	if not am or not am.attack then
 		return false
 	end
@@ -38,7 +50,12 @@ local function classify_penetrating(damage_profile, armored_type)
 	if not armored_lerp then
 		return false
 	end
-	local max_modifier = armored_lerp[2] or armored_lerp[1] or 0
+	local max_modifier
+	if type(armored_lerp) == "number" then
+		max_modifier = armored_lerp
+	else
+		max_modifier = armored_lerp[2] or armored_lerp[1] or 0
+	end
 	return max_modifier >= PENETRATING_THRESHOLD
 end
 
