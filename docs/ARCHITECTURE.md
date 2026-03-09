@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does seventeen things:
+`scripts/mods/BetterBots/BetterBots.lua` does eighteen things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -68,6 +68,11 @@ Grenade abilities are still out of scope.
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
+18. VFX/SFX bleed fix (#42):
+    - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
+    - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
+    - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
+    - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
 
 ## Why item fallback is needed
 

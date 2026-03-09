@@ -683,6 +683,73 @@ end)
 
 Sprint.register_hook()
 
+-- VFX/SFX bleed fix (#42): BotPlayer inherits from HumanPlayer, so
+-- is_local_unit = true for all bots in Solo Play. Effect scripts and
+-- CharacterStateMachineExtension gate first-person VFX/SFX on is_local_unit
+-- but not is_human_controlled, causing screen particles, sound events, and
+-- Wwise global state from bot abilities to bleed into the human player's view.
+-- Fix: set is_local_unit = false on context tables (ability effect scripts,
+-- wieldable slot scripts) and on _is_local_unit (state machine extension) for
+-- bot units after init. This suppresses local-only effects (lunge screen
+-- distortion, lunge sounds, shout aim indicator, targeted dash crosshair,
+-- item placement previews) without touching gameplay state: the ability
+-- extension's own _is_local_unit (used in action_context) stays true, and
+-- character states cache their is_local_unit from extension_init_data during
+-- init before hook_safe runs.
+mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
+	mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
+		local player = extension_init_data.player
+		if player and not player:is_human_controlled() then
+			local ctx = self._equipped_ability_effect_scripts_context
+			if ctx then
+				ctx.is_local_unit = false
+				_debug_log(
+					"vfx_fix_ability:" .. tostring(unit),
+					0,
+					"patched ability effect context is_local_unit=false for bot"
+				)
+			end
+		end
+	end)
+end)
+
+mod:hook_require(
+	"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
+	function(PlayerUnitVisualLoadoutExtension)
+		mod:hook_safe(PlayerUnitVisualLoadoutExtension, "init", function(self, _context, unit, extension_init_data)
+			local player = extension_init_data.player
+			if player and not player:is_human_controlled() then
+				local ctx = self._wieldable_slot_scripts_context
+				if ctx then
+					ctx.is_local_unit = false
+					_debug_log(
+						"vfx_fix_loadout:" .. tostring(unit),
+						0,
+						"patched wieldable slot scripts context is_local_unit=false for bot"
+					)
+				end
+			end
+		end)
+	end
+)
+
+mod:hook_require(
+	"scripts/extension_systems/character_state_machine/character_state_machine_extension",
+	function(CharacterStateMachineExtension)
+		mod:hook_safe(CharacterStateMachineExtension, "init", function(self, _context, unit, extension_init_data)
+			local player = extension_init_data.player
+			if player and not player:is_human_controlled() then
+				self._is_local_unit = false
+				_debug_log(
+					"vfx_fix_csm:" .. tostring(unit),
+					0,
+					"patched CharacterStateMachine _is_local_unit=false for bot"
+				)
+			end
+		end)
+	end
+)
+
 -- ADS verification log (#35): one-shot per scratchpad when a bot starts aiming.
 -- BT action nodes don't have self._unit; unit is only passed to enter()/run().
 -- Scratchpad is unique per enter/leave cycle, so we dedup on that.
