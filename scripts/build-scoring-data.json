@@ -205,7 +205,7 @@
       "internal": "dual_shivs_p1_m1",
       "slot": "melee",
       "role": "hybrid",
-      "classes": ["hive_scum"],
+      "classes": ["hive scum"],
       "blessings": {
         "Uncanny Strike": { "internal": "stacking_rending_on_weakspot", "t4": "+8%/stack (5 stacks)" },
         "Precognition": { "internal": "dodge_grants_critical_strike_chance", "t4": "+20% crit for 2s" },
@@ -217,7 +217,7 @@
       "internal": "dual_stubpistols_p1_m1",
       "slot": "ranged",
       "role": "hybrid",
-      "classes": ["hive_scum"],
+      "classes": ["hive scum"],
       "blessings": {
         "Run 'n' Gun": { "internal": "hipfire_while_sprinting", "t4": "-30% spread, +15% near dmg" },
         "Speedload": { "internal": "reload_speed_on_slide", "t4": "+10%/stack" },
@@ -228,7 +228,7 @@
       "internal": "stubrevolver_p1_m1",
       "slot": "ranged",
       "role": "elite-killer",
-      "classes": ["veteran", "zealot", "hive_scum"],
+      "classes": ["veteran", "zealot", "hive scum"],
       "blessings": {
         "Hand-Cannon": { "internal": "rending_on_crit", "t4": "+60% rending on crit" },
         "Surgical": { "internal": "crit_chance_based_on_aim_time", "t4": "+10%/stack, 0.3s/stack" },
@@ -250,13 +250,20 @@
       "internal": "combatknife_p1_m1",
       "slot": "melee",
       "role": "hybrid",
-      "classes": ["veteran", "zealot", "hive_scum"],
+      "classes": ["veteran", "zealot", "hive scum"],
       "blessings": null
     },
     "Helbore Lasgun": {
       "internal": "lasgun_p2_m1",
       "slot": "ranged",
       "role": "elite-killer",
+      "classes": ["veteran"],
+      "blessings": null
+    },
+    "Lawbringer Mk IIb Power Falchion": {
+      "internal": "powerfalchion_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
       "classes": ["veteran"],
       "blessings": null
     }
