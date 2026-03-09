@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does seventeen things:
+`scripts/mods/BetterBots/BetterBots.lua` does eighteen things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -68,6 +68,11 @@ Grenade abilities are still out of scope.
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
+18. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+    - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
+    - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
+    - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
+    - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
 
 ## Why item fallback is needed
 
