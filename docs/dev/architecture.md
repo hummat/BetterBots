@@ -99,7 +99,7 @@ Result: item abilities need explicit queued inputs from the mod.
 ## Class ability references
 
 Detailed per-class ability breakdowns (internal IDs, input patterns, cooldowns, talent modifiers, bot usage notes) are in:
-- `CLASS_VETERAN.md`, `CLASS_ZEALOT.md`, `CLASS_PSYKER.md`, `CLASS_OGRYN.md`, `CLASS_ARBITES.md`, `CLASS_HIVE_SCUM.md`
+- `classes/veteran.md`, `classes/zealot.md`, `classes/psyker.md`, `classes/ogryn.md`, `classes/arbites.md`, `classes/hive-scum.md`
 
 Each doc classifies abilities into the tiers above and includes implementation guidance for bot activation.
 
@@ -114,7 +114,7 @@ Key design:
 - **Hot-reload recovery**: On `Ctrl+Shift+R`, module state resets but DMF doesn't re-fire `on_game_state_changed`. Load-time code detects alive bots and re-enables logging.
 - **False-decision compression**: Tracks skip counts per (bot, ability) to weight false decisions without flooding the file.
 
-Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/LOGGING.md` for event schema.
+Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/dev/logging.md` for event schema.
 
 ## Performance analysis
 

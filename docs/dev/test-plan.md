@@ -3,7 +3,7 @@
 ## Goal
 
 Verify template-based and item-based combat ability activation, then check bot regressions.
-Use `docs/VALIDATION_TRACKER.md` as the canonical run log and matrix.
+Use `docs/dev/validation-tracker.md` as the canonical run log and matrix.
 
 ## Prerequisites
 

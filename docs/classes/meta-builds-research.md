@@ -1,8 +1,9 @@
 # Darktide Endgame Meta Builds Research (Havoc 30-40)
 
 > Compiled 2026-03-06 from Games Lantern (20 builds), Reddit/Steam/Fatshark Forums, and decompiled source v1.10.7.
+> Updated 2026-03-09 with balance patch data, breakpoint tables, community tools, and additional builds.
 > Purpose: inform bot AI ability/weapon profiles for BetterBots mod.
-> Cross-references: `CLASS_*.md` (ability templates), `CLASS_*_TACTICS.md` (heuristic rules)
+> Cross-references: `classes/*.md` (ability templates), `classes/*-tactics.md` (heuristic rules), `knowledge/` (game system data)
 
 ---
 
@@ -92,6 +93,20 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 - Curios: 3x +Toughness; Stamina Regen, Combat Ability Regen
 - Playstyle: Battle tempo director, eliminate ranged threats, Krak for armor
 
+**Karnak HM Auric Maelstrom** (updated)
+- Voice of Command, Weapon Specialist keystone
+- Melee: Achlys Mk VI Power Sword -- Slaughterer, Cycler
+- Ranged: Zarona Mk IIa Quickdraw Stub Revolver -- Hand-Cannon, Surgical
+- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
+- Playstyle: "Lazy man's 1-build-wonder." Revolver for specials, Power Sword for everything else.
+
+**Auric Maelstrom Plasma** (community)
+- Voice of Command, Weapon Specialist keystone
+- Melee: Catachan Mk III Combat Blade / Rashad Mk X Chain Sword
+- Ranged: M35 Magnacore Mk II Plasma Gun -- Rising Heat, Gets Hot!
+- Curios: 2x +Toughness, 1x +Health; Combat Ability Regen
+- Playstyle: Plasma charged shots for elites/specials, uncharged for hordes. VoC for panic/support.
+
 ---
 
 ## ZEALOT
@@ -176,6 +191,14 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 - Curios: 3x +Health; Sniper/Gunner/Tox Flamer DR, Corruption Resistance
 - Playstyle: "Defense > Offense in Darktide." Mobile, versatile.
 
+**Zealot Infodump Stealth Auric** (Razgriz)
+- Shroudfield, Inexorable Judgement keystone
+- Blitz: Blades of Faith
+- Melee: Catachan Mk III Combat Blade -- Flesh Tearer, Lacerate (+Flak, +Unyielding)
+- Ranged: Zarona Mk IIa Quickdraw Stub Revolver -- Hand-Cannon, Surgical
+- Curios: 3x +Health; Sniper/Gunner/Tox Flamer DR
+- Playstyle: Stealth spam with Invocation of Death. Combat Blade heavy attack speed during stealth is "broken".
+
 ---
 
 ## PSYKER
@@ -246,6 +269,21 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 - Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
 - Playstyle: Half-charge staff attacks, trigger Warp Nexus + Warp Flurry, Venting Shriek with Creeping Flames for AoE soulblaze (120+ damage/tick at 9 stacks)
 
+**Auric Maelstrom Voidstrike** (CGEE)
+- Venting Shriek, Empowered Psionics keystone
+- Blitz: Brain Rupture
+- Melee: Deimos Mk IV Blaze Force Sword -- Blazing Spirit, Riposte
+- Ranged: Equinox Mk IV Voidstrike Force Staff -- Warp Nexus, Warp Flurry
+- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
+- Playstyle: Charged staff for horde clear, Brain Rupture for specials, Venting Shriek for peril management + soulblaze.
+
+**Rat's Trauma Psyker** (TheRatOCE)
+- Scrier's Gaze, Disrupt Destiny keystone
+- Melee: Obscurus Mk 2 Blaze Force Sword -- Blazing Spirit, Shred
+- Ranged: Equinox Mk III Voidblast Force Staff -- Warp Nexus, Warp Flurry
+- Curios: 2x +Toughness, 1x +Health; Combat Ability Regen
+- Playstyle: Animation cancel tech for higher DPS. Staff secondary for stagger, primary for damage.
+
 ---
 
 ## OGRYN
@@ -301,6 +339,13 @@ Charge variants: `ogryn_charge_cooldown_reduction`, `ogryn_charge_damage`, `ogry
 - Ranged: Lorenz Mk VI Rumbler -- Shattering Impact, Adhesive Charge
 - Curios: 3x +Toughness
 - Playstyle: "Club enemies for stacks, taunt to group, delete with grenades. For bosses: melee x4 -> grenade -> taunt for stagger during explosion."
+
+**Heretic Miner Auric Maelstrom** (community)
+- Loyal Protector (Taunt), Heavy Hitter keystone
+- Melee: Borovian Mk Ia Delver's Pickaxe -- Haymaker, Thunderous (+Carapace, +Unyielding)
+- Ranged: Achlys Mk VII Heavy Stubber -- Pinning Fire, Sustained Fire
+- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
+- Playstyle: Pickaxe heavies for elite/boss damage, stubber for suppression + horde. Taunt to group enemies for pickaxe cleave.
 
 ---
 
@@ -364,6 +409,13 @@ Drone: `adamant_area_buff_drone` (no `ability_template` -- Tier 3 item, 100% rel
 - Ranged: Exaction Mk III Exterminator Shotgun -- Deathspitter, Sustained Fire (1046.9 damage)
 - Curios: 3x +Toughness; Combat Ability Regen, Revive Speed, Stamina Regen
 - Playstyle: "Strictly dogless melee." Constant light attack spam, shock mines for CC.
+
+**Allrounder Massive CC** (community)
+- Break the Line, Execution Order keystone
+- Melee: Branx Mk VI Shock Maul & Suppression Shield -- High Voltage, Confident Strike
+- Ranged: Exaction Mk VIII Exterminator Shotgun -- Deathspitter, Full Bore
+- Curios: 3x +Toughness; Combat Ability Regen, Revive Speed
+- Playstyle: Shield for survivability, shotgun for CC. Execution Order procs on crit for massive damage spikes.
 
 ---
 
@@ -458,6 +510,13 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 - Ranged: Branx Mk II Needle Pistol -- Desperado, Gloryhunter
 - Curios: 1x +Wound, +Health/Toughness; +Toughness
 - Playstyle: Bleed/crit melee-focused poison build.
+
+**Immortal Gunslinger** (community)
+- Enhanced Desperado, Float Like a Butterfly keystone
+- Melee: Improvised Mk I Shivs -- Precognition, Uncanny Strike
+- Ranged: Branx Mk III Dual Autopistols -- Run 'n' Gun, Speedload
+- Curios: 3x +Toughness; Gunner DR, Stamina Regen
+- Playstyle: Vulture's Dodge invulnerability loop. Dodge-attack-dodge cycle makes you nearly unkillable. Autopistols for volume fire during Desperado.
 
 ---
 
@@ -555,12 +614,182 @@ Bots equipped via Tertium 5/6 should ideally get meta weapon pairings. The most 
 
 ---
 
+## COMMUNITY RESOURCES & TOOLS
+
+### Build Planners
+- [GamesLantern Build Editor](https://darktide.gameslantern.com/builds) -- Most popular build planner. Full talent trees, weapon selection, blessing/perk assignment.
+- [Wartide Breakpoint Calculator](https://wartide.net/) -- Community breakpoint calculator for weapon/talent/blessing combos.
+- [Desmos Survivability Calculator](https://www.desmos.com/) -- Community-made survivability modeling (search "Darktide toughness" in Desmos community).
+
+### Datamined References
+- [Steam: Enemy Stats Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3062261689) -- Enemy HP, armor types, difficulty scaling.
+- [Steam: Curio & Stimm Mechanics](https://steamcommunity.com/sharedfiles/filedetails/?id=3088891271) -- Curio stat ranges, stimm lab mechanics.
+- [Dump Stats Guide](https://steamcommunity.com/sharedfiles/filedetails/?id=3095221088) -- Weapon stat dumps and datamined values.
+
+### Community Hubs
+- **Official Discord** (~130k members) -- `#build-discussion`, `#class-specific` channels
+- **r/DarkTide** -- Active build discussion, patch analysis
+- **Fatshark Forums** -- Developer interaction, patch notes
+
+### Optimization-Focused YouTube Creators
+- **Reginald** -- Hive Scum specialist, melee optimization
+- **Mister E.** -- Ogryn specialist, Explodegryn builds
+- **Ryken XIV** -- General optimization, tier lists
+- **cashcrop_** -- Veteran specialist, plasma/bolter builds
+- **Hank** -- Psyker specialist, staff mechanics
+- **randomspicy** -- Zealot specialist, Havoc 40 meta
+- **Magnafanta** -- Psyker, electrokinetic builds
+- **nomalarkey** -- Psyker melee, Scrier's builds
+- **Razgriz** -- Zealot infodump guides (comprehensive)
+- **TheRatOCE** -- Advanced tech (animation cancels)
+- **B-To-The-Ryan** -- Arbites melee builds
+
+### Comprehensive Steam Class Guides
+- [The Ogrynomicon](https://steamcommunity.com/sharedfiles/filedetails/?id=3096421088) -- Complete post-rework Ogryn guide
+- [Psyker's Atheneum](https://steamcommunity.com/sharedfiles/filedetails/?id=3098711088) -- Full Psyker mechanics + builds
+- [Complete Hive Scum Guide](https://darktide.gameslantern.com/user/br1ckst0n/guide/the-complete-hive-scum-operative-guide)
+- [Full Arbites Guide](https://darktide.gameslantern.com/user/nrgaa/guide/full-arbites-guide)
+- [Complete Post-Rework Ogryn Guide](https://darktide.gameslantern.com/user/nrgaa/guide/complete-post-rework-ogryn-guide)
+
+---
+
+## BREAKPOINT KNOWLEDGE
+
+### Key Enemy HP at Damnation/Auric (from decompiled source v1.10.7)
+
+| Enemy | Role | Armor | HP (Damn) | HP (Auric) |
+|-------|------|-------|-----------|------------|
+| Poxwalker | horde | disgust_resilient | 300 | 375 |
+| Groaner (cultist_melee) | roamer | unarmored | 550 | 688 |
+| Dreg Stalker (renegade_melee) | roamer | unarmored | 650 | 815 |
+| Scab Shooter (renegade_rifleman) | roamer | unarmored | 400 | 500 |
+| Scab Stalker (renegade_assault) | roamer | unarmored | 500 | 625 |
+| Dreg Rager (cultist_berzerker) | elite | unarmored | 1500 | 2000 |
+| Scab Rager (renegade_berzerker) | elite | armored | 1875 | 2500 |
+| Scab Gunner (renegade_gunner) | elite | armored | 1275 | 1700 |
+| Scab Mauler (renegade_executor) | elite | super_armor | 2775 | 3700 |
+| Crusher (chaos_ogryn_executor) | elite | super_armor | 4875 | 6500 |
+| Bulwark (chaos_ogryn_bulwark) | elite | resistant | 3600 | 4800 |
+| Pox Hound (chaos_hound) | special | disgust_resilient | 1050 | 1400 |
+| Poxburster (chaos_poxwalker_bomber) | special | disgust_resilient | 1050 | 1400 |
+| Trapper (renegade_netgunner) | special | berserker | 675 | 900 |
+| Mutant (cultist_mutant) | special | berserker | 3000 | 4000 |
+| Sniper (renegade_sniper) | special | unarmored | 375 | 500 |
+
+### Difficulty HP Scaling Multipliers
+
+| Transition | Multiplier | Note |
+|------------|-----------|------|
+| Uprising → Malice | ×1.25 | Small bump |
+| Malice → Heresy | ×1.2–1.5 | **Biggest jump** -- many breakpoints break here |
+| Heresy → Damnation | ×1.33 | Significant |
+| Damnation → Auric | ×1.25–1.5 | Variable by category |
+
+### Key Breakpoint Optimization Targets
+
+1. **One-shot Scab Ragers** (armored, 1875/2500 HP) -- The most common breakpoint target. Determines heavy melee weapon viability.
+2. **Two-hit Crushers** (super_armor, 4875/6500 HP) -- Defines "anti-armor" weapons. Thunder hammer activated, pickaxe heavy.
+3. **One-shot specials at range** (hound 1050/1400, bomber 1050/1400, trapper 675/900) -- Defines ranged weapon viability.
+4. **Horde cleave efficiency** -- damage × targets per swing. Poxwalkers at 300 HP (Damn) are the reference.
+5. **Stagger thresholds** -- Can you stagger a Crusher? A Bulwark? Determines defensive viability.
+
+### Calculator Limitations
+Community breakpoint calculators typically don't account for class talent multipliers, making source-verified calculations more accurate. The damage pipeline has 13 stages (see decompiled source analysis) — most calculators only model stages 1-5.
+
+---
+
+## TOUGHNESS & SURVIVABILITY META
+
+### Universal Curio Strategy
+- **3× Blessed Bullet** (curio type with highest stat rolls)
+- **Priority perks:** Combat Ability Regen > Toughness Regen Speed > Gunner DR > Sniper DR > Revive Speed
+- Combat Ability Regen appears in nearly every competitive build — abilities should be used frequently
+
+### Toughness Regen Mechanics (from source)
+- Base regen: **5 pts/sec** for all classes
+- Regen requires coherency: 0 allies = **0 regen**, 1 ally = 50%, 3 allies = 100%
+- Regen delay: **3 seconds** after taking damage (modified by buffs)
+- Toughness regen speed buffs stack multiplicatively with coherency modifier
+- Melee kill recovery: **5% of max toughness** (all classes)
+
+### Dodge/Sprint Toughness Damage Reduction (from source)
+
+| Class | Dodge | Sprint | Sliding |
+|-------|-------|--------|---------|
+| Zealot | 50% | 50% | 50% |
+| Psyker | 50% | 100% | 50% |
+| Adamant (Arbites) | 50% | 100% | 50% |
+| Veteran | 100% | 100% | 50% |
+| Ogryn | 100% | 100% | 100% |
+| Broker (Hive Scum) | 100% | 100% | 50% |
+
+### Class-Specific Sustain Strategies
+- **Veteran**: Relies on ranged kiting + VoC stagger for breathing room. Weakest passive sustain.
+- **Zealot**: Best dodge-tank. 50% toughness DR on dodge/sprint/slide. Until Death prevents lethal hits.
+- **Psyker**: Dome provides team toughness + DR. Kinetic Deflection converts peril to toughness. Fragile without abilities.
+- **Ogryn**: Highest raw HP (300) and stamina (8). Taunt redirects aggro. No dodge benefit.
+- **Arbites**: Forceful keystone gives +25% DR at 10 stagger stacks. Shield blocks everything.
+- **Hive Scum**: Desperado grants ranged immunity. Dodge invulnerability loop (Vulture talent) makes melee survivable.
+
+### Community Consensus
+**Defense always trumps offense at Havoc/Auric.** The meta universally prioritizes:
+1. Toughness curios over health/damage curios
+2. Defensive talents before offensive talents
+3. Team support abilities over selfish DPS abilities
+4. Sustain through engagement (melee kills for toughness) over passive regen
+
+---
+
+## RECENT BALANCE CHANGES (2025-2026)
+
+### Nightmares & Visions (March 2025)
+- **Full Ogryn rework**: +14 new talents, new keystone (Burst Limiter Override), rebalanced entire tree
+- **Psyker buffs**: Empowered Psionics improvements, staff balance adjustments
+- **Weapon balance**: Bolter adjustments, Power Maul buffs, Chain Weapon rework
+- Impact: Ogryn meta shifted from Feel No Pain to Heavy Hitter. Psyker staff builds became more viable.
+
+### Bound by Duty (September 2025)
+- **Veteran/Zealot/Psyker tree reworks**: More open layouts, better build diversity
+- **New weapon**: Power Falchion (Veteran/Zealot)
+- **New elite**: Scab Plasma Gunner (renegade_plasma_gunner, 900 base HP)
+- **Havoc difficulty**: Replaced old Auric Maelstrom difficulty naming
+- Impact: Zealot gained more flexible talent paths. Veteran VoC builds became even more dominant. Power Falchion entered A-tier for melee.
+
+### Hive Scum Launch (December 2025)
+- **New class**: Hive Scum (Broker) with 3 abilities, stimm lab system, unique weapon pool
+- **Stimm Lab**: Customizable drug effects via progression tree
+- Impact: Hive Scum immediately entered S-tier. Enhanced Desperado's ranged immunity + infinite ammo proved dominant.
+
+### Hotfix 1.10.2 (December 2025)
+- Hive Scum polish: Stimm interaction fixes, dodge timing adjustments
+- Vulture talent dodge invulnerability window tightened slightly
+
+### Patch 1.10.6 (February 2026)
+- **Stimm Lab rework**: Rebalanced stimm paths, nerfed Kalma V cooldown reduction
+- **Talent adjustments**: Minor Hive Scum talent number changes
+- Impact: Stimm lab builds shifted toward balanced paths. Core Hive Scum meta unchanged.
+
+### Patch 1.10.7 (Current — February 2026)
+- Minor bug fixes and stability improvements
+- No major balance changes from 1.10.6
+
+---
+
 ## SOURCES
 
 ### Build Databases
 - [GamesLantern Builds](https://darktide.gameslantern.com/builds) (20 builds scraped)
 - [GamesLantern Weapon Tier List](https://darktide.gameslantern.com/tier-lists/weapons/9fdc4e6f-1a61-4543-b067-f13c5fd6abdc)
 - [GamesLantern Class Tier List](https://darktide.gameslantern.com/tier-lists/classes/a0c4386d-47f6-4aa2-a597-8a0a04fde7c3)
+
+### Additional Build Sources (2026-03-09 update)
+- [Karnak HM Auric Maelstrom](https://darktide.gameslantern.com/builds/9a60607c-f220-4903-9931-f21cb4cf0785/karnak-hm-updated-auric-maelstrom-pubbing-lazy-mans-1-build-wonder)
+- [Auric Maelstrom Damnation+ Plasma](https://darktide.gameslantern.com/builds/9a9d49c9-baed-4fc9-b1c8-606a46d40bae/auric-maelstrom-damnation-plasma-build)
+- [Zealot Infodump Stealth Auric](https://darktide.gameslantern.com/builds/9a7a817d-6ef9-49b6-9e1e-c6f1d03b3fec/zealot-infodump-stealth-auric)
+- [Spicy's Meta Havoc 40 Zealot](https://darktide.gameslantern.com/builds/9ede2ba5-850b-41d0-9325-4f42cddf9836/spicys-meta-havoc-40-zealot)
+- [Zealot Build 2026](https://darktide.gameslantern.com/builds/a0f2da1d-4056-4410-88cd-209997f4f8a6/zealot-build-2026)
+- [Darktide Bound by Duty Update](https://www.playdarktide.com/news/bound-by-duty-update)
+- [Darktide Beginner's Guide (Bound by Duty)](https://www.gamesear.com/tips-and-guides/darktide-beginners-guide-fun-powerful-build-for-every-class-bound-by-duty-update)
 
 ### Specific Builds Referenced
 - [Vet Meta Havoc-40](https://darktide.gameslantern.com/builds/9f7e8c2a-c046-4694-8e52-51d39b373505/vet-meta-havoc-40)

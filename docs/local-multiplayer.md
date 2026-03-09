@@ -2,7 +2,7 @@
 
 > Research doc — feasibility analysis for local co-op (VT2-style) in Darktide.
 > Not a planned feature of BetterBots. Documented for game preservation context.
-> See also: `docs/BACKEND_PROGRESSION.md` for the progression/economy side.
+> See also: `docs/backend-progression.md` for the progression/economy side.
 
 ## VT2 vs Darktide Hosting
 
@@ -203,7 +203,7 @@ Once a peer is connected and synced, everything works automatically:
 | Profile sync (online) | **Low** | Use existing backend fetch |
 | Profile sync (offline) | **Medium** | Need cached/default profiles |
 | Bot backfill | **Free** | `4 - num_players` already works |
-| Progression/rewards | **Separate problem** | See `docs/BACKEND_PROGRESSION.md` |
+| Progression/rewards | **Separate problem** | See `docs/backend-progression.md` |
 
 ## The Core Blocker
 

@@ -32,7 +32,7 @@
    - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
    - Item heuristics added (#3): zealot_relic, psyker_force_field (3 variants), adamant_area_buff_drone, broker_ability_stimm_field. Replace coarse `enemies_in_proximity > 0` gate with per-ability rules using coherency, toughness, corruption, and ally state.
    - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
-   - Meta builds research (`docs/META_BUILDS_RESEARCH.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
+   - Meta builds research (`docs/classes/meta-builds-research.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
    - Use `/bb_decide` to inspect live decisions during play.
 
 6. ~~Psyker Scrier's Gaze causes warp overcharge explosions.~~ **Fixed** (#27): Warp weapon attacks blocked at ≥97% peril via `bot_queue_action_input` hook. Vent/reload inputs pass through. Root cause: stance itself doesn't explode — explosions only happen when additional peril is generated (warp weapon attacks) while at 100%.
@@ -45,7 +45,7 @@
 8. Debug log noise reduced — idle-state decisions now invisible.
    - `decision -> false`, `fallback held (nearby=0)`, and `bt gate evaluated` are suppressed.
    - Idle hold counts in `bb-log summary` will show 0 for new runs.
-   - See `docs/LOGGING.md` for details and how to re-enable.
+   - See `docs/dev/logging.md` for details and how to re-enable.
 
 ## Low severity
 

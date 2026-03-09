@@ -96,9 +96,9 @@ Heuristics and feature ideas are sourced from:
 - **VT2 decompiled source** — 14-level BT, utility-based scoring, 90+ considerations, item management
 - **Darktide community** (Fatshark forums, Steam, Reddit) — prioritized pain points
 - **Darktide decompiled source** (v1.10.7) — untapped perception signals, blackboard data, cover system, formation logic
-- **Per-class tactics docs** (`docs/CLASS_*_TACTICS.md`) — community-sourced USE WHEN / DON'T USE / proposed bot rules
+- **Per-class tactics docs** (`docs/classes/*-tactics.md`) — community-sourced USE WHEN / DON'T USE / proposed bot rules
 
-See `docs/RELATED_MODS.md` for detailed mod analysis and `docs/CLASS_*_TACTICS.md` for per-ability heuristics.
+See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics.md` for per-ability heuristics.
 
 ## Milestones
 

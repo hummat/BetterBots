@@ -109,6 +109,6 @@ Path B is more robust given the diversity of input patterns (throw vs place vs c
 ## Related
 
 - Issue #4 -- Blitz/grenade support
-- `docs/BOT_INPUT_SYSTEM.md` -- Action input queuing and item wield sequences
-- `docs/BOT_COMBAT_ACTIONS.md` -- BT action node lifecycles
-- `docs/CLASS_*.md` -- Per-class ability references (grenade sections)
+- `docs/bot/input-system.md` -- Action input queuing and item wield sequences
+- `docs/bot/combat-actions.md` -- BT action node lifecycles
+- `docs/classes/*.md` -- Per-class ability references (grenade sections)
