@@ -13,6 +13,7 @@ local _last_debug_log_t_by_key = {}
 local _patched_bt_bot_conditions = setmetatable({}, { __mode = "k" })
 local _patched_bt_conditions = setmetatable({}, { __mode = "k" })
 local _patched_ability_templates = setmetatable({}, { __mode = "k" })
+local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
@@ -153,6 +154,9 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
 
+local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
+assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -202,6 +206,13 @@ Sprint.init({
 	mod = mod,
 	debug_log = _debug_log,
 	fixed_time = _fixed_time,
+})
+
+MeleeMetaData.init({
+	mod = mod,
+	patched_weapon_templates = _patched_weapon_templates,
+	debug_log = _debug_log,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -679,6 +690,10 @@ end
 
 mod:hook_require("scripts/settings/ability/ability_templates/ability_templates", function(AbilityTemplates)
 	MetaData.inject(AbilityTemplates)
+end)
+
+mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
+	MeleeMetaData.inject(WeaponTemplates)
 end)
 
 Sprint.register_hook()
