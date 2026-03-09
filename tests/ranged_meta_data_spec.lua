@@ -299,7 +299,7 @@ describe("ranged_meta_data", function()
 			assert.is_nil(meta.fire_action_name)
 		end)
 
-		it("does not inject aim fields even when aim input is invalid", function()
+		it("does not derive aim_action_input but mirrors fire input as aim_fire_action_input", function()
 			local templates = {
 				exotic = make_ranged_template({
 					action_inputs = {
@@ -323,7 +323,31 @@ describe("ranged_meta_data", function()
 			assert.is_table(meta)
 			assert.equals("shoot_pressed", meta.fire_action_input)
 			assert.is_nil(meta.aim_action_input)
-			assert.is_nil(meta.aim_fire_action_input)
+			assert.equals("shoot_pressed", meta.aim_fire_action_input)
+		end)
+
+		it("mirrors fire input as aim_fire for plasma pattern", function()
+			local templates = {
+				plasma = make_ranged_template({
+					action_inputs = {
+						shoot_charge = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+					},
+					actions = {
+						action_shoot = { kind = "shoot_hit_scan" },
+						action_charge_direct = { start_input = "shoot_charge" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			local meta = templates.plasma.attack_meta_data
+			assert.is_table(meta)
+			assert.equals("shoot_charge", meta.fire_action_input)
+			assert.equals("shoot_charge", meta.aim_fire_action_input)
+			assert.is_nil(meta.aim_action_input)
 		end)
 
 		it("skips weapons where vanilla fallback is valid", function()

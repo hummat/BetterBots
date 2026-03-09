@@ -140,6 +140,18 @@ local function build_meta_data(weapon_template)
 	-- overloaded (ADS on guns, charged secondary on staffs). Injecting the
 	-- wrong action causes bots to start alt-fire when they should be aiming.
 	-- See #43 for charge-weapon secondary fire support.
+	--
+	-- However, when aim-fire fallback is invalid, mirror the fire input so
+	-- the bot fires correctly regardless of aim state (killshot gestalt
+	-- forces aimed shots, and invalid aim_fire_action_input silently fails).
+	local effective_fire = meta.fire_action_input or fallback.fire_action_input
+	if
+		not is_valid_input(weapon_template, fallback.aim_fire_action_input)
+		and is_valid_input(weapon_template, effective_fire)
+	then
+		meta.aim_fire_action_input = effective_fire
+		changed = true
+	end
 
 	return changed and meta or nil
 end

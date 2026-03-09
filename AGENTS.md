@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 224 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
+- `make test` — 225 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -281,5 +281,5 @@ tests/
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
   sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
-  ranged_meta_data_spec.lua                 # 26 tests for ranged fallback, input derivation + injection
+  ranged_meta_data_spec.lua                 # 27 tests for ranged fallback, input derivation + injection
 ```
