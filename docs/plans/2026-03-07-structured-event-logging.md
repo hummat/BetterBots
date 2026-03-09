@@ -1026,8 +1026,8 @@ git commit -m "feat(bb-log): add events subcommands for JSONL analysis via jq (#
 ## Task 8: Update docs and run final checks
 
 **Files:**
-- Modify: `docs/LOGGING.md` (add event log section)
-- Modify: `docs/DEBUGGING.md` (add event log reference)
+- Modify: `docs/dev/logging.md` (add event log section)
+- Modify: `docs/dev/debugging.md` (add event log reference)
 
 **Step 1: Add event log section to LOGGING.md**
 
@@ -1085,7 +1085,7 @@ Expected: PASS
 **Step 4: Commit**
 
 ```bash
-git add docs/LOGGING.md docs/DEBUGGING.md
+git add docs/dev/logging.md docs/dev/debugging.md
 git commit -m "docs: add structured event log reference to LOGGING.md and DEBUGGING.md (#29)"
 ```
 
@@ -1105,8 +1105,8 @@ git commit -m "docs: add structured event log reference to LOGGING.md and DEBUGG
 | `.luacheckrc` | Modify | ~1 added |
 | `.luarc.json` | Modify | ~1 added |
 | `bb-log` | Modify | ~80 added |
-| `docs/LOGGING.md` | Modify | ~30 added |
-| `docs/DEBUGGING.md` | Modify | ~2 added |
+| `docs/dev/logging.md` | Modify | ~30 added |
+| `docs/dev/debugging.md` | Modify | ~2 added |
 
 ## Key design decisions baked into this plan
 

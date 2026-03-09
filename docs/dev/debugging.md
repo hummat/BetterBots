@@ -196,7 +196,7 @@ Phase 1 tests need no engine stubs for the pure heuristic functions. The `resolv
 - BT node priority evaluation (full behavior tree context)
 - Multiplayer state (not applicable — Solo Play only)
 
-For these, use the existing manual verification workflow: launch game → observe → check logs → update `docs/VALIDATION_TRACKER.md`.
+For these, use the existing manual verification workflow: launch game → observe → check logs → update `docs/dev/validation-tracker.md`.
 
 ## Fatshark's Testify framework
 

@@ -37,7 +37,7 @@ Bots use per-ability heuristics to decide when to activate — based on enemy co
 
 ## Roadmap
 
-See the [full roadmap](docs/ROADMAP.md) for details and GitHub issue links.
+See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 
 **Ability activation**
 - [x] Stance, dash, charge, shout, stealth abilities (all 6 classes)
@@ -68,7 +68,7 @@ See the [full roadmap](docs/ROADMAP.md) for details and GitHub issue links.
 - [ ] Healing item management
 - [ ] Weapon special actions (parry, bayonet)
 
-See [Status Snapshot](docs/STATUS.md) and [Validation Tracker](docs/VALIDATION_TRACKER.md) for detailed evidence.
+See [Status Snapshot](docs/dev/status.md) and [Validation Tracker](docs/dev/validation-tracker.md) for detailed evidence.
 
 ## Requirements
 
@@ -141,37 +141,37 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style
 
 ## Docs
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Status Snapshot](docs/STATUS.md)
-- [Known Issues and Risks](docs/KNOWN_ISSUES.md)
-- [Debugging and Testing](docs/DEBUGGING.md)
-- [Logging and Diagnostics](docs/LOGGING.md)
-- [Manual Test Plan](docs/TEST_PLAN.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Validation Tracker](docs/VALIDATION_TRACKER.md)
-- [Related Mods](docs/RELATED_MODS.md)
-- [Meta Builds Research](docs/META_BUILDS_RESEARCH.md)
+- [Architecture](docs/dev/architecture.md)
+- [Status Snapshot](docs/dev/status.md)
+- [Known Issues and Risks](docs/dev/known-issues.md)
+- [Debugging and Testing](docs/dev/debugging.md)
+- [Logging and Diagnostics](docs/dev/logging.md)
+- [Manual Test Plan](docs/dev/test-plan.md)
+- [Roadmap](docs/dev/roadmap.md)
+- [Validation Tracker](docs/dev/validation-tracker.md)
+- [Related Mods](docs/related-mods.md)
+- [Meta Builds Research](docs/classes/meta-builds-research.md)
 
 ### Bot system internals (from decompiled source)
 
-- [Behavior Tree](docs/BOT_BEHAVIOR_TREE.md) — full node hierarchy and conditions
-- [Combat Actions](docs/BOT_COMBAT_ACTIONS.md) — melee, shoot, ability activation
-- [Perception and Targeting](docs/BOT_PERCEPTION_TARGETING.md) — scoring, gestalt weights
-- [Navigation](docs/BOT_NAVIGATION.md) — pathfinding, follow, teleport, formation
-- [Input System](docs/BOT_INPUT_SYSTEM.md) — input routing, ActionInputParser
-- [Profiles and Spawning](docs/BOT_PROFILES_SPAWNING.md) — loadouts, weapon templates
+- [Behavior Tree](docs/bot/behavior-tree.md) — full node hierarchy and conditions
+- [Combat Actions](docs/bot/combat-actions.md) — melee, shoot, ability activation
+- [Perception and Targeting](docs/bot/perception-targeting.md) — scoring, gestalt weights
+- [Navigation](docs/bot/navigation.md) — pathfinding, follow, teleport, formation
+- [Input System](docs/bot/input-system.md) — input routing, ActionInputParser
+- [Profiles and Spawning](docs/bot/profiles-spawning.md) — loadouts, weapon templates
 
 ### Class ability references
 
 Per-class docs with internal template names, input actions, cooldowns, talent interactions, and bot implementation notes.
 Each class also has a tactics doc with community-sourced heuristics for when/how to use each ability:
 
-- [Veteran](docs/CLASS_VETERAN.md) | [Tactics](docs/CLASS_VETERAN_TACTICS.md)
-- [Zealot](docs/CLASS_ZEALOT.md) | [Tactics](docs/CLASS_ZEALOT_TACTICS.md)
-- [Psyker](docs/CLASS_PSYKER.md) | [Tactics](docs/CLASS_PSYKER_TACTICS.md)
-- [Ogryn](docs/CLASS_OGRYN.md) | [Tactics](docs/CLASS_OGRYN_TACTICS.md)
-- [Arbites](docs/CLASS_ARBITES.md) (DLC) | [Tactics](docs/CLASS_ARBITES_TACTICS.md)
-- [Hive Scum](docs/CLASS_HIVE_SCUM.md) (DLC) | [Tactics](docs/CLASS_HIVE_SCUM_TACTICS.md)
+- [Veteran](docs/classes/veteran.md) | [Tactics](docs/classes/veteran-tactics.md)
+- [Zealot](docs/classes/zealot.md) | [Tactics](docs/classes/zealot-tactics.md)
+- [Psyker](docs/classes/psyker.md) | [Tactics](docs/classes/psyker-tactics.md)
+- [Ogryn](docs/classes/ogryn.md) | [Tactics](docs/classes/ogryn-tactics.md)
+- [Arbites](docs/classes/arbites.md) (DLC) | [Tactics](docs/classes/arbites-tactics.md)
+- [Hive Scum](docs/classes/hive-scum.md) (DLC) | [Tactics](docs/classes/hive-scum-tactics.md)
 
 ## Repository layout
 

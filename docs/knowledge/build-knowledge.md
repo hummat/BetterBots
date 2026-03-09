@@ -1,7 +1,7 @@
 # Build Optimization Knowledge (v1.10.7)
 
 Source: decompiled source + web research, compiled 2026-03-09.
-Full meta builds: `../META_BUILDS_RESEARCH.md`.
+Full meta builds: `../classes/meta-builds-research.md`.
 
 ## Class Base Stats
 

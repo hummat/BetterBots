@@ -3,7 +3,7 @@
 > Compiled 2026-03-06 from Games Lantern (20 builds), Reddit/Steam/Fatshark Forums, and decompiled source v1.10.7.
 > Updated 2026-03-09 with balance patch data, breakpoint tables, community tools, and additional builds.
 > Purpose: inform bot AI ability/weapon profiles for BetterBots mod.
-> Cross-references: `CLASS_*.md` (ability templates), `CLASS_*_TACTICS.md` (heuristic rules), `knowledge/` (game system data)
+> Cross-references: `classes/*.md` (ability templates), `classes/*-tactics.md` (heuristic rules), `knowledge/` (game system data)
 
 ---
 

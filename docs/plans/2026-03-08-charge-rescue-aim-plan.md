@@ -336,9 +336,9 @@ git commit -m "feat: add rescue aim direction for charge/dash abilities (#10)"
 ### Task 5: Update docs and close issue
 
 **Files:**
-- Modify: `docs/ROADMAP.md` (strike through #10 in M3)
-- Modify: `docs/STATUS.md` (update next steps)
-- Modify: `docs/KNOWN_ISSUES.md` (if relevant)
+- Modify: `docs/dev/roadmap.md` (strike through #10 in M3)
+- Modify: `docs/dev/status.md` (update next steps)
+- Modify: `docs/dev/known-issues.md` (if relevant)
 
 **Step 1: Update ROADMAP.md**
 
@@ -364,7 +364,7 @@ Expected: No stale claims
 **Step 4: Commit**
 
 ```bash
-git add docs/ROADMAP.md docs/STATUS.md
+git add docs/dev/roadmap.md docs/dev/status.md
 git commit -m "docs: close M3 with charge rescue aim (#10)"
 ```
 

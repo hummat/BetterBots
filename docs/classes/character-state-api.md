@@ -174,6 +174,6 @@ Key uses for ability gating:
 
 ## Related
 
-- `docs/BOT_INPUT_SYSTEM.md` -- How inputs are queued and consumed
-- `docs/BOT_BEHAVIOR_TREE.md` -- BT conditions that check character state
-- `docs/BOT_COMBAT_ACTIONS.md` -- Action node lifecycles and state interactions
+- `docs/bot/input-system.md` -- How inputs are queued and consumed
+- `docs/bot/behavior-tree.md` -- BT conditions that check character state
+- `docs/bot/combat-actions.md` -- Action node lifecycles and state interactions

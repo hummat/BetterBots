@@ -39,7 +39,7 @@
 ## Evidence Source
 
 - Latest analyzed log: `console-2026-03-05-14.57.34-...`
-- Full evidence matrix: `docs/VALIDATION_TRACKER.md`
+- Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
 ## Known Blockers

@@ -11,17 +11,17 @@ MEMORY.md has brief summaries — this file has the full details.
 - Grenades/blitz: no `ability_template` → Tier 3, not yet addressed.
 
 ## Bot system docs (added 2026-03-05)
-- `docs/BOT_BEHAVIOR_TREE.md` — 14-node priority hierarchy, all conditions, blackboard
-- `docs/BOT_COMBAT_ACTIONS.md` — action node lifecycles, utility scoring curves
-- `docs/BOT_PERCEPTION_TARGETING.md` — dual scoring, gestalt weights, 5m broadphase
-- `docs/BOT_NAVIGATION.md` — GwNav, 9-level destination priority, teleport at 40m
-- `docs/BOT_INPUT_SYSTEM.md` — two-pathway architecture, ActionInputParser ring buffer
-- `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots = veteran, zero talents, tiered weapons
+- `docs/bot/behavior-tree.md` — 14-node priority hierarchy, all conditions, blackboard
+- `docs/bot/combat-actions.md` — action node lifecycles, utility scoring curves
+- `docs/bot/perception-targeting.md` — dual scoring, gestalt weights, 5m broadphase
+- `docs/bot/navigation.md` — GwNav, 9-level destination priority, teleport at 40m
+- `docs/bot/input-system.md` — two-pathway architecture, ActionInputParser ring buffer
+- `docs/bot/profiles-spawning.md` — all vanilla bots = veteran, zero talents, tiered weapons
 - Key finding: `enemies_in_proximity()` is too coarse for ability triggers — perception exposes challenge_rating, breed, distance, LoS, health/toughness
-- **Perception inconsistency**: `target_enemy`/`target_enemy_type` (BT single-target) can disagree with `challenge_rating_sum`/type counts (broadphase scan). Trust aggregates for heuristic tuning, use single-target only for boolean checks (`target_is_monster`, `target_is_super_armor`). Documented in `docs/KNOWN_ISSUES.md`.
+- **Perception inconsistency**: `target_enemy`/`target_enemy_type` (BT single-target) can disagree with `challenge_rating_sum`/type counts (broadphase scan). Trust aggregates for heuristic tuning, use single-target only for boolean checks (`target_is_monster`, `target_is_super_armor`). Documented in `docs/dev/known-issues.md`.
 
 ## Tactics docs (added 2026-03-05)
-- 6 files: `docs/CLASS_{VETERAN,ZEALOT,PSYKER,OGRYN,ARBITES,HIVE_SCUM}_TACTICS.md`
+- 6 files: `docs/classes/{veteran,zealot,psyker,ogryn,arbites,hive-scum}-tactics.md`
 - Community-sourced USE WHEN / DON'T USE / PROPOSED BOT RULES per ability with confidence levels
 - Key design findings for #2 implementation:
   - Not a uniform threat-score model — each class needs different signals
@@ -32,8 +32,8 @@ MEMORY.md has brief summaries — this file has the full details.
   - Cooldown length matters: 20s (Arbites Charge) = liberal, 80s (Point-Blank Barrage) = conservative
 
 ## Stage 1 research findings (2026-03-06)
-- `docs/GRENADE_INVENTORY.md` — 19 grenade/blitz templates mapped. ALL lack `ability_template` (except `adamant_whistle`). Need item-based fallback.
-- `docs/CHARACTER_STATE_API.md` — full state detection reference. Key: `movement_state.is_dodging`, `lunge_character_state.is_lunging/.is_aiming`, `character_state.state_name`
+- `docs/classes/grenade-inventory.md` — 19 grenade/blitz templates mapped. ALL lack `ability_template` (except `adamant_whistle`). Need item-based fallback.
+- `docs/classes/character-state-api.md` — full state detection reference. Key: `movement_state.is_dodging`, `lunge_character_state.is_lunging/.is_aiming`, `character_state.state_name`
 - Tier 3 root cause: mod's `followup_delay` too short vs actual action durations (drone: 0.24s vs 1.9s needed). Fix values known.
 - Stance cancellation (#12): Tier 1 stances have NO release input, `transition="stay"` is one-way. Need template injection or `stop_action()`.
 - Revive protection (#20): DONE — `blackboard.behavior.current_interaction_unit ~= nil` blocks ability during any interaction.
@@ -63,7 +63,7 @@ MEMORY.md has brief summaries — this file has the full details.
 - Current overhead is negligible — mod reads engine-cached data, no new scans/raycasts/pathfinding
 - `build_context` (heaviest function) cached per unit per fixed_t, runs once per bot per frame
 - Heuristics are pure arithmetic — sub-microsecond
-- Full analysis + growth risk matrix documented in `docs/ARCHITECTURE.md` "Performance analysis" section
+- Full analysis + growth risk matrix documented in `docs/dev/architecture.md` "Performance analysis" section
 - **Watch list for perf-sensitive issues**: #13 (navmesh queries — gate behind heuristic, cache negatives), #22 (utility scoring — keep context cache), #23 (melee selection — cache weapon template reads), hook count (consolidate if >10 per-frame hooks)
 
 ## Log analysis patterns
@@ -72,4 +72,4 @@ MEMORY.md has brief summaries — this file has the full details.
 - `-> true` DOES appear in debug decision lines (e.g. `decision veteran_combat_ability -> true (rule=...)`)
 - Combat activity filter: `rg "BetterBots DEBUG:" <log> | grep -v "nearby=0\|patch\|logging\|loaded\|metadata\|GameplayState\|condition"`
 - Activations only: `rg "fallback queued|charge consumed" <log>`
-- See `docs/DEBUGGING.md` for full grep recipes and log pattern reference
+- See `docs/dev/debugging.md` for full grep recipes and log pattern reference

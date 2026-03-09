@@ -71,11 +71,11 @@ git commit -m "fix(item_fallback): align ITEM_SEQUENCE_PROFILES timing with engi
    - Force field: was ~13% → target: >50%
    - Drone: was ~21% → target: >50%
    - Relic: was 100% → should remain 100%
-5. Record results in `docs/VALIDATION_TRACKER.md` as a new run entry
+5. Record results in `docs/dev/validation-tracker.md` as a new run entry
 
 **Commit:**
 ```bash
-git add docs/VALIDATION_TRACKER.md
+git add docs/dev/validation-tracker.md
 git commit -m "docs: record Tier 3 timing fix validation run (#3)"
 ```
 
@@ -809,18 +809,18 @@ Verify changes are scoped to expected files.
 
 **Step 4: Update docs**
 
-Update `docs/KNOWN_ISSUES.md`:
+Update `docs/dev/known-issues.md`:
 - Note timing values have been corrected in ITEM_SEQUENCE_PROFILES
 - Note item heuristics now replace coarse `enemies_in_proximity > 0` gate
 - Update heuristic count
 
-Update `docs/VALIDATION_TRACKER.md`:
+Update `docs/dev/validation-tracker.md`:
 - Add placeholder for Tier 3 heuristic validation run (separate from timing run in Task 2)
 
 **Step 5: Commit docs**
 
 ```bash
-git add docs/KNOWN_ISSUES.md docs/VALIDATION_TRACKER.md
+git add docs/dev/known-issues.md docs/dev/validation-tracker.md
 git commit -m "docs: update known issues and validation tracker for Tier 3 heuristics (#3)"
 ```
 
@@ -847,10 +847,10 @@ git commit -m "docs: update known issues and validation tracker for Tier 3 heuri
    - force_field: `pressure`, `ranged_pressure` vs `safe`, `hold`
    - drone: `team_horde`, `monster_fight` vs `no_allies`, `low_value`
 7. Verify consume rates remain at improved levels from Task 2
-8. Record results in `docs/VALIDATION_TRACKER.md`
+8. Record results in `docs/dev/validation-tracker.md`
 
 **Commit:**
 ```bash
-git add docs/VALIDATION_TRACKER.md
+git add docs/dev/validation-tracker.md
 git commit -m "docs: record Tier 3 heuristic validation run (#3)"
 ```

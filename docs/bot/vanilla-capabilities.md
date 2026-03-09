@@ -247,7 +247,7 @@ BT node `activate_grenade_ability` exists (priority 9) and uses the same `can_ac
 
 The one exception is `adamant_whistle` (Ogryn rock throw), which has an `ability_template` field — but it's still blocked by the whitelist.
 
-**Source:** `docs/GRENADE_INVENTORY.md` for full template inventory
+**Source:** `docs/classes/grenade-inventory.md` for full template inventory
 
 **With mods:** BetterBots issue #4 tracks grenade support. Requires item-based fallback similar to Tier 3 abilities.
 

@@ -97,7 +97,7 @@ feat: tier 3 item-ability fallback and runtime hardening
 - timing/timeout tuning for item abilities
 - validation tracker with ratio-based reliability metrics
 ```
-Files: `scripts/mods/BetterBots/BetterBots.lua`, `docs/VALIDATION_TRACKER.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`, `README.md`, `HANDOFF.md`
+Files: `scripts/mods/BetterBots/BetterBots.lua`, `docs/dev/validation-tracker.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`, `README.md`, `HANDOFF.md`
 
 **Commit 2: Class doc audit**
 ```
@@ -109,7 +109,7 @@ docs: audit class profiles against decompiled source v1.10.7
 - Fix Psyker Chain Lightning cooldown (Peril-gated, not 1s)
 - Add missing talents, correct numerical values across all 6 classes
 ```
-Files: `docs/CLASS_*.md`
+Files: `docs/classes/*.md`
 
 **Commit 3: Bot system documentation**
 ```
@@ -122,7 +122,7 @@ docs: add bot system reference docs from decompiled source
 - Input system and action data pipeline
 - Bot profiles, spawning, and group coordination
 ```
-Files: `docs/BOT_*.md`
+Files: `docs/bot/*.md`
 
 **Commit 4: Package target**
 ```

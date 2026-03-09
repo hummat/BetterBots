@@ -26,13 +26,13 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 1. Launch with SoloPlay + Tertium5/6 mods active
 2. Check for `BetterBots loaded` in game chat
 3. After mission: `bb-log summary` to verify activations and hold rules
-4. See `docs/VALIDATION_TRACKER.md` for structured run entries and the heuristic validation matrix
+4. See `docs/dev/validation-tracker.md` for structured run entries and the heuristic validation matrix
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 ## Debugging
 
-See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
+See `docs/dev/debugging.md` for full debug tool reference. Key tools:
 - **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
@@ -41,7 +41,7 @@ See `docs/DEBUGGING.md` for full debug tool reference. Key tools:
 - `mod:command(name, desc, func)` — register `/name` chat commands for runtime debugging
 - In-game: `/bb_state`, `/bb_decide`, `/bb_brain` for live bot diagnostics
 - Hot-reload: `Ctrl+Shift+R` (requires DMF Developer Mode)
-- Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/DEBUGGING.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
+- Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/dev/debugging.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
 - **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
 
 ## Local static checks
@@ -181,47 +181,47 @@ Local clone: `../Darktide-Source-Code/`
 
 | You just... | Update |
 |---|---|
-| Added/removed a `_can_activate_*` function | Function count in this file + `docs/DEBUGGING.md` |
-| Added/removed/moved tests | Per-file test counts in this file + `docs/DEBUGGING.md` |
-| Changed tier status or validation result | Tier table in this file + `docs/VALIDATION_TRACKER.md` + `docs/STATUS.md` |
-| Closed a GitHub issue | Remove from active tables in `docs/ROADMAP.md` + `docs/STATUS.md` |
-| Added a new hook or module | `docs/ARCHITECTURE.md` |
-| Changed debug commands or log patterns | `docs/DEBUGGING.md` |
+| Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
+| Added/removed/moved tests | Per-file test counts in this file + `docs/dev/debugging.md` |
+| Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` |
+| Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
+| Added a new hook or module | `docs/dev/architecture.md` |
+| Changed debug commands or log patterns | `docs/dev/debugging.md` |
 | Released a new version (`make release`) | Add changelog entry on Nexus (version + user-facing summary) |
 
 ### Doc index by activity
 
 | You're about to... | Read first |
 |---------------------|------------|
-| Write or modify ability heuristics | `docs/CLASS_<name>.md` + `docs/CLASS_<name>_TACTICS.md` for the class |
-| Analyze game logs | `docs/DEBUGGING.md` (log patterns, grep recipes, file locations) |
-| Analyze logging code | `docs/LOGGING.md` (log format, throttle keys, output levels, JSONL event log) |
-| Understand what vanilla bots can/cannot do | `docs/BOT_VANILLA_CAPABILITIES.md` |
-| Modify bot behavior (targeting, movement, weapons) | Relevant `docs/BOT_*.md` file(s) |
-| Modify input queueing or action sequences | `docs/BOT_INPUT_SYSTEM.md` |
-| Assess what works / what's broken | `docs/VALIDATION_TRACKER.md` + `docs/KNOWN_ISSUES.md` |
-| Work on Tier 3 item abilities | `docs/BOT_INPUT_SYSTEM.md` + `docs/RELATED_MODS.md` |
-| Work on grenade/blitz support | `docs/GRENADE_INVENTORY.md` + `docs/BOT_INPUT_SYSTEM.md` |
-| Gate ability activation on bot state | `docs/CHARACTER_STATE_API.md` |
-| Integrate with or reference other mods | `docs/RELATED_MODS.md` |
+| Write or modify ability heuristics | `docs/classes/<name>.md` + `docs/classes/<name>-tactics.md` for the class |
+| Analyze game logs | `docs/dev/debugging.md` (log patterns, grep recipes, file locations) |
+| Analyze logging code | `docs/dev/logging.md` (log format, throttle keys, output levels, JSONL event log) |
+| Understand what vanilla bots can/cannot do | `docs/bot/vanilla-capabilities.md` |
+| Modify bot behavior (targeting, movement, weapons) | Relevant `docs/bot/*.md` file(s) |
+| Modify input queueing or action sequences | `docs/bot/input-system.md` |
+| Assess what works / what's broken | `docs/dev/validation-tracker.md` + `docs/dev/known-issues.md` |
+| Work on Tier 3 item abilities | `docs/bot/input-system.md` + `docs/related-mods.md` |
+| Work on grenade/blitz support | `docs/classes/grenade-inventory.md` + `docs/bot/input-system.md` |
+| Gate ability activation on bot state | `docs/classes/character-state-api.md` |
+| Integrate with or reference other mods | `docs/related-mods.md` |
 | Implement or fix a GitHub issue | Full issue + all comments (`gh issue view <N> --comments`) |
-| Plan work or prioritize issues | `docs/ROADMAP.md` + `docs/STATUS.md` |
-| Understand meta builds, weapon/ability popularity | `docs/META_BUILDS_RESEARCH.md` |
-| Update Nexus mod page or release text | `docs/NEXUS_DESCRIPTION.bbcode` |
-| Verify a change in-game | `docs/DEBUGGING.md` (debug commands, verification workflow) |
-| Understand the module architecture | `docs/ARCHITECTURE.md` |
+| Plan work or prioritize issues | `docs/dev/roadmap.md` + `docs/dev/status.md` |
+| Understand meta builds, weapon/ability popularity | `docs/classes/meta-builds-research.md` |
+| Update Nexus mod page or release text | `docs/nexus-description.bbcode` |
+| Verify a change in-game | `docs/dev/debugging.md` (debug commands, verification workflow) |
+| Understand the module architecture | `docs/dev/architecture.md` |
 | Create branches, batch test, or merge | Branching workflow section (this file) |
-| Add per-frame logic, hooks, or engine queries | `docs/ARCHITECTURE.md` (Performance section) |
-| Write or modify tests | `docs/DEBUGGING.md` (automated testing section) |
-| Understand backend/progression/economy systems | `docs/BACKEND_PROGRESSION.md` |
-| Explore local co-op / LAN / multiplayer modding | `docs/LOCAL_MULTIPLAYER.md` |
+| Add per-frame logic, hooks, or engine queries | `docs/dev/architecture.md` (Performance section) |
+| Write or modify tests | `docs/dev/debugging.md` (automated testing section) |
+| Understand backend/progression/economy systems | `docs/backend-progression.md` |
+| Explore local co-op / LAN / multiplayer modding | `docs/local-multiplayer.md` |
 
 ### Required reading order for ability work
 
 1. This file (architecture overview)
-2. The relevant `docs/CLASS_*.md` (template names, input patterns, tiers)
-3. The relevant `docs/CLASS_*_TACTICS.md` (when/how to use each ability, proposed bot rules)
-4. The relevant `docs/BOT_*.md` files (system internals)
+2. The relevant `docs/classes/<name>.md` (template names, input patterns, tiers)
+3. The relevant `docs/classes/<name>-tactics.md` (when/how to use each ability, proposed bot rules)
+4. The relevant `docs/bot/*.md` files (system internals)
 5. Decompiled source in `../Darktide-Source-Code/` for field-level verification
 
 Do not write trigger heuristics without first reading the tactics doc for that class.
@@ -229,32 +229,32 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 ### Full doc listing
 
 **Per-class ability references** (template names, input patterns, cooldowns, tiers):
-`docs/CLASS_VETERAN.md`, `docs/CLASS_ZEALOT.md`, `docs/CLASS_PSYKER.md`, `docs/CLASS_OGRYN.md`, `docs/CLASS_ARBITES.md`, `docs/CLASS_HIVE_SCUM.md`
+`docs/classes/veteran.md`, `docs/classes/zealot.md`, `docs/classes/psyker.md`, `docs/classes/ogryn.md`, `docs/classes/arbites.md`, `docs/classes/hive-scum.md`
 
 **Per-class tactical heuristics** (community-sourced USE WHEN / DON'T USE / proposed bot rules):
-`docs/CLASS_VETERAN_TACTICS.md`, `docs/CLASS_ZEALOT_TACTICS.md`, `docs/CLASS_PSYKER_TACTICS.md`, `docs/CLASS_OGRYN_TACTICS.md`, `docs/CLASS_ARBITES_TACTICS.md`, `docs/CLASS_HIVE_SCUM_TACTICS.md`
+`docs/classes/veteran-tactics.md`, `docs/classes/zealot-tactics.md`, `docs/classes/psyker-tactics.md`, `docs/classes/ogryn-tactics.md`, `docs/classes/arbites-tactics.md`, `docs/classes/hive-scum-tactics.md`
 
 **Bot system internals** (from decompiled source):
-- `docs/BOT_VANILLA_CAPABILITIES.md` — exhaustive inventory of what vanilla bots can/cannot do, with source references
-- `docs/BOT_BEHAVIOR_TREE.md` — full BT node hierarchy, all conditions, blackboard schema
-- `docs/BOT_COMBAT_ACTIONS.md` — melee/shoot/ability action node lifecycles, utility scoring
-- `docs/BOT_PERCEPTION_TARGETING.md` — target selection scoring formula, gestalt weights, proximity
-- `docs/BOT_NAVIGATION.md` — pathfinding, follow behavior, teleport triggers, formation
-- `docs/BOT_INPUT_SYSTEM.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
-- `docs/BOT_PROFILES_SPAWNING.md` — all vanilla bots are veterans, zero talents, weapon templates
+- `docs/bot/vanilla-capabilities.md` — exhaustive inventory of what vanilla bots can/cannot do, with source references
+- `docs/bot/behavior-tree.md` — full BT node hierarchy, all conditions, blackboard schema
+- `docs/bot/combat-actions.md` — melee/shoot/ability action node lifecycles, utility scoring
+- `docs/bot/perception-targeting.md` — target selection scoring formula, gestalt weights, proximity
+- `docs/bot/navigation.md` — pathfinding, follow behavior, teleport triggers, formation
+- `docs/bot/input-system.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
+- `docs/bot/profiles-spawning.md` — all vanilla bots are veterans, zero talents, weapon templates
 
 **API references** (from decompiled source):
-- `docs/GRENADE_INVENTORY.md` — all 19 grenade/blitz templates, input patterns, implementation approach
-- `docs/CHARACTER_STATE_API.md` — character state detection components, fields, access patterns
-- `docs/META_BUILDS_RESEARCH.md` — endgame meta builds per class, weapon/ability rankings, community build database
-- `docs/BACKEND_PROGRESSION.md` — backend API architecture, progression systems, local backend feasibility
-- `docs/LOCAL_MULTIPLAYER.md` — local co-op feasibility, engine networking, VT2 comparison
+- `docs/classes/grenade-inventory.md` — all 19 grenade/blitz templates, input patterns, implementation approach
+- `docs/classes/character-state-api.md` — character state detection components, fields, access patterns
+- `docs/classes/meta-builds-research.md` — endgame meta builds per class, weapon/ability rankings, community build database
+- `docs/backend-progression.md` — backend API architecture, progression systems, local backend feasibility
+- `docs/local-multiplayer.md` — local co-op feasibility, engine networking, VT2 comparison
 
 **Project management:**
-`docs/DEBUGGING.md`, `docs/LOGGING.md`, `docs/ARCHITECTURE.md`, `docs/VALIDATION_TRACKER.md`, `docs/KNOWN_ISSUES.md`, `docs/RELATED_MODS.md`, `docs/ROADMAP.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`
+`docs/dev/debugging.md`, `docs/dev/logging.md`, `docs/dev/architecture.md`, `docs/dev/validation-tracker.md`, `docs/dev/known-issues.md`, `docs/related-mods.md`, `docs/dev/roadmap.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`
 
 **Release:**
-- `docs/NEXUS_DESCRIPTION.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
+- `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
 
 ## Mod file structure
 
