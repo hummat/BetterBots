@@ -1,0 +1,23 @@
+{
+  "title": "Veteran Squad Leader",
+  "author": "seventhcodex",
+  "class": "veteran",
+  "weapons": [
+    {
+      "name": "Lawbringer Mk IIb Power Falchion",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Cranial Grounding" }, { "name": "Heatsink" }]
+    },
+    {
+      "name": "M35 Magnacore Mk II Plasma Gun",
+      "perks": ["20-25% Damage (Maniacs)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Rising Heat" }, { "name": "Gets Hot!" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+15-20% DR vs Snipers", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

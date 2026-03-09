@@ -1,0 +1,23 @@
+{
+  "title": "Arby's OP Melee Meta Havoc 40",
+  "author": "B-To-The-Ryan",
+  "class": "arbites",
+  "weapons": [
+    {
+      "name": "Branx Mk III Arbites Shock Maul",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "High Voltage" }, { "name": "Relentless Strikes" }]
+    },
+    {
+      "name": "Exaction Mk III Exterminator Shotgun",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Deathspitter" }, { "name": "Sustained Fire" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+10-12% Revive Speed"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

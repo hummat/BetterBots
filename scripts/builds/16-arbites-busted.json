@@ -1,0 +1,23 @@
+{
+  "title": "BUSTED Havoc 40",
+  "author": "charname",
+  "class": "arbites",
+  "weapons": [
+    {
+      "name": "Branx Mk III Arbites Shock Maul",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Execution" }, { "name": "High Voltage" }]
+    },
+    {
+      "name": "Exaction Mk III Exterminator Shotgun",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Deathspitter" }, { "name": "Execution" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Revive Speed", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

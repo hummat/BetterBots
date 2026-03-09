@@ -1,0 +1,23 @@
+{
+  "title": "The Chemist",
+  "author": "Reginald",
+  "class": "hive scum",
+  "weapons": [
+    {
+      "name": "Chirurgeon's Mk IV Bone Saw",
+      "perks": ["20-25% Damage (Unyielding)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Decimator" }, { "name": "Shock & Awe" }]
+    },
+    {
+      "name": "Branx Mk II Needle Pistol",
+      "perks": ["20-25% Damage (Unyielding)", "20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "Run 'n' Gun" }, { "name": "Stripped Down" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+10-12% Revive Speed", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

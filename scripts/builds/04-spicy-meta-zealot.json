@@ -1,0 +1,23 @@
+{
+  "title": "Spicy's Meta Havoc 40 Zealot",
+  "author": "randomspicy",
+  "class": "zealot",
+  "weapons": [
+    {
+      "name": "Munitorum Mk X Relic Blade",
+      "perks": ["20-25% Damage (Carapace)", "8-10% Damage (Elites)"],
+      "blessings": [{ "name": "Heatsink" }, { "name": "Cranial Grounding" }]
+    },
+    {
+      "name": "Artemia Mk III Purgation Flamer",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Blaze Away" }, { "name": "Penetrating Flame" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Block Efficiency", "+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

@@ -1,0 +1,23 @@
+{
+  "title": "Execution Order Nuncio-Aquila",
+  "author": "fatherlyfigure",
+  "class": "arbites",
+  "weapons": [
+    {
+      "name": "Branx Mk VI Shock Maul & Suppression Shield",
+      "perks": ["20-25% Damage (Maniacs)", "20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "High Voltage" }, { "name": "Confident Strike" }]
+    },
+    {
+      "name": "Judgement Mk IV Subductor Shotpistol & Riot Shield",
+      "perks": ["20-25% Damage (Maniacs)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Full Bore" }, { "name": "Fire Frenzy" }]
+    }
+  ],
+  "curios": [
+    { "name": "Gilded Inquisitorial Rosette", "perks": ["+4-5% Toughness", "+15-20% DR vs Gunners"] },
+    { "name": "Gilded Inquisitorial Rosette", "perks": ["+4-5% Health"] },
+    { "name": "Scrap of Scripture", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

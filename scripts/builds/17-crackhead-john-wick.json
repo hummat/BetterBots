@@ -1,0 +1,23 @@
+{
+  "title": "Crackhead John Wick",
+  "author": "Sanloms",
+  "class": "hive scum",
+  "weapons": [
+    {
+      "name": "Improvised Mk I Shivs",
+      "perks": ["20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "Uncanny Strike" }, { "name": "Precognition" }]
+    },
+    {
+      "name": "Branx Mk VIII Dual Stub Pistols",
+      "perks": ["20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Run 'n' Gun" }, { "name": "Speedload" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+4-5% Health", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

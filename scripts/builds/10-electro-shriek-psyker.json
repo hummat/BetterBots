@@ -1,0 +1,23 @@
+{
+  "title": "Electro Shriek Big Damage",
+  "author": "Mizumelon",
+  "class": "psyker",
+  "weapons": [
+    {
+      "name": "Covenant Mk VIII Blaze Force Greatsword",
+      "perks": ["20-25% Damage (Infested)", "20-25% Damage (Unarmoured)"],
+      "blessings": [{ "name": "Shred" }, { "name": "Wrath" }]
+    },
+    {
+      "name": "Nomanus Mk VI Electrokinetic Force Staff",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Warp Nexus" }, { "name": "Warp Flurry" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

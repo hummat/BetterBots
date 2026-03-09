@@ -1,0 +1,23 @@
+{
+  "title": "Holy Gains Havoc 40",
+  "author": "charname",
+  "class": "zealot",
+  "weapons": [
+    {
+      "name": "Tigrus Mk XV Heavy Eviscerator",
+      "perks": ["20-25% Damage (Unyielding)", "20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "Wrath" }, { "name": "Bloodthirsty" }]
+    },
+    {
+      "name": "Godwyn-Branx Mk IV Bolt Pistol",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Lethal Proximity" }, { "name": "Puncture" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": ["+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

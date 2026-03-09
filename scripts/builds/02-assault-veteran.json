@@ -1,0 +1,23 @@
+{
+  "title": "Assault Veteran",
+  "author": "Graf",
+  "class": "veteran",
+  "weapons": [
+    {
+      "name": "Lawbringer Mk IIb Power Falchion",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Energy Leakage" }, { "name": "Cranial Grounding" }]
+    },
+    {
+      "name": "M35 Magnacore Mk II Plasma Gun",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Gets Hot!" }, { "name": "Rising Heat" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

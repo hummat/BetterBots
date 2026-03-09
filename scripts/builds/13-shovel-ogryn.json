@@ -1,0 +1,23 @@
+{
+  "title": "Shovel Ogryn",
+  "author": "dopeslinker",
+  "class": "ogryn",
+  "weapons": [
+    {
+      "name": "Brute-Brainer Mk III Latrine Shovel",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Skullcrusher" }, { "name": "Thunderous" }]
+    },
+    {
+      "name": "Foe-Rend Mk V Ripper Gun",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [{ "name": "Inspiring Barrage" }, { "name": "Blaze Away" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+10-12% Revive Speed", "+4-5% Health"] },
+    { "name": "Blessed Bullet", "perks": ["+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

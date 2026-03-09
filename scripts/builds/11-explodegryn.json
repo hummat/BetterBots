@@ -1,0 +1,23 @@
+{
+  "title": "Mister E's Explodegryn",
+  "author": "Mister E",
+  "class": "ogryn",
+  "weapons": [
+    {
+      "name": "Achlys Mk I Power Maul",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Power Surge" }, { "name": "Skullcrusher" }]
+    },
+    {
+      "name": "Lorenz Mk VI Rumbler",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Shattering Impact" }, { "name": "Adhesive Charge" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}
