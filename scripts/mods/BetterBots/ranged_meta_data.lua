@@ -136,27 +136,10 @@ local function build_meta_data(weapon_template)
 		end
 	end
 
-	if not is_valid_input(weapon_template, fallback.aim_action_input) then
-		local aim_input, aim_action = find_aim_input(weapon_template)
-		if aim_input then
-			meta.aim_action_input = aim_input
-			if not (weapon_template.actions or {})["action_zoom"] then
-				meta.aim_action_name = aim_action
-			end
-			changed = true
-		end
-	end
-
-	if not is_valid_input(weapon_template, fallback.aim_fire_action_input) then
-		local aim_fire_input, aim_fire_action = find_aim_fire_input(weapon_template)
-		if aim_fire_input then
-			meta.aim_fire_action_input = aim_fire_input
-			if not (weapon_template.actions or {})["action_shoot_zoomed"] then
-				meta.aim_fire_action_name = aim_fire_action
-			end
-			changed = true
-		end
-	end
+	-- Aim/aim-fire derivation deliberately omitted: action_two_hold is
+	-- overloaded (ADS on guns, charged secondary on staffs). Injecting the
+	-- wrong action causes bots to start alt-fire when they should be aiming.
+	-- See #43 for charge-weapon secondary fire support.
 
 	return changed and meta or nil
 end

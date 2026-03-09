@@ -14,6 +14,7 @@ local _patched_bt_bot_conditions = setmetatable({}, { __mode = "k" })
 local _patched_bt_conditions = setmetatable({}, { __mode = "k" })
 local _patched_ability_templates = setmetatable({}, { __mode = "k" })
 local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
+local _patched_weapon_templates_ranged = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
@@ -220,7 +221,7 @@ MeleeMetaData.init({
 
 RangedMetaData.init({
 	mod = mod,
-	patched_weapon_templates = _patched_weapon_templates,
+	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
 })
 

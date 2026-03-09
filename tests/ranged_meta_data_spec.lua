@@ -299,24 +299,20 @@ describe("ranged_meta_data", function()
 			assert.is_nil(meta.fire_action_name)
 		end)
 
-		it("also injects aim fields when aim input is invalid", function()
+		it("does not inject aim fields even when aim input is invalid", function()
 			local templates = {
 				exotic = make_ranged_template({
 					action_inputs = {
 						shoot_pressed = { input_sequence = {
 							{ input = "action_one_pressed", value = true },
 						} },
-						brace_pressed = { input_sequence = {
+						charge = { input_sequence = {
 							{ input = "action_two_hold", value = true },
-						} },
-						trigger_explosion = { input_sequence = {
-							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
 						} },
 					},
 					actions = {
 						rapid_left = { start_input = "shoot_pressed" },
-						action_brace = { start_input = "brace_pressed" },
-						action_explode = { start_input = "trigger_explosion" },
+						action_charge = { start_input = "charge" },
 					},
 				}),
 			}
@@ -326,10 +322,8 @@ describe("ranged_meta_data", function()
 			local meta = templates.exotic.attack_meta_data
 			assert.is_table(meta)
 			assert.equals("shoot_pressed", meta.fire_action_input)
-			assert.equals("brace_pressed", meta.aim_action_input)
-			assert.equals("action_brace", meta.aim_action_name)
-			assert.equals("trigger_explosion", meta.aim_fire_action_input)
-			assert.equals("action_explode", meta.aim_fire_action_name)
+			assert.is_nil(meta.aim_action_input)
+			assert.is_nil(meta.aim_fire_action_input)
 		end)
 
 		it("skips weapons where vanilla fallback is valid", function()
