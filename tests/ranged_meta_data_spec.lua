@@ -391,8 +391,8 @@ describe("ranged_meta_data", function()
 			assert.is_nil(templates.sword.attack_meta_data)
 		end)
 
-		it("does not overwrite existing attack_meta_data", function()
-			local existing = { fire_action_input = "custom" }
+		it("merges corrections into existing attack_meta_data without overwriting", function()
+			local existing = { aim_data = { min_distance = 5 } }
 			local template = make_ranged_template({
 				action_inputs = {
 					shoot_pressed = { input_sequence = {
@@ -407,6 +407,27 @@ describe("ranged_meta_data", function()
 			RangedMetaData.inject(templates)
 
 			assert.equals(existing, templates.staff.attack_meta_data)
+			assert.equals("shoot_pressed", existing.fire_action_input)
+			assert.equals("rapid_left", existing.fire_action_name)
+			assert.same({ min_distance = 5 }, existing.aim_data)
+		end)
+
+		it("does not overwrite existing fields in attack_meta_data", function()
+			local existing = { fire_action_input = "custom_fire" }
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = { rapid_left = { start_input = "shoot_pressed" } },
+			})
+			template.attack_meta_data = existing
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("custom_fire", existing.fire_action_input)
 		end)
 
 		it("is idempotent for the same table", function()

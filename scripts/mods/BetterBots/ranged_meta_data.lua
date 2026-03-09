@@ -162,18 +162,32 @@ local function inject(WeaponTemplates)
 	end
 
 	local injected = 0
+	local patched = 0
 	local skipped = 0
 
 	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
 		if type(template) == "table" and has_keyword(template, "ranged") then
-			if template.attack_meta_data then
-				skipped = skipped + 1
-			else
-				local meta = build_meta_data(template)
-				if meta then
-					template.attack_meta_data = meta
+			local corrections = build_meta_data(template)
+			if corrections then
+				if template.attack_meta_data then
+					local merged = 0
+					for k, v in pairs(corrections) do
+						if template.attack_meta_data[k] == nil then
+							template.attack_meta_data[k] = v
+							merged = merged + 1
+						end
+					end
+					if merged > 0 then
+						patched = patched + 1
+					else
+						skipped = skipped + 1
+					end
+				else
+					template.attack_meta_data = corrections
 					injected = injected + 1
 				end
+			else
+				skipped = skipped + 1
 			end
 		end
 	end
@@ -182,7 +196,13 @@ local function inject(WeaponTemplates)
 	_debug_log(
 		"ranged_meta_injection:" .. tostring(WeaponTemplates),
 		0,
-		"ranged attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
+		"ranged attack_meta_data patch installed (injected="
+			.. injected
+			.. ", patched="
+			.. patched
+			.. ", skipped="
+			.. skipped
+			.. ")"
 	)
 end
 
