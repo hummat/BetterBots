@@ -27,7 +27,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Charge/dash rescue aim (#10): rescue triggers + aim correction for zealot dash, ogryn charge, arbites charge
 - 198 unit tests, M3 complete
 
-### dev/m4-batch1 (validated on branch, pending merge — 2026-03-09)
+### v0.5.0 (2026-03-09)
 - VFX/SFX bleed fix (#42), smart melee attack selection (#23), ranged fire fix (#31), warp venting (#30)
 - Staff charged fire (#43, partial — p4 PASS in-game, p3 untested, p1/p2 need investigation)
 - 230 unit tests
@@ -55,14 +55,12 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 4 | Blitz / grenade support | Inventory extracted — 19 templates mapped. All except `adamant_whistle` need item-based fallback. `adamant_whistle` is the only blitz with `ability_template` (potential Tier 1/2). #3 resolved — Phase 1 unblocked. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
-| 30 | Bot warp charge venting | Validated on dev/m4-batch1, pending merge. 3 hooks: warp charge bridge, hysteresis fix, reload→vent translation. |
-| 43 | Staff charged fire | Partial on dev/m4-batch1. `_may_fire()` hook + aim chain derivation. p4 PASS in-game, p3 untested, p1/p2 need decompiled template inspection. |
+| 43 | Staff charged fire | Partial — shipped in v0.5.0. `_may_fire()` hook + aim chain derivation. p4 PASS in-game, p3 untested, p1/p2 need decompiled template inspection. |
 
 **Bot weapon/equipment fixes:**
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 31 | Player weapon ranged `attack_meta_data` | Validated on dev/m4-batch1, pending merge. 36 templates patched with corrected fire/aim-fire inputs. |
 | 41 | Weapon/enemy-aware ADS vs hip-fire | Static `killshot` gestalt for all weapons. Need per-weapon gestalt + enemy-aware fire cadence. |
 
 **General bot behavior:**
@@ -81,7 +79,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | 7 | Revive-with-ability | Inject ability BT node before revive (stealth/taunt/shout to protect revive). |
 | 14 | Ability cooldown staggering | Team-level coordination: don't stack all abilities simultaneously. |
 | 22 | Utility-based ability scoring | Replace boolean conditions with spline-interpolated utility curves (90+ considerations in VT2). Architectural upgrade. |
-| 23 | Smart melee attack selection | Armor-aware attack choice (+utility for penetrating vs carapace). Also covers player weapon melee `attack_meta_data` injection. |
 | 24 | Healing item management | Don't waste medicae, distribute healing to wounded allies, stim usage. |
 | 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
 | 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch (`bot_group.lua:26` reads wrong field). Not a one-flag fix. |
@@ -111,6 +108,6 @@ See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
 3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
-4. **M4:** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30) validated on branch, pending merge. Staff charged fire (#43) partial — p4 PASS, p1/p2/p3 open. Remaining: stance cancellation (#12), navmesh validation (#13), suppress dodge (#15), hazard avoidance (#21), objective-aware activation (#37), per-ability toggles (#6), Hive Scum support (#8), ADS awareness (#41).
+4. **M4:** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30) shipped in v0.5.0. Staff charged fire (#43) partial — p4 PASS, p1/p2/p3 open. Remaining: stance cancellation (#12), navmesh validation (#13), suppress dodge (#15), hazard avoidance (#21), objective-aware activation (#37), per-ability toggles (#6), Hive Scum support (#8), ADS awareness (#41).
 5. **M5:** Scope expansion — grenade/blitz support (#4), bot behavior (#16-#19), heal deferral (#39).
 6. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

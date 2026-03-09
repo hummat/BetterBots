@@ -28,7 +28,7 @@
 - **Unit tests**: 230 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
 
-### dev/m4-batch1 (validated on branch, pending merge — 2026-03-09)
+### v0.5.0 (2026-03-09)
 - **VFX/SFX bleed fix** (#42): suppress bot ability VFX/SFX bleeding to human player
 - **Smart melee attack selection** (#23): armor-aware `attack_meta_data` injection (66 templates)
 - **Ranged fire fix** (#31): `attack_meta_data` injection for non-standard fire paths (36 templates patched)
@@ -54,7 +54,6 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
-- Merge dev/m4-batch1 (#42/#23/#31/#30) to main and tag v0.5.0
 - #43: inspect decompiled `forcestaff_p2_m1` action graph, write failing test for p2, then broaden `find_aim_action_for_fire()`
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2

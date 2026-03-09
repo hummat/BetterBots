@@ -59,12 +59,14 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 
 **Bot weapon/equipment fixes**
 - [x] Fix ADS for Tertium 5/6 bots
-- [ ] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
-- [ ] Bot warp charge venting
+- [x] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
+- [x] Bot warp charge venting
+- [x] Suppress bot VFX/SFX bleed to human player
+- [x] Smart melee attack selection (armor-aware)
+- [ ] Weapon/enemy-aware ADS vs hip-fire
 
 **Long-term**
 - [ ] Utility-based ability scoring
-- [ ] Smart melee attack selection
 - [ ] Healing item management
 - [ ] Weapon special actions (parry, bayonet)
 
@@ -182,8 +184,10 @@ scripts/mods/BetterBots/          # Mod source
   heuristics.lua                  #   18 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
-  event_log.lua                   #   Structured JSONL event logging
-  debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
+  melee_meta_data.lua              #   Armor-aware melee attack_meta_data injection
+  ranged_meta_data.lua             #   Per-family ranged attack_meta_data injection
+  event_log.lua                    #   Structured JSONL event logging
+  debug.lua                        #   Debug commands (/bb_state, /bb_decide, /bb_brain)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
 tests/                            # Unit tests (busted)
