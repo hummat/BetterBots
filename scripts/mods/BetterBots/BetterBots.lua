@@ -76,7 +76,7 @@ local function _debug_log(key, fixed_t, message, min_interval_s)
 	end
 
 	_last_debug_log_t_by_key[key] = t
-	mod:echo("BetterBots DEBUG: " .. message)
+	mod:echo("BetterBots DEBUG: " .. message:gsub("%%", "%%%%"))
 end
 
 local _SUPPRESSED_STATES = {
