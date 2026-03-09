@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 226 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
+- `make test` — 229 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -253,6 +253,9 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 **Project management:**
 `docs/dev/debugging.md`, `docs/dev/logging.md`, `docs/dev/architecture.md`, `docs/dev/validation-tracker.md`, `docs/dev/known-issues.md`, `docs/related-mods.md`, `docs/dev/roadmap.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`
 
+**Build research:**
+- `scripts/extract-build.mjs` — Playwright scraper for GamesLantern build profiles (talents, weapons, curios). See header for GL discovery tips (path routes, `site:` search).
+
 **Release:**
 - `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
 
@@ -281,5 +284,5 @@ tests/
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
   sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
-  ranged_meta_data_spec.lua                 # 28 tests for ranged fallback, input derivation + injection
+  ranged_meta_data_spec.lua                 # 31 tests for ranged fallback, input derivation, injection + charge override
 ```
