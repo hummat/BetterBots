@@ -61,21 +61,21 @@ end
 
 local function find_start_action(weapon_template)
 	for _, action in pairs(weapon_template.actions or {}) do
-		if action.start_input == "start_attack" then
+		if action.start_input == "start_attack" and not action.invalid_start_action_for_stat_calculation then
 			return action
 		end
 	end
 	return nil
 end
 
-local function build_attack_entry(damage_profile, input_name, armored_type)
+local function build_attack_entry(damage_profile, input_name, chain_time, armored_type)
 	return {
 		arc = classify_arc(damage_profile),
 		penetrating = classify_penetrating(damage_profile, armored_type),
 		max_range = DEFAULT_MELEE_RANGE,
 		action_inputs = {
 			{ action_input = "start_attack", timing = 0 },
-			{ action_input = input_name, timing = 0 },
+			{ action_input = input_name, timing = chain_time or 0 },
 		},
 	}
 end
@@ -99,7 +99,7 @@ local function build_meta_data(weapon_template, armored_type)
 		if chain and chain.action_name then
 			local action = weapon_template.actions[chain.action_name]
 			if action and action.damage_profile then
-				meta[input_name] = build_attack_entry(action.damage_profile, input_name, armored_type)
+				meta[input_name] = build_attack_entry(action.damage_profile, input_name, chain.chain_time, armored_type)
 				count = count + 1
 			end
 		end

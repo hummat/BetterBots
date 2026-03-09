@@ -4,7 +4,8 @@ local ARMORED = 2
 
 local function noop_debug_log() end
 
-local function make_weapon_template(keywords, light_dp, heavy_dp)
+local function make_weapon_template(keywords, light_dp, heavy_dp, opts)
+	opts = opts or {}
 	local actions = {
 		action_melee_start_left = {
 			start_input = "start_attack",
@@ -14,12 +15,14 @@ local function make_weapon_template(keywords, light_dp, heavy_dp)
 	if light_dp then
 		actions.action_melee_start_left.allowed_chain_actions.light_attack = {
 			action_name = "action_left_light",
+			chain_time = opts.light_chain_time,
 		}
 		actions.action_left_light = { damage_profile = light_dp }
 	end
 	if heavy_dp then
 		actions.action_melee_start_left.allowed_chain_actions.heavy_attack = {
 			action_name = "action_left_heavy",
+			chain_time = opts.heavy_chain_time,
 		}
 		actions.action_left_heavy = { damage_profile = heavy_dp }
 	end
@@ -302,6 +305,82 @@ describe("melee_meta_data", function()
 				MeleeMetaData.inject(templates)
 			end)
 			assert.is_table(templates.sword.attack_meta_data)
+		end)
+
+		it("uses chain_time as timing for heavy_attack input", function()
+			local templates = {
+				sword = make_weapon_template(
+					{ "melee" },
+					make_damage_profile(6, 0.3),
+					make_damage_profile(0.001, 1.0),
+					{ heavy_chain_time = 0.75 }
+				),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local heavy_inputs = templates.sword.attack_meta_data.heavy_attack.action_inputs
+			assert.equals(0.75, heavy_inputs[2].timing)
+		end)
+
+		it("uses chain_time as timing for light_attack input", function()
+			local templates = {
+				sword = make_weapon_template(
+					{ "melee" },
+					make_damage_profile(6, 0.3),
+					nil,
+					{ light_chain_time = 0.1 }
+				),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local light_inputs = templates.sword.attack_meta_data.light_attack.action_inputs
+			assert.equals(0.1, light_inputs[2].timing)
+		end)
+
+		it("defaults timing to 0 when chain_time is nil", function()
+			local templates = {
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local light_inputs = templates.sword.attack_meta_data.light_attack.action_inputs
+			assert.equals(0, light_inputs[2].timing)
+		end)
+
+		it("skips start actions marked invalid_start_action_for_stat_calculation", function()
+			local special_dp = { cleave_distribution = { attack = { 999, 999 } } }
+			local normal_dp = make_damage_profile(6, 0.3)
+			local templates = {
+				force_sword = {
+					keywords = { "melee" },
+					actions = {
+						action_melee_start_special = {
+							start_input = "start_attack",
+							invalid_start_action_for_stat_calculation = true,
+							allowed_chain_actions = {
+								light_attack = { action_name = "action_special_light" },
+							},
+						},
+						action_special_light = { damage_profile = special_dp },
+						action_melee_start_left = {
+							start_input = "start_attack",
+							allowed_chain_actions = {
+								light_attack = { action_name = "action_left_light" },
+							},
+						},
+						action_left_light = { damage_profile = normal_dp },
+					},
+				},
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local meta = templates.force_sword.attack_meta_data
+			assert.is_table(meta)
+			assert.equals(1, meta.light_attack.arc)
 		end)
 	end)
 end)
