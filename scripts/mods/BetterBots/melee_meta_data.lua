@@ -42,8 +42,92 @@ local function classify_penetrating(damage_profile, armored_type)
 	return max_modifier >= PENETRATING_THRESHOLD
 end
 
-local function inject(WeaponTemplates) -- luacheck: ignore 212
-	-- placeholder
+local function find_start_action(weapon_template)
+	for _, action in pairs(weapon_template.actions or {}) do
+		if action.start_input == "start_attack" then
+			return action
+		end
+	end
+	return nil
+end
+
+local function build_attack_entry(damage_profile, input_name, armored_type)
+	return {
+		arc = classify_arc(damage_profile),
+		penetrating = classify_penetrating(damage_profile, armored_type),
+		max_range = DEFAULT_MELEE_RANGE,
+		action_inputs = {
+			{ action_input = "start_attack", timing = 0 },
+			{ action_input = input_name, timing = 0 },
+		},
+	}
+end
+
+local function build_meta_data(weapon_template, armored_type)
+	local start_action = find_start_action(weapon_template)
+	if not start_action then
+		return nil
+	end
+
+	local chains = start_action.allowed_chain_actions
+	if not chains then
+		return nil
+	end
+
+	local meta = {}
+	local count = 0
+
+	for _, input_name in ipairs({ "light_attack", "heavy_attack" }) do
+		local chain = chains[input_name]
+		if chain and chain.action_name then
+			local action = weapon_template.actions[chain.action_name]
+			if action and action.damage_profile then
+				meta[input_name] = build_attack_entry(action.damage_profile, input_name, armored_type)
+				count = count + 1
+			end
+		end
+	end
+
+	return count > 0 and meta or nil
+end
+
+local function has_keyword(weapon_template, keyword)
+	for _, kw in ipairs(weapon_template.keywords or {}) do
+		if kw == keyword then
+			return true
+		end
+	end
+	return false
+end
+
+local function inject(WeaponTemplates)
+	if _patched_set[WeaponTemplates] then
+		return
+	end
+
+	local injected = 0
+	local skipped = 0
+
+	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
+		if type(template) == "table" and has_keyword(template, "melee") then
+			if template.attack_meta_data then
+				skipped = skipped + 1
+			else
+				local meta = build_meta_data(template, _armored_type)
+				if meta then
+					template.attack_meta_data = meta
+					injected = injected + 1
+				end
+			end
+		end
+	end
+
+	_patched_set[WeaponTemplates] = true
+	_debug_log(
+		"melee_meta_injection:" .. tostring(WeaponTemplates),
+		0,
+		"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
+	)
 end
 
 return {

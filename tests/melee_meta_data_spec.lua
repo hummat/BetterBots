@@ -4,6 +4,31 @@ local ARMORED = 2
 
 local function noop_debug_log() end
 
+local function make_weapon_template(keywords, light_dp, heavy_dp)
+	local actions = {
+		action_melee_start_left = {
+			start_input = "start_attack",
+			allowed_chain_actions = {},
+		},
+	}
+	if light_dp then
+		actions.action_melee_start_left.allowed_chain_actions.light_attack = {
+			action_name = "action_left_light",
+		}
+		actions.action_left_light = { damage_profile = light_dp }
+	end
+	if heavy_dp then
+		actions.action_melee_start_left.allowed_chain_actions.heavy_attack = {
+			action_name = "action_left_heavy",
+		}
+		actions.action_left_heavy = { damage_profile = heavy_dp }
+	end
+	return {
+		keywords = keywords,
+		actions = actions,
+	}
+end
+
 local function make_damage_profile(cleave_max, armored_max)
 	return {
 		cleave_distribution = {
@@ -80,6 +105,139 @@ describe("melee_meta_data", function()
 
 		it("returns false for nil armored_type", function()
 			assert.is_false(MeleeMetaData._classify_penetrating(make_damage_profile(0, 1.0), nil))
+		end)
+	end)
+
+	describe("inject", function()
+		it("injects attack_meta_data for melee weapon with light and heavy", function()
+			local light_dp = make_damage_profile(6, 0.3)
+			local heavy_dp = make_damage_profile(0.001, 1.0)
+			local templates = {
+				sword = make_weapon_template({ "melee", "combat_sword" }, light_dp, heavy_dp),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local meta = templates.sword.attack_meta_data
+			assert.is_table(meta)
+			assert.is_table(meta.light_attack)
+			assert.equals(1, meta.light_attack.arc)
+			assert.is_false(meta.light_attack.penetrating)
+			assert.equals(2.5, meta.light_attack.max_range)
+			assert.is_table(meta.heavy_attack)
+			assert.equals(0, meta.heavy_attack.arc)
+			assert.is_true(meta.heavy_attack.penetrating)
+		end)
+
+		it("generates correct action_inputs sequences", function()
+			local templates = {
+				sword = make_weapon_template(
+					{ "melee" },
+					make_damage_profile(6, 0.3),
+					make_damage_profile(0.001, 1.0)
+				),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			local light_inputs = templates.sword.attack_meta_data.light_attack.action_inputs
+			assert.equals(2, #light_inputs)
+			assert.equals("start_attack", light_inputs[1].action_input)
+			assert.equals(0, light_inputs[1].timing)
+			assert.equals("light_attack", light_inputs[2].action_input)
+
+			local heavy_inputs = templates.sword.attack_meta_data.heavy_attack.action_inputs
+			assert.equals("start_attack", heavy_inputs[1].action_input)
+			assert.equals("heavy_attack", heavy_inputs[2].action_input)
+		end)
+
+		it("handles weapon with only light attack", function()
+			local templates = {
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			assert.is_table(templates.sword.attack_meta_data)
+			assert.is_table(templates.sword.attack_meta_data.light_attack)
+			assert.is_nil(templates.sword.attack_meta_data.heavy_attack)
+		end)
+
+		it("skips non-melee weapons", function()
+			local templates = {
+				gun = make_weapon_template({ "ranged", "lasgun" }, make_damage_profile(0, 0), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			assert.is_nil(templates.gun.attack_meta_data)
+		end)
+
+		it("does not overwrite existing attack_meta_data", function()
+			local existing = { custom = { arc = 99 } }
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil)
+			template.attack_meta_data = existing
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+
+			assert.equals(existing, templates.sword.attack_meta_data)
+		end)
+
+		it("is idempotent for the same table", function()
+			local templates = {
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+			local first_meta = templates.sword.attack_meta_data
+
+			MeleeMetaData.inject(templates)
+			assert.equals(first_meta, templates.sword.attack_meta_data)
+		end)
+
+		it("handles weapon with no start_attack action", function()
+			local templates = {
+				broken = {
+					keywords = { "melee" },
+					actions = {
+						some_action = { start_input = "other_input" },
+					},
+				},
+			}
+
+			assert.has_no.errors(function()
+				MeleeMetaData.inject(templates)
+			end)
+			assert.is_nil(templates.broken.attack_meta_data)
+		end)
+
+		it("handles weapon with no allowed_chain_actions", function()
+			local templates = {
+				broken = {
+					keywords = { "melee" },
+					actions = {
+						action_start = { start_input = "start_attack" },
+					},
+				},
+			}
+
+			assert.has_no.errors(function()
+				MeleeMetaData.inject(templates)
+			end)
+			assert.is_nil(templates.broken.attack_meta_data)
+		end)
+
+		it("skips non-table entries in WeaponTemplates", function()
+			local templates = {
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),
+				_version = 42,
+			}
+
+			assert.has_no.errors(function()
+				MeleeMetaData.inject(templates)
+			end)
+			assert.is_table(templates.sword.attack_meta_data)
 		end)
 	end)
 end)
