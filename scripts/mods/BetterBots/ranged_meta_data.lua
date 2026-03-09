@@ -1,6 +1,6 @@
 local _mod -- luacheck: ignore 231
-local _patched_set -- luacheck: ignore 231
-local _debug_log -- luacheck: ignore 231
+local _patched_set
+local _debug_log
 
 local function resolve_vanilla_fallback(weapon_template)
 	local actions = weapon_template.actions or {}
@@ -111,13 +111,93 @@ local function find_aim_fire_input(weapon_template)
 	return nil, nil
 end
 
+local function has_keyword(weapon_template, keyword)
+	for _, kw in ipairs(weapon_template.keywords or {}) do
+		if kw == keyword then
+			return true
+		end
+	end
+	return false
+end
+
+local function build_meta_data(weapon_template)
+	local fallback = resolve_vanilla_fallback(weapon_template)
+	local meta = {}
+	local changed = false
+
+	if not is_valid_input(weapon_template, fallback.fire_action_input) then
+		local fire_input, fire_action = find_fire_input(weapon_template)
+		if fire_input then
+			meta.fire_action_input = fire_input
+			if not (weapon_template.actions or {})["action_shoot"] then
+				meta.fire_action_name = fire_action
+			end
+			changed = true
+		end
+	end
+
+	if not is_valid_input(weapon_template, fallback.aim_action_input) then
+		local aim_input, aim_action = find_aim_input(weapon_template)
+		if aim_input then
+			meta.aim_action_input = aim_input
+			if not (weapon_template.actions or {})["action_zoom"] then
+				meta.aim_action_name = aim_action
+			end
+			changed = true
+		end
+	end
+
+	if not is_valid_input(weapon_template, fallback.aim_fire_action_input) then
+		local aim_fire_input, aim_fire_action = find_aim_fire_input(weapon_template)
+		if aim_fire_input then
+			meta.aim_fire_action_input = aim_fire_input
+			if not (weapon_template.actions or {})["action_shoot_zoomed"] then
+				meta.aim_fire_action_name = aim_fire_action
+			end
+			changed = true
+		end
+	end
+
+	return changed and meta or nil
+end
+
+local function inject(WeaponTemplates)
+	if _patched_set[WeaponTemplates] then
+		return
+	end
+
+	local injected = 0
+	local skipped = 0
+
+	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
+		if type(template) == "table" and has_keyword(template, "ranged") then
+			if template.attack_meta_data then
+				skipped = skipped + 1
+			else
+				local meta = build_meta_data(template)
+				if meta then
+					template.attack_meta_data = meta
+					injected = injected + 1
+				end
+			end
+		end
+	end
+
+	_patched_set[WeaponTemplates] = true
+	_debug_log(
+		"ranged_meta_injection:" .. tostring(WeaponTemplates),
+		0,
+		"ranged attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
+	)
+end
+
 return {
 	init = function(deps)
 		_mod = deps.mod
 		_patched_set = deps.patched_weapon_templates
 		_debug_log = deps.debug_log
 	end,
-	inject = function() end,
+	inject = inject,
 	_resolve_vanilla_fallback = resolve_vanilla_fallback,
 	_needs_injection = needs_injection,
 	_find_fire_input = find_fire_input,

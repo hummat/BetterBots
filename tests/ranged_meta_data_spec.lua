@@ -249,4 +249,202 @@ describe("ranged_meta_data", function()
 			assert.is_nil(input)
 		end)
 	end)
+
+	describe("inject", function()
+		it("injects attack_meta_data for weapon with broken fire input", function()
+			local templates = {
+				forcestaff = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+						wield = { input_sequence = {
+							{ input = "weapon_extra_pressed", value = true },
+						} },
+					},
+					actions = {
+						rapid_left = { start_input = "shoot_pressed", kind = "spawn_projectile" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			local meta = templates.forcestaff.attack_meta_data
+			assert.is_table(meta)
+			assert.equals("shoot_pressed", meta.fire_action_input)
+			assert.equals("rapid_left", meta.fire_action_name)
+		end)
+
+		it("sets fire_action_input but keeps fire_action_name default when action_shoot exists", function()
+			local templates = {
+				plasma = make_ranged_template({
+					action_inputs = {
+						shoot_charge = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+					},
+					actions = {
+						action_shoot = { kind = "shoot_hit_scan" },
+						action_charge_direct = { start_input = "shoot_charge" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			local meta = templates.plasma.attack_meta_data
+			assert.is_table(meta)
+			assert.equals("shoot_charge", meta.fire_action_input)
+			assert.is_nil(meta.fire_action_name)
+		end)
+
+		it("also injects aim fields when aim input is invalid", function()
+			local templates = {
+				exotic = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+						brace_pressed = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						trigger_explosion = { input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						} },
+					},
+					actions = {
+						rapid_left = { start_input = "shoot_pressed" },
+						action_brace = { start_input = "brace_pressed" },
+						action_explode = { start_input = "trigger_explosion" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			local meta = templates.exotic.attack_meta_data
+			assert.is_table(meta)
+			assert.equals("shoot_pressed", meta.fire_action_input)
+			assert.equals("brace_pressed", meta.aim_action_input)
+			assert.equals("action_brace", meta.aim_action_name)
+			assert.equals("trigger_explosion", meta.aim_fire_action_input)
+			assert.equals("action_explode", meta.aim_fire_action_name)
+		end)
+
+		it("skips weapons where vanilla fallback is valid", function()
+			local templates = {
+				lasgun = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+						zoom = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						zoom_shoot = { input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						} },
+					},
+					actions = {
+						action_shoot = { start_input = "shoot_pressed" },
+						action_zoom = { start_input = "zoom" },
+						action_shoot_zoomed = { start_input = "zoom_shoot" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.is_nil(templates.lasgun.attack_meta_data)
+		end)
+
+		it("skips non-ranged weapons", function()
+			local templates = {
+				sword = {
+					keywords = { "melee", "combat_sword" },
+					actions = {},
+					action_inputs = {},
+				},
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.is_nil(templates.sword.attack_meta_data)
+		end)
+
+		it("does not overwrite existing attack_meta_data", function()
+			local existing = { fire_action_input = "custom" }
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = { rapid_left = { start_input = "shoot_pressed" } },
+			})
+			template.attack_meta_data = existing
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals(existing, templates.staff.attack_meta_data)
+		end)
+
+		it("is idempotent for the same table", function()
+			local templates = {
+				staff = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+					},
+					actions = { rapid_left = { start_input = "shoot_pressed" } },
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+			local first_meta = templates.staff.attack_meta_data
+
+			RangedMetaData.inject(templates)
+			assert.equals(first_meta, templates.staff.attack_meta_data)
+		end)
+
+		it("skips non-table entries in WeaponTemplates", function()
+			local templates = {
+				staff = make_ranged_template({
+					action_inputs = {
+						shoot_pressed = { input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						} },
+					},
+					actions = { rapid_left = { start_input = "shoot_pressed" } },
+				}),
+				_version = 42,
+			}
+
+			assert.has_no.errors(function()
+				RangedMetaData.inject(templates)
+			end)
+			assert.is_table(templates.staff.attack_meta_data)
+		end)
+
+		it("handles weapon with no derivable fire input", function()
+			local templates = {
+				broken = make_ranged_template({
+					action_inputs = {
+						reload = { input_sequence = {
+							{ input = "weapon_reload_pressed", value = true },
+						} },
+					},
+					actions = {},
+				}),
+			}
+
+			assert.has_no.errors(function()
+				RangedMetaData.inject(templates)
+			end)
+			assert.is_nil(templates.broken.attack_meta_data)
+		end)
+	end)
 end)
