@@ -253,6 +253,16 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 **Project management:**
 `docs/dev/debugging.md`, `docs/dev/logging.md`, `docs/dev/architecture.md`, `docs/dev/validation-tracker.md`, `docs/dev/known-issues.md`, `docs/related-mods.md`, `docs/dev/roadmap.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`
 
+**Game knowledge base** (`docs/knowledge/`):
+- `class-talents.md` — all 6 classes: abilities, keystones, key passives, coherency (from decompiled source)
+- `perks-curios.md` — weapon perk + curio perk T1→T4 tables (from decompiled source)
+- `damage-system.md` — 13-stage damage pipeline, ADM, rending, finesse, toughness absorption
+- `enemy-stats.md` — enemy HP/armor tables by breed and difficulty
+- `build-knowledge.md` — class base stats, coherency, talent architecture, meta overview
+- `weapon-blessings.md` — blessing catalog for 18 S/A-tier weapons
+- `research.md` — ability patterns, bot system docs, API gotchas, healing architecture
+- `patch-history.md` — balance changes Mar 2025–Mar 2026
+
 **Build research:**
 - `scripts/extract-build.mjs` — Playwright scraper for GamesLantern build profiles (talents, weapons, curios). See header for GL discovery tips (path routes, `site:` search).
 

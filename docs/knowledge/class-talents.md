@@ -1,7 +1,6 @@
 # Class Talent Values — All 6 Classes (v1.10.7)
 
-Source: decompiled `talent_settings_*.lua`, verified 2026-03-09.
-Veteran/Zealot details in `build_knowledge.md`. This file covers Psyker, Ogryn, Adamant, Broker + cross-class summary.
+Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, verified 2026-03-09.
 
 ## Tree Structure
 
@@ -13,6 +12,111 @@ Veteran/Zealot details in `build_knowledge.md`. This file covers Psyker, Ogryn, 
 | Ogryn | 23 | 94 | 30 | 2.5% |
 | Adamant | 18 | 100 | 30 | 7.5% |
 | Broker | 13 | 79 | 30 | 10% |
+
+## VETERAN — Key Values
+
+### Combat Abilities
+| Ability | CD | Duration | Key Bonus |
+|---------|-----|----------|-----------|
+| Volley Fire (stance) | 30s | 5s | +25% ranged, +25% weakspot, outlines elites/specials |
+| Voice of Command (shout) | 30s | — | 9m AoE stagger, +50% toughness, can revive downed allies |
+| Infiltrate (stealth) | 45s | buff-template | Invisibility, damage bonus on exit, reduced threat |
+
+### Blitz/Grenades
+| Grenade | Max Charges | Notes |
+|---------|-------------|-------|
+| Frag Grenade (base) | 3 | Can be improved: +damage%, +radius%; bleed (6 stacks) |
+| Krak Grenade | 3 | Can be improved: +damage% |
+| Smoke Grenade | 3 | Can be improved: +fog duration% |
+| Grenade replenishment | — | +1 grenade every 60s; OR 5% chance on elite kill (aura) |
+
+### Keystones
+| Keystone | Key Stats |
+|----------|-----------|
+| Sniper's Focus | 10 stacks (15 improved), +7.5% ranged power/stack, +1% reload/stack, 6s decay, +stacks while still |
+| Weapon Switch | Swap to ranged: crit + attack speed; swap to melee: attack speed + dodge; +20% stamina/toughness on swap |
+| Focus Target (tag) | Tag stacks every 1.5s, max 4 (6 improved), increased damage to tagged; +5% toughness on tagged kill |
+
+### Key Passives
+- Weakspot damage: +30%
+- Range damage: +10% close → +25% far
+- ADS-drain crit: +25% crit chance, −60% sway, costs 0.75 stamina/s + 0.1/shot
+- Elite kill CDR: −6s CD (−10s improved), +1% CDR for 3s
+- Clip size: +25%
+- Ammo reserve: +40%
+- Reload on elite kill: +30% speed for next reload
+- Non-empty clip reload: +25% speed
+- Toughness per ally in coherency: up to 33% TDR at max allies
+- TDR above 75% toughness (conditional)
+- Block/toughness break synergy: block broken → 33% TDR 5s; toughness broken → −50% block cost 5s
+- Movement towards downed: +20% speed, revived allies get 33% DR for 5s
+- Plasma proficiency: reduced vent self-damage
+- Bolter proficiency: reduced spread/recoil/sway
+- Las crits: no ammo cost on critical hits
+- Consecutive rending: +1%/stack rending per hit, max 10 stacks
+
+### Coherency
+- Base aura: elite kills → +0.75% ammo to coherency, 5s CD
+- Improved aura: your kills 0.75%, ally kills 1.0%
+- Alt aura: increased damage or movement speed to coherency
+- Ability grants: melee + ranged damage to allies for 8s; outlines allies 5s; max toughness boost
+
+## ZEALOT — Key Values
+
+### Combat Abilities
+| Ability | CD | Duration | Key Bonus |
+|---------|-----|----------|-----------|
+| Chastise the Wicked (dash) | 30s | 3s buff | 7m dash, +25% melee, +100% rending, +50% toughness, 100% crit during dash |
+| Chastise (upgraded) | 30s | 3s + 10s | Same + +20% attack speed for 10s; OR 2 charges |
+| Zealot Stealth | 30s | buff-template | Backstab/finesse/crit/rending bonus, move speed; +50% toughness + 30% DR on exit |
+| Bolstering Prayer (relic) | 60s | channel | +20% toughness/tick (0.8s) to team, +50% self toughness, +15 flat toughness/stack (×5=75 max) |
+
+### Blitz/Grenades
+| Grenade | Max Charges | Notes |
+|---------|-------------|-------|
+| Shock Grenade | 3 | Stun AoE; upgradable: +radius |
+| Flame Grenade | 3 | Fire liquid AoE |
+| Throwing Knives | 12 | Melee kill refills 1; ammo pickups refill; bleed kills can generate knives |
+
+### Keystones
+| Keystone | Key Stats |
+|----------|-----------|
+| Martyrdom | +10% damage per missing health segment (15% HP/step), max 5 stacks; +6% attack speed/stack; +7.5% TDR/stack; +10% CDR/stack |
+| Fanatic Rage | Enemy deaths within 25m + crits grant fury stacks, max 25, 8s; at max: +15% crit, +50% toughness |
+| Quickness | Movement builds stacks (max 20), activates on hit: attack speed + fire rate per stack; dodge grants 3 stacks |
+| Resist Death | Survive lethal: 5s immunity, 120s CD; melee ×3 leech during, up to 25% HP; can trigger ability instantly |
+
+### Key Passives
+- Melee attack speed: +10%
+- Crit → bleed + crit chance: +10% crit for 3s on crit (2 stacks)
+- Kill stacking: +10%/kill melee damage, max 5 stacks, 5s
+- Hit stacking: +4%/hit melee damage, max 5, 5s (= +20%)
+- Heavy → damage: +15% damage 5s
+- Post-push cleave: +25% cleave + impact, 5s
+- Weakspot kills: +5%/stack weakspot power, max 5, 5s (= +25%)
+- Damage vs elites: +15%
+- Bleed → damage: bled enemies take +15% more
+- Crits rend: +15% rending per crit
+- Close ranged damage: +25%
+- Cleave: +50% max hit mass impact
+- Impact: +30%
+- Uninterruptible heavies: 100% movement speed during heavies
+- Dodge improvements: +1 dodge, +25% dodge distance
+- Sprint improvements: +10% speed, −10% cost, 1s slowdown immunity
+- Toughness in melee: +2.5% base/s, +1%/s per nearby enemy (max +7.5%)
+- Corruption resistance: ×0.5 (50% reduction)
+- Extra wounds: +2 health segments
+- Heal 20% of damage taken over 4s
+- Segment break DR: 40% on segment-breaking hit
+- Stealth CDR: monster 50%, Ogryn 30%, other 15% per kill
+- Backstab kills: −75% threat for 5s
+- Backstab toughness: +10% ally toughness + 10% TDR for 5s
+
+### Coherency
+- Base aura: −7.5% TDR for allies (always ≥2 stacks active)
+- Improved aura: −15% TDR
+- Alt aura: −15% stamina cost
+- Corruption healing aura: 0.5/s (×1.5 improved)
 
 ## PSYKER — Key Values
 
