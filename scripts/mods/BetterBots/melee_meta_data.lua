@@ -1,4 +1,4 @@
-local _mod
+local _mod -- luacheck: ignore 231
 local _patched_set
 local _debug_log
 local _armored_type
