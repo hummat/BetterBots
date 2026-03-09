@@ -166,3 +166,180 @@ export function scoreWeaponPerks(weapon, slot) {
 
   return { score, perks: scored };
 }
+
+/**
+ * Normalize a weapon name for fuzzy matching: lowercase, collapse whitespace.
+ */
+function normalizeName(name) {
+  return name.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Find a weapon in the data by name, using fuzzy matching.
+ *
+ * Matching strategy (in order):
+ *   1. Exact match on key
+ *   2. Substring: data key contained in weapon name or vice versa
+ *   3. Word containment: all words of the shorter name appear in the longer name
+ *
+ * @param {string} weaponName
+ * @returns {{ key: string, entry: object } | null}
+ */
+function findWeapon(weaponName) {
+  const data = loadData();
+  const weapons = data.weapons;
+  if (!weapons) return null;
+
+  // Exact match first
+  if (weapons[weaponName]) {
+    return { key: weaponName, entry: weapons[weaponName] };
+  }
+
+  const normalized = normalizeName(weaponName);
+  const inputWords = normalized.split(" ");
+
+  for (const [key, entry] of Object.entries(weapons)) {
+    const normKey = normalizeName(key);
+
+    // Substring match
+    if (normalized.includes(normKey) || normKey.includes(normalized)) {
+      return { key, entry };
+    }
+
+    // Word containment: all words of the shorter name appear in the longer
+    const keyWords = normKey.split(" ");
+    if (keyWords.length <= inputWords.length) {
+      if (keyWords.every((w) => inputWords.includes(w))) {
+        return { key, entry };
+      }
+    } else {
+      if (inputWords.every((w) => keyWords.includes(w))) {
+        return { key, entry };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Validate blessings on a weapon against the scoring data.
+ *
+ * @param {{ name: string, blessings: Array<{ name: string, description: string }> }} weapon
+ * @returns {{ valid: boolean|null, blessings: Array<{ name: string, known: boolean, internal: string|null }> }}
+ */
+export function scoreBlessings(weapon) {
+  const found = findWeapon(weapon.name);
+
+  // Unknown weapon — can't validate
+  if (!found) {
+    return { valid: null, blessings: [] };
+  }
+
+  const blessingData = found.entry.blessings;
+
+  // Weapon exists but has no blessing data (null)
+  if (blessingData === null || blessingData === undefined) {
+    return { valid: null, blessings: [] };
+  }
+
+  const results = [];
+  for (const blessing of weapon.blessings) {
+    const match = blessingData[blessing.name];
+    results.push({
+      name: blessing.name,
+      known: !!match,
+      internal: match ? match.internal : null,
+    });
+  }
+
+  const allKnown = results.every((b) => b.known);
+  return { valid: allKnown, blessings: results };
+}
+
+/**
+ * Score curio perks against class-specific ratings.
+ *
+ * Flattens all perks across all curios, parses each, checks against
+ * class optimal/good lists and universal avoid list, then scores 1-5.
+ *
+ * @param {Array<{ name: string, perks: string[] }>} curios
+ * @param {string} className - e.g. "veteran", "zealot"
+ * @returns {{ score: number, perks: Array<{ name: string, tier: number, rating: string }> }}
+ */
+export function scoreCurios(curios, className) {
+  const data = loadData();
+  const ratings = data.curio_ratings;
+  if (!ratings) return { score: 1, perks: [] };
+
+  const classRatings = ratings[className] || {};
+  const universalOptimal = ratings._universal_optimal || [];
+  const universalGood = ratings._universal_good || [];
+  const universalAvoid = ratings._universal_avoid || [];
+
+  const classOptimal = classRatings.optimal || [];
+  const classGood = classRatings.good || [];
+
+  // Combine class + universal lists (class-specific takes priority)
+  const optimalSet = new Set([...classOptimal, ...universalOptimal]);
+  const goodSet = new Set([...classGood, ...universalGood]);
+  const avoidSet = new Set(universalAvoid);
+
+  const perkResults = [];
+
+  for (const curio of curios) {
+    if (!curio.perks) continue;
+    for (const perkStr of curio.perks) {
+      const parsed = parsePerkString(perkStr);
+      if (!parsed) {
+        perkResults.push({ name: perkStr, tier: 0, rating: "neutral" });
+        continue;
+      }
+
+      const scored = scorePerk(parsed.name, parsed.max, "curio");
+      const tier = scored ? scored.tier : 0;
+
+      let rating;
+      if (avoidSet.has(parsed.name)) {
+        rating = "avoid";
+      } else if (optimalSet.has(parsed.name)) {
+        rating = "optimal";
+      } else if (goodSet.has(parsed.name)) {
+        rating = "good";
+      } else {
+        rating = "neutral";
+      }
+
+      perkResults.push({ name: parsed.name, tier, rating });
+    }
+  }
+
+  if (perkResults.length === 0) {
+    return { score: 1, perks: [] };
+  }
+
+  // Score 1-5 based on rating + tier combination
+  const hasAvoid = perkResults.some((p) => p.rating === "avoid");
+  if (hasAvoid) {
+    return { score: 1, perks: perkResults };
+  }
+
+  const optimalCount = perkResults.filter((p) => p.rating === "optimal").length;
+  const goodCount = perkResults.filter((p) => p.rating === "good").length;
+  const total = perkResults.length;
+  const avgTier = perkResults.reduce((sum, p) => sum + p.tier, 0) / total;
+  const desirableRatio = (optimalCount + goodCount) / total;
+
+  let score;
+  if (optimalCount === total && avgTier >= 3.5) {
+    score = 5;
+  } else if (desirableRatio >= 0.8 && avgTier >= 3) {
+    score = 4;
+  } else if (desirableRatio >= 0.5 && avgTier >= 2.5) {
+    score = 3;
+  } else {
+    score = 2;
+  }
+
+  return { score, perks: perkResults };
+}

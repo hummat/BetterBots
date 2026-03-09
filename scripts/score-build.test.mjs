@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
-import { parsePerkString, scorePerk, scoreWeaponPerks } from "./score-build.mjs";
+import { parsePerkString, scorePerk, scoreWeaponPerks, scoreBlessings, scoreCurios } from "./score-build.mjs";
 
 describe("parsePerkString", () => {
   it("parses percentage range perk", () => {
@@ -125,5 +125,154 @@ describe("scoreWeaponPerks", () => {
     };
     const result = scoreWeaponPerks(weapon, "melee");
     assert.equal(result.score, 1);
+  });
+});
+
+describe("scoreBlessings", () => {
+  it("validates known blessing on known weapon", () => {
+    const weapon = {
+      name: "M35 Magnacore Mk II Plasma Gun",
+      blessings: [{ name: "Rising Heat", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, true);
+    assert.equal(result.blessings[0].known, true);
+  });
+
+  it("flags unknown blessing", () => {
+    const weapon = {
+      name: "M35 Magnacore Mk II Plasma Gun",
+      blessings: [{ name: "Fake Blessing", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.blessings[0].known, false);
+  });
+
+  it("returns valid=null for weapon with null blessings in data", () => {
+    const weapon = {
+      name: "Voidstrike Staff",
+      blessings: [{ name: "Something", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, null);
+    assert.deepEqual(result.blessings, []);
+  });
+
+  it("returns valid=null for unknown weapon", () => {
+    const weapon = {
+      name: "Totally Unknown Weapon XYZ",
+      blessings: [{ name: "Something", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, null);
+    assert.deepEqual(result.blessings, []);
+  });
+
+  it("validates all blessings and sets valid=true when all known", () => {
+    const weapon = {
+      name: "M35 Magnacore Mk II Plasma Gun",
+      blessings: [
+        { name: "Rising Heat", description: "..." },
+        { name: "Gets Hot!", description: "..." },
+      ],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, true);
+    assert.equal(result.blessings.length, 2);
+    assert.ok(result.blessings.every((b) => b.known === true));
+  });
+
+  it("sets valid=false when any blessing is unknown", () => {
+    const weapon = {
+      name: "M35 Magnacore Mk II Plasma Gun",
+      blessings: [
+        { name: "Rising Heat", description: "..." },
+        { name: "Fake One", description: "..." },
+      ],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, false);
+  });
+
+  it("fuzzy matches weapon name (data key substring of weapon name)", () => {
+    const weapon = {
+      name: "Improvised Mk I Shivs",
+      blessings: [{ name: "Uncanny Strike", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.valid, true);
+    assert.equal(result.blessings[0].known, true);
+  });
+
+  it("includes internal name in blessing result", () => {
+    const weapon = {
+      name: "M35 Magnacore Mk II Plasma Gun",
+      blessings: [{ name: "Rising Heat", description: "..." }],
+    };
+    const result = scoreBlessings(weapon);
+    assert.equal(result.blessings[0].internal, "crit_chance_scaled_on_heat");
+  });
+});
+
+describe("scoreCurios", () => {
+  it("scores optimal curio perks higher", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+15-20% DR vs Gunners", "+4-5% Toughness"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.ok(result.score >= 4);
+  });
+
+  it("penalizes XP/docket perks", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+6-10% Experience", "+4-10% Ordo Dockets"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.ok(result.score <= 2);
+  });
+
+  it("returns perk details with rating", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+15-20% DR vs Gunners"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.equal(result.perks.length, 1);
+    assert.equal(result.perks[0].name, "DR vs Gunners");
+    assert.equal(result.perks[0].rating, "optimal");
+    assert.ok(result.perks[0].tier >= 1 && result.perks[0].tier <= 4);
+  });
+
+  it("rates universal_avoid perks as avoid", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+5-20% Curio Drop Chance"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.equal(result.perks[0].rating, "avoid");
+  });
+
+  it("rates class good perks as good", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+6-12% Stamina Regeneration"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.equal(result.perks[0].rating, "good");
+  });
+
+  it("rates unknown perks as neutral", () => {
+    const curios = [
+      { name: "Blessed Bullet", perks: ["+6-12% Revive Speed"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.equal(result.perks[0].rating, "neutral");
+  });
+
+  it("scores multiple curios together", () => {
+    const curios = [
+      { name: "C1", perks: ["+15-20% DR vs Gunners", "+4-5% Toughness"] },
+      { name: "C2", perks: ["+15-20% DR vs Snipers", "+3-4% Combat Ability Regen"] },
+    ];
+    const result = scoreCurios(curios, "veteran");
+    assert.ok(result.score >= 4);
+    assert.equal(result.perks.length, 4);
   });
 });
