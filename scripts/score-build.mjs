@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Score Darktide build data (output of extract-build.mjs) against build-scoring-data.json.
-// Currently implements: perk parsing and scoring.
-// Future tasks will add blessing scoring, curio scoring, and CLI interface.
+// Perk parsing/scoring, blessing validation, curio scoring, and CLI scorecard output.
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -207,14 +206,15 @@ function findWeapon(weaponName) {
       return { key, entry };
     }
 
-    // Word containment: all words of the shorter name appear in the longer
+    // Word containment: all words of the shorter name appear in the longer,
+    // and at least 50% of the longer name's words are matched (prevents false
+    // positives on short generic inputs like "Gun" or "Mk II").
     const keyWords = normKey.split(" ");
-    if (keyWords.length <= inputWords.length) {
-      if (keyWords.every((w) => inputWords.includes(w))) {
-        return { key, entry };
-      }
-    } else {
-      if (inputWords.every((w) => keyWords.includes(w))) {
+    const shorter = keyWords.length <= inputWords.length ? keyWords : inputWords;
+    const longer = keyWords.length <= inputWords.length ? inputWords : keyWords;
+    if (shorter.length >= 2 && shorter.every((w) => longer.includes(w))) {
+      const matchRatio = shorter.length / longer.length;
+      if (matchRatio >= 0.5) {
         return { key, entry };
       }
     }
