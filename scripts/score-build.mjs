@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_PATH = join(__dirname, "build-scoring-data.json");
@@ -342,4 +343,167 @@ export function scoreCurios(curios, className) {
   }
 
   return { score, perks: perkResults };
+}
+
+/**
+ * Generate a full scorecard for a build.
+ *
+ * Calls scoreWeaponPerks, scoreBlessings, scoreCurios and assembles the result.
+ *
+ * @param {{ title: string, class: string, weapons: Array, curios: Array, talents: object }} build
+ * @returns {object} Scorecard object
+ */
+export function generateScorecard(build) {
+  const weaponResults = [];
+  const perkScores = [];
+
+  for (const weapon of build.weapons || []) {
+    const found = findWeapon(weapon.name);
+    const slot = found ? found.entry.slot : null;
+
+    // Score perks — use slot from data, or try both catalogs if unknown
+    let perkResult;
+    if (slot) {
+      perkResult = scoreWeaponPerks(weapon, slot);
+    } else {
+      // Try ranged first, then melee — pick whichever has more resolved perks
+      const rangedResult = scoreWeaponPerks(weapon, "ranged");
+      const meleeResult = scoreWeaponPerks(weapon, "melee");
+      const rangedResolved = rangedResult.perks.filter((p) => p !== null).length;
+      const meleeResolved = meleeResult.perks.filter((p) => p !== null).length;
+      perkResult = rangedResolved >= meleeResolved ? rangedResult : meleeResult;
+    }
+
+    perkScores.push(perkResult.score);
+
+    const blessingResult = scoreBlessings(weapon);
+
+    weaponResults.push({
+      name: weapon.name,
+      slot,
+      perks: perkResult,
+      blessings: blessingResult,
+    });
+  }
+
+  const curioResult = scoreCurios(build.curios || [], build.class);
+
+  // Average perk scores across weapons, or 1 if none
+  const perkOptimality =
+    perkScores.length > 0
+      ? Math.round(perkScores.reduce((a, b) => a + b, 0) / perkScores.length)
+      : 1;
+
+  return {
+    title: build.title,
+    class: build.class,
+    perk_optimality: perkOptimality,
+    curio_efficiency: curioResult.score,
+    weapons: weaponResults,
+    curios: curioResult,
+    qualitative: {
+      blessing_synergy: null,
+      talent_coherence: null,
+      breakpoint_relevance: null,
+      role_coverage: null,
+      difficulty_scaling: null,
+    },
+    bot_flags: [],
+  };
+}
+
+/**
+ * Format scorecard as human-readable text.
+ */
+function formatScorecardText(card) {
+  const lines = [];
+  lines.push(`=== ${card.title} (${card.class}) ===`);
+  lines.push("");
+  lines.push("MECHANICAL SCORES:");
+  lines.push(`  Perk Optimality:      ${card.perk_optimality}/5`);
+  lines.push(`  Curio Efficiency:     ${card.curio_efficiency}/5`);
+  lines.push("  Breakpoint Relevance: -/5  (requires qualitative assessment)");
+  lines.push("");
+  lines.push("WEAPONS:");
+
+  for (const w of card.weapons) {
+    const slotTag = w.slot ? `[${w.slot}]` : "[?]";
+    lines.push(`  ${slotTag} ${w.name}`);
+
+    // Perks line
+    const perkParts = [];
+    for (const p of w.perks.perks) {
+      if (p === null) {
+        perkParts.push("? (unknown)");
+      } else {
+        perkParts.push(`+${p.name} (T${p.tier}) \u2713`);
+      }
+    }
+    if (perkParts.length > 0) {
+      lines.push(`    Perks: ${perkParts.join(", ")}`);
+    }
+
+    // Blessings line
+    const blessingParts = [];
+    for (const b of w.blessings.blessings) {
+      blessingParts.push(`${b.name} ${b.known ? "\u2713" : "(?)"}`);
+    }
+    if (blessingParts.length > 0) {
+      lines.push(`    Blessings: ${blessingParts.join(", ")}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("CURIOS:");
+  for (const p of card.curios.perks) {
+    const tierStr = p.tier > 0 ? `(T${p.tier})` : "(?)";
+    const check = p.rating === "avoid" ? "\u2717" : "\u2713";
+    lines.push(`  ${p.name} ${tierStr} ${check} ${p.rating}`);
+  }
+
+  lines.push("");
+  lines.push("QUALITATIVE (fill manually):");
+  lines.push("  Blessing Synergy:     _/5");
+  lines.push("  Talent Coherence:     _/5");
+  lines.push("  Role Coverage:        _/5");
+  lines.push("  Difficulty Scaling:   _/5");
+
+  lines.push("");
+  lines.push("BOT FLAGS: (fill manually)");
+  lines.push("  [ ] BOT:NO_DODGE");
+  lines.push("  [ ] BOT:NO_WEAKSPOT");
+  lines.push("  [ ] BOT:NO_PERIL_MGT");
+  lines.push("  [ ] BOT:NO_POSITIONING");
+  lines.push("  [ ] BOT:NO_BLOCK_TIMING");
+  lines.push("  [ ] BOT:AIM_DEPENDENT");
+  lines.push("  [ ] BOT:ABILITY_OK");
+  lines.push("  [ ] BOT:ABILITY_MISSING");
+
+  return lines.join("\n");
+}
+
+// CLI entry point — only when executed directly
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: {
+      json: { type: "boolean", default: false },
+      text: { type: "boolean", default: false },
+    },
+  });
+
+  const buildPath = positionals[0];
+  if (!buildPath) {
+    console.error("Usage: node scripts/score-build.mjs <build.json> [--json|--text]");
+    process.exit(1);
+  }
+
+  const build = JSON.parse(readFileSync(buildPath, "utf-8"));
+  const card = generateScorecard(build);
+
+  if (values.text) {
+    console.log(formatScorecardText(card));
+  } else {
+    console.log(JSON.stringify(card, null, 2));
+  }
 }

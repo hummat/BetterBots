@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
-import { parsePerkString, scorePerk, scoreWeaponPerks, scoreBlessings, scoreCurios } from "./score-build.mjs";
+import { parsePerkString, scorePerk, scoreWeaponPerks, scoreBlessings, scoreCurios, generateScorecard } from "./score-build.mjs";
 
 describe("parsePerkString", () => {
   it("parses percentage range perk", () => {
@@ -274,5 +274,76 @@ describe("scoreCurios", () => {
     const result = scoreCurios(curios, "veteran");
     assert.ok(result.score >= 4);
     assert.equal(result.perks.length, 4);
+  });
+});
+
+describe("generateScorecard", () => {
+  it("produces scorecard from sample build", () => {
+    const build = {
+      title: "Test Build",
+      class: "veteran",
+      weapons: [
+        { name: "M35 Magnacore Mk II Plasma Gun", perks: ["20-25% Damage (Unyielding)", "8-10% Damage (Elites)"], blessings: [{ name: "Rising Heat" }, { name: "Gets Hot!" }] },
+        { name: "Lawbringer Mk IIb Power Falchion", perks: ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"], blessings: [{ name: "Cranial Grounding" }, { name: "Heatsink" }] },
+      ],
+      curios: [
+        { name: "Blessed Bullet", perks: ["+15-20% DR vs Gunners", "+4-5% Toughness"] },
+        { name: "Blessed Bullet", perks: ["+15-20% DR vs Snipers", "+4-5% Toughness"] },
+        { name: "Blessed Bullet", perks: ["+2-5% Health", "+3-4% Combat Ability Regen"] },
+      ],
+      talents: { active: [], inactive: [] },
+    };
+    const card = generateScorecard(build);
+    assert.ok(card.title === "Test Build");
+    assert.ok(card.perk_optimality >= 1 && card.perk_optimality <= 5);
+    assert.ok(card.curio_efficiency >= 1 && card.curio_efficiency <= 5);
+    assert.ok(card.weapons.length === 2);
+    assert.ok(card.curios);
+  });
+
+  it("includes weapon slot from data lookup", () => {
+    const build = {
+      title: "Slot Test",
+      class: "veteran",
+      weapons: [
+        { name: "M35 Magnacore Mk II Plasma Gun", perks: [], blessings: [] },
+      ],
+      curios: [],
+      talents: { active: [], inactive: [] },
+    };
+    const card = generateScorecard(build);
+    assert.equal(card.weapons[0].slot, "ranged");
+  });
+
+  it("defaults slot to null for unknown weapon", () => {
+    const build = {
+      title: "Unknown Weapon",
+      class: "veteran",
+      weapons: [
+        { name: "Totally Fake Weapon XYZ", perks: [], blessings: [] },
+      ],
+      curios: [],
+      talents: { active: [], inactive: [] },
+    };
+    const card = generateScorecard(build);
+    assert.equal(card.weapons[0].slot, null);
+  });
+
+  it("includes qualitative and bot_flags fields", () => {
+    const build = {
+      title: "Structure Test",
+      class: "zealot",
+      weapons: [],
+      curios: [],
+      talents: { active: [], inactive: [] },
+    };
+    const card = generateScorecard(build);
+    assert.ok(card.qualitative !== undefined);
+    assert.equal(card.qualitative.blessing_synergy, null);
+    assert.equal(card.qualitative.talent_coherence, null);
+    assert.equal(card.qualitative.breakpoint_relevance, null);
+    assert.equal(card.qualitative.role_coverage, null);
+    assert.equal(card.qualitative.difficulty_scaling, null);
+    assert.deepEqual(card.bot_flags, []);
   });
 });
