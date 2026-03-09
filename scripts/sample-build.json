@@ -1,0 +1,33 @@
+{
+  "url": "https://darktide.gameslantern.com/builds/9a565016-bd70-4fe0-8c82-1080bc73412e/veteran-squad-leader",
+  "title": "Veteran Squad Leader",
+  "author": "seventhcodex",
+  "class": "veteran",
+  "weapons": [
+    {
+      "name": "Lawbringer Mk IIb Power Falchion",
+      "rarity": "Transcendant",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Maniacs)"],
+      "blessings": [
+        { "name": "Cranial Grounding", "description": "Targets receive stacks on headshot (melee). At max stacks, target takes increased damage for a duration." },
+        { "name": "Heatsink", "description": "Charged melee attacks generate less heat." }
+      ]
+    },
+    {
+      "name": "M35 Magnacore Mk II Plasma Gun",
+      "rarity": "Transcendant",
+      "perks": ["20-25% Damage (Maniacs)", "20-25% Damage (Unyielding)"],
+      "blessings": [
+        { "name": "Rising Heat", "description": "Increased critical chance and critical damage based on current heat." },
+        { "name": "Gets Hot!", "description": "Critical hits reduce heat generated." }
+      ]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "rarity": "", "perks": ["+4-5% Toughness", "+15-20% DR vs Snipers"], "blessings": [] },
+    { "name": "Blessed Bullet", "rarity": "", "perks": ["+4-5% Toughness", "+15-20% DR vs Gunners"], "blessings": [] },
+    { "name": "Blessed Bullet", "rarity": "", "perks": ["+4-5% Health"], "blessings": [] }
+  ],
+  "talents": { "active": [], "inactive": [] },
+  "description": "Team support through CC and coherency buffs. Voice of Command + Duty and Honour keystone with Survivalist aura."
+}

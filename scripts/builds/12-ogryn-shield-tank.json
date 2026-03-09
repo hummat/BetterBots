@@ -1,0 +1,23 @@
+{
+  "title": "Havoc 40 Ogryn Shield Tank",
+  "author": "Jay-Brodi",
+  "class": "ogryn",
+  "weapons": [
+    {
+      "name": "Orox Mk II Battle Maul & Slab Shield",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Brutal Momentum" }, { "name": "Skullcrusher" }]
+    },
+    {
+      "name": "Lorenz Mk VI Rumbler",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Adhesive Charge" }, { "name": "Shrapnel" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+15-20% DR vs Gunners", "+3-4% Combat Ability Regen"] },
+    { "name": "Blessed Bullet", "perks": ["+12-15% Corruption Resistance"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

@@ -108,3 +108,8 @@
 - name: "tier: 3"
   color: "D93F0B"
   description: No ability_template — needs custom approach
+
+# Workflow
+- name: needs-testing
+  color: "FEF2C0"
+  description: Implemented, awaiting in-game verification

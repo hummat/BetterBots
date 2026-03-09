@@ -1,0 +1,23 @@
+{
+  "title": "Fatmangus Zealot Stealth",
+  "author": "dopeslinker",
+  "class": "zealot",
+  "weapons": [
+    {
+      "name": "Munitorum Mk II Relic Blade",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Wrath" }, { "name": "Overload" }]
+    },
+    {
+      "name": "Locke Mk III Spearhead Boltgun",
+      "perks": ["20-25% Damage (Maniacs)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Pinning Fire" }, { "name": "Puncture" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+10-12% Revive Speed", "+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": ["+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does seventeen things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -68,6 +68,22 @@ Grenade abilities are still out of scope.
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
+18. VFX/SFX bleed fix (#42):
+    - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
+    - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
+    - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
+    - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
+19. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+    - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
+    - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
+    - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
+    - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
+20. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+    - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
+    - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
+    - cross-references with `actions` via `start_input` to find correct action names
+    - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
+    - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
 
 ## Why item fallback is needed
 

@@ -1,0 +1,293 @@
+{
+  "melee_perks": {
+    "Damage (Unarmoured)": { "stat": "unarmored_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Flak Armoured)": { "stat": "armored_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Unyielding)": { "stat": "resistant_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Maniacs)": { "stat": "berserker_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Carapace)": { "stat": "super_armor_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Infested)": { "stat": "disgustingly_resilient_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Critical Hit Chance": { "stat": "critical_strike_chance", "tiers": [0.02, 0.03, 0.04, 0.05] },
+    "Critical Hit Damage": { "stat": "critical_strike_damage", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Stamina": { "stat": "stamina_modifier", "tiers": [1, 1.25, 1.5, 2] },
+    "Weakspot Damage": { "stat": "weakspot_damage", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (flat)": { "stat": "damage", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Finesse": { "stat": "finesse_modifier_bonus", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Power Level": { "stat": "power_level_modifier", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Impact": { "stat": "impact_modifier", "tiers": [0.05, 0.06, 0.07, 0.08] },
+    "Block Efficiency": { "stat": "block_cost_multiplier", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "Damage (Elites)": { "stat": "damage_vs_elites", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (Hordes)": { "stat": "damage_vs_horde", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (Specialists)": { "stat": "damage_vs_specials", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Sprint Efficiency": { "stat": "sprinting_cost_multiplier", "tiers": [0.06, 0.09, 0.12, 0.15] }
+  },
+  "ranged_perks": {
+    "Damage (Unarmoured)": { "stat": "unarmored_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Flak Armoured)": { "stat": "armored_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Unyielding)": { "stat": "resistant_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Maniacs)": { "stat": "berserker_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Carapace)": { "stat": "super_armor_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Damage (Infested)": { "stat": "disgustingly_resilient_damage", "tiers": [0.10, 0.15, 0.20, 0.25] },
+    "Critical Hit Chance": { "stat": "critical_strike_chance", "tiers": [0.02, 0.03, 0.04, 0.05] },
+    "Critical Hit Damage": { "stat": "critical_strike_damage", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Stamina (while active)": { "stat": "stamina_modifier", "tiers": [1, 1.25, 1.5, 2] },
+    "Weakspot Damage": { "stat": "weakspot_damage", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (flat)": { "stat": "damage", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Finesse": { "stat": "finesse_modifier_bonus", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Power Level": { "stat": "power_level_modifier", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Damage (Elites)": { "stat": "damage_vs_elites", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (Hordes)": { "stat": "damage_vs_horde", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Damage (Specialists)": { "stat": "damage_vs_specials", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Reload Speed": { "stat": "reload_speed", "tiers": [0.05, 0.07, 0.085, 0.10] }
+  },
+  "curio_perks": {
+    "Toughness": { "stat": "toughness", "tiers": [0.02, 0.03, 0.04, 0.05] },
+    "Health": { "stat": "health", "tiers": [0.02, 0.03, 0.04, 0.05] },
+    "Combat Ability Regen": { "stat": "combat_ability_regen", "tiers": [0.01, 0.02, 0.03, 0.04] },
+    "Revive Speed": { "stat": "revive_speed", "tiers": [0.06, 0.08, 0.10, 0.12] },
+    "Stamina Regeneration": { "stat": "stamina_regeneration", "tiers": [0.06, 0.08, 0.10, 0.12] },
+    "Block Efficiency": { "stat": "block_cost_multiplier", "tiers": [0.06, 0.08, 0.10, 0.12] },
+    "Sprint Efficiency": { "stat": "sprinting_cost_multiplier", "tiers": [0.06, 0.09, 0.12, 0.15] },
+    "Corruption Resistance": { "stat": "corruption_resistance", "tiers": [0.06, 0.09, 0.12, 0.15] },
+    "Grimoire Corruption Resist": { "stat": "grimoire_corruption_resistance", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "Toughness Regen Speed": { "stat": "toughness_regen_speed", "tiers": [0.075, 0.15, 0.225, 0.30] },
+    "DR vs Gunners": { "stat": "dr_vs_gunners", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "DR vs Snipers": { "stat": "dr_vs_snipers", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "DR vs Flamers": { "stat": "dr_vs_flamers", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "DR vs Bombers": { "stat": "dr_vs_bombers", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "DR vs Mutants": { "stat": "dr_vs_mutants", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "DR vs Pox Hounds": { "stat": "dr_vs_pox_hounds", "tiers": [0.05, 0.10, 0.15, 0.20] },
+    "Experience": { "stat": "experience", "tiers": [0.02, 0.04, 0.06, 0.10] },
+    "Ordo Dockets": { "stat": "ordo_dockets", "tiers": [0.04, 0.06, 0.08, 0.10] },
+    "Curio Drop Chance": { "stat": "curio_drop_chance", "tiers": [0.05, 0.10, 0.15, 0.20] }
+  },
+  "weapons": {
+    "M35 Magnacore Mk II Plasma Gun": {
+      "internal": "plasmagun_p1_m1",
+      "slot": "ranged",
+      "role": "elite-killer",
+      "classes": ["veteran"],
+      "blessings": {
+        "Rising Heat": { "internal": "crit_chance_scaled_on_heat", "t4": "+10% crit / +10% crit dmg" },
+        "Gets Hot!": { "internal": "reduced_overheat_on_critical_strike", "t4": "60% less heat on crit" },
+        "Blaze Away": { "internal": "power_bonus_on_continuous_fire", "t4": "+8%/stack (5 stacks)" },
+        "Charge Crit": { "internal": "charge_level_increases_critical_strike_chance", "t4": "+5%/stack (max 25%)" }
+      }
+    },
+    "Achlys Mk VI Power Sword": {
+      "internal": "powersword_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["veteran", "zealot"],
+      "blessings": {
+        "Slaughterer": { "internal": "increased_melee_damage_on_multiple_hits", "t4": "+36% power" },
+        "Cycler": { "internal": "extended_activation_duration_on_chained_attacks", "t4": "+10% impact, +2 extra hits" },
+        "Headtaker": { "internal": "infinite_melee_cleave_on_weakspot_kill", "t4": "+15% weakspot, infinite cleave" },
+        "Thrust": { "internal": "windup_increases_power", "t4": "+20%/stack" }
+      }
+    },
+    "Maccabian Mk IV Duelling Sword": {
+      "internal": "combatsword_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["veteran", "zealot"],
+      "blessings": {
+        "Riposte": { "internal": "staggered_targets_receive_increased_damage_debuff", "t4": "4 stacks" },
+        "Shred": { "internal": "increased_melee_damage_on_multiple_hits", "t4": "+36% power" },
+        "Headtaker": { "internal": "infinite_melee_cleave_on_crit", "t4": "+80% cleave" }
+      }
+    },
+    "Artemia Mk III Purgation Flamer": {
+      "internal": "flamer_p1_m1",
+      "slot": "ranged",
+      "role": "horde-clear",
+      "classes": ["zealot"],
+      "blessings": {
+        "Blaze Away": { "internal": "power_bonus_on_continuous_fire", "t4": "+8%/stack (5 stacks)" },
+        "Penetrating Flame": { "internal": "burned_targets_receive_rending_debuff", "t4": "4 rending stacks" },
+        "Charmed Reload": { "internal": "faster_reload_on_empty_clip", "t4": "+36% reload speed" },
+        "Soulfire": { "internal": "chance_to_explode_elites_on_kill", "t4": "20% proc chance" }
+      }
+    },
+    "Deimos Mk IV Blaze Force Sword": {
+      "internal": "forcesword_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["psyker"],
+      "blessings": {
+        "Blazing Spirit": { "internal": "warp_charge_power_bonus", "t4": "+5%/warp charge (max 20%)" },
+        "Uncanny Strike": { "internal": "stacking_rending_on_weakspot", "t4": "+24%/stack (5 stacks)" },
+        "Riposte": { "internal": "can_block_ranged", "t4": "-30% block cost" },
+        "Shred": { "internal": "increase_power_on_kill", "t4": "+8%/stack" }
+      }
+    },
+    "Voidstrike Staff": {
+      "internal": "forcestaff_p1_m1",
+      "slot": "ranged",
+      "role": "support",
+      "classes": ["psyker"],
+      "blessings": null
+    },
+    "Inferno Staff": {
+      "internal": "forcestaff_p2_m1",
+      "slot": "ranged",
+      "role": "horde-clear",
+      "classes": ["psyker"],
+      "blessings": null
+    },
+    "Surge Staff": {
+      "internal": "forcestaff_p3_m1",
+      "slot": "ranged",
+      "role": "horde-clear",
+      "classes": ["psyker"],
+      "blessings": null
+    },
+    "Equinox Mk III Voidblast Staff": {
+      "internal": "forcestaff_p4_m1",
+      "slot": "ranged",
+      "role": "support",
+      "classes": ["psyker"],
+      "blessings": null
+    },
+    "Delver's Pickaxe": {
+      "internal": "ogryn_pickaxe_2h_p1_m1",
+      "slot": "melee",
+      "role": "elite-killer",
+      "classes": ["ogryn"],
+      "blessings": {
+        "Haymaker": { "internal": "power_bonus_on_first_attack", "t4": "+60%, 3.5s CD" },
+        "Thunderous": { "internal": "windup_increases_power", "t4": "+20%/stack" },
+        "Headtaker": { "internal": "increase_power_on_kill", "t4": "+8%/stack" }
+      }
+    },
+    "Bully Club": {
+      "internal": "ogryn_club_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["ogryn"],
+      "blessings": null
+    },
+    "Heavy Stubber": {
+      "internal": "ogryn_heavystubber_p1_m1",
+      "slot": "ranged",
+      "role": "horde-clear",
+      "classes": ["ogryn"],
+      "blessings": null
+    },
+    "Rumbler": {
+      "internal": "ogryn_thumper_p1_m1",
+      "slot": "ranged",
+      "role": "horde-clear",
+      "classes": ["ogryn"],
+      "blessings": null
+    },
+    "Shock Maul & Shield": {
+      "internal": "powermaul_p1_m1",
+      "slot": "melee",
+      "role": "support",
+      "classes": ["arbites"],
+      "blessings": null
+    },
+    "Shock Maul (2H)": {
+      "internal": "powermaul_p2_m1",
+      "slot": "melee",
+      "role": "support",
+      "classes": ["arbites"],
+      "blessings": null
+    },
+    "Exterminator Shotgun": {
+      "internal": "shotgun_p1_m1",
+      "slot": "ranged",
+      "role": "hybrid",
+      "classes": ["arbites"],
+      "blessings": null
+    },
+    "Improvised Shivs": {
+      "internal": "dual_shivs_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["hive scum"],
+      "blessings": {
+        "Uncanny Strike": { "internal": "stacking_rending_on_weakspot", "t4": "+8%/stack (5 stacks)" },
+        "Precognition": { "internal": "dodge_grants_critical_strike_chance", "t4": "+20% crit for 2s" },
+        "Lacerate": { "internal": "bleed_on_non_weakspot_hit", "t4": "4 bleed stacks" },
+        "Flesh Tearer": { "internal": "increased_weakspot_damage_against_bleeding", "t4": "+60% weakspot vs bleeding" }
+      }
+    },
+    "Dual Stub Pistols": {
+      "internal": "dual_stubpistols_p1_m1",
+      "slot": "ranged",
+      "role": "hybrid",
+      "classes": ["hive scum"],
+      "blessings": {
+        "Run 'n' Gun": { "internal": "hipfire_while_sprinting", "t4": "-30% spread, +15% near dmg" },
+        "Speedload": { "internal": "reload_speed_on_slide", "t4": "+10%/stack" },
+        "Flanking Fire": { "internal": "allow_flanking_and_increased_damage_when_flanking", "t4": "+40% flanking dmg" }
+      }
+    },
+    "Zarona Stub Revolver": {
+      "internal": "stubrevolver_p1_m1",
+      "slot": "ranged",
+      "role": "elite-killer",
+      "classes": ["veteran", "zealot", "hive scum"],
+      "blessings": {
+        "Hand-Cannon": { "internal": "rending_on_crit", "t4": "+60% rending on crit" },
+        "Surgical": { "internal": "crit_chance_based_on_aim_time", "t4": "+10%/stack, 0.3s/stack" },
+        "Gloryhunter": { "internal": "toughness_on_elite_kills", "t4": "30% toughness on elite kill" }
+      }
+    },
+    "Godwyn-Branx Bolt Pistol": {
+      "internal": "boltpistol_p1_m1",
+      "slot": "ranged",
+      "role": "elite-killer",
+      "classes": ["zealot", "arbites"],
+      "blessings": {
+        "Puncture": { "internal": "rending_on_crit", "t4": "+60% crit rending" },
+        "Lethal Proximity": { "internal": "crit_weakspot_finesse", "t4": "+100% crit weakspot" },
+        "Pinning Fire": { "internal": "stagger_bonus_damage", "t4": "+20% vs staggered" }
+      }
+    },
+    "Catachan Combat Blade": {
+      "internal": "combatknife_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["veteran", "zealot", "hive scum"],
+      "blessings": null
+    },
+    "Helbore Lasgun": {
+      "internal": "lasgun_p2_m1",
+      "slot": "ranged",
+      "role": "elite-killer",
+      "classes": ["veteran"],
+      "blessings": null
+    },
+    "Lawbringer Mk IIb Power Falchion": {
+      "internal": "powerfalchion_p1_m1",
+      "slot": "melee",
+      "role": "hybrid",
+      "classes": ["veteran"],
+      "blessings": null
+    }
+  },
+  "enemies": {
+    "crusher": { "armor": "super_armor", "hp": { "damnation": 4875, "auric": 6500 } },
+    "mauler": { "armor": "armored", "hp": { "damnation": 2775, "auric": 3700 } },
+    "bulwark": { "armor": "resistant", "hp": { "damnation": 3600, "auric": 4800 } },
+    "reaper": { "armor": "resistant", "hp": { "damnation": 3000, "auric": 4000 } },
+    "renegade_berzerker": { "armor": "armored", "hp": { "damnation": 1875, "auric": 2500 } },
+    "sniper": { "armor": "unarmored", "hp": { "damnation": 375, "auric": 500 } },
+    "pox_hound": { "armor": "disgustingly_resilient", "hp": { "damnation": 1050, "auric": 1400 } },
+    "mutant": { "armor": "berserker", "hp": { "damnation": 3000, "auric": 4000 } },
+    "plague_ogryn": { "armor": "resistant", "hp": { "damnation": 40000, "auric": 60000 } }
+  },
+  "curio_ratings": {
+    "_universal_optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"],
+    "_universal_good": ["Health", "Combat Ability Regen", "Stamina Regeneration", "Corruption Resistance"],
+    "_universal_avoid": ["Experience", "Ordo Dockets", "Curio Drop Chance"],
+    "veteran": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Combat Ability Regen"], "good": ["Stamina Regeneration", "Toughness"] },
+    "zealot": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Stamina Regeneration", "Sprint Efficiency"] },
+    "psyker": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Combat Ability Regen", "Corruption Resistance"] },
+    "ogryn": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Health", "Block Efficiency"] },
+    "arbites": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Block Efficiency", "Combat Ability Regen"] },
+    "hive scum": { "optimal": ["DR vs Gunners", "DR vs Snipers", "Toughness"], "good": ["Combat Ability Regen", "Stamina Regeneration"] }
+  }
+}

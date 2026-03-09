@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 165 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- `make test` — 230 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -175,7 +175,7 @@ Local clone: `../Darktide-Source-Code/`
 
 **Read first:** Before performing ANY task in this project — implementation, debugging, log analysis, validation, planning — check the doc index below and read the relevant docs first. Do not guess from memory. The docs are the ground truth for game internals, log formats, mod conventions, and validation status. This applies to all tasks, not just code changes.
 
-**GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time. Use `gh issue view <number> --comments` to get the complete picture.
+**GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
 **Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale function counts and test counts automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
@@ -253,6 +253,20 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 **Project management:**
 `docs/dev/debugging.md`, `docs/dev/logging.md`, `docs/dev/architecture.md`, `docs/dev/validation-tracker.md`, `docs/dev/known-issues.md`, `docs/related-mods.md`, `docs/dev/roadmap.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`
 
+**Game knowledge base** (`docs/knowledge/`):
+- `class-talents.md` — all 6 classes: abilities, keystones, key passives, coherency (from decompiled source)
+- `perks-curios.md` — weapon perk + curio perk T1→T4 tables (from decompiled source)
+- `buff-templates.md` — exhaustive buff template stat values for all 6 classes (from decompiled source)
+- `damage-system.md` — 13-stage damage pipeline, ADM, rending, finesse, toughness absorption
+- `enemy-stats.md` — enemy HP/armor tables by breed and difficulty
+- `build-knowledge.md` — class base stats, coherency, talent architecture, meta overview
+- `weapon-blessings.md` — blessing catalog for 18 S/A-tier weapons
+- `research.md` — ability patterns, bot system docs, API gotchas, healing architecture
+- `patch-history.md` — balance changes Mar 2025–Mar 2026
+
+**Build research:**
+- `scripts/extract-build.mjs` — Playwright scraper for GamesLantern build profiles (talents, weapons, curios). See header for GL discovery tips (path routes, `site:` search).
+
 **Release:**
 - `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
 
@@ -268,6 +282,8 @@ scripts/mods/BetterBots/
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
+  melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
+  ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
@@ -278,4 +294,6 @@ tests/
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
   sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
+  melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
+  ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
 ```

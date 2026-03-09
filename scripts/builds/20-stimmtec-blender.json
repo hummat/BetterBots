@@ -1,0 +1,23 @@
+{
+  "title": "Stimmtec: Will It Blend?",
+  "author": "ThetaZer0",
+  "class": "hive scum",
+  "weapons": [
+    {
+      "name": "Improvised Mk I Shivs",
+      "perks": ["20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Precognition" }, { "name": "Uncanny Strike" }]
+    },
+    {
+      "name": "Branx Mk II Needle Pistol",
+      "perks": ["5-10% Reload Speed", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Stripped Down" }, { "name": "Run 'n' Gun" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+15-20% DR vs Gunners"] },
+    { "name": "Blessed Bullet", "perks": [] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

@@ -56,6 +56,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `suppressed poxburster target` | Bot cleared close-range (<5m) poxburster target (#34) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
+| `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 
 **Preferred: use `bb-log`** (project root):

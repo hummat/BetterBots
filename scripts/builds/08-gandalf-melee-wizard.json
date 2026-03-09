@@ -1,0 +1,23 @@
+{
+  "title": "Gandalf: Melee Wizard",
+  "author": "nomalarkey",
+  "class": "psyker",
+  "weapons": [
+    {
+      "name": "Covenant Mk VI Blaze Force Greatsword",
+      "perks": ["20-25% Damage (Unyielding)", "20-25% Damage (Carapace)"],
+      "blessings": [{ "name": "Blazing Spirit" }, { "name": "Shred" }]
+    },
+    {
+      "name": "Equinox Mk III Voidblast Force Staff",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Flak Armoured)"],
+      "blessings": [{ "name": "Warp Nexus" }, { "name": "Warp Flurry" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+3-4% Combat Ability Regen", "+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": ["+12-15% Sprint Efficiency"] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

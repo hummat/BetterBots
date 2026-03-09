@@ -2,6 +2,7 @@
 
 > Compiled 2026-03-06 from Games Lantern (20 builds), Reddit/Steam/Fatshark Forums, and decompiled source v1.10.7.
 > Updated 2026-03-09 with balance patch data, breakpoint tables, community tools, and additional builds.
+> Validated 2026-03-09: 12 GL builds machine-scraped via `scripts/extract-build.mjs` — full talent trees, perks, blessings corrected.
 > Purpose: inform bot AI ability/weapon profiles for BetterBots mod.
 > Cross-references: `classes/*.md` (ability templates), `classes/*-tactics.md` (heuristic rules), `knowledge/` (game system data)
 
@@ -79,33 +80,41 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 
 ### Community Builds (Games Lantern)
 
-**Veteran Squad Leader** (seventhcodex)
-- Voice of Command, Shredder Frag, Survivalist aura, Focus Target keystone
-- Melee: Lawbringer Mk IIb Power Falchion -- Cranial Grounding, Heatsink
-- Ranged: M35 Magnacore Mk II Plasma Gun -- Rising Heat, Gets Hot!
-- Curios: 2x +Toughness, 1x +Health; Sniper/Gunner resistance
+**Veteran Squad Leader** (seventhcodex) — [GL link](https://darktide.gameslantern.com/builds/9a565016-bd70-4fe0-8c82-1080bc73412e/veteran-squad-leader)
+- Keystones: Voice of Command, Duty and Honour
+- Notables: Shredder Frag Grenade
+- Aura: Survivalist
+- Talents: Exploit Weakness, Skirmisher, Desperado, Reciprocity, Serrated Blade, Trench Fighter Drill, Catch a Breath, Exhilarating Takedown, Grenade Tinkerer, Born Leader, Demolition Stockpile, Superiority Complex, Tactical Awareness, Confirmed Kill, Close Order Drill, Longshot, Precision Strikes, Bring it Down, Iron Will, Focus Target, Redirect Fire
+- Stats: Toughness ×2, Stamina, Melee Damage, Ranged Damage
+- Melee: Lawbringer Mk IIb Power Falchion -- Cranial Grounding, Heatsink (+Flak, +Maniacs)
+- Ranged: M35 Magnacore Mk II Plasma Gun -- Rising Heat, Gets Hot! (+Maniacs, +Unyielding)
+- Curios: 2x Blessed Bullet +Toughness, 1x +Health; Sniper DR, Gunner DR
 - Playstyle: Team support through CC and coherency buffs
+- **Rating: S (33/35)** — Perk: 5, Blessing: 5, Talent: 5, Breakpoint: 4, Curio: 5, Role: 5, Difficulty: 4 | Bot: BOT:AIM_DEPENDENT, BOT:ABILITY_OK
 
-**Guardian's Spec Ops Sergeant** (Guardian)
-- Focus Target keystone, Krak Grenade + Grenade Tinkerer
-- Melee: Catachan Mk III Combat Blade -- Flesh Tearer, Lacerate (+Unyielding)
-- Ranged: Accatran Mk XII Recon Lasgun -- Headhunter, Infernus (+Unyielding)
-- Curios: 3x +Toughness; Stamina Regen, Combat Ability Regen
-- Playstyle: Battle tempo director, eliminate ranged threats, Krak for armor
+**Assault Veteran** (Graf) — [GL link](https://darktide.gameslantern.com/builds/a0461ea4-4701-473d-ba0d-cb8b91fd3479/assault-veteran)
+- Keystones: Infiltrate, Hunter's Resolve
+- Notables: Shredder Frag Grenade
+- Aura: Survivalist
+- Talents: Demolition Team, Exploit Weakness, Out For Blood, Skirmisher, Desperado, Reciprocity, Agile Engagement, Trench Fighter Drill, Catch A Breath, Grenade Tinkerer, Demolition Stockpile, Field Improvisation, Superiority Complex, Tactical Awareness, Confirmed Kill, Close Order Drill, Bring It Down, Iron Will, Weapons Specialist, Always Prepared, One Motion
+- Stats: Toughness ×2, Stamina, Melee Damage
+- Melee: Lawbringer Mk IIb Power Falchion -- Energy Leakage, Cranial Grounding (+Flak, +Maniacs)
+- Ranged: M35 Magnacore Mk II Plasma Gun -- Gets Hot!, Rising Heat (+Carapace, +Unyielding)
+- Curios: 2x Blessed Bullet +Toughness, 1x +Health; Combat Ability Regen, Gunner DR, Stamina Regen
+- Playstyle: Vanguard frontliner/backline diver. Infiltrate for stealth revives or flanking. Falchion for hordes, Plasma for Crushers/Bulwarks/specials.
+- **Rating: A (29/35)** — Perk: 5, Blessing: 5, Talent: 4, Breakpoint: 4, Curio: 4, Role: 4, Difficulty: 3 | Bot: BOT:NO_POSITIONING, BOT:ABILITY_OK
 
-**Karnak HM Auric Maelstrom** (updated)
-- Voice of Command, Weapon Specialist keystone
-- Melee: Achlys Mk VI Power Sword -- Slaughterer, Cycler
-- Ranged: Zarona Mk IIa Quickdraw Stub Revolver -- Hand-Cannon, Surgical
-- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
-- Playstyle: "Lazy man's 1-build-wonder." Revolver for specials, Power Sword for everything else.
-
-**Auric Maelstrom Plasma** (community)
-- Voice of Command, Weapon Specialist keystone
-- Melee: Catachan Mk III Combat Blade / Rashad Mk X Chain Sword
-- Ranged: M35 Magnacore Mk II Plasma Gun -- Rising Heat, Gets Hot!
-- Curios: 2x +Toughness, 1x +Health; Combat Ability Regen
-- Playstyle: Plasma charged shots for elites/specials, uncharged for hordes. VoC for panic/support.
+**Slinking Veteran** (dopeslinker) — [GL link](https://darktide.gameslantern.com/builds/a0d307bf-c6b5-4270-9492-e142e61d2722/slinking-veteran)
+- Keystones: Executioner's Stance, Marksman, The Bigger They Are
+- Notables: Shredder Frag Grenade
+- Aura: Survivalist
+- Talents: Demolition Team, Catch A Breath, Kill Zone, Shock Trooper, Exhilarating Takedown, Demolition Stockpile, Field Improvisation, Superiority Complex, Tactical Awareness, Confirmed Kill, Close Order Drill, Longshot, Precision Strikes, Bring It Down, Fully Loaded, Iron Will, Marksman's Focus, Tunnel Vision, Long Range Assassin, One Motion
+- Stats: Toughness ×2, Stamina, Stamina Regen, Melee Damage, Ranged Damage
+- Melee: Catachan Mk VII "Devil's Claw" Sword -- Rampage, Wrath (+Flak, +Unarmoured)
+- Ranged: Lucius Mk IV Helbore Lasgun -- Hot-Shot, Surgical (+Carapace, +Unyielding)
+- Curios: 1x +Toughness, 1x +Health, 1x +Stamina; Revive Speed, Stamina Regen
+- Playstyle: Ranged sniper. Executioner's + Marksman's Focus for elite/special deletion at range. Helbore charged shots one-shot most specials.
+- **Rating: A (28/35)** — Perk: 5, Blessing: 4, Talent: 5, Breakpoint: 5, Curio: 3, Role: 3, Difficulty: 3 | Bot: BOT:AIM_DEPENDENT, BOT:NO_WEAKSPOT, BOT:ABILITY_MISSING
 
 ---
 
@@ -154,50 +163,53 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 
 ### Community Builds (Games Lantern)
 
-**Spicy's Meta Havoc 40 Zealot** (randomspicy)
-- Blades of Faith, Beacon of Purity aura
-- Talents: Good Balance, Enduring Faith, Stalwart, Backstabber, Chorus, Infectious Zeal, Righteous Warrior, Purge the Unclean, Thy Wrath be Swift, Abolish Blasphemers
-- Melee: Munitorum Mk X Relic Blade -- Heatsink, Cranial Grounding
-- Ranged: Artemia Mk III Purgation Flamer -- Blaze Away, Penetrating Flame
-- Curios: 2x +Toughness, 1x +Health; Combat Ability Regen, Gunner DR
+**Spicy's Meta Havoc 40 Zealot** (randomspicy) — [GL link](https://darktide.gameslantern.com/builds/9ede2ba5-850b-41d0-9325-4f42cddf9836/spicys-meta-havoc-40-zealot)
+- Keystones: Chorus of Spiritual Fortitude, Ecclesiarch's Call
+- Notables: Blades of Faith
+- Aura: Beacon of Purity
+- Talents: Scourge, Backstabber, Purge the Unclean, Anoint in Blood, Enduring Faith, Second Wind, Duellist, Until Death, Holy Revenant, Thy Wrath be Swift, Good Balance, Faithful Frenzy, Sustained Assault, Invocation of Death, Blazing Piety, Stalwart, Righteous Warrior, Infectious Zeal, Providence, Abolish Blasphemers, Prime Target, Against the Odds
+- Stats: Melee Damage ×2, Toughness DR, Toughness
+- Melee: Munitorum Mk X Relic Blade -- Heatsink, Cranial Grounding (+Carapace, +Melee Elites)
+- Ranged: Artemia Mk III Purgation Flamer -- Blaze Away, Penetrating Flame (+Carapace, +Flak)
+- Curios: 2x Blessed Bullet +Toughness, 1x +Health; Combat Ability Regen, Gunner DR, Block Efficiency, Stamina Regen
 - Playstyle: "Pick out Elites, hold the line, give ranged characters space"
+- **Rating: S (32/35)** — Perk: 5, Blessing: 5, Talent: 5, Breakpoint: 4, Curio: 3, Role: 5, Difficulty: 5 | Bot: BOT:ABILITY_OK
 
-**Fatmangus Zealot Stealth** (dopeslinker)
-- Shroudfield
-- Melee: Munitorum Mk II Relic Blade -- Wrath, Overload (+Flak required for H40 Captain one-shots)
-- Ranged: Locke Mk III Spearhead Boltgun -- Pinning Fire, Puncture
-- Curios: 3x +Health; Revive Speed, Gunner DR
+**Fatmangus Zealot Stealth** (dopeslinker) — [GL link](https://darktide.gameslantern.com/builds/a0d300f6-9d15-4766-bab5-76122e9477f7/fatmangus-zealot-stealth-version)
+- Keystones: Shroudfield, Master Crafted Shroudfield, Invigorating Revelation
+- Notables: Blades of Faith
+- Aura: Beacon of Purity
+- Talents: Backstabber, Purge the Unclean, Second Wind, Restoring Faith, Bleed for the Emperor, Duellist, Shield of Contempt, Until Death, Holy Revenant, Thy Wrath be Swift, Good Balance, Faith's Fortitude, Sustained Assault, Pious Cut-Throat, Inexorable Judgement, Inebriate's Poise, The Master's Retribution, Riposte, Providence, Hubris, Time to Kill
+- Stats: Toughness DR, Melee Damage, Toughness, Movement Speed
+- Melee: Munitorum Mk II Relic Blade -- Wrath, Overload (+Flak, +Unyielding)
+- Ranged: Locke Mk III Spearhead Boltgun -- Pinning Fire, Puncture (+Maniacs, +Unyielding)
+- Curios: 3x +Health; Revive Speed, Gunner DR, Stamina Regen
+- **Rating: B (26/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 4, Curio: 3, Role: 3, Difficulty: 3 | Bot: BOT:NO_POSITIONING, BOT:ABILITY_OK
 
-**Go Go Gadget Daemonhost Impregnator** (Harelike abhuman)
-- Shroudfield, Martyrdom keystone (-5 wounds = +40% melee damage, +32.5% toughness DR, +20% melee speed)
-- Melee: Crucis Mk II Thunder Hammer -- Thrust, Slaughterer
-- Ranged: Locke Mk IIb Spearhead Boltgun -- Pinning Fire, Shattering Impact
-- Curios: 3x +Wounds, +Health, +Toughness, Gunner DR
 
-**Holy Gains Havoc 40** (charname)
-- Martyrdom implied
-- Melee: Tigrus Mk XV Heavy Eviscerator -- Wrath, Bloodthirsty (990 first target damage)
-- Ranged: Godwyn-Branx Mk IV Bolt Pistol -- Lethal Proximity, Puncture
-- Curios: 3x +1 Wound; Stamina Regen, Toughness, DR
+**Holy Gains Havoc 40** (charname) — [GL link](https://darktide.gameslantern.com/builds/9d2b5a53-1975-4850-8041-0bc911ac4efc/holy-gains-havoc-40)
+- Keystones: Fury of the Faithful, Redoubled Zeal, Unrelenting Fury
+- Notables: Stunstorm Grenade
+- Aura: Benediction
+- Talents: Disdain, Purge the Unclean, Enduring Faith, Second Wind, Restoring Faith, Until Death, Holy Revenant, Good Balance, Enemies Within Enemies Without, Faithful Frenzy, Martyr's Purpose, Faith's Fortitude, Martyrdom, I Shall Not Fall, Maniac, Sustained Assault, Restorative Verses, Providence, Abolish Blasphemers, Prime Target, Against the Odds
+- Stats: Melee Damage ×2, Toughness DR, Toughness
+- Melee: Tigrus Mk XV Heavy Eviscerator -- Wrath, Bloodthirsty (+Unyielding, +Carapace)
+- Ranged: Godwyn-Branx Mk IV Bolt Pistol -- Lethal Proximity, Puncture (+Flak, +Maniacs)
+- Curios: 3x Blessed Bullet +Wounds; Combat Ability Regen, Stamina Regen, Gunner DR
 - Playstyle: "Not meta but viable and fun." Chains heavy specials to dismantle Crusher groups.
+- **Rating: A (28/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 4, Curio: 4, Role: 4, Difficulty: 3 | Bot: BOT:ABILITY_OK
 
-**Zealot Infodump No Stealth Auric** (Razgriz)
-- Fury of the Faithful, Blazing Piety keystone
-- Blitz: Stunstorm / Immolation / Blades of Faith (player choice)
-- Aura: Benediction or Beacon of Purity
-- Talents: Anoint in Blood, Purge the Unclean, Backstabber, Scourge, Dance of Death, Duellist, Redoubled Zeal, Punishment, Invocation of Death, Prime Target, Restoring Faith, Second Wind, Enduring Faith, Good Balance, Thy Wrath be Swift, Until Death, Holy Revenant
+**Zealot Infodump No Stealth Auric** (Razgriz) — [GL link](https://darktide.gameslantern.com/builds/9a4fa304-0b88-4cf8-827a-d0435327a8c3/zealot-infodump-no-stealth-auric)
+- Keystones: Fury of the Faithful, Redoubled Zeal
+- Notables: Immolation Grenade
+- Aura: Beacon of Purity
+- Talents: Blood Redemption, Scourge, Backstabber, Purge the Unclean, Anoint in Blood, Enduring Faith, Second Wind, Bleed for the Emperor, Dance of Death, Duellist, Shield of Contempt, Until Death, Holy Revenant, Thy Wrath be Swift, Good Balance, Sustained Assault, Invocation of Death, Blazing Piety, Unseen Blade, Blinded by Blood, Providence, Prime Target
+- Stats: Melee Damage ×2, Toughness DR, Toughness
 - Melee: Maccabian Mk IV Duelling Sword -- Uncanny Strike, Riposte (+Flak, +Unyielding)
 - Ranged: Agripinaa Mk VIII Braced Autogun -- Inspiring Barrage, Speedload (+Flak, +Maniacs)
-- Curios: 3x +Health; Sniper/Gunner/Tox Flamer DR, Corruption Resistance
+- Curios: 3x Blessed Bullet +Health; Sniper DR, Gunner DR, Tox Flamer DR, Corruption Resistance
 - Playstyle: "Defense > Offense in Darktide." Mobile, versatile.
-
-**Zealot Infodump Stealth Auric** (Razgriz)
-- Shroudfield, Inexorable Judgement keystone
-- Blitz: Blades of Faith
-- Melee: Catachan Mk III Combat Blade -- Flesh Tearer, Lacerate (+Flak, +Unyielding)
-- Ranged: Zarona Mk IIa Quickdraw Stub Revolver -- Hand-Cannon, Surgical
-- Curios: 3x +Health; Sniper/Gunner/Tox Flamer DR
-- Playstyle: Stealth spam with Invocation of Death. Combat Blade heavy attack speed during stealth is "broken".
+- **Rating: A (30/35)** — Perk: 5, Blessing: 5, Talent: 5, Breakpoint: 4, Curio: 3, Role: 4, Difficulty: 4 | Bot: BOT:NO_DODGE, BOT:ABILITY_OK
 
 ---
 
@@ -247,42 +259,40 @@ Note: VoC and Executioner's share `veteran_combat_ability` template -- need `cla
 
 ### Community Builds (Games Lantern)
 
-**Gandalf: Melee Wizard** (nomalarkey)
-- Scrier's Gaze, Psykinetic's Aura
-- Talents: Warp Ghost, Warp Splitting, One with the Warp, Warp Rider, Brain Rupture, Kinetic Flayer, Mettle, Disrupt Destiny, Empathic Evasion, Vulnerable Minds, Just a Dream, By Crack of Bone
-- Melee: Covenant Mk VI Blaze Force Greatsword -- Blazing Spirit, Shred
-- Ranged: Equinox Mk III Voidblast Force Staff -- Warp Nexus, Warp Flurry
-- Curios: 3x +Toughness; Combat Ability Regen, Stamina Regen, Sprint Efficiency
+**Gandalf: Melee Wizard** (nomalarkey) — [GL link](https://darktide.gameslantern.com/builds/9da62e0d-1e0f-4d9b-adca-a60b3809dd98/gandalf-melee-wizard-updated-for-bound-by-duty)
+- Keystones: Scrier's Gaze, Precognition, Warp Unbound
+- Notables: Kinetic Flayer, Brain Rupture
+- Aura: Psykinetic's Aura
+- Talents: Mettle, Perilous Combustion, Battle Meditation, Perfect Timing, Prescience, Malefic Momentum, One with the Warp, Empathic Evasion, Warp Rider, Kinetic Deflection, Disrupt Destiny, Lingering Influence, Lightning Speed, Warp Splitting, Souldrinker, Warp Expenditure, Warp Ghost
+- Stats: Movement Speed, Toughness ×2, Melee Damage, Stamina, Toughness DR, Critical Chance
+- Melee: Covenant Mk VI Blaze Force Greatsword -- Blazing Spirit, Shred (+Unyielding, +Carapace)
+- Ranged: Equinox Mk III Voidblast Force Staff -- Warp Nexus, Warp Flurry (+Carapace, +Flak)
+- Curios: 3x Blessed Bullet +Toughness; Combat Ability Regen, Stamina Regen, Sprint Efficiency
+- **Rating: B (26/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 3, Curio: 3, Role: 4, Difficulty: 3 | Bot: BOT:NO_PERIL_MGT, BOT:NO_DODGE, BOT:ABILITY_MISSING
 
-**Electrodominance Havoc 40 Scrier Smiter** (Magnafanta)
-- Scrier's Gaze implied
-- Melee: Covenant Mk VIII Blaze Force Greatsword -- Momentum, Deflector
-- Ranged: Nomanus Mk VI Electrokinetic Force Staff -- Warp Flurry, Warp Nexus
-- Curios: 2x +Toughness, 1x +Health; Gunner DR, Corruption Resistance
+**Electrodominance Havoc 40 Scrier Smiter** (Magnafanta) — [GL link](https://darktide.gameslantern.com/builds/9fe8da5a-85d2-4193-a584-e47a6a8b5135/electrodominance-havoc-40-scrier-smiter)
+- Keystones: Scrier's Gaze, Precognition, Warp Unbound
+- Notables: Smite, Enfeeble
+- Aura: Psykinetic's Aura
+- Talents: Soulstealer, Quietude, Mettle, Perilous Combustion, Perfect Timing, Kinetic Presence, Wildfire, One with the Warp, Warp Rider, Puppet Master, Empowered Psionics, Bio-Lodestone, Psychic Leeching, Charged Up, Souldrinker, Immaterial Focus
+- Stats: Toughness ×2, Ranged Damage, Melee Damage, Stamina, Toughness DR, Peril Resistance, Critical Chance
+- Melee: Covenant Mk VIII Blaze Force Greatsword -- Momentum, Deflector (+Flak)
+- Ranged: Nomanus Mk VI Electrokinetic Force Staff -- Warp Flurry, Warp Nexus (+Unyielding, +Carapace)
+- Curios: 2x Blessed Bullet +Toughness, 1x +Health; Gunner DR, Corruption Resistance
 - WARNING: "DO NOT use this build for Final Toll condition!"
+- **Rating: A (28/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 4, Curio: 4, Role: 4, Difficulty: 3 | Bot: BOT:NO_PERIL_MGT, BOT:ABILITY_MISSING
 
-**Electro Shriek Big Damage** (Mizumelon)
-- Venting Shriek, Brain Rupture blitz, Psykinetic's Aura, Kinetic Flayer keystone
-- Talents: Penetration of the Soul, Vulnerable Minds, Perilous Combustion, Wildfire, Seer's Presence, Quietude, Mettle, Souldrinker, One with the Warp, Essence Harvest, Kinetic Deflection, Empyric Resolve, Creeping Flames
-- Melee (4 options): Blaze Force Greatsword (Shred+Wrath), Assault Chainsword, Combat Blade, Duelling Sword (Uncanny Strike+Riposte)
+**Electro Shriek Big Damage** (Mizumelon) — [GL link](https://darktide.gameslantern.com/builds/9ff2a0e7-4008-4f0d-a00c-25b16773c9e0/electro-shriek-big-damage-psykers-squishy-just-delete-everything)
+- Keystones: Venting Shriek, Becalming Eruption, Creeping Flames
+- Notables: Kinetic Flayer, Brain Rupture
+- Aura: Psykinetic's Aura
+- Talents: Quietude, Mettle, Perilous Combustion, Perfect Timing, Seer's Presence, Wildfire, One with the Warp, Solidity, Warp Rider, Warp Siphon, Essence Harvest, Psychic Vampire, Warp Battery, Souldrinker, Empyric Resolve, Penetration of the Soul, Vulnerable Minds
+- Stats: Toughness DR ×2, Toughness ×2, Ranged Damage, Stamina, Critical Chance
+- Melee: Covenant Mk VIII Blaze Force Greatsword -- Shred, Wrath (+Infested, +Unarmoured)
 - Ranged: Nomanus Mk VI Electrokinetic Force Staff -- Warp Nexus, Warp Flurry (+Flak, +Unyielding)
-- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
+- Curios: 2x Blessed Bullet +Toughness, 1x +Stamina; Combat Ability Regen, Gunner DR
 - Playstyle: Half-charge staff attacks, trigger Warp Nexus + Warp Flurry, Venting Shriek with Creeping Flames for AoE soulblaze (120+ damage/tick at 9 stacks)
-
-**Auric Maelstrom Voidstrike** (CGEE)
-- Venting Shriek, Empowered Psionics keystone
-- Blitz: Brain Rupture
-- Melee: Deimos Mk IV Blaze Force Sword -- Blazing Spirit, Riposte
-- Ranged: Equinox Mk IV Voidstrike Force Staff -- Warp Nexus, Warp Flurry
-- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
-- Playstyle: Charged staff for horde clear, Brain Rupture for specials, Venting Shriek for peril management + soulblaze.
-
-**Rat's Trauma Psyker** (TheRatOCE)
-- Scrier's Gaze, Disrupt Destiny keystone
-- Melee: Obscurus Mk 2 Blaze Force Sword -- Blazing Spirit, Shred
-- Ranged: Equinox Mk III Voidblast Force Staff -- Warp Nexus, Warp Flurry
-- Curios: 2x +Toughness, 1x +Health; Combat Ability Regen
-- Playstyle: Animation cancel tech for higher DPS. Staff secondary for stagger, primary for damage.
+- **Rating: A (31/35)** — Perk: 5, Blessing: 4, Talent: 5, Breakpoint: 4, Curio: 4, Role: 5, Difficulty: 4 | Bot: BOT:NO_PERIL_MGT, BOT:ABILITY_OK
 
 ---
 
@@ -333,19 +343,39 @@ Charge variants: `ogryn_charge_cooldown_reduction`, `ogryn_charge_damage`, `ogry
 
 ### Community Builds (Games Lantern)
 
-**Mister E's Explodegryn** (Mister E)
-- Taunt ability
-- Melee: Achlys Mk I Power Maul -- Power Surge, Skullcrusher
-- Ranged: Lorenz Mk VI Rumbler -- Shattering Impact, Adhesive Charge
-- Curios: 3x +Toughness
+**Mister E's Explodegryn** (Mister E) — [GL link](https://darktide.gameslantern.com/builds/9e632ca3-292b-4721-af64-2230bca819bf/mister-es-explodegryn)
+- Keystones: Loyal Protector, Valuable Distraction, No Pain
+- Notables: Bombs Away
+- Talents: Smash 'Em, Steady Grip, Heavyweight, Reloaded and Ready, Coward Culling, Soften Them Up, Pacemaker, Ammo Stash, Burst Limiter Override, Maximum Firepower, Bruiser, Get Stuck In, Payback Time, Big Boom, Unstoppable Momentum, No Hurting Friends, Fire Away, Pumped Up, Keep Shooting, Back Off
+- Stats: Toughness ×3, Reload, Toughness DR, Ranged Damage
+- Melee: Achlys Mk I Power Maul -- Power Surge, Skullcrusher (+Carapace, +Flak)
+- Ranged: Lorenz Mk VI Rumbler -- Shattering Impact, Adhesive Charge (+Carapace, +Unyielding)
+- Curios: 3x Blessed Bullet +Toughness; Combat Ability Regen, Gunner DR, Stamina Regen
 - Playstyle: "Club enemies for stacks, taunt to group, delete with grenades. For bosses: melee x4 -> grenade -> taunt for stagger during explosion."
+- **Rating: A (29/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 4, Curio: 4, Role: 4, Difficulty: 4 | Bot: BOT:ABILITY_OK
 
-**Heretic Miner Auric Maelstrom** (community)
-- Loyal Protector (Taunt), Heavy Hitter keystone
-- Melee: Borovian Mk Ia Delver's Pickaxe -- Haymaker, Thunderous (+Carapace, +Unyielding)
-- Ranged: Achlys Mk VII Heavy Stubber -- Pinning Fire, Sustained Fire
-- Curios: 3x +Toughness; Combat Ability Regen, Gunner DR
-- Playstyle: Pickaxe heavies for elite/boss damage, stubber for suppression + horde. Taunt to group enemies for pickaxe cleave.
+
+**Havoc 40 Ogryn Shield Tank** (Jay-Brodi) — [GL link](https://darktide.gameslantern.com/builds/a006d28e-3024-4c8b-b73f-b57383335a8a/dec-2025-havoc-40-ogryn-shield-tank-build-for-the-liluns)
+- Keystones: Loyal Protector, Valuable Distraction, No Pain
+- Notables: Frag Bomb
+- Talents: The Best Defence, Smash 'Em, Heavyweight, Bonebreaker's Aura, Slam, Soften Them Up, Batter, Hard Knocks, Feel No Pain, Implacable, Delight in Destruction, Toughest, Bruiser, No Stopping Me, No Pushover, Attention Seeker, No Hurting Friends, Focused Fighter, Brutish Strength, Strongman, Strike True
+- Stats: Toughness ×3, Toughness DR, Melee Damage
+- Melee: Orox Mk II Battle Maul & Slab Shield -- Brutal Momentum, Skullcrusher (+Carapace, +Flak)
+- Ranged: Lorenz Mk VI Rumbler -- Adhesive Charge, Shrapnel (+Carapace, +Unyielding)
+- Curios: 3x Blessed Bullet +Toughness; Gunner DR, Combat Ability Regen, Corruption Resistance
+- Playstyle: Shield-wall frontliner with Feel No Pain + Toughest for permanent toughness regen
+- **Rating: A (31/35)** — Perk: 5, Blessing: 4, Talent: 5, Breakpoint: 3, Curio: 4, Role: 5, Difficulty: 5 | Bot: BOT:ABILITY_OK
+
+**Shovel Ogryn** (dopeslinker) — [GL link](https://darktide.gameslantern.com/builds/a0e74df0-681b-49b1-bcbd-0483d2c0e12a/shovel-ogryn-2)
+- Keystones: Indomitable (Bull Rush), Stomping Boots
+- Notables: Big Friendly Rock, That One Didn't Count
+- Talents: The Best Defence, Smash 'Em, Heavyweight, Bonebreaker's Aura, Slam, Soften Them Up, Batter, Delight in Destruction, Heavy Hitter, Just Getting Started, Bruiser, No Pushover, No Hurting Friends, For the Lil'uns, Pumped Up, Frenzied Blows, Beat Them Back, Impactful, Dedicated Practice, Strike True
+- Stats: Toughness ×2, Rending, Toughness DR ×2, Melee Damage
+- Melee: Brute-Brainer Mk III Latrine Shovel -- Skullcrusher, Thunderous (+Flak, +Unyielding)
+- Ranged: Foe-Rend Mk V Ripper Gun -- Inspiring Barrage, Blaze Away (+Flak, +Maniacs)
+- Curios: 1x +Health, 2x +Toughness; Revive Speed, Health, Gunner DR
+- Playstyle: Bull Rush melee brawler. Shovel for horde/elite, Rock for specials.
+- **Rating: B (25/35)** — Perk: 5, Blessing: 3, Talent: 4, Breakpoint: 4, Curio: 3, Role: 3, Difficulty: 3 | Bot: BOT:ABILITY_OK
 
 ---
 
@@ -396,26 +426,39 @@ Drone: `adamant_area_buff_drone` (no `ability_template` -- Tier 3 item, 100% rel
 
 ### Community Builds (Games Lantern)
 
-**Execution Order Nuncio-Aquila** (fatherlyfigure)
-- Voltaic Shock Mine, Nuncia Lex aura
-- Melee: Branx Mk VI Shock Maul & Suppression Shield -- High Voltage, Confident Strike
-- Ranged: Judgement Mk IV Subductor Shotpistol & Riot Shield -- Full Bore, Fire Frenzy
-- Curios: 2x Gilded Inquisitorial Rosette, 1x Scrap of Scripture; +Toughness
+**Execution Order Nuncio-Aquila** (fatherlyfigure) — [GL link](https://darktide.gameslantern.com/builds/9f35c673-7c83-4bd1-9d77-a25d7b19984d/execution-order-nuncio-aquila-arbites)
+- Keystones: Nuncio-Aquila, Inspiring Recitation, Fear of Justice
+- Notables: Voltaic Shock Mine
+- Talents: Part of the Squad, Execution Order, Man and Cyber-Mastiff, Withering Fire, Up Close, Force of Will, Walk it Off, Arbitrator Armour, Ammo Belt, Suppression Protocols, Imposing Force, Hold the Line, Plasteel Plates, Arbites Revelatum, Shield Plates, Malocator, No Lenience, Keeping Protocol, Zealous Dedication, Unleashed Brutality, Justified Measures, Suppression Force, Concussive, Target the Weak
+- Stats: Toughness DR, Cleave
+- Melee: Branx Mk VI Shock Maul & Suppression Shield -- High Voltage, Confident Strike (+Maniacs, +Carapace)
+- Ranged: Judgement Mk IV Subductor Shotpistol & Riot Shield -- Full Bore, Fire Frenzy (+Maniacs, +Flak)
+- Curios: 2x Gilded Inquisitorial Rosette, 1x Scrap of Scripture; +Toughness, Gunner DR, Health
 - Playstyle: Frontline tank, stagger weakpoints for damage buffs and toughness recovery
+- **Rating: A (27/35)** — Perk: 5, Blessing: 3, Talent: 4, Breakpoint: 3, Curio: 4, Role: 4, Difficulty: 4 | Bot: BOT:NO_BLOCK_TIMING, BOT:ABILITY_OK
 
-**Arby's OP Melee Meta Havoc 40** (B-To-The-Ryan)
-- Shock Mines blitz
-- Melee: Branx Mk III Arbites Shock Maul -- High Voltage, Relentless Strikes (344.9 damage, 20.82 stagger)
-- Ranged: Exaction Mk III Exterminator Shotgun -- Deathspitter, Sustained Fire (1046.9 damage)
-- Curios: 3x +Toughness; Combat Ability Regen, Revive Speed, Stamina Regen
+**Arby's OP Melee Meta Havoc 40** (B-To-The-Ryan) — [GL link](https://darktide.gameslantern.com/builds/9f6108ec-d547-448f-b847-38fc0e21ccce/arbys-op-melee-meta-havoc-40)
+- Keystones: Break the Line, Commendation from Condemnation, Targeted Brutality
+- Notables: Voltaic Shock Mine
+- Talents: Forceful, Breaking Dissent, Hammer of Judgement, Up Close, Force of Will, Walk it Off, Arbitrator Armour, Suppression Protocols, Lone Wolf, Will of the Lex, Targets Acquired, Arbites Vigilant, Hold the Line, Plasteel Plates, Arbites Revelatum, Soulguilt Scan, Drive Them Back, Zealous Dedication, Street Smarts, Monstrosity Hunter, The Emperor's Fist, Justified Measures, Concussive, Target the Weak
+- Stats: Toughness DR, Impact
+- Melee: Branx Mk III Arbites Shock Maul -- High Voltage, Relentless Strikes (+Flak, +Carapace)
+- Ranged: Exaction Mk III Exterminator Shotgun -- Deathspitter, Sustained Fire (+Flak, +Maniacs)
+- Curios: 3x Blessed Bullet +Toughness; Combat Ability Regen, Revive Speed, Stamina Regen
 - Playstyle: "Strictly dogless melee." Constant light attack spam, shock mines for CC.
+- **Rating: A (28/35)** — Perk: 5, Blessing: 3, Talent: 5, Breakpoint: 4, Curio: 3, Role: 4, Difficulty: 4 | Bot: BOT:ABILITY_OK
 
-**Allrounder Massive CC** (community)
-- Break the Line, Execution Order keystone
-- Melee: Branx Mk VI Shock Maul & Suppression Shield -- High Voltage, Confident Strike
-- Ranged: Exaction Mk VIII Exterminator Shotgun -- Deathspitter, Full Bore
-- Curios: 3x +Toughness; Combat Ability Regen, Revive Speed
-- Playstyle: Shield for survivability, shotgun for CC. Execution Order procs on crit for massive damage spikes.
+
+**BUSTED Havoc 40** (charname) — [GL link](https://darktide.gameslantern.com/builds/9f510b13-dfcc-4e7e-9850-7b868f140477/busted-havoc-40)
+- Keystones: Castigator's Stance
+- Notables: Remote Detonation (Cyber-Mastiff)
+- Talents: Part of the Squad, Execution Order, Up Close, Force of Will, Voltaic Mandibles Augment, Walk it Off, True Grit, Arbitrator Armour, Imposing Force, Hold the Line, Plasteel Plates, Arbites Revelatum, Soulguilt Scan, No Escape, Weight of the Lex, Malocator, Keeping Protocol, Zealous Dedication, Go Get 'Em, Street Smarts, Monstrosity Hunter, The Emperor's Fist, Canine Morale, Justified Measures, Concussive, Target the Weak
+- Stats: Toughness DR, Cleave
+- Melee: Branx Mk III Arbites Shock Maul -- Execution, High Voltage (+Carapace, +Unyielding)
+- Ranged: Exaction Mk III Exterminator Shotgun -- Deathspitter, Execution (+Flak, +Maniacs)
+- Curios: 3x Blessed Bullet +Toughness; Combat Ability Regen, Stamina Regen, Revive Speed, Gunner DR
+- Playstyle: Cyber-Mastiff + Castigator's Stance for sustained melee dominance. Execution on both weapons for damage spikes.
+- **Rating: A (27/35)** — Perk: 5, Blessing: 3, Talent: 4, Breakpoint: 4, Curio: 3, Role: 4, Difficulty: 4 | Bot: BOT:ABILITY_OK, BOT:ABILITY_MISSING
 
 ---
 
@@ -473,50 +516,81 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 
 ### Community Builds (Games Lantern)
 
-**Crackhead John Wick** (Sanloms)
-- Enhanced Desperado, Chem Grenade, Gunslinger aura
-- Melee: Improvised Mk I Shivs -- Uncanny Strike, Precognition (+Stamina, +Carapace)
-- Ranged: Branx Mk VIII Dual Stub Pistols -- Run 'n' Gun, Speedload (+Flak, +Crit Chance)
-- Curios: 3x +Toughness; Gunner DR
+**Crackhead John Wick** (Sanloms) — [GL link](https://darktide.gameslantern.com/builds/a077be66-a1c9-4623-aa8c-3ce4af979bbd/crackhead-john-wick-high-havoc-build)
+- Keystones: Enhanced Desperado, Pick Your Targets
+- Notables: Chem Grenade
+- Talents: Sticky Hands, In Your Face, Precision Violence, Voice of Tertium, Float Like a Butterfly, Speedloader, Anarchist, Nimble, Jittery, Swift Endurance, Unload, Vulture's Mark, Calling for a Time Out, 'Tis But a Scratch, Hive City Brawler, Hyper-Critical, Punching Above One's Weight, The Sweet Spot, Vulture's Push, Vulture's Dodge, Gang Tough, Burst of Energy, Pickpocket
+- Stats: Toughness ×2, Critical Chance, Melee Damage
+- Melee: Improvised Mk I Shivs -- Uncanny Strike, Precognition (+Carapace)
+- Ranged: Branx Mk VIII Dual Stub Pistols -- Run 'n' Gun, Speedload (+Flak)
+- Curios: 3x Blessed Bullet +Toughness; Health, Gunner DR
 - Playstyle: "Primary job is taking out Specials, Disablers and Ranged Elites almost as fast as they appear."
+- **Rating: S (33/35)** — Perk: 5, Blessing: 5, Talent: 5, Breakpoint: 4, Curio: 4, Role: 5, Difficulty: 5 | Bot: BOT:NO_DODGE, BOT:ABILITY_MISSING
 
-**Reginald's Melee Build** (Reginald)
-- Melee: Chirurgeon's Mk IV Bone Saw -- Decimator (+5% Power x10 stacks), Shock & Awe (-60% hit mass on kill)
-- Ranged: Branx Mk VIII Dual Stub Pistols -- Pinning Fire, Run 'n' Gun
-- Curios: +Stamina, +Toughness; Revive Speed, Gunner DR
+**Reginald's Melee Build** (Reginald) — [GL link](https://darktide.gameslantern.com/builds/a07c16c1-4370-4657-9f6b-33e714ca67c5/reginalds-melee-build)
+- Keystones: Rampage, Pulverising Strikes, Forge's Bellow, Boiling Blood
+- Notables: Chem Grenade
+- Aura: Gunslinger Improved
+- Talents: A Tertium Welcome, Precision Violence, Float Like a Butterfly, Nimble, Jittery, Swift Endurance, 'Tis But a Scratch, Hive City Brawler, Battering Strikes, Sample Collector, Extra Pouches, Chemical Dependency, Hyper-Critical, Punching Above One's Weight, Chem Enhanced, Chem Fortified, Gang Tough, Burst of Energy, Pickpocket
+- Stats: Toughness ×2, Critical Chance, Melee Damage, Potent Tox
+- Melee: Chirurgeon's Mk IV Bone Saw -- Decimator, Shock & Awe (+Unyielding, +Flak)
+- Ranged: Branx Mk VIII Dual Stub Pistols -- Pinning Fire, Run 'n' Gun (+Flak, +Maniacs)
+- Curios: 2x +Stamina, 1x +Toughness; Revive Speed, Gunner DR, Stamina Regen
 - Playstyle: Cycles between chems and ability for burst. Bone saw primary damage.
+- **Rating: B (26/35)** — Perk: 5, Blessing: 4, Talent: 4, Breakpoint: 3, Curio: 3, Role: 4, Difficulty: 3 | Bot: BOT:NO_DODGE, BOT:ABILITY_MISSING
 
-**The Chemist** (Reginald)
-- Melee: Chirurgeon's Mk IV Bone Saw -- Decimator, Shock & Awe
-- Ranged: Branx Mk II Needle Pistol -- Run 'n' Gun, Stripped Down (ranged immunity while sprinting >50% stamina)
-- Curios: 3x +Stamina/Health/Toughness; Revive Speed, Gunner DR, Stamina Regen
+**The Chemist** (Reginald) — [GL link](https://darktide.gameslantern.com/builds/a0aaf6c0-6b02-4472-b679-1a93866ad0a2/the-chemist)
+- Keystones: Stimm Supply, Fast Acting Stimms, Booby Trap
+- Notables: Boom Bringer
+- Aura: Gunslinger Improved
+- Talents: A Tertium Welcome, Precision Violence, Float Like a Butterfly, Nimble, Slippery Customer, Jittery, Swift Endurance, 'Tis But a Scratch, Hive City Brawler, Battering Strikes, Sample Collector, Extra Pouches, Chemical Dependency, Hyper-Critical, Punching Above One's Weight, Chem Enhanced, Chem Fortified, Gang Tough, Burst of Energy, Pickpocket
+- Stats: Toughness ×2, Critical Chance, Melee Damage, Potent Tox
+- Melee: Chirurgeon's Mk IV Bone Saw -- Decimator, Shock & Awe (+Unyielding, +Flak)
+- Ranged: Branx Mk II Needle Pistol -- Run 'n' Gun, Stripped Down (+Unyielding, +Carapace)
+- Curios: 2x +Stamina, 1x +Toughness; Revive Speed, Gunner DR, Stamina Regen
 - Playstyle: Anti-special, anti-elite, anti-boss versatile build.
+- **Rating: B (25/35)** — Perk: 5, Blessing: 3, Talent: 4, Breakpoint: 3, Curio: 3, Role: 4, Difficulty: 3 | Bot: BOT:NO_DODGE, BOT:ABILITY_MISSING
 
-**Stimmtec: Will It Blend?** (ThetaZer0)
-- Rampage! ability, Gunslinger Improved aura
-- Talents: Coated Weaponry, Adrenaline Frenzy, Hyper-Violence, Stoked Rage, Adrenaline Unbound, Sample Collector, Swift Endurance, Precision Violence, Channelled Aggression
-- Melee: Improvised Mk I Shivs -- Precognition, Uncanny Strike (+Stamina, +Flak)
+**Stimmtec: Will It Blend?** (ThetaZer0) — [GL link](https://darktide.gameslantern.com/builds/a083151c-9fc9-4e84-9c27-cee4720e0ada/stimmtec-will-it-blend-hive-scum-blender-build)
+- Keystones: Rampage, Pulverising Strikes, Channelled Aggression, Boiling Blood
+- Notables: Boom Bringer
+- Aura: Gunslinger Improved
+- Talents: A Tertium Welcome, Precision Violence, Float Like a Butterfly, Nimble, Swift Endurance, Adrenaline Frenzy, 'Tis But a Scratch, Hive City Brawler, Hyper-Violence, Toxin Mania, Sample Collector, Extra Pouches, Coated Weaponry, Punching Above One's Weight, The Sweet Spot, Gang Tough, Burst of Energy, Stoked Rage, Adrenaline Unbound
+- Stats: Toughness ×2, Critical Chance, Melee Damage, Potent Tox
+- Melee: Improvised Mk I Shivs -- Precognition, Uncanny Strike (+Flak)
 - Ranged: Branx Mk II Needle Pistol -- Stripped Down, Run 'n' Gun (+Reload Speed, +Unyielding)
-- Curios: +Toughness; Gunner DR
+- Curios: 1x Blessed Bullet +Toughness, 1x Gilded Mandible +Stamina, 1x Guardian Nocturnus +Stamina; Gunner DR
 - Playstyle: Constant crit with toughness regen through melee. Dodge timing key for crit/damage boost. Needle Pistol yellow mode for boss DoT, blue for AoE.
+- **Rating: A (28/35)** — Perk: 5, Blessing: 5, Talent: 4, Breakpoint: 3, Curio: 5, Role: 3, Difficulty: 3 | Bot: BOT:NO_DODGE, BOT:ABILITY_MISSING
 
-**Big Dom's Havoc 40 Explosive Tox Scum** (Big Dom)
-- Melee: Improvised Mk I Shivs -- Uncanny Strike, Flesh Tearer (+Carapace, +Unyielding)
-- Ranged: Branx Mk II Needle Pistol -- Hot-Shot, Point Blank (+Flak, +Unyielding)
-- Curios: 2x +Toughness, 1x +Stamina; Stamina Regen, Revive Speed
+### Build Scoring Summary
 
-**Melee Poisonous CRIT** (Dakillah)
-- Melee: Improvised Mk I Shivs -- Lacerate (4 bleed on non-weakspot), Uncanny Strike
-- Ranged: Branx Mk II Needle Pistol -- Desperado, Gloryhunter
-- Curios: 1x +Wound, +Health/Toughness; +Toughness
-- Playstyle: Bleed/crit melee-focused poison build.
+| # | Build | Class | Grade | Score | Bot-Safe? |
+|---|-------|-------|-------|-------|-----------|
+| 1 | Veteran Squad Leader | Veteran | S | 33/35 | Partial (aim) |
+| 2 | Assault Veteran | Veteran | A | 29/35 | Partial (positioning) |
+| 3 | Slinking Veteran | Veteran | A | 28/35 | Poor (aim+weakspot) |
+| 4 | Spicy's Meta Zealot | Zealot | S | 32/35 | Good |
+| 5 | Fatmangus Stealth | Zealot | B | 26/35 | Partial (positioning) |
+| 6 | Holy Gains | Zealot | A | 28/35 | Good |
+| 7 | Zealot Infodump | Zealot | A | 30/35 | Partial (dodge) |
+| 8 | Gandalf Wizard | Psyker | B | 26/35 | Poor (peril+dodge) |
+| 9 | Electrodominance | Psyker | A | 28/35 | Poor (peril) |
+| 10 | Electro Shriek | Psyker | A | 31/35 | Partial (peril) |
+| 11 | Explodegryn | Ogryn | A | 29/35 | Good |
+| 12 | Shield Tank | Ogryn | A | 31/35 | Good |
+| 13 | Shovel Ogryn | Ogryn | B | 25/35 | Good |
+| 14 | Nuncio-Aquila | Arbites | A | 27/35 | Partial (block) |
+| 15 | Melee Meta | Arbites | A | 28/35 | Good |
+| 16 | BUSTED | Arbites | A | 27/35 | Partial (blitz) |
+| 17 | Crackhead JW | Hive Scum | S | 33/35 | Poor (dodge+DLC) |
+| 18 | Reginald Melee | Hive Scum | B | 26/35 | Poor (dodge+DLC) |
+| 19 | The Chemist | Hive Scum | B | 25/35 | Poor (dodge+DLC) |
+| 20 | Stimmtec Blender | Hive Scum | A | 28/35 | Poor (dodge+DLC) |
 
-**Immortal Gunslinger** (community)
-- Enhanced Desperado, Float Like a Butterfly keystone
-- Melee: Improvised Mk I Shivs -- Precognition, Uncanny Strike
-- Ranged: Branx Mk III Dual Autopistols -- Run 'n' Gun, Speedload
-- Curios: 3x +Toughness; Gunner DR, Stamina Regen
-- Playstyle: Vulture's Dodge invulnerability loop. Dodge-attack-dodge cycle makes you nearly unkillable. Autopistols for volume fire during Desperado.
+**Grade distribution:** S: 3, A: 12, B: 5 | **Bot-safe:** Good: 6, Partial: 7, Poor: 7
+
+> Scoring methodology: `docs/knowledge/build-scoring-rubric.md` | Mechanical scores: `node scripts/score-build.mjs scripts/builds/<file>.json --text`
 
 ---
 

@@ -13,6 +13,8 @@ local _last_debug_log_t_by_key = {}
 local _patched_bt_bot_conditions = setmetatable({}, { __mode = "k" })
 local _patched_bt_conditions = setmetatable({}, { __mode = "k" })
 local _patched_ability_templates = setmetatable({}, { __mode = "k" })
+local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
+local _patched_weapon_templates_ranged = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
@@ -74,7 +76,7 @@ local function _debug_log(key, fixed_t, message, min_interval_s)
 	end
 
 	_last_debug_log_t_by_key[key] = t
-	mod:echo("BetterBots DEBUG: " .. message)
+	mod:echo("BetterBots DEBUG: " .. message:gsub("%%", "%%%%"))
 end
 
 local _SUPPRESSED_STATES = {
@@ -153,6 +155,12 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
 
+local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
+assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
+
+local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
+assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -204,6 +212,19 @@ Sprint.init({
 	fixed_time = _fixed_time,
 })
 
+MeleeMetaData.init({
+	mod = mod,
+	patched_weapon_templates = _patched_weapon_templates,
+	debug_log = _debug_log,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+})
+
+RangedMetaData.init({
+	mod = mod,
+	patched_weapon_templates = _patched_weapon_templates_ranged,
+	debug_log = _debug_log,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -218,6 +239,25 @@ Debug.wire({
 	enemy_breed = Heuristics.enemy_breed,
 	can_use_item_fallback = ItemFallback.can_use_item_fallback,
 })
+
+local function _weapon_log_context(unit)
+	local bot_slot = Debug.bot_slot_for_unit(unit) or "?"
+	local wielded_slot = "none"
+	local weapon_template_name = "none"
+	local warp_charge_template_name = "none"
+	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
+	if unit_data_extension then
+		local inventory_component = unit_data_extension:read_component("inventory")
+		local weapon_action_component = unit_data_extension:read_component("weapon_action")
+		local weapon_tweaks_component = unit_data_extension:read_component("weapon_tweak_templates")
+		wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
+		weapon_template_name = weapon_action_component and weapon_action_component.template_name or "none"
+		warp_charge_template_name = weapon_tweaks_component and weapon_tweaks_component.warp_charge_template_name
+			or "none"
+	end
+
+	return bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name
+end
 
 -- Condition hook: replaces bt_bot_conditions.can_activate_ability
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -648,6 +688,36 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	conditions.can_activate_ability = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 		return _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
 	end
+
+	-- #30: fix should_vent_overheat hysteresis. Vanilla checks
+	-- scratchpad.reloading which is never set (BtBotReloadAction sets
+	-- scratchpad.is_reloading — key mismatch). Use is_running instead,
+	-- which correctly reflects whether the vent action is active.
+	if conditions.should_vent_overheat then
+		local Overheat = require("scripts/utilities/overheat")
+		conditions.should_vent_overheat = function(
+			unit,
+			blackboard,
+			_scratchpad, -- luacheck: ignore 212
+			condition_args,
+			_action_data, -- luacheck: ignore 212
+			is_running
+		)
+			local perception_component = blackboard.perception
+			if perception_component.target_enemy_type == "melee" then
+				return false
+			end
+			local overheat_percentage =
+				Overheat.slot_percentage(unit, "slot_secondary", condition_args.overheat_limit_type)
+			if is_running then
+				return overheat_percentage >= condition_args.stop_percentage
+			else
+				return overheat_percentage >= condition_args.start_min_percentage
+					and overheat_percentage <= condition_args.start_max_percentage
+			end
+		end
+	end
+
 	patched_set[conditions] = true
 
 	_debug_log(
@@ -681,7 +751,79 @@ mod:hook_require("scripts/settings/ability/ability_templates/ability_templates",
 	MetaData.inject(AbilityTemplates)
 end)
 
+mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
+	MeleeMetaData.inject(WeaponTemplates)
+	RangedMetaData.inject(WeaponTemplates)
+end)
+
 Sprint.register_hook()
+
+-- VFX/SFX bleed fix (#42): BotPlayer inherits from HumanPlayer, so
+-- is_local_unit = true for all bots in Solo Play. Effect scripts and
+-- CharacterStateMachineExtension gate first-person VFX/SFX on is_local_unit
+-- but not is_human_controlled, causing screen particles, sound events, and
+-- Wwise global state from bot abilities to bleed into the human player's view.
+-- Fix: set is_local_unit = false on context tables (ability effect scripts,
+-- wieldable slot scripts) and on _is_local_unit (state machine extension) for
+-- bot units after init. This suppresses local-only effects (lunge screen
+-- distortion, lunge sounds, shout aim indicator, targeted dash crosshair,
+-- item placement previews) without touching gameplay state: the ability
+-- extension's own _is_local_unit (used in action_context) stays true, and
+-- character states cache their is_local_unit from extension_init_data during
+-- init before hook_safe runs.
+mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
+	mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
+		local player = extension_init_data.player
+		if player and not player:is_human_controlled() then
+			local ctx = self._equipped_ability_effect_scripts_context
+			if ctx then
+				ctx.is_local_unit = false
+				_debug_log(
+					"vfx_fix_ability:" .. tostring(unit),
+					0,
+					"patched ability effect context is_local_unit=false for bot"
+				)
+			end
+		end
+	end)
+end)
+
+mod:hook_require(
+	"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
+	function(PlayerUnitVisualLoadoutExtension)
+		mod:hook_safe(PlayerUnitVisualLoadoutExtension, "init", function(self, _context, unit, extension_init_data)
+			local player = extension_init_data.player
+			if player and not player:is_human_controlled() then
+				local ctx = self._wieldable_slot_scripts_context
+				if ctx then
+					ctx.is_local_unit = false
+					_debug_log(
+						"vfx_fix_loadout:" .. tostring(unit),
+						0,
+						"patched wieldable slot scripts context is_local_unit=false for bot"
+					)
+				end
+			end
+		end)
+	end
+)
+
+mod:hook_require(
+	"scripts/extension_systems/character_state_machine/character_state_machine_extension",
+	function(CharacterStateMachineExtension)
+		mod:hook_safe(CharacterStateMachineExtension, "init", function(self, _context, unit, extension_init_data)
+			local player = extension_init_data.player
+			if player and not player:is_human_controlled() then
+				self._is_local_unit = false
+				_debug_log(
+					"vfx_fix_csm:" .. tostring(unit),
+					0,
+					"patched CharacterStateMachine _is_local_unit=false for bot"
+				)
+			end
+		end)
+	end
+)
 
 -- ADS verification log (#35): one-shot per scratchpad when a bot starts aiming.
 -- BT action nodes don't have self._unit; unit is only passed to enter()/run().
@@ -697,12 +839,40 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_sh
 			end
 		end
 	end)
+
+	mod:hook(BtBotShootAction, "_may_fire", function(func, self, unit, scratchpad, range_squared, t)
+		if
+			not scratchpad
+			or not scratchpad.aiming_shot
+			or scratchpad.fire_action_input == scratchpad.aim_fire_action_input
+		then
+			return func(self, unit, scratchpad, range_squared, t)
+		end
+
+		-- Vanilla _may_fire() validates fire_action_input even though _fire()
+		-- dispatches aim_fire_action_input while aiming. Swap only for this
+		-- validation call so ADS/charge weapons validate the input they will
+		-- actually queue, without mutating scratchpad state across the whole
+		-- aim lifecycle.
+		local fire_action_input = scratchpad.fire_action_input
+		scratchpad.fire_action_input = scratchpad.aim_fire_action_input
+
+		local may_fire = func(self, unit, scratchpad, range_squared, t)
+
+		scratchpad.fire_action_input = fire_action_input
+
+		return may_fire
+	end)
 end)
 
 -- Guard: plasma guns (and similar) have overheat_configuration but nest thresholds
 -- under a .thresholds subtable instead of flat top-level keys. The vanilla
 -- Overheat.slot_percentage divides by overheat_configuration[threshold_type] without
 -- a nil check, crashing the BT when bots wield these weapons.
+--
+-- #30: warp weapons (force staffs, etc.) have no overheat_configuration at all,
+-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
+-- warp_charge.current_percentage so should_vent_overheat triggers for peril.
 mod:hook_require("scripts/utilities/overheat", function(Overheat)
 	local _orig_slot_percentage = Overheat.slot_percentage
 	Overheat.slot_percentage = function(unit, slot_name, threshold_type)
@@ -711,6 +881,18 @@ mod:hook_require("scripts/utilities/overheat", function(Overheat)
 			local cfg = Overheat.configuration(vis_ext, slot_name)
 			if cfg and not cfg[threshold_type] then
 				return 0
+			end
+			if not cfg then
+				local ude = ScriptUnit.has_extension(unit, "unit_data_system")
+				if ude then
+					local tweaks = ude:read_component("weapon_tweak_templates")
+					if tweaks and tweaks.warp_charge_template_name ~= "none" then
+						local warp = ude:read_component("warp_charge")
+						if warp then
+							return warp.current_percentage
+						end
+					end
+				end
 			end
 		end
 		return _orig_slot_percentage(unit, slot_name, threshold_type)
@@ -954,7 +1136,25 @@ mod:hook_require(
 					end
 				end
 
-				if unit and id == "weapon_action" and action_input ~= "wield" then
+				-- #30: BtBotReloadAction queues "reload" but warp weapons have
+				-- "vent" not "reload". Translate BEFORE the peril guard so
+				-- venting is not blocked at critical peril.
+				if unit and id == "weapon_action" and action_input == "reload" then
+					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
+					if ude then
+						local tweaks = ude:read_component("weapon_tweak_templates")
+						if tweaks and tweaks.warp_charge_template_name ~= "none" then
+							_debug_log(
+								"vent_translate:" .. tostring(unit),
+								_fixed_time(),
+								"translated reload -> vent (warp weapon)"
+							)
+							action_input = "vent"
+						end
+					end
+				end
+
+				if unit and id == "weapon_action" and action_input ~= "wield" and action_input ~= "vent" then
 					local ude = ScriptUnit.has_extension(unit, "unit_data_system")
 					if ude then
 						local warp = ude:read_component("warp_charge")
@@ -974,6 +1174,38 @@ mod:hook_require(
 							end
 						end
 					end
+				end
+
+				-- DIAGNOSTIC (#43): log bot weapon actions (except wield) with
+				-- bot/template tags so charged inputs can be attributed to the
+				-- correct bot and staff family. Remove after validation.
+				if id == "weapon_action" and action_input ~= "wield" then
+					local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
+						_weapon_log_context(unit)
+					_debug_log(
+						"bot_weapon:"
+							.. tostring(bot_slot)
+							.. ":"
+							.. tostring(weapon_template_name)
+							.. ":"
+							.. tostring(action_input)
+							.. ":"
+							.. tostring(raw_input),
+						_fixed_time(),
+						"bot weapon: bot="
+							.. tostring(bot_slot)
+							.. " slot="
+							.. tostring(wielded_slot)
+							.. " weapon_template="
+							.. tostring(weapon_template_name)
+							.. " warp_template="
+							.. tostring(warp_charge_template_name)
+							.. " action="
+							.. tostring(action_input)
+							.. " raw_input="
+							.. tostring(raw_input),
+						0
+					)
 				end
 
 				return func(self, id, action_input, raw_input)

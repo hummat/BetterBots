@@ -15,7 +15,7 @@ require_jq() {
 LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
 ERROR_LINE_PATTERN="<<Script Error>>|<<Lua Stack>>|<<Crash>>"
 
-EVENTS_DIR="./dump"
+EVENTS_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/common/Warhammer 40,000 DARKTIDE/binaries/dump"
 
 get_events_file() {
     local idx="${1:-0}"

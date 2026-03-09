@@ -69,6 +69,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
+- `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (temporary `#43` diagnostic; template-tagged queued weapon input)
 
 ## Intentionally suppressed (noise reduction)
 

@@ -1,4 +1,4 @@
-# Status Snapshot (March 8, 2026)
+# Status Snapshot (March 9, 2026)
 
 ## What's shipped
 
@@ -25,8 +25,15 @@
 - **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
 - **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
 - **Charge/dash rescue aim** (#10): zealot dash, ogryn charge, and arbites charge aim toward disabled allies. 14 rescue activations confirmed in-game.
-- **Unit tests**: 165 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- **Unit tests**: 230 tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
 - **Debug commands**: `/bb_state`, `/bb_decide`, `/bb_brain`
+
+### dev/m4-batch1 (validated on branch, pending merge — 2026-03-09)
+- **VFX/SFX bleed fix** (#42): suppress bot ability VFX/SFX bleeding to human player
+- **Smart melee attack selection** (#23): armor-aware `attack_meta_data` injection (66 templates)
+- **Ranged fire fix** (#31): `attack_meta_data` injection for non-standard fire paths (36 templates patched)
+- **Warp venting** (#30): `Overheat.slot_percentage` warp charge bridge + `should_vent_overheat` hysteresis fix + `reload→vent` translation
+- **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS, p2 flame FAIL, p1/p3 untested. Suspected cause: `find_aim_action_for_fire()` lookup doesn't match p1/p2 template structure (needs decompiled inspection to confirm).
 
 ## Current Tier Status
 
@@ -47,10 +54,10 @@
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 
 ## Next Steps
+- Merge dev/m4-batch1 (#42/#23/#31/#30) to main and tag v0.5.0
+- #43: inspect decompiled `forcestaff_p2_m1` action graph, write failing test for p2, then broaden `find_aim_action_for_fire()`
 - Per-ability toggle settings (#6) — P2
-- Player weapon ranged metadata (#31) — P2, medium effort
 - Weapon/enemy-aware ADS (#41) — P2
 - Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
-- Bot warp venting (#30) — P2
 - Objective-aware ability activation (#37) — P2

@@ -1,0 +1,23 @@
+{
+  "title": "Slinking Veteran",
+  "author": "dopeslinker",
+  "class": "veteran",
+  "weapons": [
+    {
+      "name": "Catachan Mk VII \"Devil's Claw\" Sword",
+      "perks": ["20-25% Damage (Flak Armoured)", "20-25% Damage (Unarmoured)"],
+      "blessings": [{ "name": "Rampage" }, { "name": "Wrath" }]
+    },
+    {
+      "name": "Lucius Mk IV Helbore Lasgun",
+      "perks": ["20-25% Damage (Carapace)", "20-25% Damage (Unyielding)"],
+      "blessings": [{ "name": "Hot-Shot" }, { "name": "Surgical" }]
+    }
+  ],
+  "curios": [
+    { "name": "Blessed Bullet", "perks": ["+10-12% Revive Speed", "+10-12% Stamina Regeneration"] },
+    { "name": "Blessed Bullet", "perks": [] },
+    { "name": "Blessed Bullet", "perks": [] }
+  ],
+  "talents": { "active": [], "inactive": [] }
+}

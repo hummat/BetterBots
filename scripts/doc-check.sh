@@ -42,7 +42,7 @@ if [ -d tests ]; then
 
     # Check AGENTS.md and DEBUGGING.md for stale per-file counts
     for doc in AGENTS.md docs/DEBUGGING.md; do
-      match=$(grep -P "$base.*#\s*\d+" "$doc" 2>/dev/null || true)
+      match=$(grep -P "(^|\s)${base}.*#\s*\d+" "$doc" 2>/dev/null || true)
       if [[ -n "$match" ]]; then
         claimed=$(echo "$match" | grep -oP '\d+(?=\s+test)')
         if [[ -n "$claimed" && "$claimed" != "$count" ]]; then
