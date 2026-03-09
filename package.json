@@ -1,0 +1,29 @@
+{
+  "name": "betterbots",
+  "version": "1.0.0",
+  "description": "[![CI](https://github.com/hummat/BetterBots/actions/workflows/ci.yml/badge.svg)](https://github.com/hummat/BetterBots/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hummat/BetterBots.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/hummat/BetterBots/issues"
+  },
+  "homepage": "https://github.com/hummat/BetterBots#readme",
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.68",
+    "playwright": "^1.59.0-alpha-1771104257000"
+  }
+}
