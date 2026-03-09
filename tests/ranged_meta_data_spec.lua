@@ -77,4 +77,176 @@ describe("ranged_meta_data", function()
 			assert.is_true(RangedMetaData._needs_injection(t))
 		end)
 	end)
+
+	describe("find_fire_input", function()
+		it("finds single action_one_pressed input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					reload = { input_sequence = {
+						{ input = "weapon_reload_pressed", value = true },
+					} },
+				},
+				actions = {
+					action_shoot_hip = { start_input = "shoot_pressed" },
+				},
+			})
+			local input, action = RangedMetaData._find_fire_input(t)
+			assert.equals("shoot_pressed", input)
+			assert.equals("action_shoot_hip", action)
+		end)
+
+		it("disambiguates multiple candidates preferring shoot_pressed", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					shoot_charge = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = {
+					action_shoot_hip = { start_input = "shoot_pressed" },
+					action_charge_direct = { start_input = "shoot_charge" },
+				},
+			})
+			local input, _ = RangedMetaData._find_fire_input(t)
+			assert.equals("shoot_pressed", input)
+		end)
+
+		it("disambiguates preferring shoot_charge when no shoot_pressed", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_charge = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = {
+					action_charge_direct = { start_input = "shoot_charge" },
+				},
+			})
+			local input, action = RangedMetaData._find_fire_input(t)
+			assert.equals("shoot_charge", input)
+			assert.equals("action_charge_direct", action)
+		end)
+
+		it("filters out hold_input entries", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					trigger_explosion = { input_sequence = {
+						{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+					} },
+				},
+				actions = {
+					action_explode = { start_input = "trigger_explosion" },
+				},
+			})
+			local input, _ = RangedMetaData._find_fire_input(t)
+			assert.is_nil(input)
+		end)
+
+		it("filters chain-only inputs without matching start_input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = {
+					action_shoot_charged = { kind = "shoot_hit_scan" },
+				},
+			})
+			local input, _ = RangedMetaData._find_fire_input(t)
+			assert.is_nil(input)
+		end)
+
+		it("returns nil when no action_inputs", function()
+			local t = make_ranged_template({ actions = {} })
+			local input, _ = RangedMetaData._find_fire_input(t)
+			assert.is_nil(input)
+		end)
+	end)
+
+	describe("find_aim_input", function()
+		it("finds action_two_hold input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					zoom = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+				},
+				actions = {
+					action_zoom = { start_input = "zoom" },
+				},
+			})
+			local input, action = RangedMetaData._find_aim_input(t)
+			assert.equals("zoom", input)
+			assert.equals("action_zoom", action)
+		end)
+
+		it("returns nil when no action_two_hold input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = {},
+			})
+			local input, _ = RangedMetaData._find_aim_input(t)
+			assert.is_nil(input)
+		end)
+
+		it("ignores action_two_hold release (value=false)", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					brace_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+				},
+				actions = {
+					action_unbrace = { start_input = "brace_release" },
+				},
+			})
+			local input, _ = RangedMetaData._find_aim_input(t)
+			assert.is_nil(input)
+		end)
+	end)
+
+	describe("find_aim_fire_input", function()
+		it("finds input with hold_input and action_one_pressed", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					trigger_explosion = { input_sequence = {
+						{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+					} },
+				},
+				actions = {
+					action_explode = { start_input = "trigger_explosion" },
+				},
+			})
+			local input, action = RangedMetaData._find_aim_fire_input(t)
+			assert.equals("trigger_explosion", input)
+			assert.equals("action_explode", action)
+		end)
+
+		it("returns nil when no hold_input entries", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+				},
+				actions = {},
+			})
+			local input, _ = RangedMetaData._find_aim_fire_input(t)
+			assert.is_nil(input)
+		end)
+	end)
 end)
