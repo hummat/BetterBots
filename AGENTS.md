@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 165 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint)
+- `make test` — 198 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
