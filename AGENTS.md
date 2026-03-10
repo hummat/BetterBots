@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 283 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -54,7 +54,7 @@ Use project-local tooling configs before handing off changes:
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
-- `make doc-check` → verify doc claims against code (function counts, test counts, issue states)
+- `make doc-check` → verify doc claims against code (heuristic function counts, closed issue state)
 - `make check` → runs all of the above
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
@@ -188,12 +188,11 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 
 **GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
-**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale function counts and test counts automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
+**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
 |---|---|
 | Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
-| Added/removed/moved tests | Per-file test counts in this file + `docs/dev/debugging.md` |
 | Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` |
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
 | Added a new hook or module | `docs/dev/architecture.md` |
@@ -303,15 +302,15 @@ scripts/mods/BetterBots/
   BetterBots_localization.lua               # Display strings
 tests/
   test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # 125 tests for all 18 heuristic functions + grenade heuristic
-  meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
-  resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
-  event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
-  sprint_spec.lua                           # 23 tests for sprint conditions + daemonhost safety
-  condition_patch_spec.lua                  # 13 tests for DH combat suppression wrappers
-  target_selection_spec.lua                 # 8 tests for melee target distance penalty
-  melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
-  ranged_meta_data_spec.lua                  # 32 tests for ranged fallback, input derivation, injection + charge override
-  grenade_fallback_spec.lua                # 16 tests for grenade throw state machine
-  ping_system_spec.lua                      # 8 tests for bot pinging logic
+  heuristics_spec.lua                       # all 18 heuristic functions + grenade heuristic
+  meta_data_spec.lua                        # injection/overrides/idempotency
+  resolve_decision_spec.lua                 # nil→fallback paths
+  event_log_spec.lua                        # event buffering/flush/lifecycle
+  sprint_spec.lua                           # sprint conditions + daemonhost safety
+  condition_patch_spec.lua                  # DH combat suppression wrappers
+  target_selection_spec.lua                 # melee target distance penalty
+  melee_meta_data_spec.lua                  # melee meta_data classification + injection
+  ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
+  grenade_fallback_spec.lua                 # grenade throw state machine
+  ping_system_spec.lua                      # bot pinging logic
 ```

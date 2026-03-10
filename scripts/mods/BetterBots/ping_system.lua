@@ -42,6 +42,9 @@ local PING_SLOTS = {
 }
 
 function M.update(unit, blackboard)
+	if not _fixed_time then
+		return
+	end
 	local fixed_t = _fixed_time()
 	local last_ping_t = _last_ping_t_by_bot[unit] or -PING_COOLDOWN_S
 

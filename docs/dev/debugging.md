@@ -169,18 +169,18 @@ The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) create
 ```
 tests/
   test_helper.lua           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua       # 122 tests: all 18 heuristic functions (14 combat + 4 item)
-  meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
-  resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
-  event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
-  sprint_spec.lua           # 18 tests: sprint conditions + daemonhost safety
-  target_selection_spec.lua # 8 tests: melee target distance penalty
+  heuristics_spec.lua       # all 18 heuristic functions (14 combat + 4 item)
+  meta_data_spec.lua        # injection, overrides, idempotency
+  resolve_decision_spec.lua # centralized nil→fallback paths
+  event_log_spec.lua        # buffer, flush, lifecycle, false-decision compression
+  sprint_spec.lua           # sprint conditions + daemonhost safety
+  target_selection_spec.lua # melee target distance penalty
 ```
 
 ### Running tests
 
 ```bash
-make test      # runs busted (auto-detected) — 160 tests
+make test      # runs busted (auto-detected)
 make check     # runs format + lint + lsp + test (full quality gate)
 ```
 

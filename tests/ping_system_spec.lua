@@ -311,6 +311,32 @@ describe("ping_system", function()
 		assert.spy(set_contextual_unit_tag_mock).was_called(1)
 	end)
 
+	it("ignores enemy whose breed has no tags field", function()
+		local blackboard = {
+			perception = {
+				priority_target_enemy = { name = "unknown" },
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		_G.ScriptUnit.has_extension = function(unit, extension_name)
+			if extension_name == "unit_data_system" then
+				return {
+					breed = function()
+						return {} -- breed present but tags field absent
+					end,
+				}
+			elseif extension_name == "smart_tag_system" then
+				return { tag_id = function() return nil end }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_not_called()
+	end)
+
 	it("ignores regular enemies for tagging in all slots", function()
 		local blackboard = {
 			perception = {
