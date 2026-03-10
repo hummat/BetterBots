@@ -17,6 +17,8 @@ local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
 local _patched_weapon_templates_ranged = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
+local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
+local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_emitted = false
@@ -122,6 +124,13 @@ local function _equipped_combat_ability_name(unit)
 	return combat_ability and combat_ability.name or "unknown"
 end
 
+local function _equipped_grenade_ability(unit)
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
+	local grenade_ability = equipped_abilities and equipped_abilities.grenade_ability
+	return ability_extension, grenade_ability
+end
+
 -- Sub-modules
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
@@ -161,6 +170,9 @@ assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
 
 local AbilityQueue = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ability_queue")
 assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
+
+local GrenadeFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_fallback")
+assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
 
 -- Init each module with its dependencies
 MetaData.init({
@@ -271,6 +283,17 @@ AbilityQueue.init({
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 })
 
+GrenadeFallback.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	event_log = EventLog,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	grenade_state_by_unit = _grenade_state_by_unit,
+	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -299,6 +322,12 @@ AbilityQueue.wire({
 	ItemFallback = ItemFallback,
 	Debug = Debug,
 	EventLog = EventLog,
+})
+
+GrenadeFallback.wire({
+	build_context = Heuristics.build_context,
+	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
+	equipped_grenade_ability = _equipped_grenade_ability,
 })
 
 -- Register hooks for extracted modules
@@ -399,12 +428,37 @@ mod:hook_require(
 -- Charge consume tracking
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
-		if ability_type ~= "combat_ability" then
+		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 			return
 		end
 
 		local player = self._player
 		if not player or player:is_human_controlled() then
+			return
+		end
+
+		if ability_type == "grenade_ability" then
+			local grenade_name = "unknown"
+			local equipped_abilities = self._equipped_abilities
+			local grenade_ability = equipped_abilities and equipped_abilities.grenade_ability
+			if grenade_ability and grenade_ability.name then
+				grenade_name = grenade_ability.name
+			end
+
+			local unit = self._unit
+			if unit then
+				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
+			end
+
+			_debug_log(
+				"grenade_charge:" .. grenade_name,
+				_fixed_time(),
+				"grenade charge consumed for "
+					.. grenade_name
+					.. " (charges="
+					.. tostring(optional_num_charges or 1)
+					.. ")"
+			)
 			return
 		end
 
@@ -559,6 +613,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		end
 
 		AbilityQueue.try_queue(unit, blackboard)
+		GrenadeFallback.try_queue(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
 
 		if EventLog.is_enabled() then
@@ -592,6 +647,9 @@ function mod.on_game_state_changed(status, state)
 		end
 		for unit in pairs(_decision_context_cache_by_unit) do
 			_decision_context_cache_by_unit[unit] = nil
+		end
+		for unit in pairs(_grenade_state_by_unit) do
+			_grenade_state_by_unit[unit] = nil
 		end
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
 		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
