@@ -55,6 +55,7 @@
 
 ## Next Steps
 - #43: inspect decompiled `forcestaff_p2_m1` action graph, write failing test for p2, then broaden `find_aim_action_for_fire()`
+- Default class profiles for bots (#45) — P2, design approved
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2
 - Investigate grenade/blitz approach (#4) — P2

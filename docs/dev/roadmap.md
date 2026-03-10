@@ -63,6 +63,12 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 |---|-------|-------|
 | 41 | Weapon/enemy-aware ADS vs hip-fire | Static `killshot` gestalt for all weapons. Need per-weapon gestalt + enemy-aware fire cadence. |
 
+**Bot profiles:**
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 45 | Default class profiles for bots | Ship hardcoded Zealot/Psyker/Ogryn/Veteran profiles so players without leveled characters get class-diverse bots with abilities. Complements #28. |
+
 **General bot behavior:**
 
 | # | Issue | Notes |
