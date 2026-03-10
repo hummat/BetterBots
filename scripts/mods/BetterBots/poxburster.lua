@@ -80,14 +80,29 @@ function M.register_hooks()
 
 				if _is_close_poxburster(perception_component.opportunity_target_enemy, self_position) then
 					perception_component.opportunity_target_enemy = nil
+					_debug_log(
+						"poxburster_suppress_opp:" .. tostring(self_unit),
+						_fixed_time(),
+						"suppressed poxburster opportunity target (too close)"
+					)
 				end
 
 				if _is_close_poxburster(perception_component.urgent_target_enemy, self_position) then
 					perception_component.urgent_target_enemy = nil
+					_debug_log(
+						"poxburster_suppress_urg:" .. tostring(self_unit),
+						_fixed_time(),
+						"suppressed poxburster urgent target (too close)"
+					)
 				end
 
 				if _is_close_poxburster(perception_component.priority_target_enemy, self_position) then
 					perception_component.priority_target_enemy = nil
+					_debug_log(
+						"poxburster_suppress_pri:" .. tostring(self_unit),
+						_fixed_time(),
+						"suppressed poxburster priority target (too close)"
+					)
 				end
 			end
 		)

@@ -53,7 +53,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
-| `suppressed poxburster target` | Bot cleared close-range (<5m) poxburster target (#34) |
+| `suppressed poxburster target (too close)` | Bot cleared close-range (<5m) poxburster `target_enemy` (#34) |
+| `suppressed poxburster opportunity/urgent/priority target` | Bot cleared close-range poxburster from secondary perception slots (#34) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |

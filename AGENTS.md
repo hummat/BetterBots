@@ -286,17 +286,22 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 BetterBots.mod                              # DMF entry point
 bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
-  BetterBots.lua                            # Main: hooks, condition patch, fallback queue
+  BetterBots.lua                            # Main: module wiring, lifecycle hooks, BT hooks
+  condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
+  ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
   heuristics.lua                            # 18 per-template heuristic functions + build_context()
-  meta_data.lua                             # ability_meta_data injection
+  meta_data.lua                             # ability_meta_data injection (Tier 2 templates + Veteran overrides)
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
-  grenade_fallback.lua                     # Grenade throw state machine (wield/aim/throw/unwield)
+  grenade_fallback.lua                      # Grenade throw state machine (wield/aim/throw/unwield)
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
-  melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
+  melee_meta_data.lua                       # Melee attack_meta_data injection (arc/penetrating classification)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
+  weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
   target_selection.lua                      # Melee target selection distance penalty for specials
   ping_system.lua                           # Bot elite/special pinging system
+  poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
+  vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings

@@ -22,22 +22,22 @@ Grenade abilities are still out of scope.
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
-3. Replaces `can_activate_ability` on both `bt_bot_conditions` and `bt_conditions` so templates with valid metadata can pass.
-4. Adds a fallback in `BotBehaviorExtension:update`:
+3. Replaces `can_activate_ability` on both `bt_bot_conditions` and `bt_conditions` so templates with valid metadata can pass (via `condition_patch.lua`).
+4. Adds a fallback in `BotBehaviorExtension:update` (via `ability_queue.lua` for Tier 1/2; `item_fallback.lua` for Tier 3):
    - template fallback: queue ability action input directly on `combat_ability_action`
    - item fallback: queue explicit `weapon_action` sequence (`combat_ability` wield + cast follow-ups + unwind)
    - item sequence selection is profile-driven (shared profile catalog + per-ability priority order)
 5. Adds state-transition recovery:
    - hook `ActionCharacterStateChange.finish`
    - if bot combat ability did not reach wanted character state, schedule a fast fallback retry
-6. Adds queue-level weapon-switch protection for item abilities:
+6. Adds queue-level weapon-switch protection for item abilities (via `weapon_action.lua`):
    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`
    - block bot `weapon_action:wield` while protected item abilities are active/in-sequence
-7. Adds `wield_slot` redirect for item abilities:
+7. Adds `wield_slot` redirect for item abilities (via `weapon_action.lua`):
    - redirects non-combat-ability wield calls back to `slot_combat_ability` during item sequences (prevents cancel loop)
-8. Guards against overheat crash:
+8. Guards against overheat crash (via `weapon_action.lua`):
    - prevents crash when bots wield plasma guns with nested threshold config
-9. Guards against perils achievement crash:
+9. Guards against perils achievement crash (via `weapon_action.lua`):
    - skips `WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement` when `account_id` is nil (bot crash guard)
 10. Per-template heuristics (via `heuristics.lua`):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
@@ -54,11 +54,11 @@ Grenade abilities are still out of scope.
 13. Ability suppression / impulse control (#11):
     - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
     - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
-14. Warp weapon peril block (#27):
+14. Warp weapon peril block (#27, via `weapon_action.lua`):
     - blocks `weapon_action` inputs (except `wield`) for warp weapons at ≥97% peril
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
-15. Poxburster targeting (#34):
+15. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
     - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
 16. ADS fix for T5/T6 bots (#35):
@@ -68,7 +68,7 @@ Grenade abilities are still out of scope.
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-18. VFX/SFX bleed fix (#42):
+18. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
