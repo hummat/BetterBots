@@ -729,6 +729,8 @@ local ITEM_HEURISTICS = {
 	broker_ability_stimm_field = _can_activate_stimm_field,
 }
 
+local GRENADE_HEURISTICS = {}
+
 local function _evaluate_template_heuristic(
 	ability_template_name,
 	conditions,
@@ -856,6 +858,23 @@ local function evaluate_item_heuristic(ability_name, context)
 	return fn(context)
 end
 
+local function evaluate_grenade_heuristic(grenade_template_name, context)
+	if not context then
+		return false, "grenade_no_context"
+	end
+
+	local fn = GRENADE_HEURISTICS[grenade_template_name]
+	if fn then
+		return fn(context)
+	end
+
+	if context.num_nearby > 0 then
+		return true, "grenade_generic"
+	end
+
+	return false, "grenade_no_enemies"
+end
+
 return {
 	init = function(deps)
 		_fixed_time = deps.fixed_time
@@ -867,5 +886,6 @@ return {
 	resolve_decision = resolve_decision,
 	evaluate_heuristic = evaluate_heuristic,
 	evaluate_item_heuristic = evaluate_item_heuristic,
+	evaluate_grenade_heuristic = evaluate_grenade_heuristic,
 	enemy_breed = _enemy_breed,
 }
