@@ -70,6 +70,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (temporary `#43` diagnostic; template-tagged queued weapon input)
+- `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
+- `skip penalty: special at dist_sq=<N> but ammo=<N>` (special beyond 18m but insufficient ammo to penalize melee)
 
 ## Intentionally suppressed (noise reduction)
 

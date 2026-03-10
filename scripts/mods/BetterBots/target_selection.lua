@@ -4,17 +4,19 @@ local M = {}
 
 local _mod
 local _debug_log
+local _fixed_time
 local CHASE_RANGE_SQ = 324
 
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_fixed_time = deps.fixed_time
 end
 
 function M.register_hooks()
 	local ok, Ammo = pcall(require, "scripts/utilities/ammo")
 	if not (ok and Ammo) then
-		_debug_log("target_selection", 1, "Failed to require scripts/utilities/ammo")
+		_debug_log("target_selection", _fixed_time(), "Failed to require scripts/utilities/ammo")
 		return
 	end
 
@@ -29,28 +31,40 @@ function M.register_hooks()
 				-- If target is a special at >18m and bot has sufficient ammo (>50%),
 				-- massively penalize melee score. This forces the bot to either shoot it
 				-- or pick a closer target for melee.
-				if target_distance_sq > CHASE_RANGE_SQ then
-					local tags = target_breed.tags
-					if tags and tags.special then
-						local ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
-						if ammo_percent and ammo_percent > 0.5 then
-							_debug_log(
-								"target_selection",
-								3,
-								"Penalizing melee score for distant special",
-								target_breed.name,
-								"dist_sq:",
-								target_distance_sq,
-								"ammo:",
-								ammo_percent
-							)
-							-- Massive penalty to ensure melee_score loses to ranged_score
-							return score - 100
-						end
-					end
+				if target_distance_sq <= CHASE_RANGE_SQ then
+					return score
 				end
 
-				return score
+				local tags = target_breed.tags
+				if not (tags and tags.special) then
+					return score
+				end
+
+				local ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
+				if not (ammo_percent and ammo_percent > 0.5) then
+					_debug_log(
+						"target_sel_skip_ammo",
+						_fixed_time(),
+						"skip penalty: special at dist_sq="
+							.. target_distance_sq
+							.. " but ammo="
+							.. tostring(ammo_percent)
+					)
+					return score
+				end
+
+				_debug_log(
+					"target_sel_penalty",
+					_fixed_time(),
+					"penalizing melee score for distant special "
+						.. tostring(target_breed.name)
+						.. " dist_sq="
+						.. target_distance_sq
+						.. " ammo="
+						.. ammo_percent
+				)
+				-- Massive penalty to ensure melee_score loses to ranged_score
+				return score - 100
 			end
 		)
 	end)

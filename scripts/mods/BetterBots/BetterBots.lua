@@ -253,6 +253,7 @@ RangedMetaData.init({
 TargetSelection.init({
 	mod = mod,
 	debug_log = _debug_log,
+	fixed_time = _fixed_time,
 })
 
 Poxburster.init({

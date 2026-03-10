@@ -23,6 +23,7 @@ describe("TargetSelection", function()
 		TargetSelection.init({
 			mod = _mod,
 			debug_log = function() end,
+			fixed_time = function() return 0 end,
 		})
 
 		original_slot_weight = function(unit, target_unit, target_distance_sq, target_breed, target_ally)
