@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 230 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
+- `make test` — 244 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -289,6 +289,7 @@ scripts/mods/BetterBots/
   heuristics.lua                            # 18 per-template heuristic functions + build_context()
   meta_data.lua                             # ability_meta_data injection
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
+  grenade_fallback.lua                     # Grenade throw state machine (wield/aim/throw/unwield)
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
   melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
@@ -298,11 +299,12 @@ scripts/mods/BetterBots/
   BetterBots_localization.lua               # Display strings
 tests/
   test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # 122 tests for all 18 heuristic functions
+  heuristics_spec.lua                       # 125 tests for all 18 heuristic functions + grenade heuristic
   meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
   sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
   ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
+  grenade_fallback_spec.lua                # 11 tests for grenade throw state machine
 ```

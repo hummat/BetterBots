@@ -52,7 +52,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | Blitz / grenade support | Inventory extracted — 19 templates mapped. All except `adamant_whistle` need item-based fallback. `adamant_whistle` is the only blitz with `ability_template` (potential Tier 1/2). #3 resolved — Phase 1 unblocked. |
+| 4 | Blitz / grenade support | **Phase 1 done:** 12 standard/handleless grenade templates via `grenade_fallback.lua` state machine. `adamant_whistle` (Remote Detonation) deferred — needs BT ability path. Psyker blitz, zealot knives, shock mine deferred. |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
 | 43 | Staff charged fire | Partial — shipped in v0.5.0. `_may_fire()` hook + aim chain derivation. p4 PASS in-game, p3 untested, p1/p2 need decompiled template inspection. |
