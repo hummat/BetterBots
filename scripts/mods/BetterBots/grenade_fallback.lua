@@ -28,18 +28,37 @@ local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exc
 -- Same cooldown for success and failure; split if tuning requires it.
 local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
+-- Only these templates use the aim_hold/aim_released throw flow.
+-- Blitz abilities (knives, chain lightning, smite, whistle, mine, missile)
+-- have different input chains and must NOT enter this state machine.
+local SUPPORTED_THROW_TEMPLATES = {
+	-- Standard grenades (9)
+	adamant_grenade = true,
+	fire_grenade = true,
+	frag_grenade = true,
+	ogryn_grenade_box = true,
+	ogryn_grenade_box_cluster = true,
+	ogryn_grenade_frag = true,
+	ogryn_grenade_friend_rock = true,
+	smoke_grenade = true,
+	tox_grenade = true,
+	-- Handleless grenades (3)
+	krak_grenade = true,
+	quick_flash_grenade = true,
+	shock_grenade = true,
+}
+
 local function _reset_state(state, next_try_t)
 	state.stage = nil
 	state.deadline_t = nil
 	state.wait_t = nil
-	state.action_input_extension = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
 end
 
-local function _queue_weapon_input(state, input_name)
-	local ext = state.action_input_extension
+local function _queue_weapon_input(unit, input_name)
+	local ext = ScriptUnit.has_extension(unit, "action_input_system")
 	if not ext then
 		_debug_log(
 			"grenade_no_ext:" .. input_name,
@@ -112,7 +131,7 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			_queue_weapon_input(state, "aim_hold")
+			_queue_weapon_input(unit, "aim_hold")
 			state.stage = "wait_throw"
 			state.wait_t = fixed_t + THROW_DELAY_S
 			_debug_log("grenade_aim_hold:" .. tostring(unit), fixed_t, "grenade queued aim_hold")
@@ -133,7 +152,7 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			_queue_weapon_input(state, "aim_released")
+			_queue_weapon_input(unit, "aim_released")
 			state.stage = "wait_unwield"
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 			_debug_log("grenade_aim_released:" .. tostring(unit), fixed_t, "grenade queued aim_released")
@@ -154,7 +173,7 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.deadline_t or 0) then
-			_queue_weapon_input(state, "unwield_to_previous")
+			_queue_weapon_input(unit, "unwield_to_previous")
 			_debug_log(
 				"grenade_unwield_forced:" .. tostring(unit),
 				fixed_t,
@@ -207,8 +226,16 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	local context = _build_context(unit, blackboard)
 	local grenade_name = grenade_ability.name or "unknown"
+
+	-- Only enter the aim_hold/aim_released flow for standard+handleless grenades.
+	-- Blitz abilities (knives, smite, chain lightning, mine, whistle, missile)
+	-- have different input chains and would get wrong inputs from this state machine.
+	if not SUPPORTED_THROW_TEMPLATES[grenade_name] then
+		return
+	end
+
+	local context = _build_context(unit, blackboard)
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
 	if not should_throw then
 		_debug_log(
@@ -219,7 +246,7 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	local action_input_extension = ScriptUnit.extension(unit, "action_input_system")
+	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
 		return
 	end
@@ -228,7 +255,6 @@ local function try_queue(unit, blackboard)
 
 	state.stage = "wield"
 	state.deadline_t = fixed_t + WIELD_TIMEOUT_S
-	state.action_input_extension = action_input_extension
 
 	_debug_log(
 		"grenade_wield:" .. tostring(unit),

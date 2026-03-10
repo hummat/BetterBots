@@ -46,12 +46,8 @@ local mock_unit_data_extension = {
 
 -- Mock ScriptUnit
 _G.ScriptUnit = {
-	has_extension = function(unit, system_name)
-		local exts = _extensions[unit]
-		return exts and exts[system_name] or nil
-	end,
-	extension = function(unit, system_name)
-		local exts = _extensions[unit]
+	has_extension = function(u, system_name)
+		local exts = _extensions[u]
 		return exts and exts[system_name] or nil
 	end,
 }
@@ -324,6 +320,23 @@ describe("grenade_fallback", function()
 
 	it("blocks during interaction", function()
 		blackboard = { behavior = { current_interaction_unit = "revive_target" } }
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("blocks unsupported blitz templates", function()
+		-- Wire with a blitz template that uses a different input chain
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_generic"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "psyker_chain_lightning" }
+			end,
+		})
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(0, #_recorded_inputs)
 	end)

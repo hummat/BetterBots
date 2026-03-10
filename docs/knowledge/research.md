@@ -58,6 +58,7 @@ MEMORY.md has brief summaries — this file has the full details.
 ## API gotchas
 - `Health.damage_taken_percent()` does NOT exist. Use `1 - Health.current_health_percent(unit)`.
 - `buff_extension:has_buff_name()` does NOT exist. Use `buff_extension:current_stacks("buff_name") > 0`.
+- `ScriptUnit.extension(unit, system)` **throws a hard Lua error** if the extension doesn't exist. Use `ScriptUnit.has_extension(unit, system)` in mod code — it returns nil on miss. In BT update tick context, a crash from `.extension()` kills the bot's entire behavior loop for that frame. Rule: always `has_extension` + nil check unless you have a structural guarantee the extension exists.
 
 ## Performance
 - Current overhead is negligible — mod reads engine-cached data, no new scans/raycasts/pathfinding
