@@ -162,6 +162,9 @@ assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
 local AbilityQueue = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ability_queue")
 assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
 
+local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
+assert(PingSystem, "BetterBots: failed to load ping_system module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -269,6 +272,13 @@ AbilityQueue.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+})
+
+PingSystem.init({
+	mod = mod,
+	debug_log = _debug_log,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -559,6 +569,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		end
 
 		AbilityQueue.try_queue(unit, blackboard)
+		PingSystem.update(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
 
 		if EventLog.is_enabled() then
