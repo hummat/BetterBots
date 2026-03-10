@@ -9,6 +9,10 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 
+-- One-shot set: each unique bot:template:action:raw_input combo logged once
+-- per load. Mirrors the ability_queue.lua context dump pattern.
+local _weapon_logged_combos = {}
+
 local function _weapon_log_context(unit)
 	local bot_slot = _bot_slot_for_unit(unit) or "?"
 	local wielded_slot = "none"
@@ -186,34 +190,37 @@ function M.register_hooks(deps)
 
 					-- DIAGNOSTIC (#43): log bot weapon actions (except wield) with
 					-- bot/template tags so charged inputs can be attributed to the
-					-- correct bot and staff family. Remove after validation.
-					if id == "weapon_action" and action_input ~= "wield" then
+					-- correct bot and staff family. One-shot per unique combo.
+					-- Remove after validation.
+					if id == "weapon_action" and action_input ~= "wield" and _debug_enabled() then
 						local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
 							_weapon_log_context(unit)
-						_debug_log(
-							"bot_weapon:"
-								.. tostring(bot_slot)
-								.. ":"
-								.. tostring(weapon_template_name)
-								.. ":"
-								.. tostring(action_input)
-								.. ":"
-								.. tostring(raw_input),
-							_fixed_time(),
-							"bot weapon: bot="
-								.. tostring(bot_slot)
-								.. " slot="
-								.. tostring(wielded_slot)
-								.. " weapon_template="
-								.. tostring(weapon_template_name)
-								.. " warp_template="
-								.. tostring(warp_charge_template_name)
-								.. " action="
-								.. tostring(action_input)
-								.. " raw_input="
-								.. tostring(raw_input),
-							0
-						)
+						local combo_key = tostring(bot_slot)
+							.. ":"
+							.. tostring(weapon_template_name)
+							.. ":"
+							.. tostring(action_input)
+							.. ":"
+							.. tostring(raw_input)
+						if not _weapon_logged_combos[combo_key] then
+							_weapon_logged_combos[combo_key] = true
+							_debug_log(
+								"bot_weapon:" .. combo_key,
+								_fixed_time(),
+								"bot weapon: bot="
+									.. tostring(bot_slot)
+									.. " slot="
+									.. tostring(wielded_slot)
+									.. " weapon_template="
+									.. tostring(weapon_template_name)
+									.. " warp_template="
+									.. tostring(warp_charge_template_name)
+									.. " action="
+									.. tostring(action_input)
+									.. " raw_input="
+									.. tostring(raw_input)
+							)
+						end
 					end
 
 					return func(self, id, action_input, raw_input)
