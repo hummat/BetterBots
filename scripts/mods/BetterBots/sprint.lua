@@ -12,11 +12,11 @@ local DAEMONHOST_BREED_NAMES = {
 local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 
--- Check for dormant daemonhosts using side.ai_target_units (all enemy units
--- on the opposing side). enemies_in_proximity() is unsuitable: it only
--- returns aggroed enemies within a 5m broadphase radius — dormant
+-- Check for non-aggroed daemonhosts using side.ai_target_units (all enemy
+-- units on the opposing side). enemies_in_proximity() is unsuitable: it
+-- only returns aggroed enemies within a 5m radius — non-aggroed
 -- daemonhosts at the intended 20m safety range are invisible to that API.
--- Skips fully aggroed daemonhosts (#17) — once fighting, suppression is
+-- Skips aggroed daemonhosts (#17) — once fighting, suppression is
 -- pointless and bots should defend themselves.
 local function _is_near_daemonhost(unit)
 	local unit_position = POSITION_LOOKUP[unit]

@@ -412,7 +412,25 @@ describe("sprint", function()
 			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
 			setup_side_system(unit, { dh })
-			-- No BLACKBOARDS entry — treat as dormant (conservative)
+			-- No BLACKBOARDS entry — treat as non-aggroed (conservative)
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true when one DH aggroed and another non-aggroed nearby", function()
+			local unit = "bot1"
+			local dh_aggro = "dh_fighting"
+			local dh_passive = "dh_sleeping"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh_aggro] = pos(5, 0, 0)
+			_positions[dh_passive] = pos(10, 0, 0)
+			_alive[dh_aggro] = true
+			_alive[dh_passive] = true
+			setup_breed(dh_aggro, "chaos_daemonhost")
+			setup_breed(dh_passive, "chaos_daemonhost")
+			setup_side_system(unit, { dh_aggro, dh_passive })
+			_blackboards[dh_aggro] = { perception = { aggro_state = "aggroed" } }
+			_blackboards[dh_passive] = { perception = { aggro_state = "passive" } }
+			-- Skips the aggroed one, catches the passive one
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)
 	end)

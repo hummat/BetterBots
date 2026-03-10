@@ -108,7 +108,7 @@ local function _is_suppressed(unit)
 		return true, "moving_platform"
 	end
 
-	-- #17: suppress abilities near dormant daemonhosts
+	-- #17: suppress abilities near non-aggroed daemonhosts
 	if _is_near_daemonhost and _is_near_daemonhost(unit) then
 		return true, "daemonhost_nearby"
 	end

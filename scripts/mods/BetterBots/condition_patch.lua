@@ -198,14 +198,19 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat near dormant daemonhosts.
+	-- #17: suppress melee/ranged combat near non-aggroed daemonhosts.
 	-- Wraps the original conditions so bots won't initiate attacks that
-	-- could wake a nearby daemonhost.
+	-- could provoke a nearby daemonhost.
 	if _is_near_daemonhost then
 		local orig_bot_in_melee_range = conditions.bot_in_melee_range
 		if orig_bot_in_melee_range then
 			conditions.bot_in_melee_range = function(unit, ...)
 				if _is_near_daemonhost(unit) then
+					_debug_log(
+						"dh_suppress_melee:" .. tostring(unit),
+						_fixed_time(),
+						"melee suppressed (daemonhost_nearby)"
+					)
 					return false
 				end
 				return orig_bot_in_melee_range(unit, ...)
@@ -216,6 +221,11 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		if orig_has_target_and_ammo then
 			conditions.has_target_and_ammo_greater_than = function(unit, ...)
 				if _is_near_daemonhost(unit) then
+					_debug_log(
+						"dh_suppress_ranged:" .. tostring(unit),
+						_fixed_time(),
+						"ranged suppressed (daemonhost_nearby)"
+					)
 					return false
 				end
 				return orig_has_target_and_ammo(unit, ...)
