@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 267 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch)
+- `make test` — 275 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -296,6 +296,7 @@ scripts/mods/BetterBots/
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
   melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
+  target_selection.lua                      # Melee target selection distance penalty for specials
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
@@ -307,6 +308,7 @@ tests/
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
   sprint_spec.lua                           # 23 tests for sprint conditions + daemonhost safety
   condition_patch_spec.lua                  # 13 tests for DH combat suppression wrappers
+  target_selection_spec.lua                 # 8 tests for melee target distance penalty
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
   ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                # 16 tests for grenade throw state machine

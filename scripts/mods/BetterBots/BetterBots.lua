@@ -165,6 +165,9 @@ assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
 assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
 
+local TargetSelection = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_selection")
+assert(TargetSelection, "BetterBots: failed to load target_selection module")
+
 local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
 assert(Poxburster, "BetterBots: failed to load poxburster module")
 
@@ -244,6 +247,11 @@ MeleeMetaData.init({
 RangedMetaData.init({
 	mod = mod,
 	patched_weapon_templates = _patched_weapon_templates_ranged,
+	debug_log = _debug_log,
+})
+
+TargetSelection.init({
+	mod = mod,
 	debug_log = _debug_log,
 })
 
@@ -341,6 +349,7 @@ GrenadeFallback.wire({
 })
 
 -- Register hooks for extracted modules
+TargetSelection.register_hooks()
 Poxburster.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
