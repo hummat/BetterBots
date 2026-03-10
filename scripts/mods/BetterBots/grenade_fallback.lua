@@ -1,13 +1,15 @@
 -- grenade_fallback.lua — bot grenade throw state machine (#4)
 -- Wields grenade slot, aims, throws, and returns to previous weapon.
+-- Only activates when charges are available and the heuristic permits.
 
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled -- luacheck: ignore 231
 local _fixed_time
-local _event_log -- luacheck: ignore 231
-local _bot_slot_for_unit -- luacheck: ignore 231
+local _event_log -- luacheck: ignore 231 — TODO: emit grenade_queued/grenade_complete events
+local _bot_slot_for_unit -- luacheck: ignore 231 — TODO: include in EventLog emissions
+local _is_suppressed
 
 -- Late-bound cross-module refs (set via wire)
 local _build_context
@@ -19,11 +21,12 @@ local _grenade_state_by_unit
 local _last_grenade_charge_event_by_unit
 
 -- Timing constants
-local WIELD_TIMEOUT_S = 2.0
-local AIM_DELAY_S = 0.15
-local THROW_DELAY_S = 0.3
-local UNWIELD_TIMEOUT_S = 3.0
-local RETRY_COOLDOWN_S = 2.0
+local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
+local AIM_DELAY_S = 0.15 -- Minimum hold before queueing aim_hold (lets wield animation settle)
+local THROW_DELAY_S = 0.3 -- Minimum hold after aim_hold before releasing
+local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
+-- Same cooldown for success and failure; split if tuning requires it.
+local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
 local function _reset_state(state, next_try_t)
 	state.stage = nil
@@ -37,9 +40,15 @@ end
 
 local function _queue_weapon_input(state, input_name)
 	local ext = state.action_input_extension
-	if ext then
-		ext:bot_queue_action_input("weapon_action", input_name, nil)
+	if not ext then
+		_debug_log(
+			"grenade_no_ext:" .. input_name,
+			_fixed_time(),
+			"grenade _queue_weapon_input skipped: no action_input_extension for " .. input_name
+		)
+		return
 	end
+	ext:bot_queue_action_input("weapon_action", input_name, nil)
 end
 
 local function try_queue(unit, blackboard)
@@ -56,6 +65,18 @@ local function try_queue(unit, blackboard)
 	end
 
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+
+	-- If unit_data_extension is gone mid-sequence, abort cleanly.
+	if not unit_data_extension and state.stage then
+		_debug_log(
+			"grenade_no_unit_data:" .. tostring(unit),
+			fixed_t,
+			"grenade aborted stage=" .. tostring(state.stage) .. ": unit_data_system missing"
+		)
+		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+		return
+	end
+
 	local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
 	local wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
 
@@ -128,7 +149,6 @@ local function try_queue(unit, blackboard)
 				fixed_t,
 				"grenade throw complete, slot returned to " .. tostring(wielded_slot)
 			)
-			-- Same cooldown for success and failure; split if tuning requires it.
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -146,7 +166,38 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	-- Idle: check if we can and should throw a grenade
+	-- Unknown stage — log and reset rather than falling through to idle.
+	if state.stage ~= nil then
+		_debug_log(
+			"grenade_unknown_stage:" .. tostring(unit),
+			fixed_t,
+			"grenade unknown stage=" .. tostring(state.stage) .. ", resetting"
+		)
+		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+		return
+	end
+
+	-- Idle: check if we can and should throw a grenade.
+	-- Guards mirror ability_queue.lua: block during interactions and suppressed states.
+	local behavior = blackboard and blackboard.behavior
+	if behavior and behavior.current_interaction_unit ~= nil then
+		return
+	end
+
+	local suppressed, suppress_reason = _is_suppressed(unit)
+	if suppressed then
+		_debug_log(
+			"grenade_suppress:" .. tostring(suppress_reason),
+			fixed_t,
+			"grenade blocked: suppressed (" .. tostring(suppress_reason) .. ")"
+		)
+		return
+	end
+
+	-- NOTE: No mutual exclusion with AbilityQueue yet. Both state machines run
+	-- independently. In practice the heuristic + cooldown gates make simultaneous
+	-- activation rare, but a shared "ability_in_progress" flag would be cleaner.
+
 	local ability_extension, grenade_ability = _equipped_grenade_ability(unit)
 	if not ability_extension or not grenade_ability then
 		return
@@ -160,6 +211,11 @@ local function try_queue(unit, blackboard)
 	local grenade_name = grenade_ability.name or "unknown"
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
 	if not should_throw then
+		_debug_log(
+			"grenade_blocked:" .. tostring(unit),
+			fixed_t,
+			"grenade blocked for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
+		)
 		return
 	end
 
@@ -198,6 +254,7 @@ return {
 		_fixed_time = deps.fixed_time
 		_event_log = deps.event_log
 		_bot_slot_for_unit = deps.bot_slot_for_unit
+		_is_suppressed = deps.is_suppressed
 		_grenade_state_by_unit = deps.grenade_state_by_unit
 		_last_grenade_charge_event_by_unit = deps.last_grenade_charge_event_by_unit
 	end,
