@@ -84,6 +84,10 @@ Grenade abilities are still out of scope.
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
+21. Melee target selection distance penalty (#19, via `target_selection.lua`):
+    - hook `BotTargetSelection.slot_weight` during melee scoring
+    - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%)
+    - biases the bot's behavior toward ranged engagement instead of chasing distant specials
 
 ## Why item fallback is needed
 

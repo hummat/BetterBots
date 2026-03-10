@@ -229,7 +229,10 @@ RangedMetaData.init({
 	debug_log = _debug_log,
 })
 
-TargetSelection.init(mod)
+TargetSelection.init({
+	mod = mod,
+	debug_log = _debug_log,
+})
 
 Poxburster.init({
 	mod = mod,
