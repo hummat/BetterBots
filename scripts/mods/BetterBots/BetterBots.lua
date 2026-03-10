@@ -39,6 +39,9 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
+-- Forward ref: set after Sprint loads (#17 daemonhost avoidance)
+local _is_near_daemonhost
+
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
 end
@@ -107,6 +110,11 @@ local function _is_suppressed(unit)
 		return true, "moving_platform"
 	end
 
+	-- #17: suppress abilities near non-aggroed daemonhosts
+	if _is_near_daemonhost and _is_near_daemonhost(unit) then
+		return true, "daemonhost_nearby"
+	end
+
 	return false
 end
 
@@ -149,6 +157,7 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
+_is_near_daemonhost = Sprint.is_near_daemonhost
 
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")

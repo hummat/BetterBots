@@ -32,6 +32,14 @@ _G.Vector3 = {
 	end,
 }
 
+-- Mock BLACKBOARDS for daemonhost aggro state detection (#17)
+local _blackboards = {}
+_G.BLACKBOARDS = setmetatable({}, {
+	__index = function(_, unit)
+		return _blackboards[unit]
+	end,
+})
+
 -- Mock Managers.state.extension:system("side_system") for daemonhost detection
 local _mock_side_system = nil
 
@@ -49,6 +57,17 @@ _G.Managers = {
 }
 
 local Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
+
+-- Mock time for per-frame caching — increment between tests to bust cache
+local _mock_time = 0
+
+Sprint.init({
+	mod = { echo = function() end },
+	debug_log = function() end,
+	fixed_time = function()
+		return _mock_time
+	end,
+})
 
 -- Helper: build a mock BotUnitInput self with _move and _group_extension
 local function make_self(opts)
@@ -142,7 +161,11 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	for k in pairs(_blackboards) do
+		_blackboards[k] = nil
+	end
 	_mock_side_system = nil
+	_mock_time = _mock_time + 1 -- bust per-frame DH distance cache
 end
 
 describe("sprint", function()
@@ -367,6 +390,76 @@ describe("sprint", function()
 			setup_breed(dh, "chaos_mutator_daemonhost")
 			setup_side_system(unit, { dh })
 			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns false for aggroed daemonhost", function()
+			local unit = "bot1"
+			local dh = "dh_aggro"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			_blackboards[dh] = { perception = { aggro_state = "aggroed" } }
+			assert.is_false(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true for alerted (non-aggroed) daemonhost", function()
+			local unit = "bot1"
+			local dh = "dh_alerted"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			_blackboards[dh] = { perception = { aggro_state = "alerted" } }
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true when daemonhost has no blackboard", function()
+			local unit = "bot1"
+			local dh = "dh_no_bb"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			-- No BLACKBOARDS entry — treat as non-aggroed (conservative)
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true when one DH aggroed and another non-aggroed nearby", function()
+			local unit = "bot1"
+			local dh_aggro = "dh_fighting"
+			local dh_passive = "dh_sleeping"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh_aggro] = pos(5, 0, 0)
+			_positions[dh_passive] = pos(10, 0, 0)
+			_alive[dh_aggro] = true
+			_alive[dh_passive] = true
+			setup_breed(dh_aggro, "chaos_daemonhost")
+			setup_breed(dh_passive, "chaos_daemonhost")
+			setup_side_system(unit, { dh_aggro, dh_passive })
+			_blackboards[dh_aggro] = { perception = { aggro_state = "aggroed" } }
+			_blackboards[dh_passive] = { perception = { aggro_state = "passive" } }
+			-- Skips the aggroed one, catches the passive one
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("respects tighter combat range parameter", function()
+			local unit = "bot1"
+			local dh = "dh_mid"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(15, 0, 0) -- 15m: inside 20m but outside 10m
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			-- Default 20m range: true
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+			-- Bust cache for next call with different range
+			_mock_time = _mock_time + 1
+			-- Tighter 10m combat range: false (15m > 10m)
+			assert.is_false(Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ))
 		end)
 	end)
 end)

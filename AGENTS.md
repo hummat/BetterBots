@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 249 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback)
+- `make test` — 266 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -31,6 +31,8 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 ## Debugging
+
+Every new feature must include enough `_debug_log` calls to verify correctness from a single in-game session. Not exhaustive or verbose — just sufficient to confirm each code path fires when expected. Before marking a feature complete, audit: can you grep `bb-log` output and tell with certainty that it works?
 
 See `docs/dev/debugging.md` for full debug tool reference. Key tools:
 - **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
@@ -303,7 +305,8 @@ tests/
   meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
   resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
   event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
-  sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
+  sprint_spec.lua                           # 23 tests for sprint conditions + daemonhost safety
+  condition_patch_spec.lua                  # 12 tests for DH combat suppression wrappers
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
   ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                # 16 tests for grenade throw state machine
