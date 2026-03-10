@@ -6,6 +6,7 @@ read_globals = {
 	"ScriptUnit",
 	"cjson",
 	"ALIVE",
+	"BLACKBOARDS",
 	"POSITION_LOOKUP",
 	"Vector3",
 	"Managers",

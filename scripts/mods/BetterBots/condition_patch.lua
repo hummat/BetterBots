@@ -15,6 +15,7 @@ local _EventLog
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
 local _rescue_intent
+local _is_near_daemonhost
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
@@ -197,6 +198,31 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
+	-- #17: suppress melee/ranged combat near dormant daemonhosts.
+	-- Wraps the original conditions so bots won't initiate attacks that
+	-- could wake a nearby daemonhost.
+	if _is_near_daemonhost then
+		local orig_bot_in_melee_range = conditions.bot_in_melee_range
+		if orig_bot_in_melee_range then
+			conditions.bot_in_melee_range = function(unit, ...)
+				if _is_near_daemonhost(unit) then
+					return false
+				end
+				return orig_bot_in_melee_range(unit, ...)
+			end
+		end
+
+		local orig_has_target_and_ammo = conditions.has_target_and_ammo_greater_than
+		if orig_has_target_and_ammo then
+			conditions.has_target_and_ammo_greater_than = function(unit, ...)
+				if _is_near_daemonhost(unit) then
+					return false
+				end
+				return orig_has_target_and_ammo(unit, ...)
+			end
+		end
+	end
+
 	patched_set[conditions] = true
 
 	_debug_log(
@@ -217,6 +243,7 @@ function M.init(deps)
 	_patched_bt_bot_conditions = deps.patched_bt_bot_conditions
 	_patched_bt_conditions = deps.patched_bt_conditions
 	_rescue_intent = deps.rescue_intent
+	_is_near_daemonhost = deps.is_near_daemonhost
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 end

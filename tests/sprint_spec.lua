@@ -32,6 +32,14 @@ _G.Vector3 = {
 	end,
 }
 
+-- Mock BLACKBOARDS for daemonhost aggro state detection (#17)
+local _blackboards = {}
+_G.BLACKBOARDS = setmetatable({}, {
+	__index = function(_, unit)
+		return _blackboards[unit]
+	end,
+})
+
 -- Mock Managers.state.extension:system("side_system") for daemonhost detection
 local _mock_side_system = nil
 
@@ -141,6 +149,9 @@ local function reset()
 	end
 	for k in pairs(_alive) do
 		_alive[k] = nil
+	end
+	for k in pairs(_blackboards) do
+		_blackboards[k] = nil
 	end
 	_mock_side_system = nil
 end
@@ -366,6 +377,42 @@ describe("sprint", function()
 			_alive[dh] = true
 			setup_breed(dh, "chaos_mutator_daemonhost")
 			setup_side_system(unit, { dh })
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns false for aggroed daemonhost", function()
+			local unit = "bot1"
+			local dh = "dh_aggro"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			_blackboards[dh] = { perception = { aggro_state = "aggroed" } }
+			assert.is_false(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true for alerted (non-aggroed) daemonhost", function()
+			local unit = "bot1"
+			local dh = "dh_alerted"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			_blackboards[dh] = { perception = { aggro_state = "alerted" } }
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("returns true when daemonhost has no blackboard", function()
+			local unit = "bot1"
+			local dh = "dh_no_bb"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			-- No BLACKBOARDS entry — treat as dormant (conservative)
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)
 	end)

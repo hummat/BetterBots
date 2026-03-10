@@ -12,10 +12,12 @@ local DAEMONHOST_BREED_NAMES = {
 local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 
--- Check for daemonhosts using side.ai_target_units (all enemy units on the
--- opposing side). enemies_in_proximity() is unsuitable: it only returns
--- aggroed enemies within a 5m broadphase radius — dormant daemonhosts at
--- the intended 20m safety range are invisible to that API.
+-- Check for dormant daemonhosts using side.ai_target_units (all enemy units
+-- on the opposing side). enemies_in_proximity() is unsuitable: it only
+-- returns aggroed enemies within a 5m broadphase radius — dormant
+-- daemonhosts at the intended 20m safety range are invisible to that API.
+-- Skips fully aggroed daemonhosts (#17) — once fighting, suppression is
+-- pointless and bots should defend themselves.
 local function _is_near_daemonhost(unit)
 	local unit_position = POSITION_LOOKUP[unit]
 	if not unit_position then
@@ -53,11 +55,18 @@ local function _is_near_daemonhost(unit)
 					if unit_data_ext then
 						local breed = unit_data_ext:breed()
 						if breed and DAEMONHOST_BREED_NAMES[breed.name] then
-							local enemy_pos = POSITION_LOOKUP[enemy_unit]
-							if enemy_pos then
-								local dist_sq = Vector3.distance_squared(unit_position, enemy_pos)
-								if dist_sq < DAEMONHOST_SAFE_RANGE_SQ then
-									return true
+							-- Skip fully aggroed daemonhosts — suppression
+							-- only matters while it can still be avoided.
+							local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
+							local dh_perception = dh_bb and dh_bb.perception
+							local is_aggroed = dh_perception and dh_perception.aggro_state == "aggroed"
+							if not is_aggroed then
+								local enemy_pos = POSITION_LOOKUP[enemy_unit]
+								if enemy_pos then
+									local dist_sq = Vector3.distance_squared(unit_position, enemy_pos)
+									if dist_sq < DAEMONHOST_SAFE_RANGE_SQ then
+										return true
+									end
 								end
 							end
 						end

@@ -37,6 +37,9 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
+-- Forward ref: set after Sprint loads (#17 daemonhost avoidance)
+local _is_near_daemonhost
+
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
 end
@@ -105,6 +108,11 @@ local function _is_suppressed(unit)
 		return true, "moving_platform"
 	end
 
+	-- #17: suppress abilities near dormant daemonhosts
+	if _is_near_daemonhost and _is_near_daemonhost(unit) then
+		return true, "daemonhost_nearby"
+	end
+
 	return false
 end
 
@@ -140,6 +148,7 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
+_is_near_daemonhost = Sprint.is_near_daemonhost
 
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
@@ -254,6 +263,7 @@ ConditionPatch.init({
 	patched_bt_bot_conditions = _patched_bt_bot_conditions,
 	patched_bt_conditions = _patched_bt_conditions,
 	rescue_intent = _rescue_intent,
+	is_near_daemonhost = _is_near_daemonhost,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
 })
