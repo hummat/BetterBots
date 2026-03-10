@@ -174,6 +174,7 @@ tests/
   resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
   event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
   sprint_spec.lua           # 18 tests: sprint conditions + daemonhost safety
+  target_selection_spec.lua # 4 tests: melee target distance penalty
 ```
 
 ### Running tests
