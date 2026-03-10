@@ -16,6 +16,7 @@ local _patched_bt_bot_conditions
 local _patched_bt_conditions
 local _rescue_intent
 local _is_near_daemonhost
+local _daemonhost_combat_range_sq
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
@@ -198,14 +199,15 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat near non-aggroed daemonhosts.
-	-- Wraps the original conditions so bots won't initiate attacks that
-	-- could provoke a nearby daemonhost.
-	if _is_near_daemonhost then
+	-- #17: suppress melee/ranged combat within 10m of non-aggroed daemonhosts.
+	-- Uses a tighter radius than ability/sprint suppression (20m) so bots
+	-- can still fight enemies in mixed encounters at moderate distance.
+	if _is_near_daemonhost and _daemonhost_combat_range_sq then
+		local combat_range_sq = _daemonhost_combat_range_sq
 		local orig_bot_in_melee_range = conditions.bot_in_melee_range
 		if orig_bot_in_melee_range then
 			conditions.bot_in_melee_range = function(unit, ...)
-				if _is_near_daemonhost(unit) then
+				if _is_near_daemonhost(unit, combat_range_sq) then
 					_debug_log(
 						"dh_suppress_melee:" .. tostring(unit),
 						_fixed_time(),
@@ -220,7 +222,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		local orig_has_target_and_ammo = conditions.has_target_and_ammo_greater_than
 		if orig_has_target_and_ammo then
 			conditions.has_target_and_ammo_greater_than = function(unit, ...)
-				if _is_near_daemonhost(unit) then
+				if _is_near_daemonhost(unit, combat_range_sq) then
 					_debug_log(
 						"dh_suppress_ranged:" .. tostring(unit),
 						_fixed_time(),
@@ -254,6 +256,7 @@ function M.init(deps)
 	_patched_bt_conditions = deps.patched_bt_conditions
 	_rescue_intent = deps.rescue_intent
 	_is_near_daemonhost = deps.is_near_daemonhost
+	_daemonhost_combat_range_sq = deps.daemonhost_combat_range_sq
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 end

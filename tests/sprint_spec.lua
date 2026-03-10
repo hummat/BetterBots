@@ -58,6 +58,17 @@ _G.Managers = {
 
 local Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
 
+-- Mock time for per-frame caching — increment between tests to bust cache
+local _mock_time = 0
+
+Sprint.init({
+	mod = { echo = function() end },
+	debug_log = function() end,
+	fixed_time = function()
+		return _mock_time
+	end,
+})
+
 -- Helper: build a mock BotUnitInput self with _move and _group_extension
 local function make_self(opts)
 	opts = opts or {}
@@ -154,6 +165,7 @@ local function reset()
 		_blackboards[k] = nil
 	end
 	_mock_side_system = nil
+	_mock_time = _mock_time + 1 -- bust per-frame DH distance cache
 end
 
 describe("sprint", function()
@@ -432,6 +444,22 @@ describe("sprint", function()
 			_blackboards[dh_passive] = { perception = { aggro_state = "passive" } }
 			-- Skips the aggroed one, catches the passive one
 			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("respects tighter combat range parameter", function()
+			local unit = "bot1"
+			local dh = "dh_mid"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(15, 0, 0) -- 15m: inside 20m but outside 10m
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			-- Default 20m range: true
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+			-- Bust cache for next call with different range
+			_mock_time = _mock_time + 1
+			-- Tighter 10m combat range: false (15m > 10m)
+			assert.is_false(Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ))
 		end)
 	end)
 end)
