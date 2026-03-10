@@ -263,8 +263,6 @@ ConditionPatch.init({
 	patched_bt_bot_conditions = _patched_bt_bot_conditions,
 	patched_bt_conditions = _patched_bt_conditions,
 	rescue_intent = _rescue_intent,
-	is_near_daemonhost = _is_near_daemonhost,
-	daemonhost_combat_range_sq = Sprint.DAEMONHOST_COMBAT_RANGE_SQ,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
 })

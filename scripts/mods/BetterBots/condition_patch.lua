@@ -15,11 +15,40 @@ local _EventLog
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
 local _rescue_intent
-local _is_near_daemonhost
-local _daemonhost_combat_range_sq
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
+
+-- #17: breed names for daemonhost target-specific combat suppression.
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
+
+-- Returns true when the bot's current target_enemy is a non-aggroed
+-- daemonhost. O(1) — no proximity scan needed since we only check
+-- the single target the bot is already committed to attacking.
+local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ignore 212/_unit
+	local perception = blackboard and blackboard.perception
+	local target_enemy = perception and perception.target_enemy
+	if not target_enemy then
+		return false
+	end
+
+	local target_data_ext = ScriptUnit.has_extension(target_enemy, "unit_data_system")
+	local breed = target_data_ext and target_data_ext:breed()
+	if not (breed and DAEMONHOST_BREED_NAMES[breed.name]) then
+		return false
+	end
+
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_enemy]
+	local target_perception = target_bb and target_bb.perception
+	if target_perception and target_perception.aggro_state == "aggroed" then
+		return false
+	end
+
+	return true
+end
 
 local RESCUE_CHARGE_RULES = {
 	ogryn_charge_ally_aid = true,
@@ -199,39 +228,43 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat within 10m of non-aggroed daemonhosts.
-	-- Uses a tighter radius than ability/sprint suppression (20m) so bots
-	-- can still fight enemies in mixed encounters at moderate distance.
-	if _is_near_daemonhost and _daemonhost_combat_range_sq then
-		local combat_range_sq = _daemonhost_combat_range_sq
-		local orig_bot_in_melee_range = conditions.bot_in_melee_range
-		if orig_bot_in_melee_range then
-			conditions.bot_in_melee_range = function(unit, ...)
-				if _is_near_daemonhost(unit, combat_range_sq) then
-					_debug_log(
-						"dh_suppress_melee:" .. tostring(unit),
-						_fixed_time(),
-						"melee suppressed (daemonhost_nearby)"
-					)
-					return false
-				end
-				return orig_bot_in_melee_range(unit, ...)
+	-- #17: suppress melee/ranged combat when the bot's current target IS a
+	-- non-aggroed daemonhost. Target-specific (not proximity-based) so bots
+	-- can still fight hordes/specials in mixed encounters near a sleeping DH.
+	local orig_bot_in_melee_range = conditions.bot_in_melee_range
+	if orig_bot_in_melee_range then
+		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+			if _is_dormant_daemonhost_target(unit, blackboard) then
+				_debug_log(
+					"dh_suppress_melee:" .. tostring(unit),
+					_fixed_time(),
+					"melee suppressed (target is dormant daemonhost)"
+				)
+				return false
 			end
+			return orig_bot_in_melee_range(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 		end
+	end
 
-		local orig_has_target_and_ammo = conditions.has_target_and_ammo_greater_than
-		if orig_has_target_and_ammo then
-			conditions.has_target_and_ammo_greater_than = function(unit, ...)
-				if _is_near_daemonhost(unit, combat_range_sq) then
-					_debug_log(
-						"dh_suppress_ranged:" .. tostring(unit),
-						_fixed_time(),
-						"ranged suppressed (daemonhost_nearby)"
-					)
-					return false
-				end
-				return orig_has_target_and_ammo(unit, ...)
+	local orig_has_target_and_ammo = conditions.has_target_and_ammo_greater_than
+	if orig_has_target_and_ammo then
+		conditions.has_target_and_ammo_greater_than = function(
+			unit,
+			blackboard,
+			scratchpad,
+			condition_args,
+			action_data,
+			is_running
+		)
+			if _is_dormant_daemonhost_target(unit, blackboard) then
+				_debug_log(
+					"dh_suppress_ranged:" .. tostring(unit),
+					_fixed_time(),
+					"ranged suppressed (target is dormant daemonhost)"
+				)
+				return false
 			end
+			return orig_has_target_and_ammo(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 		end
 	end
 
@@ -255,8 +288,6 @@ function M.init(deps)
 	_patched_bt_bot_conditions = deps.patched_bt_bot_conditions
 	_patched_bt_conditions = deps.patched_bt_conditions
 	_rescue_intent = deps.rescue_intent
-	_is_near_daemonhost = deps.is_near_daemonhost
-	_daemonhost_combat_range_sq = deps.daemonhost_combat_range_sq
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 end
@@ -275,6 +306,10 @@ end
 function M.rescue_intent()
 	return _rescue_intent
 end
+
+-- Exposed for testing; not part of the public API.
+M._install_condition_patch = _install_condition_patch
+M._is_dormant_daemonhost_target = _is_dormant_daemonhost_target
 
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
