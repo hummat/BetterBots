@@ -31,7 +31,7 @@ local DAEMONHOST_BREED_NAMES = {
 local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ignore 212/_unit
 	local perception = blackboard and blackboard.perception
 	local target_enemy = perception and perception.target_enemy
-	if not target_enemy then
+	if not target_enemy or not ALIVE[target_enemy] then
 		return false
 	end
 

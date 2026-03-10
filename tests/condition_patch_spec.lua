@@ -33,7 +33,12 @@ _G.Vector3 = {
 		return dx * dx + dy * dy + dz * dz
 	end,
 }
-_G.ALIVE = {}
+local _alive = {}
+_G.ALIVE = setmetatable({}, {
+	__index = function(_, unit)
+		return _alive[unit]
+	end,
+})
 _G.Managers = { state = { extension = { system = function() return nil end } } }
 
 -- Stub require so condition_patch.lua doesn't crash on game modules
@@ -72,7 +77,7 @@ ConditionPatch.wire({
 	EventLog = { is_enabled = function() return false end },
 })
 
--- Helper: set up unit_data extension for a breed
+-- Helper: set up unit_data extension for a breed (marks unit alive)
 local function setup_breed(unit, breed_name)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
@@ -82,6 +87,7 @@ local function setup_breed(unit, breed_name)
 			return { name = breed_name }
 		end,
 	}
+	_alive[unit] = true
 end
 
 -- Helper: build a blackboard with a target_enemy
@@ -103,6 +109,9 @@ local function reset()
 	end
 	for k in pairs(_blackboards) do
 		_blackboards[k] = nil
+	end
+	for k in pairs(_alive) do
+		_alive[k] = nil
 	end
 end
 
@@ -148,6 +157,14 @@ describe("condition_patch", function()
 			_blackboards[target] = { perception = { aggro_state = "alerted" } }
 			local bb = make_blackboard(target)
 			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns false when target enemy is dead", function()
+			local target = "dh_dead"
+			setup_breed(target, "chaos_daemonhost")
+			_alive[target] = nil -- dead
+			local bb = make_blackboard(target)
+			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
 
 		it("returns false when no target enemy", function()
