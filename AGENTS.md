@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 275 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection)
+- `make test` — 283 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -198,7 +198,7 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
 | Added a new hook or module | `docs/dev/architecture.md` |
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
-| Released a new version (`make release`) | Add changelog entry on Nexus (version + user-facing summary) |
+| Released a new version (`make release`) | Add changelog entry on Nexus (version + summary of user-facing changes) |
 
 ### Doc index by activity
 
@@ -297,6 +297,7 @@ scripts/mods/BetterBots/
   melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   target_selection.lua                      # Melee target selection distance penalty for specials
+  ping_system.lua                           # Bot elite/special pinging system
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
@@ -310,6 +311,7 @@ tests/
   condition_patch_spec.lua                  # 13 tests for DH combat suppression wrappers
   target_selection_spec.lua                 # 8 tests for melee target distance penalty
   melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
-  ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
+  ranged_meta_data_spec.lua                  # 32 tests for ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                # 16 tests for grenade throw state machine
+  ping_system_spec.lua                      # 8 tests for bot pinging logic
 ```

@@ -186,6 +186,9 @@ assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
 local GrenadeFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_fallback")
 assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
 
+local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
+assert(PingSystem, "BetterBots: failed to load ping_system module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -311,6 +314,13 @@ GrenadeFallback.init({
 	is_suppressed = _is_suppressed,
 	grenade_state_by_unit = _grenade_state_by_unit,
 	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+})
+
+PingSystem.init({
+	mod = mod,
+	debug_log = _debug_log,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -634,6 +644,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 
 		AbilityQueue.try_queue(unit, blackboard)
 		GrenadeFallback.try_queue(unit, blackboard)
+		PingSystem.update(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
 
 		if EventLog.is_enabled() then
