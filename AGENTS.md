@@ -138,6 +138,15 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 Local clone: `../Darktide-Source-Code/`
 
+**Before starting any new feature work**, pull the latest decompiled source:
+```bash
+cd ../Darktide-Source-Code && git pull && cd -
+```
+If the clone doesn't exist, create it:
+```bash
+gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 1
+```
+
 **Repo structure:**
 - `scripts/extension_systems/` — runtime systems (ability, behavior, weapon, input, UI)
 - `scripts/managers/` — orchestration and stateful managers
