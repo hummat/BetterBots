@@ -60,6 +60,10 @@ _G.ScriptUnit = {
 local _heuristic_result = true
 local _heuristic_rule = "grenade_generic"
 
+-- Mock suppression
+local _is_suppressed_result = false
+local _is_suppressed_reason = nil
+
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
 
@@ -76,9 +80,12 @@ local function reset()
 	_wielded_slot = "slot_secondary"
 	_heuristic_result = true
 	_heuristic_rule = "grenade_generic"
+	_is_suppressed_result = false
+	_is_suppressed_reason = nil
 	_recorded_inputs = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
+	blackboard = {}
 
 	_extensions[unit] = {
 		ability_system = mock_ability_extension,
@@ -99,6 +106,9 @@ local function reset()
 		bot_slot_for_unit = function()
 			return "slot1"
 		end,
+		is_suppressed = function()
+			return _is_suppressed_result, _is_suppressed_reason
+		end,
 		grenade_state_by_unit = _grenade_state_by_unit,
 		last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
 	})
@@ -114,6 +124,31 @@ local function reset()
 			return mock_ability_extension, { name = "frag_grenade" }
 		end,
 	})
+end
+
+-- Helper: advance state machine from idle to a target stage
+local function advance_to_stage(target_stage)
+	GrenadeFallback.try_queue(unit, blackboard)
+	if target_stage == "wield" then
+		return
+	end
+
+	_wielded_slot = "slot_grenade_ability"
+	_mock_time = _mock_time + 0.5
+	GrenadeFallback.try_queue(unit, blackboard)
+	if target_stage == "wait_aim" then
+		return
+	end
+
+	_mock_time = _mock_time + 0.5
+	GrenadeFallback.try_queue(unit, blackboard)
+	if target_stage == "wait_throw" then
+		return
+	end
+
+	_mock_time = _mock_time + 0.5
+	GrenadeFallback.try_queue(unit, blackboard)
+	-- now in wait_unwield
 end
 
 describe("grenade_fallback", function()
@@ -139,14 +174,12 @@ describe("grenade_fallback", function()
 		assert.equals("weapon_action", _recorded_inputs[1].component)
 		assert.equals("grenade_ability", _recorded_inputs[1].input)
 		assert.is_nil(_recorded_inputs[1].extra)
-		-- State should transition to "wield"
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
 	end)
 
 	it("waits in wield stage until slot changes", function()
-		-- Start a wield
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wield")
 		assert.equals("wield", _grenade_state_by_unit[unit].stage)
 
 		-- Still on secondary slot — should remain in wield
@@ -158,22 +191,18 @@ describe("grenade_fallback", function()
 
 		-- Slot changes to grenade — should transition to wait_aim
 		_wielded_slot = "slot_grenade_ability"
-		_recorded_inputs = {}
 		_mock_time = 11.0
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
 	end)
 
 	it("times out wield stage and retries", function()
-		GrenadeFallback.try_queue(unit, blackboard)
-		assert.equals("wield", _grenade_state_by_unit[unit].stage)
+		advance_to_stage("wield")
 
-		-- Advance past wield timeout (2.0s)
 		_mock_time = 13.0
 		_recorded_inputs = {}
 		GrenadeFallback.try_queue(unit, blackboard)
 
-		-- Should reset to idle with retry cooldown
 		local state = _grenade_state_by_unit[unit]
 		assert.is_nil(state.stage)
 		assert.truthy(state.next_try_t)
@@ -181,18 +210,12 @@ describe("grenade_fallback", function()
 	end)
 
 	it("queues aim_hold in wait_aim stage", function()
-		-- Get to wait_aim stage
-		GrenadeFallback.try_queue(unit, blackboard)
-		_wielded_slot = "slot_grenade_ability"
-		_mock_time = 10.5
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wait_aim")
 		assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
 
-		-- Advance past aim delay (0.15s)
 		_recorded_inputs = {}
-		_mock_time = 11.0
+		_mock_time = _mock_time + 1.0
 		GrenadeFallback.try_queue(unit, blackboard)
-		-- Should have queued aim_hold
 		assert.equals(1, #_recorded_inputs)
 		assert.equals("weapon_action", _recorded_inputs[1].component)
 		assert.equals("aim_hold", _recorded_inputs[1].input)
@@ -200,19 +223,11 @@ describe("grenade_fallback", function()
 	end)
 
 	it("queues aim_released in wait_throw stage", function()
-		-- Get to wait_throw stage
-		GrenadeFallback.try_queue(unit, blackboard)
-		_wielded_slot = "slot_grenade_ability"
-		_mock_time = 10.5
-		GrenadeFallback.try_queue(unit, blackboard)
-		_recorded_inputs = {}
-		_mock_time = 11.0
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wait_throw")
 		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
 
-		-- Advance past throw delay (0.3s)
 		_recorded_inputs = {}
-		_mock_time = 11.5
+		_mock_time = _mock_time + 1.0
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(1, #_recorded_inputs)
 		assert.equals("weapon_action", _recorded_inputs[1].component)
@@ -221,24 +236,14 @@ describe("grenade_fallback", function()
 	end)
 
 	it("completes when slot leaves grenade in wait_unwield", function()
-		-- Get to wait_unwield stage
-		GrenadeFallback.try_queue(unit, blackboard)
-		_wielded_slot = "slot_grenade_ability"
-		_mock_time = 10.5
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.0
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.5
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wait_unwield")
 		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 
-		-- Slot returns to secondary
 		_wielded_slot = "slot_secondary"
 		_recorded_inputs = {}
-		_mock_time = 12.0
+		_mock_time = _mock_time + 1.0
 		GrenadeFallback.try_queue(unit, blackboard)
 
-		-- Should reset to idle with retry cooldown
 		local state = _grenade_state_by_unit[unit]
 		assert.is_nil(state.stage)
 		assert.truthy(state.next_try_t)
@@ -246,52 +251,79 @@ describe("grenade_fallback", function()
 	end)
 
 	it("forces unwield on timeout in wait_unwield", function()
-		-- Get to wait_unwield stage
-		GrenadeFallback.try_queue(unit, blackboard)
-		_wielded_slot = "slot_grenade_ability"
-		_mock_time = 10.5
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.0
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.5
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wait_unwield")
 		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 
-		-- Stay on grenade slot and advance past unwield timeout (3.0s)
 		_recorded_inputs = {}
-		_mock_time = 15.0
+		_mock_time = _mock_time + 5.0
 		GrenadeFallback.try_queue(unit, blackboard)
 
 		assert.equals(1, #_recorded_inputs)
 		assert.equals("weapon_action", _recorded_inputs[1].component)
 		assert.equals("unwield_to_previous", _recorded_inputs[1].input)
-		-- Should have reset
 		local state = _grenade_state_by_unit[unit]
 		assert.is_nil(state.stage)
 	end)
 
 	it("respects retry cooldown between throws", function()
 		-- Complete a throw cycle
-		GrenadeFallback.try_queue(unit, blackboard)
-		_wielded_slot = "slot_grenade_ability"
-		_mock_time = 10.5
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.0
-		GrenadeFallback.try_queue(unit, blackboard)
-		_mock_time = 11.5
-		GrenadeFallback.try_queue(unit, blackboard)
+		advance_to_stage("wait_unwield")
 		_wielded_slot = "slot_secondary"
-		_mock_time = 12.0
+		_mock_time = _mock_time + 1.0
 		GrenadeFallback.try_queue(unit, blackboard)
 
-		-- Now in cooldown
 		local state = _grenade_state_by_unit[unit]
 		assert.is_nil(state.stage)
 		assert.truthy(state.next_try_t)
 
 		-- Try again within cooldown
 		_recorded_inputs = {}
-		_mock_time = 12.5
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("resets when wield lost during wait_aim", function()
+		advance_to_stage("wait_aim")
+		assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+		-- Slot changes away (e.g., stagger forced weapon switch)
+		_wielded_slot = "slot_secondary"
+		_recorded_inputs = {}
+		_mock_time = _mock_time + 0.1
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		local state = _grenade_state_by_unit[unit]
+		assert.is_nil(state.stage)
+		assert.truthy(state.next_try_t)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("resets when wield lost during wait_throw", function()
+		advance_to_stage("wait_throw")
+		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+
+		-- Slot changes away
+		_wielded_slot = "slot_secondary"
+		_recorded_inputs = {}
+		_mock_time = _mock_time + 0.1
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		local state = _grenade_state_by_unit[unit]
+		assert.is_nil(state.stage)
+		assert.truthy(state.next_try_t)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("blocks when suppressed", function()
+		_is_suppressed_result = true
+		_is_suppressed_reason = "dodging"
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("blocks during interaction", function()
+		blackboard = { behavior = { current_interaction_unit = "revive_target" } }
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(0, #_recorded_inputs)
 	end)
