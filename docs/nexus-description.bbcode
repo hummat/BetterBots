@@ -1,6 +1,6 @@
 [size=4][b]BetterBots — Bot Combat Abilities for Solo Play[/b][/size]
 
-Aims to bring VT2-level bot ability usage to Darktide. Covers stance, dash, charge, shout, stealth, and item-based abilities with smart per-ability trigger heuristics — grenades/blitz are planned.
+Aims to bring VT2-level bot ability usage to Darktide. Covers stance, dash, charge, shout, stealth, item-based abilities, and grenade/blitz with smart per-ability trigger heuristics.
 
 Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects the missing metadata so the existing infrastructure handles the rest.
 
@@ -47,6 +47,15 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 [*]Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
 [/list]
 
+[b]Grenade / blitz support (new in v0.6.0):[/b]
+[list]
+[*]All standard grenades: frag, krak, smoke, fire, shock, cluster, friend rock, flash, tox
+[*]Zealot: Throwing Knives
+[*]Arbites: Remote Detonation (whistle), Shock Mine
+[*]Hive Scum: Missile Launcher (untested — DLC required)
+[*]Psyker blitz (Smite, Chain Lightning, Assail) — not yet supported
+[/list]
+
 [b]Smart trigger conditions:[/b]
 Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
 
@@ -60,7 +69,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Item-based abilities (relic, force field, drone)
 [*][color=green]✓[/color] Smart per-ability trigger heuristics
 [*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
-[*]Grenade / blitz support
+[*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz pending)
 [*]Per-ability toggle settings
 [*]Hive Scum validation (DLC-blocked)
 [/list]
@@ -69,11 +78,11 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [list]
 [*][color=green]✓[/color] Charge/dash to rescue disabled allies
 [*][color=green]✓[/color] Bot sprinting
-[*]Daemonhost avoidance
-[*]Bot pinging of elites/specials
+[*][color=green]✓[/color] Daemonhost avoidance
+[*][color=green]✓[/color] Bot pinging of elites/specials
 [*]Boss engagement discipline
 [*][color=green]✓[/color] Poxburster targeting
-[*]Stop chasing distant specials
+[*][color=green]✓[/color] Stop chasing distant specials
 [/list]
 
 [b]Bot weapon/equipment fixes[/b]
@@ -83,6 +92,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Bot warp charge venting
 [*][color=green]✓[/color] Suppress bot VFX/SFX bleed to human player
 [*][color=green]✓[/color] Smart melee attack selection (armor-aware)
+[*][color=green]✓[/color] Force staff charged fire (all 4 staves)
 [*]Weapon/enemy-aware ADS vs hip-fire
 [/list]
 

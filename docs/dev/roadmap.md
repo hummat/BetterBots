@@ -30,7 +30,14 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 ### v0.5.0 (2026-03-09)
 - VFX/SFX bleed fix (#42), smart melee attack selection (#23), ranged fire fix (#31), warp venting (#30)
 - Staff charged fire (#43, partial — p4 PASS in-game, p3 untested, p1/p2 need investigation)
-- 230 unit tests
+
+### v0.6.0 (2026-03-11)
+- Grenade/blitz throw (#4): state machine for 19 templates, profile-driven. Standard/handleless/mine/knives/whistle/missile. Generic heuristic only; per-grenade heuristics in v0.6.1.
+- Staff charged fire complete (#43): all 4 staves PASS — chain-only fire derivation fix for p1 Voidstrike + p2 Purgatus.
+- Bot pinging (#16): bots ping elites/specials for human player.
+- Distant special penalty (#19): melee target distance penalty for specials.
+- Daemonhost avoidance (#17): suppress combat near dormant daemonhosts.
+- 305 unit tests
 
 ## Priority tiers
 
@@ -52,10 +59,9 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | Blitz / grenade support | **Phase 1 done:** 12 standard/handleless grenade templates via `grenade_fallback.lua` state machine. `adamant_whistle` (Remote Detonation) deferred — needs BT ability path. Psyker blitz, zealot knives, shock mine deferred. |
+| 4 | Grenade/blitz heuristics | Mechanism shipped in v0.6.0. Missing: per-grenade heuristics (krak→elite only, frag→horde, smoke→defensive), psyker blitz (smite/chain lightning/knives). |
 | 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
-| 43 | Staff charged fire | Partial — shipped in v0.5.0. `_may_fire()` hook + aim chain derivation. p4 PASS in-game, p3 untested, p1/p2 need decompiled template inspection. |
 
 **Bot weapon/equipment fixes:**
 
@@ -73,10 +79,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 16 | Bot pinging of elites/specials | Tag high-threat enemies (LOS + 2s cooldown). VT2 mod's #2 feature. |
-| 17 | Daemonhost avoidance | Suppress all actions near Daemonhosts. #1 solo play rage-quit scenario. |
 | 18 | Boss engagement discipline | Don't focus boss when adds are up. |
-| 19 | Stop chasing distant specials | Don't walk >18m to melee a special. Still shoot at any range. |
 
 ### P3: Backlog — Nice to have, no timeline
 
@@ -114,6 +117,6 @@ See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics
 1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
 2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
 3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
-4. **M4:** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30) shipped in v0.5.0. Staff charged fire (#43) partial — p4 PASS, p1/p2/p3 open. Remaining: stance cancellation (#12), navmesh validation (#13), suppress dodge (#15), hazard avoidance (#21), objective-aware activation (#37), per-ability toggles (#6), Hive Scum support (#8), ADS awareness (#41).
-5. **M5:** Scope expansion — grenade/blitz support (#4), bot behavior (#16-#19), heal deferral (#39).
+4. **M4 (shipped v0.5.0):** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30), staff charged fire (#43 partial — p4 only).
+5. **M5 (shipped v0.6.0):** Scope expansion — grenade/blitz support (#4), staff charged fire complete (#43), bot pinging (#16), daemonhost avoidance (#17), distant special penalty (#19).
 6. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
