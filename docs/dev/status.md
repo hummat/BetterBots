@@ -33,7 +33,7 @@
 - **Smart melee attack selection** (#23): armor-aware `attack_meta_data` injection (66 templates)
 - **Ranged fire fix** (#31): `attack_meta_data` injection for non-standard fire paths (36 templates patched)
 - **Warp venting** (#30): `Overheat.slot_percentage` warp charge bridge + `should_vent_overheat` hysteresis fix + `reload→vent` translation
-- **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS, p2 flame FAIL, p1/p3 untested. Suspected cause: `find_aim_action_for_fire()` lookup doesn't match p1/p2 template structure (needs decompiled inspection to confirm).
+- **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS, p2 flame FAIL (fixed in dev/m5-batch1), p1/p3 untested. Root cause: `find_aim_fire_input()` couldn't find chain-only fire actions (no `start_input`). Fix: `find_chain_target_action()` fallback scans `allowed_chain_actions`.
 
 ## Current Tier Status
 
@@ -56,11 +56,13 @@ In-game validation: 2026-03-11, commit a178251.
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
 | #4 | Grenade throw | **PASS** | 7 charges consumed (krak + fire), 0 forced timeouts |
+| #4 | Blitz profiles (knives, whistle, shock mine) | **Partial** | Knives observed; whistle blocked by combat ability mutex (fixed cc4c488); needs re-test |
 | #16 | Bot pinging | **PASS** | 4 ping events for elites across multiple bots |
 | #17 | Daemonhost avoidance | **Unverifiable** | No daemonhost spawned in 5 sessions |
 | #19 | Distant special penalty | **PASS** | 30+ penalty events across 6 special breeds |
+| #43 | Staff p2 charged fire fix | **Needs re-test** | Chain-only fire derivation fix (09e0f22); p1 also structurally fixed |
 
-Unit tests: 293 successes / 0 failures.
+Unit tests: 302 successes / 0 failures.
 
 ## Known Blockers
 
@@ -68,7 +70,8 @@ Unit tests: 293 successes / 0 failures.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 
 ## Next Steps
-- #43: inspect decompiled `forcestaff_p2_m1` action graph, write failing test for p2, then broaden `find_aim_action_for_fire()`
+- #43: re-test p2 flame staff + p1 surge staff in-game (code fix shipped in dev/m5-batch1, commit 09e0f22)
+- #4: re-test whistle after combat ability mutex fix (commit cc4c488)
 - Default class profiles for bots (#45) — P2, design approved
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2
