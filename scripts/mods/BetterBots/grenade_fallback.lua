@@ -35,7 +35,8 @@ local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 -- Table value: { aim_input, release_input, throw_delay, auto_unwield } for custom input chains.
 --   aim_input:     input to queue after wield (nil = auto-fires, skip to wait_unwield)
 --   release_input: input to queue after throw_delay (nil = skip wait_throw)
---   throw_delay:   seconds between aim and release (default DEFAULT_THROW_DELAY_S)
+--   throw_delay:   seconds between aim and release (default DEFAULT_THROW_DELAY_S);
+--                  only used when both aim_input and release_input are non-nil
 --   auto_unwield:  engine auto-chains unwield? (default true; false = force immediately)
 local SUPPORTED_THROW_TEMPLATES = {
 	-- Veteran (standard generator, chain_time=0.1)
