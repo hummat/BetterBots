@@ -44,6 +44,7 @@ end
 
 function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
+	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -143,17 +144,18 @@ function M.register_hooks(deps)
 				function(func, self, id, action_input, raw_input)
 					local unit = self._betterbots_player_unit
 					if unit and id == "weapon_action" and action_input == "wield" then
-						local should_lock, ability_name, lock_reason = should_lock_weapon_switch(unit)
-						if should_lock then
+						local should_block, ability_name = should_block_wield_input(unit)
+						if should_block then
 							if _debug_enabled() then
 								local fixed_t = _fixed_time()
+								local _, _, lock_reason = should_lock_weapon_switch(unit)
 								_debug_log(
 									"lock_wield:" .. tostring(ability_name),
 									fixed_t,
 									"blocked weapon switch while keeping "
 										.. tostring(ability_name)
 										.. " "
-										.. tostring(lock_reason)
+										.. tostring(lock_reason or "sequence")
 										.. " (raw_input="
 										.. tostring(raw_input)
 										.. ")"

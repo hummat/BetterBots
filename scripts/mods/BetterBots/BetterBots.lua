@@ -374,12 +374,25 @@ local function _should_lock_weapon_switch(unit)
 	return GrenadeFallback.should_lock_weapon_switch(unit)
 end
 
+-- Block BT wield inputs for the full grenade sequence (including wait_unwield).
+-- Separate from should_lock_weapon_switch so the wield_slot redirect can be
+-- lifted in wait_unwield without also letting the BT switch weapons mid-throw.
+local function _should_block_wield_input(unit)
+	local should_lock, ability_name = ItemFallback.should_lock_weapon_switch(unit)
+	if should_lock then
+		return true, ability_name
+	end
+
+	return GrenadeFallback.should_block_wield_input(unit)
+end
+
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
+	should_block_wield_input = _should_block_wield_input,
 })
 ConditionPatch.register_hooks()
 

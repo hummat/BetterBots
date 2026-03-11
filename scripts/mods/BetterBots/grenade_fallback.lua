@@ -83,9 +83,28 @@ local function _has_confirmed_charge(state, unit)
 	return charge_t ~= nil and release_t ~= nil and charge_t >= release_t
 end
 
+-- Returns true while any grenade stage is active.
+-- Used to block incoming wield action inputs from the BT for the full sequence,
+-- including wait_unwield — where the wield_slot redirect must be off so that
+-- action_unwield_to_previous can switch the slot, but the BT must still not
+-- be able to wield a different weapon and abort the throw mid-air.
+local function should_block_wield_input(unit)
+	local state = _grenade_state_by_unit[unit]
+	if not state or not state.stage then
+		return false
+	end
+	return true, state.grenade_name or "grenade_ability"
+end
+
 local function should_lock_weapon_switch(unit)
 	local state = _grenade_state_by_unit[unit]
 	if not state or not state.stage then
+		return false
+	end
+
+	-- In wait_unwield the throw is already done; we want the post-throw
+	-- action_unwield_to_previous chain to proceed unblocked.
+	if state.stage == "wait_unwield" then
 		return false
 	end
 
@@ -381,5 +400,6 @@ return {
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,
+	should_block_wield_input = should_block_wield_input,
 	should_lock_weapon_switch = should_lock_weapon_switch,
 }
