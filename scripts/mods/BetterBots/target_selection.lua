@@ -4,12 +4,14 @@ local M = {}
 
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
 local CHASE_RANGE_SQ = 324
 
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 end
 
@@ -42,27 +44,21 @@ function M.register_hooks()
 
 				local ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
 				if not (ammo_percent and ammo_percent > 0.5) then
-					_debug_log(
-						"target_sel_skip_ammo",
-						_fixed_time(),
-						"skip penalty: special at dist_sq="
-							.. target_distance_sq
-							.. " but ammo="
-							.. tostring(ammo_percent)
-					)
 					return score
 				end
 
-				_debug_log(
-					"target_sel_penalty",
-					_fixed_time(),
-					"penalizing melee score for distant special "
-						.. tostring(target_breed.name)
-						.. " dist_sq="
-						.. target_distance_sq
-						.. " ammo="
-						.. ammo_percent
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"target_sel_penalty",
+						_fixed_time(),
+						"penalizing melee score for distant special "
+							.. tostring(target_breed.name)
+							.. " dist_sq="
+							.. target_distance_sq
+							.. " ammo="
+							.. ammo_percent
+					)
+				end
 				-- Massive penalty to ensure melee_score loses to ranged_score
 				return score - 100
 			end

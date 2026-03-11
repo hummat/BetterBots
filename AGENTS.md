@@ -32,9 +32,16 @@ Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 ## Debugging
 
-Every new feature must include enough `_debug_log` calls to verify correctness from a single in-game session. Not exhaustive or verbose — just sufficient to confirm each code path fires when expected. Before marking a feature complete, audit: can you grep `bb-log` output and tell with certainty that it works?
+Every new feature must include enough `_debug_log` calls to verify correctness from a single in-game session. Not exhaustive or verbose — just sufficient to confirm each code path fires when expected. This logging is **permanent** — it exists to catch regressions and validate working state across releases, not just during initial development. Before marking a feature complete, audit: can you grep `bb-log` output and tell with certainty that it works?
 
-See `docs/dev/debugging.md` for full debug tool reference. Key tools:
+**Writing `_debug_log` calls — mandatory rules:**
+- **Gate expensive reads**: never call `read_component()`, `has_extension()`, or build context strings unless `_debug_enabled()` is true. These run on the hot path every frame.
+- **One-shot dedup for repeated events**: use a weak-keyed set (`setmetatable({}, { __mode = "k" })`) keyed on scratchpad/unit, or a string-keyed set for `combo_key` patterns. Log each unique occurrence once per load, not per frame.
+- **Throttle key convention**: first arg to `_debug_log` is `"feature_tag:" .. discriminator` (e.g. `"may_fire_swap:" .. input_name`). This enables grep-based filtering.
+- **Log the confirmation signal**: the event that proves the feature fired correctly (e.g. "input was swapped", "grenade state transitioned", "target was penalized"), not intermediate state.
+- **Don't log no-ops**: idle paths, false conditions, and expected skips produce no output. Only log when something interesting happened.
+
+See `docs/dev/logging.md` for the full logging architecture, output channels, log line catalog, and analysis tools. See `docs/dev/debugging.md` for debug tool reference. Key tools:
 - **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
@@ -235,6 +242,25 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 5. Decompiled source in `../Darktide-Source-Code/` for field-level verification
 
 Do not write trigger heuristics without first reading the tactics doc for that class.
+
+### No unsourced game knowledge claims
+
+Every factual claim about Darktide mechanics — talent effects, ability interactions, buff values, tree structure, weapon behavior, bot capabilities — must be sourced from a specific file before you state it. If you haven't read the source, you don't know the answer. Say so and go read it.
+
+**Verification chain (in priority order):**
+1. Decompiled source (`../Darktide-Source-Code/`) — ground truth for mechanics, tree structure, buff values
+2. In-repo docs (`docs/knowledge/`, `docs/classes/`) — curated summaries, cross-reference with (1) when uncertain
+3. Mod source (`scripts/mods/BetterBots/`) — ground truth for what BetterBots actually does
+4. Online sources (Games Lantern, wiki, Reddit) — community knowledge, may be wrong or outdated
+
+**Concrete rules:**
+- When analyzing a build: read the class doc, tactics doc, and relevant `buff_templates.md` / `class-talents.md` entries BEFORE writing any assessment. Not after. Not "I'll verify later." Before.
+- When a label or classification comes from scraped/generated data: cross-check it against decompiled source. Scraper heuristics have bugs. Generated labels are hypotheses, not facts.
+- When claiming what BetterBots can or cannot do: read the actual module source. The validation tracker and CLAUDE.md tier table exist for this purpose.
+- When stating a talent is a keystone, modifier, or regular node: verify against the decompiled tree layout file (node `type` field), not against display names or frame shapes.
+- If you haven't verified a claim and can't verify it right now, mark it explicitly: "(unverified)" or "I haven't read the source for this." Never present an unverified guess as fact.
+
+**Why this matters:** Wrong game knowledge propagates. It gets written into docs, shapes heuristic design, and wastes hours of debugging when the assumed behavior doesn't match reality. Reading one file takes seconds. Correcting a cascade of wrong assumptions takes sessions.
 
 ### Full doc listing
 

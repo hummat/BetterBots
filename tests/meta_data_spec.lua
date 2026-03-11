@@ -18,6 +18,7 @@ describe("meta_data", function()
 			mod = make_mock_mod(),
 			patched_ability_templates = {},
 			debug_log = noop_debug_log,
+			debug_enabled = function() return false end,
 			META_PATCH_VERSION = 1,
 		})
 	end)

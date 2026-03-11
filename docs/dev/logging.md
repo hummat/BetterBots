@@ -67,11 +67,19 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item queued ...` (item fallback queued wield/cast/unwield input)
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
+- `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
+- `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
+- `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
+- `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
+- `grenade throw complete, slot returned to <slot>` (grenade sequence fully completed)
+- `grenade forced unwield_to_previous on timeout` (cleanup fallback; indicates normal post-throw unwind did not complete)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
-- `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (temporary `#43` diagnostic; template-tagged queued weapon input)
+- `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
+- `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
-- `skip penalty: special at dist_sq=<N> but ammo=<N>` (special beyond 18m but insufficient ammo to penalize melee)
+- `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
+- `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 
 ## Intentionally suppressed (noise reduction)
 
@@ -94,6 +102,63 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
+
+## Writing debug logging for new features
+
+Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every feature's logs must survive across releases to catch regressions and validate working state. Never mark logs as "remove after validation."
+
+### Rules
+
+1. **Gate expensive reads behind `_debug_enabled()`**. `read_component()`, `has_extension()`, and string concatenation run on the hot path (multiple bots, every frame). Only pay that cost when debug mode is on.
+
+2. **One-shot dedup for repeated events**. Most bot actions repeat every frame. Use one of two patterns:
+   - **Weak-keyed set** for object-keyed dedup (scratchpad, unit): `local _logged = setmetatable({}, { __mode = "k" })`. Entries auto-clear when the key is GC'd (e.g. scratchpad recycled between missions).
+   - **String-keyed set** for combo dedup: `local _logged_combos = {}`. Build a key like `bot_slot .. ":" .. template .. ":" .. action` and skip if already seen. Use this when the discriminator is a value, not an object reference.
+
+3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
+
+4. **Log the confirmation signal**. Each feature should log the event that proves it fired correctly:
+   - State machine transition → log the new state and trigger
+   - Input swap/translation → log what was swapped and why
+   - Suppression/block → log what was blocked and the reason
+   - Injection/patch → log once at load time that the patch applied
+
+5. **Don't log no-ops**. Idle paths, false conditions, and expected skips produce no output. If a bot has no enemies nearby and the heuristic returns false, that's not interesting. Only log when something happened.
+
+### Example: one-shot scratchpad logging
+
+```lua
+local _logged = setmetatable({}, { __mode = "k" })
+
+-- Inside a hook:
+if not _logged[scratchpad] and _debug_enabled() then
+    _logged[scratchpad] = true
+    _debug_log(
+        "feature_tag:" .. tostring(discriminator),
+        _fixed_time(),
+        "human-readable message with key values"
+    )
+end
+```
+
+### Example: combo-key logging
+
+```lua
+local _logged_combos = {}
+
+-- Inside a per-frame hook:
+if _debug_enabled() then
+    local key = bot_slot .. ":" .. template .. ":" .. action
+    if not _logged_combos[key] then
+        _logged_combos[key] = true
+        _debug_log("feature:" .. key, _fixed_time(), "descriptive message")
+    end
+end
+```
+
+### Updating the log line catalog
+
+When adding new `_debug_log` calls, add the corresponding log line to the "Key BetterBots log lines" section above. Include the prefix pattern and a brief description of when it appears.
 
 ## Structured event log (JSONL)
 

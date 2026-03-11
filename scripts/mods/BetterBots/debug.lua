@@ -1,5 +1,6 @@
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
 local _equipped_combat_ability_name
 local _fallback_state_by_unit
@@ -184,27 +185,29 @@ local function log_ability_decision(ability_template_name, fixed_t, can_activate
 		return
 	end
 
-	_debug_log(
-		"decision:" .. ability_template_name,
-		fixed_t,
-		"decision "
-			.. ability_template_name
-			.. " -> true (rule="
-			.. tostring(rule)
-			.. ", nearby="
-			.. tostring(context.num_nearby)
-			.. ", challenge="
-			.. string.format("%.2f", context.challenge_rating_sum or 0)
-			.. ", hp="
-			.. fmt_percent(context.health_pct)
-			.. ", tough="
-			.. fmt_percent(context.toughness_pct)
-			.. ", peril="
-			.. fmt_percent(context.peril_pct)
-			.. ", target_dist="
-			.. fmt_percent(context.target_enemy_distance)
-			.. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"decision:" .. ability_template_name,
+			fixed_t,
+			"decision "
+				.. ability_template_name
+				.. " -> true (rule="
+				.. tostring(rule)
+				.. ", nearby="
+				.. tostring(context.num_nearby)
+				.. ", challenge="
+				.. string.format("%.2f", context.challenge_rating_sum or 0)
+				.. ", hp="
+				.. fmt_percent(context.health_pct)
+				.. ", tough="
+				.. fmt_percent(context.toughness_pct)
+				.. ", peril="
+				.. fmt_percent(context.peril_pct)
+				.. ", target_dist="
+				.. fmt_percent(context.target_enemy_distance)
+				.. ")"
+		)
+	end
 end
 
 local function register_commands()
@@ -428,6 +431,7 @@ return {
 	init = function(deps)
 		_mod = deps.mod
 		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 		_fixed_time = deps.fixed_time
 		_equipped_combat_ability_name = deps.equipped_combat_ability_name
 		_fallback_state_by_unit = deps.fallback_state_by_unit

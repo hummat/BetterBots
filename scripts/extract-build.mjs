@@ -29,6 +29,9 @@ function slugToName(slug) {
   const special = {
     "scriers-gaze": "Scrier's Gaze",
     "psykinetics-aura": "Psykinetic's Aura",
+    "marksmans-focus": "Marksman's Focus",
+    "vultures-mark": "Vulture's Mark",
+    "tis-but-a-scratch": "'Tis But a Scratch",
   };
   if (special[slug]) return special[slug];
   return slug
@@ -37,9 +40,31 @@ function slugToName(slug) {
     .join(" ");
 }
 
-// Frame shape → talent tier
+// Known passive keystones by GL slug. On GL, keystones use circular_frame
+// (same as regular talents), so we need explicit identification to promote them.
+// Source: decompiled talent_settings_*.lua + meta-builds-research.md
+const KEYSTONES = new Set([
+  // Veteran (internal: Sniper's Focus, Weapon Switch, Focus Target)
+  "marksmans-focus", "weapons-specialist", "focus-target",
+  // Zealot (internal: Fanatic Rage, Quickness, Martyrdom)
+  "blazing-piety", "inexorable-judgement", "martyrdom",
+  // Psyker
+  "warp-siphon", "empowered-psionics", "disrupt-destiny",
+  // Ogryn
+  "heavy-hitter", "feel-no-pain", "burst-limiter-override",
+  // Arbites (Adamant)
+  "forceful", "execution-order", "terminus-warrant", "stance-dance",
+  "exterminator", "bullet-rain", "pinning-dog",
+  // Hive Scum (Broker)
+  "float-like-a-butterfly", "pickpocket", "hyper-critical",
+  "vultures-mark", "chemical-dependency", "adrenaline-junkie",
+]);
+
+// Frame shape → talent tier.
+// hex_frame = ability section (combat ability + modifiers), NOT passive keystones.
+// Actual keystones use circular_frame and are promoted via the KEYSTONES set.
 function frameTier(href) {
-  if (href.includes("hex_frame")) return "keystone";
+  if (href.includes("hex_frame")) return "ability";
   if (href.includes("square_frame")) return "notable";
   if (href.includes("circular_small")) return "stat";
   if (href.includes("circular_frame")) return "talent";
@@ -277,16 +302,24 @@ function formatMarkdown(build) {
   lines.push(`Source: ${build.url}`);
   lines.push("");
 
-  // Talents grouped by tier
-  const tiers = { keystone: [], notable: [], talent: [], stat: [] };
+  // Talents grouped by tier (uses pre-computed t.tier from post-processing)
+  const tiers = { ability: [], keystone: [], notable: [], talent: [], stat: [] };
   for (const t of build.talents.active) {
-    const tier = frameTier(t.frame);
+    const tier = t.tier || frameTier(t.frame);
     tiers[tier] = tiers[tier] || [];
-    tiers[tier].push(slugToName(t.slug));
+    tiers[tier].push(t.name || slugToName(t.slug));
   }
 
   lines.push("## Talents");
   lines.push("");
+  if (tiers.ability.length) {
+    const [abilityName, ...modifiers] = tiers.ability;
+    if (modifiers.length) {
+      lines.push(`**Ability:** ${abilityName} (modifiers: ${modifiers.join(", ")})`);
+    } else {
+      lines.push(`**Ability:** ${abilityName}`);
+    }
+  }
   if (tiers.keystone.length) {
     lines.push(`**Keystones:** ${tiers.keystone.join(", ")}`);
   }
@@ -355,17 +388,17 @@ if (!url || !url.includes("gameslantern.com/builds/")) {
 console.error("Extracting build from:", url);
 const build = await extractBuild(url);
 
-// Post-process talents
-build.talents.active = build.talents.active.map((t) => ({
-  ...t,
-  name: slugToName(t.slug),
-  tier: frameTier(t.frame),
-}));
-build.talents.inactive = build.talents.inactive.map((t) => ({
-  ...t,
-  name: slugToName(t.slug),
-  tier: frameTier(t.frame),
-}));
+// Post-process talents: compute tier and promote known keystones
+build.talents.active = build.talents.active.map((t) => {
+  const baseTier = frameTier(t.frame);
+  const tier = baseTier === "talent" && KEYSTONES.has(t.slug) ? "keystone" : baseTier;
+  return { ...t, name: slugToName(t.slug), tier };
+});
+build.talents.inactive = build.talents.inactive.map((t) => {
+  const baseTier = frameTier(t.frame);
+  const tier = baseTier === "talent" && KEYSTONES.has(t.slug) ? "keystone" : baseTier;
+  return { ...t, name: slugToName(t.slug), tier };
+});
 
 if (format === "json") {
   console.log(JSON.stringify(build, null, 2));

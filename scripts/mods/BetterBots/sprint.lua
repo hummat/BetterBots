@@ -1,5 +1,6 @@
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
 
 local SPRINT_FOLLOW_DISTANCE = 12
@@ -186,12 +187,14 @@ local function on_update_movement(func, self, unit, input, dt, t)
 		local dominated_start = not should and _last_interesting_start_by_unit[unit]
 		local dominated_reason = dominated_start or reason
 		if reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby" or dominated_start then
-			local fixed_t = _fixed_time and _fixed_time() or 0
-			_debug_log(
-				"sprint:" .. tostring(unit),
-				fixed_t,
-				"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")"
-			)
+			if _debug_enabled() then
+				local fixed_t = _fixed_time and _fixed_time() or 0
+				_debug_log(
+					"sprint:" .. tostring(unit),
+					fixed_t,
+					"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")"
+				)
+			end
 		end
 		_last_interesting_start_by_unit[unit] = should
 				and (reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby")
@@ -205,6 +208,7 @@ local Sprint = {}
 Sprint.init = function(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 end
 

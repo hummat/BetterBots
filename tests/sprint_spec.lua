@@ -64,6 +64,7 @@ local _mock_time = 0
 Sprint.init({
 	mod = { echo = function() end },
 	debug_log = function() end,
+	debug_enabled = function() return false end,
 	fixed_time = function()
 		return _mock_time
 	end,

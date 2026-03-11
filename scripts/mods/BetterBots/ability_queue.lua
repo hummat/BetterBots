@@ -38,16 +38,18 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	if not ability_template_name or ability_template_name == "none" then
-		_debug_log(
-			"fallback_none:" .. tostring(unit),
-			fixed_t,
-			"fallback skipped "
-				.. ability_component_name
-				.. " (template_name=none, equipped="
-				.. _equipped_combat_ability_name(unit)
-				.. ")",
-			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_none:" .. tostring(unit),
+				fixed_t,
+				"fallback skipped "
+					.. ability_component_name
+					.. " (template_name=none, equipped="
+					.. _equipped_combat_ability_name(unit)
+					.. ")",
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+			)
+		end
 
 		local ability_extension, combat_ability = _equipped_combat_ability(unit)
 		if ability_extension then
@@ -89,41 +91,49 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	if not ability_template then
-		_debug_log(
-			"fallback_missing_template:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked missing template " .. ability_template_name
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_missing_template:" .. ability_template_name,
+				fixed_t,
+				"fallback blocked missing template " .. ability_template_name
+			)
+		end
 		return
 	end
 
 	local ability_meta_data = ability_template and ability_template.ability_meta_data
 	if not ability_meta_data then
-		_debug_log(
-			"fallback_missing_meta:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (no ability_meta_data)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_missing_meta:" .. ability_template_name,
+				fixed_t,
+				"fallback blocked " .. ability_template_name .. " (no ability_meta_data)"
+			)
+		end
 		return
 	end
 
 	local activation_data = ability_meta_data and ability_meta_data.activation
 	if not activation_data then
-		_debug_log(
-			"fallback_missing_activation:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (no activation data)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_missing_activation:" .. ability_template_name,
+				fixed_t,
+				"fallback blocked " .. ability_template_name .. " (no activation data)"
+			)
+		end
 		return
 	end
 
 	local action_input = activation_data and activation_data.action_input
 	if not action_input then
-		_debug_log(
-			"fallback_missing_action_input:" .. ability_template_name,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (activation.action_input missing)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_missing_action_input:" .. ability_template_name,
+				fixed_t,
+				"fallback blocked " .. ability_template_name .. " (activation.action_input missing)"
+			)
+		end
 		return
 	end
 
@@ -158,11 +168,13 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local suppressed, suppress_reason = _is_suppressed(unit)
 	if suppressed then
-		_debug_log(
-			"fallback_suppress:" .. tostring(suppress_reason),
-			fixed_t,
-			"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_suppress:" .. tostring(suppress_reason),
+				fixed_t,
+				"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
+			)
+		end
 		return
 	end
 
@@ -172,11 +184,17 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
 
 	if not action_input_is_valid then
-		_debug_log(
-			"fallback_invalid_input:" .. ability_template_name .. ":" .. action_input,
-			fixed_t,
-			"fallback blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_invalid_input:" .. ability_template_name .. ":" .. action_input,
+				fixed_t,
+				"fallback blocked "
+					.. ability_template_name
+					.. " (invalid action_input="
+					.. tostring(action_input)
+					.. ")"
+			)
+		end
 		return
 	end
 
@@ -208,7 +226,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	if not can_activate then
-		if context.num_nearby > 0 then
+		if context.num_nearby > 0 and _debug_enabled() then
 			_debug_log(
 				"fallback_decision_block:" .. ability_template_name,
 				fixed_t,
@@ -237,11 +255,13 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 				if bot_input then
 					bot_input:set_aiming(true)
 					bot_input:set_aim_position(ally_pos)
-					_debug_log(
-						"rescue_aim:" .. tostring(unit),
-						fixed_t,
-						"rescue aim (fallback): directed charge toward disabled ally"
-					)
+					if _debug_enabled() then
+						_debug_log(
+							"rescue_aim:" .. tostring(unit),
+							fixed_t,
+							"rescue aim (fallback): directed charge toward disabled ally"
+						)
+					end
 				end
 			end
 		end
@@ -273,19 +293,21 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	state.wait_action_input = ability_meta_data.wait_action and ability_meta_data.wait_action.action_input or nil
 	state.wait_sent = false
 
-	_debug_log(
-		"fallback_queue:" .. tostring(unit),
-		fixed_t,
-		"fallback queued "
-			.. ability_template_name
-			.. " input="
-			.. tostring(action_input)
-			.. " (rule="
-			.. tostring(rule)
-			.. ", nearby="
-			.. tostring(context.num_nearby)
-			.. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"fallback_queue:" .. tostring(unit),
+			fixed_t,
+			"fallback queued "
+				.. ability_template_name
+				.. " input="
+				.. tostring(action_input)
+				.. " (rule="
+				.. tostring(rule)
+				.. ", nearby="
+				.. tostring(context.num_nearby)
+				.. ")"
+		)
+	end
 
 	local function _sanitize(value)
 		local fragment = tostring(value or "unknown")

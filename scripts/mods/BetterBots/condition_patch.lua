@@ -3,6 +3,7 @@
 -- Also fixes should_vent_overheat hysteresis (#30).
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
 local _is_suppressed
 local _equipped_combat_ability_name
@@ -72,11 +73,13 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 
 	local suppressed, suppress_reason = _is_suppressed(unit)
 	if suppressed then
-		_debug_log(
-			"suppress:" .. tostring(suppress_reason),
-			_fixed_time(),
-			"ability suppressed (" .. tostring(suppress_reason) .. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"suppress:" .. tostring(suppress_reason),
+				_fixed_time(),
+				"ability suppressed (" .. tostring(suppress_reason) .. ")"
+			)
+		end
 		return false
 	end
 
@@ -86,12 +89,14 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	local fixed_t = _fixed_time()
 
 	if ability_template_name == "none" then
-		_debug_log(
-			"none:" .. ability_component_name,
-			fixed_t,
-			"blocked " .. ability_component_name .. " (template_name=none)",
-			DEBUG_SKIP_RELIC_LOG_INTERVAL_S
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"none:" .. ability_component_name,
+				fixed_t,
+				"blocked " .. ability_component_name .. " (template_name=none)",
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+			)
+		end
 		return false
 	end
 
@@ -100,41 +105,49 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	if not ability_template then
-		_debug_log(
-			"missing_template:" .. ability_template_name,
-			fixed_t,
-			"blocked missing template " .. ability_template_name
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"missing_template:" .. ability_template_name,
+				fixed_t,
+				"blocked missing template " .. ability_template_name
+			)
+		end
 		return false
 	end
 
 	local ability_meta_data = ability_template.ability_meta_data
 	if not ability_meta_data then
-		_debug_log(
-			"missing_meta:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (no ability_meta_data)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"missing_meta:" .. ability_template_name,
+				fixed_t,
+				"blocked " .. ability_template_name .. " (no ability_meta_data)"
+			)
+		end
 		return false
 	end
 
 	local activation_data = ability_meta_data.activation
 	if not activation_data then
-		_debug_log(
-			"missing_activation:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (no activation data)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"missing_activation:" .. ability_template_name,
+				fixed_t,
+				"blocked " .. ability_template_name .. " (no activation data)"
+			)
+		end
 		return false
 	end
 
 	local action_input = activation_data.action_input
 	if not action_input then
-		_debug_log(
-			"missing_action_input:" .. ability_template_name,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (activation.action_input missing)"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"missing_action_input:" .. ability_template_name,
+				fixed_t,
+				"blocked " .. ability_template_name .. " (activation.action_input missing)"
+			)
+		end
 		return false
 	end
 
@@ -144,11 +157,13 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
 
 	if not action_input_is_valid then
-		_debug_log(
-			"invalid_input:" .. ability_template_name .. ":" .. action_input,
-			fixed_t,
-			"blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"invalid_input:" .. ability_template_name .. ":" .. action_input,
+				fixed_t,
+				"blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
+			)
+		end
 		return false
 	end
 
@@ -235,11 +250,13 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			if _is_dormant_daemonhost_target(unit, blackboard) then
-				_debug_log(
-					"dh_suppress_melee:" .. tostring(unit),
-					_fixed_time(),
-					"melee suppressed (target is dormant daemonhost)"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_melee:" .. tostring(unit),
+						_fixed_time(),
+						"melee suppressed (target is dormant daemonhost)"
+					)
+				end
 				return false
 			end
 			return orig_bot_in_melee_range(unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -257,11 +274,13 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			is_running
 		)
 			if _is_dormant_daemonhost_target(unit, blackboard) then
-				_debug_log(
-					"dh_suppress_ranged:" .. tostring(unit),
-					_fixed_time(),
-					"ranged suppressed (target is dormant daemonhost)"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_ranged:" .. tostring(unit),
+						_fixed_time(),
+						"ranged suppressed (target is dormant daemonhost)"
+					)
+				end
 				return false
 			end
 			return orig_has_target_and_ammo(unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -270,11 +289,13 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 
 	patched_set[conditions] = true
 
-	_debug_log(
-		"condition_patch:" .. patch_label .. ":" .. tostring(conditions),
-		0,
-		"patched " .. patch_label .. ".can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"condition_patch:" .. patch_label .. ":" .. tostring(conditions),
+			0,
+			"patched " .. patch_label .. ".can_activate_ability (version=" .. CONDITIONS_PATCH_VERSION .. ")"
+		)
+	end
 end
 
 local M = {}
@@ -282,6 +303,7 @@ local M = {}
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_is_suppressed = deps.is_suppressed
 	_equipped_combat_ability_name = deps.equipped_combat_ability_name

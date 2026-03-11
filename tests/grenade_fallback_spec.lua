@@ -117,7 +117,7 @@ local function reset()
 			return _heuristic_result, _heuristic_rule
 		end,
 		equipped_grenade_ability = function(_u)
-			return mock_ability_extension, { name = "frag_grenade" }
+			return mock_ability_extension, { name = "veteran_frag_grenade" }
 		end,
 	})
 end
@@ -150,6 +150,29 @@ end
 describe("grenade_fallback", function()
 	before_each(function()
 		reset()
+	end)
+
+	describe("should_lock_weapon_switch", function()
+		it("does not lock outside an active grenade sequence", function()
+			local should_lock = GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.is_false(should_lock)
+		end)
+
+		it("locks weapon switches to keep grenade slot during active sequence", function()
+			advance_to_stage("wait_aim")
+			local should_lock, grenade_name, reason, slot_to_keep = GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.is_true(should_lock)
+			assert.equals("veteran_frag_grenade", grenade_name)
+			assert.equals("sequence", reason)
+			assert.equals("slot_grenade_ability", slot_to_keep)
+		end)
+
+		it("does not lock after grenade slot is already lost", function()
+			advance_to_stage("wait_aim")
+			_wielded_slot = "slot_secondary"
+			local should_lock = GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.is_false(should_lock)
+		end)
 	end)
 
 	it("does nothing when grenade charges depleted", function()
@@ -259,6 +282,42 @@ describe("grenade_fallback", function()
 		assert.equals("unwield_to_previous", _recorded_inputs[1].input)
 		local state = _grenade_state_by_unit[unit]
 		assert.is_nil(state.stage)
+	end)
+
+	it("queues explicit unwield after grenade charge confirmation", function()
+		advance_to_stage("wait_unwield")
+		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+		_mock_time = _mock_time + 0.1
+		_last_grenade_charge_event_by_unit[unit] = {
+			grenade_name = "veteran_frag_grenade",
+			fixed_t = _mock_time,
+		}
+
+		_recorded_inputs = {}
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(1, #_recorded_inputs)
+		assert.equals("weapon_action", _recorded_inputs[1].component)
+		assert.equals("unwield_to_previous", _recorded_inputs[1].input)
+		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+	end)
+
+	it("ignores stale grenade charge events from before the current throw", function()
+		advance_to_stage("wait_unwield")
+		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+		_last_grenade_charge_event_by_unit[unit] = {
+			grenade_name = "veteran_frag_grenade",
+			fixed_t = _mock_time - 1.0,
+		}
+
+		_recorded_inputs = {}
+		_mock_time = _mock_time + 0.1
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 	end)
 
 	it("respects retry cooldown between throws", function()

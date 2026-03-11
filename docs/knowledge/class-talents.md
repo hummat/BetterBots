@@ -96,9 +96,9 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 | Martyrdom | +10% damage per missing health segment (15% HP/step), max 5 stacks; +6% attack speed/stack; +7.5% TDR/stack; +10% CDR/stack |
 | Fanatic Rage | Enemy deaths within 25m + crits grant fury, max 25, 8s; at max: +15% crit, +50% toughness, −25% TDR, +2%/s regen |
 | Quickness | Movement builds stacks (max 20); per stack: +1% atk speed, +1% damage, +0.5% dodge; 6s (10s improved); dodge grants 3 |
-| Resist Death | Survive lethal: 5s immunity, 120s CD; melee ×3 leech during, up to 25% HP; can trigger ability instantly |
 
 ### Key Passives
+- Resist Death (Until Death): survive lethal hit, 5s immunity, 120s CD; melee ×3 leech during, up to 25% HP; can trigger ability instantly
 - Melee attack speed: +10%
 - Crit → bleed + crit chance: +10% crit for 3s on crit (2 stacks)
 - Kill stacking: +10%/kill melee damage, max 5 stacks, 5s

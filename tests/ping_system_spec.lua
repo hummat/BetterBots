@@ -21,6 +21,7 @@ describe("ping_system", function()
 		PingSystem.init({
 			mod = mod_mock,
 			debug_log = debug_log_mock,
+			debug_enabled = function() return false end,
 			fixed_time = fixed_time_mock,
 			bot_slot_for_unit = function()
 				return 1

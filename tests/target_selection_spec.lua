@@ -23,6 +23,7 @@ describe("TargetSelection", function()
 		TargetSelection.init({
 			mod = _mod,
 			debug_log = function() end,
+			debug_enabled = function() return false end,
 			fixed_time = function() return 0 end,
 		})
 

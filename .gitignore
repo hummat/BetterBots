@@ -1,8 +1,10 @@
 CLAUDE.md
 GEMINI.md
 QWEN.md
+HANDOFF.md
 /tmp/
 *.log
 BetterBots.zip
 node_modules/
 package-lock.json
+.worktrees/

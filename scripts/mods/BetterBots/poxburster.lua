@@ -7,7 +7,12 @@ local _poxburster_breed_patched = false
 
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
+
+-- One-shot dedup: log poxburster suppression once per bot per encounter
+-- instead of every 2s frame. Weak-keyed so entries are GC'd when bots despawn.
+local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_close_poxburster(unit, self_position)
 	if not unit then
@@ -37,6 +42,7 @@ local M = {}
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 end
 
@@ -71,38 +77,50 @@ function M.register_hooks()
 					perception_component.target_enemy_distance = math.huge
 					perception_component.target_enemy_type = "none"
 
-					_debug_log(
-						"poxburster_suppress:" .. tostring(self_unit),
-						_fixed_time(),
-						"suppressed poxburster target (too close)"
-					)
+					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
+						_pox_suppress_logged[self_unit] = true
+						_debug_log(
+							"poxburster_suppress:" .. tostring(self_unit),
+							_fixed_time(),
+							"suppressed poxburster target (too close)"
+						)
+					end
 				end
 
 				if _is_close_poxburster(perception_component.opportunity_target_enemy, self_position) then
 					perception_component.opportunity_target_enemy = nil
-					_debug_log(
-						"poxburster_suppress_opp:" .. tostring(self_unit),
-						_fixed_time(),
-						"suppressed poxburster opportunity target (too close)"
-					)
+					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
+						_pox_suppress_logged[self_unit] = true
+						_debug_log(
+							"poxburster_suppress_opp:" .. tostring(self_unit),
+							_fixed_time(),
+							"suppressed poxburster opportunity target (too close)"
+						)
+					end
 				end
 
 				if _is_close_poxburster(perception_component.urgent_target_enemy, self_position) then
 					perception_component.urgent_target_enemy = nil
-					_debug_log(
-						"poxburster_suppress_urg:" .. tostring(self_unit),
-						_fixed_time(),
-						"suppressed poxburster urgent target (too close)"
-					)
+					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
+						_pox_suppress_logged[self_unit] = true
+						_debug_log(
+							"poxburster_suppress_urg:" .. tostring(self_unit),
+							_fixed_time(),
+							"suppressed poxburster urgent target (too close)"
+						)
+					end
 				end
 
 				if _is_close_poxburster(perception_component.priority_target_enemy, self_position) then
 					perception_component.priority_target_enemy = nil
-					_debug_log(
-						"poxburster_suppress_pri:" .. tostring(self_unit),
-						_fixed_time(),
-						"suppressed poxburster priority target (too close)"
-					)
+					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
+						_pox_suppress_logged[self_unit] = true
+						_debug_log(
+							"poxburster_suppress_pri:" .. tostring(self_unit),
+							_fixed_time(),
+							"suppressed poxburster priority target (too close)"
+						)
+					end
 				end
 			end
 		)

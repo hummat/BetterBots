@@ -5,7 +5,7 @@
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
 local _debug_log
-local _debug_enabled -- luacheck: ignore 231
+local _debug_enabled
 local _fixed_time
 local _event_log -- luacheck: ignore 231 — TODO: emit grenade_queued/grenade_complete events
 local _bot_slot_for_unit -- luacheck: ignore 231 — TODO: include in EventLog emissions
@@ -23,48 +23,101 @@ local _last_grenade_charge_event_by_unit
 -- Timing constants
 local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
 local AIM_DELAY_S = 0.15 -- Minimum hold before queueing aim_hold (lets wield animation settle)
-local THROW_DELAY_S = 0.3 -- Minimum hold after aim_hold before releasing
+local DEFAULT_THROW_DELAY_S = 0.3 -- Default hold after aim_hold before releasing
 local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
 -- Same cooldown for success and failure; split if tuning requires it.
 local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
--- Only these templates use the aim_hold/aim_released throw flow.
+-- Maps player-ability names → throw delay (seconds after aim_hold before aim_released).
+-- grenade_ability.name returns the player-ability key (e.g. "veteran_frag_grenade"),
+-- NOT the raw template name. Values derived from weapon template chain_time for aim_released:
+-- standard generator default = 0.1s, handleless = 0.8s, plus per-template overrides.
 -- Blitz abilities (knives, chain lightning, smite, whistle, mine, missile)
 -- have different input chains and must NOT enter this state machine.
 local SUPPORTED_THROW_TEMPLATES = {
-	-- Standard grenades (9)
-	adamant_grenade = true,
-	fire_grenade = true,
-	frag_grenade = true,
-	ogryn_grenade_box = true,
-	ogryn_grenade_box_cluster = true,
-	ogryn_grenade_frag = true,
-	ogryn_grenade_friend_rock = true,
-	smoke_grenade = true,
-	tox_grenade = true,
-	-- Handleless grenades (3)
-	krak_grenade = true,
-	quick_flash_grenade = true,
-	shock_grenade = true,
+	-- Veteran (standard generator, chain_time=0.1)
+	veteran_frag_grenade = DEFAULT_THROW_DELAY_S,
+	veteran_smoke_grenade = DEFAULT_THROW_DELAY_S,
+	-- Veteran (handleless generator, chain_time=0.8)
+	veteran_krak_grenade = 1.0,
+	-- Zealot (standard/handleless)
+	zealot_fire_grenade = DEFAULT_THROW_DELAY_S,
+	zealot_shock_grenade = 1.0,
+	-- Psyker — no throwable grenades (smite/chain lightning/knives are blitz)
+	-- Ogryn (standard generator with per-template overrides)
+	ogryn_grenade_box = 1.1, -- chain_time=0.9
+	ogryn_grenade_box_cluster = 1.1, -- chain_time=0.9
+	ogryn_grenade_frag = 0.8, -- chain_time=0.6
+	ogryn_grenade_friend_rock = 0.6, -- chain_time=0.4
+	-- Arbites (standard generator, chain_time=0.1)
+	adamant_grenade = DEFAULT_THROW_DELAY_S,
+	adamant_grenade_improved = DEFAULT_THROW_DELAY_S,
+	-- Hive Scum (handleless generator, chain_time=0.8)
+	broker_flash_grenade = 1.0,
+	broker_flash_grenade_improved = 1.0,
+	broker_tox_grenade = DEFAULT_THROW_DELAY_S,
 }
 
 local function _reset_state(state, next_try_t)
 	state.stage = nil
 	state.deadline_t = nil
 	state.wait_t = nil
+	state.throw_delay = nil
+	state.grenade_name = nil
+	state.release_t = nil
+	state.unwield_requested_t = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
 end
 
+local function _has_confirmed_charge(state, unit)
+	local charge_event = _last_grenade_charge_event_by_unit[unit]
+	if not charge_event or charge_event.grenade_name ~= state.grenade_name then
+		return false
+	end
+
+	local charge_t = charge_event.fixed_t
+	local release_t = state.release_t
+
+	return charge_t ~= nil and release_t ~= nil and charge_t >= release_t
+end
+
+local function should_lock_weapon_switch(unit)
+	local state = _grenade_state_by_unit[unit]
+	if not state or not state.stage then
+		return false
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return false
+	end
+
+	local inventory_component = unit_data_extension:read_component("inventory")
+	if not inventory_component or inventory_component.wielded_slot ~= "slot_grenade_ability" then
+		return false
+	end
+
+	local grenade_name = state.grenade_name
+	if not grenade_name and _equipped_grenade_ability then
+		local grenade_ability = select(2, _equipped_grenade_ability(unit))
+		grenade_name = grenade_ability and grenade_ability.name or "grenade_ability"
+	end
+
+	return true, grenade_name or "grenade_ability", "sequence", "slot_grenade_ability"
+end
+
 local function _queue_weapon_input(unit, input_name)
 	local ext = ScriptUnit.has_extension(unit, "action_input_system")
 	if not ext then
-		_debug_log(
-			"grenade_no_ext:" .. input_name,
-			_fixed_time(),
-			"grenade _queue_weapon_input skipped: no action_input_extension for " .. input_name
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_no_ext:" .. input_name,
+				_fixed_time(),
+				"grenade _queue_weapon_input skipped: no action_input_extension for " .. input_name
+			)
+		end
 		return
 	end
 	ext:bot_queue_action_input("weapon_action", input_name, nil)
@@ -87,11 +140,13 @@ local function try_queue(unit, blackboard)
 
 	-- If unit_data_extension is gone mid-sequence, abort cleanly.
 	if not unit_data_extension and state.stage then
-		_debug_log(
-			"grenade_no_unit_data:" .. tostring(unit),
-			fixed_t,
-			"grenade aborted stage=" .. tostring(state.stage) .. ": unit_data_system missing"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_no_unit_data:" .. tostring(unit),
+				fixed_t,
+				"grenade aborted stage=" .. tostring(state.stage) .. ": unit_data_system missing"
+			)
+		end
 		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
@@ -103,16 +158,20 @@ local function try_queue(unit, blackboard)
 		if wielded_slot == "slot_grenade_ability" then
 			state.stage = "wait_aim"
 			state.wait_t = fixed_t + AIM_DELAY_S
-			_debug_log("grenade_wield_ok:" .. tostring(unit), fixed_t, "grenade wield confirmed, waiting for aim")
+			if _debug_enabled() then
+				_debug_log("grenade_wield_ok:" .. tostring(unit), fixed_t, "grenade wield confirmed, waiting for aim")
+			end
 			return
 		end
 
 		if fixed_t >= (state.deadline_t or 0) then
-			_debug_log(
-				"grenade_wield_timeout:" .. tostring(unit),
-				fixed_t,
-				"grenade wield timeout, resetting with retry"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_wield_timeout:" .. tostring(unit),
+					fixed_t,
+					"grenade wield timeout, resetting with retry"
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
@@ -121,11 +180,13 @@ local function try_queue(unit, blackboard)
 
 	if state.stage == "wait_aim" then
 		if wielded_slot ~= "slot_grenade_ability" then
-			_debug_log(
-				"grenade_aim_lost_wield:" .. tostring(unit),
-				fixed_t,
-				"grenade lost wield during aim (slot=" .. tostring(wielded_slot) .. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_aim_lost_wield:" .. tostring(unit),
+					fixed_t,
+					"grenade lost wield during aim (slot=" .. tostring(wielded_slot) .. ")"
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -133,8 +194,10 @@ local function try_queue(unit, blackboard)
 		if fixed_t >= (state.wait_t or 0) then
 			_queue_weapon_input(unit, "aim_hold")
 			state.stage = "wait_throw"
-			state.wait_t = fixed_t + THROW_DELAY_S
-			_debug_log("grenade_aim_hold:" .. tostring(unit), fixed_t, "grenade queued aim_hold")
+			state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
+			if _debug_enabled() then
+				_debug_log("grenade_aim_hold:" .. tostring(unit), fixed_t, "grenade queued aim_hold")
+			end
 		end
 
 		return
@@ -142,11 +205,13 @@ local function try_queue(unit, blackboard)
 
 	if state.stage == "wait_throw" then
 		if wielded_slot ~= "slot_grenade_ability" then
-			_debug_log(
-				"grenade_throw_lost_wield:" .. tostring(unit),
-				fixed_t,
-				"grenade lost wield during throw (slot=" .. tostring(wielded_slot) .. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_throw_lost_wield:" .. tostring(unit),
+					fixed_t,
+					"grenade lost wield during throw (slot=" .. tostring(wielded_slot) .. ")"
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -155,7 +220,11 @@ local function try_queue(unit, blackboard)
 			_queue_weapon_input(unit, "aim_released")
 			state.stage = "wait_unwield"
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
-			_debug_log("grenade_aim_released:" .. tostring(unit), fixed_t, "grenade queued aim_released")
+			state.release_t = fixed_t
+			state.unwield_requested_t = nil
+			if _debug_enabled() then
+				_debug_log("grenade_aim_released:" .. tostring(unit), fixed_t, "grenade queued aim_released")
+			end
 		end
 
 		return
@@ -163,22 +232,39 @@ local function try_queue(unit, blackboard)
 
 	if state.stage == "wait_unwield" then
 		if wielded_slot ~= "slot_grenade_ability" then
-			_debug_log(
-				"grenade_unwield_ok:" .. tostring(unit),
-				fixed_t,
-				"grenade throw complete, slot returned to " .. tostring(wielded_slot)
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_unwield_ok:" .. tostring(unit),
+					fixed_t,
+					"grenade throw complete, slot returned to " .. tostring(wielded_slot)
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			return
+		end
+
+		if not state.unwield_requested_t and _has_confirmed_charge(state, unit) then
+			_queue_weapon_input(unit, "unwield_to_previous")
+			state.unwield_requested_t = fixed_t
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_unwield_requested:" .. tostring(unit),
+					fixed_t,
+					"grenade queued unwield_to_previous after charge confirmation"
+				)
+			end
 			return
 		end
 
 		if fixed_t >= (state.deadline_t or 0) then
 			_queue_weapon_input(unit, "unwield_to_previous")
-			_debug_log(
-				"grenade_unwield_forced:" .. tostring(unit),
-				fixed_t,
-				"grenade forced unwield_to_previous on timeout"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_unwield_forced:" .. tostring(unit),
+					fixed_t,
+					"grenade forced unwield_to_previous on timeout"
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
@@ -187,11 +273,13 @@ local function try_queue(unit, blackboard)
 
 	-- Unknown stage — log and reset rather than falling through to idle.
 	if state.stage ~= nil then
-		_debug_log(
-			"grenade_unknown_stage:" .. tostring(unit),
-			fixed_t,
-			"grenade unknown stage=" .. tostring(state.stage) .. ", resetting"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_unknown_stage:" .. tostring(unit),
+				fixed_t,
+				"grenade unknown stage=" .. tostring(state.stage) .. ", resetting"
+			)
+		end
 		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
@@ -205,11 +293,13 @@ local function try_queue(unit, blackboard)
 
 	local suppressed, suppress_reason = _is_suppressed(unit)
 	if suppressed then
-		_debug_log(
-			"grenade_suppress:" .. tostring(suppress_reason),
-			fixed_t,
-			"grenade blocked: suppressed (" .. tostring(suppress_reason) .. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_suppress:" .. tostring(suppress_reason),
+				fixed_t,
+				"grenade blocked: suppressed (" .. tostring(suppress_reason) .. ")"
+			)
+		end
 		return
 	end
 
@@ -231,18 +321,14 @@ local function try_queue(unit, blackboard)
 	-- Only enter the aim_hold/aim_released flow for standard+handleless grenades.
 	-- Blitz abilities (knives, smite, chain lightning, mine, whistle, missile)
 	-- have different input chains and would get wrong inputs from this state machine.
-	if not SUPPORTED_THROW_TEMPLATES[grenade_name] then
+	local throw_delay = SUPPORTED_THROW_TEMPLATES[grenade_name]
+	if not throw_delay then
 		return
 	end
 
 	local context = _build_context(unit, blackboard)
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
 	if not should_throw then
-		_debug_log(
-			"grenade_blocked:" .. tostring(unit),
-			fixed_t,
-			"grenade blocked for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
-		)
 		return
 	end
 
@@ -255,12 +341,16 @@ local function try_queue(unit, blackboard)
 
 	state.stage = "wield"
 	state.deadline_t = fixed_t + WIELD_TIMEOUT_S
+	state.throw_delay = throw_delay
+	state.grenade_name = grenade_name
 
-	_debug_log(
-		"grenade_wield:" .. tostring(unit),
-		fixed_t,
-		"grenade queued wield for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"grenade_wield:" .. tostring(unit),
+			fixed_t,
+			"grenade queued wield for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
+		)
+	end
 end
 
 -- Called from BetterBots.lua use_ability_charge hook for grenade_ability.
@@ -291,4 +381,5 @@ return {
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,
+	should_lock_weapon_switch = should_lock_weapon_switch,
 }

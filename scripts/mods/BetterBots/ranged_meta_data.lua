@@ -1,6 +1,7 @@
 local _mod -- luacheck: ignore 231
 local _patched_set
 local _debug_log
+local _debug_enabled
 
 local function resolve_vanilla_fallback(weapon_template)
 	local actions = weapon_template.actions or {}
@@ -272,19 +273,21 @@ local function inject(WeaponTemplates)
 	end
 
 	_patched_set[WeaponTemplates] = true
-	_debug_log(
-		"ranged_meta_injection:" .. tostring(WeaponTemplates),
-		0,
-		"ranged attack_meta_data patch installed (injected="
-			.. injected
-			.. ", patched="
-			.. patched
-			.. ", charge="
-			.. charge_overrides
-			.. ", skipped="
-			.. skipped
-			.. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"ranged_meta_injection:" .. tostring(WeaponTemplates),
+			0,
+			"ranged attack_meta_data patch installed (injected="
+				.. injected
+				.. ", patched="
+				.. patched
+				.. ", charge="
+				.. charge_overrides
+				.. ", skipped="
+				.. skipped
+				.. ")"
+		)
+	end
 end
 
 return {
@@ -292,6 +295,7 @@ return {
 		_mod = deps.mod
 		_patched_set = deps.patched_weapon_templates
 		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 	end,
 	inject = inject,
 	_resolve_vanilla_fallback = resolve_vanilla_fallback,

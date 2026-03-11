@@ -60,6 +60,7 @@ rawset(_G, "require", _orig_require)
 ConditionPatch.init({
 	mod = { echo = function() end, hook_require = function() end },
 	debug_log = function() end,
+	debug_enabled = function() return false end,
 	fixed_time = function() return 0 end,
 	is_suppressed = function() return false end,
 	equipped_combat_ability_name = function() return "none" end,

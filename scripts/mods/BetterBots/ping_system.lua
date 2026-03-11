@@ -4,6 +4,7 @@ local M = {}
 
 local _mod
 local _debug_log
+local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 
@@ -14,6 +15,7 @@ local _missing_los_method_warned = false
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 end
@@ -69,7 +71,9 @@ function M.update(unit, blackboard)
 			local already_tagged = target_extension and target_extension:tag_id()
 
 			if target_extension and not already_tagged then
-				-- Check LOS
+				-- Check LOS via enemy's perception (BotPerceptionExtension has no has_line_of_sight).
+				-- This asks "can the enemy see the bot?" — asymmetric (ignores bot facing), but
+				-- wall occlusion is symmetric and perception slots already filter awareness.
 				local has_los = true
 				local target_perception_extension = ScriptUnit.has_extension(candidate, "perception_system")
 				if target_perception_extension then
@@ -114,7 +118,7 @@ function M.update(unit, blackboard)
 	-- Update cooldown timestamp unconditionally to prevent retry-on-crash loops.
 	_last_ping_t_by_bot[unit] = fixed_t
 
-	if _debug_log then
+	if _debug_enabled() then
 		local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
 		local unit_data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
 		local breed = unit_data_ext and unit_data_ext:breed()

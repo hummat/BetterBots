@@ -39,9 +39,6 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
 
--- Forward ref: set after Sprint loads (#17 daemonhost avoidance)
-local _is_near_daemonhost
-
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
 end
@@ -110,10 +107,10 @@ local function _is_suppressed(unit)
 		return true, "moving_platform"
 	end
 
-	-- #17: suppress abilities near non-aggroed daemonhosts
-	if _is_near_daemonhost and _is_near_daemonhost(unit) then
-		return true, "daemonhost_nearby"
-	end
+	-- #17: daemonhost combat suppression is handled target-specifically in
+	-- condition_patch.lua (melee/ranged suppression when targeting a dormant DH).
+	-- Blanket proximity suppression was removed — it blocked abilities in mixed
+	-- encounters where bots fight other enemies near a sleeping daemonhost.
 
 	return false
 end
@@ -157,7 +154,6 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
-_is_near_daemonhost = Sprint.is_near_daemonhost
 
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
@@ -194,6 +190,7 @@ MetaData.init({
 	mod = mod,
 	patched_ability_templates = _patched_ability_templates,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	META_PATCH_VERSION = META_PATCH_VERSION,
 })
 
@@ -223,6 +220,7 @@ ItemFallback.init({
 Debug.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	equipped_combat_ability_name = _equipped_combat_ability_name,
 	fallback_state_by_unit = _fallback_state_by_unit,
@@ -237,6 +235,7 @@ EventLog.init({
 Sprint.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 })
 
@@ -244,6 +243,7 @@ MeleeMetaData.init({
 	mod = mod,
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 })
 
@@ -251,23 +251,27 @@ RangedMetaData.init({
 	mod = mod,
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 })
 
 TargetSelection.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 })
 
 Poxburster.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 })
 
 VfxSuppression.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 })
 
 WeaponAction.init({
@@ -281,6 +285,7 @@ WeaponAction.init({
 ConditionPatch.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	is_suppressed = _is_suppressed,
 	equipped_combat_ability_name = _equipped_combat_ability_name,
@@ -319,6 +324,7 @@ GrenadeFallback.init({
 PingSystem.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
@@ -359,12 +365,21 @@ GrenadeFallback.wire({
 	equipped_grenade_ability = _equipped_grenade_ability,
 })
 
+local function _should_lock_weapon_switch(unit)
+	local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+	if should_lock then
+		return should_lock, ability_name, lock_reason, slot_to_keep
+	end
+
+	return GrenadeFallback.should_lock_weapon_switch(unit)
+end
+
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
-	should_lock_weapon_switch = ItemFallback.should_lock_weapon_switch,
+	should_lock_weapon_switch = _should_lock_weapon_switch,
 })
 ConditionPatch.register_hooks()
 
@@ -419,14 +434,16 @@ mod:hook_require(
 				local action_input = activation_data and activation_data.action_input or "?"
 				local fixed_t = _fixed_time()
 
-				_debug_log(
-					"enter:" .. tostring(ability_component_name) .. ":" .. tostring(action_input),
-					fixed_t,
-					"enter ability node component="
-						.. tostring(ability_component_name)
-						.. " action_input="
-						.. tostring(action_input)
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"enter:" .. tostring(ability_component_name) .. ":" .. tostring(action_input),
+						fixed_t,
+						"enter ability node component="
+							.. tostring(ability_component_name)
+							.. " action_input="
+							.. tostring(action_input)
+					)
+				end
 
 				if EventLog.is_enabled() and unit then
 					local state = _fallback_state_by_unit[unit]
@@ -480,15 +497,17 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
 			end
 
-			_debug_log(
-				"grenade_charge:" .. grenade_name,
-				_fixed_time(),
-				"grenade charge consumed for "
-					.. grenade_name
-					.. " (charges="
-					.. tostring(optional_num_charges or 1)
-					.. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_charge:" .. grenade_name,
+					_fixed_time(),
+					"grenade charge consumed for "
+						.. grenade_name
+						.. " (charges="
+						.. tostring(optional_num_charges or 1)
+						.. ")"
+				)
+			end
 			return
 		end
 
@@ -564,19 +583,21 @@ mod:hook_require(
 			local fixed_t = _fixed_time()
 			local ability_name = _equipped_combat_ability_name(unit)
 			ItemFallback.schedule_retry(unit, fixed_t, ABILITY_STATE_FAIL_RETRY_S)
-			_debug_log(
-				"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
-				fixed_t,
-				"combat ability state transition failed for "
-					.. tostring(ability_name)
-					.. " (wanted="
-					.. tostring(wanted_state_name)
-					.. ", current="
-					.. tostring(current_state_name)
-					.. ", reason="
-					.. tostring(reason)
-					.. "); scheduled fast retry"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
+					fixed_t,
+					"combat ability state transition failed for "
+						.. tostring(ability_name)
+						.. " (wanted="
+						.. tostring(wanted_state_name)
+						.. ", current="
+						.. tostring(current_state_name)
+						.. ", reason="
+						.. tostring(reason)
+						.. "); scheduled fast retry"
+				)
+			end
 		end)
 	end
 )

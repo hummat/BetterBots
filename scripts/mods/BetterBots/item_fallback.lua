@@ -380,11 +380,13 @@ end
 
 local function _queue_item_start_input(unit, ability_name, state, fixed_t, blackboard)
 	_queue_weapon_action_input(state, state.item_start_input)
-	_debug_log(
-		"fallback_item_start:" .. ability_name,
-		fixed_t,
-		"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_start_input)
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"fallback_item_start:" .. ability_name,
+			fixed_t,
+			"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_start_input)
+		)
+	end
 
 	if _event_log and _event_log.is_enabled() then
 		state.attempt_id = _event_log.next_attempt_id()
@@ -491,25 +493,29 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 	if not state.item_charge_confirmed and _item_attempt_charge_confirmed(unit, state, ability_name) then
 		state.item_charge_confirmed = true
-		_debug_log(
-			"fallback_item_charge_confirmed:" .. ability_name,
-			fixed_t,
-			"fallback item confirmed charge consume for "
-				.. ability_name
-				.. " (profile="
-				.. tostring(state.item_profile_name)
-				.. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_item_charge_confirmed:" .. ability_name,
+				fixed_t,
+				"fallback item confirmed charge consume for "
+					.. ability_name
+					.. " (profile="
+					.. tostring(state.item_profile_name)
+					.. ")"
+			)
+		end
 	end
 
 	if state.item_stage == "waiting_wield" then
 		if wielded_slot ~= "slot_combat_ability" then
 			if fixed_t >= (state.item_wield_deadline_t or 0) then
-				_debug_log(
-					"fallback_item_wield_timeout:" .. ability_name,
-					fixed_t,
-					"fallback item blocked " .. ability_name .. " (wield timeout)"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"fallback_item_wield_timeout:" .. ability_name,
+						fixed_t,
+						"fallback item blocked " .. ability_name .. " (wield timeout)"
+					)
+				end
 				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "wield_timeout" })
 				_schedule_item_sequence_retry(state, fixed_t, false)
 			end
@@ -522,15 +528,17 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 			local sequence, profile_key, selected_index, candidate_count =
 				_select_item_cast_sequence(state, ability_name, weapon_template_name, weapon_template)
 			if not sequence then
-				_debug_log(
-					"fallback_item_unsupported:" .. ability_name .. ":" .. weapon_template_name,
-					fixed_t,
-					"fallback item blocked "
-						.. ability_name
-						.. " (unsupported weapon template="
-						.. tostring(weapon_template_name)
-						.. ")"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"fallback_item_unsupported:" .. ability_name .. ":" .. weapon_template_name,
+						fixed_t,
+						"fallback item blocked "
+							.. ability_name
+							.. " (unsupported weapon template="
+							.. tostring(weapon_template_name)
+							.. ")"
+					)
+				end
 				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "unsupported_template" })
 				_schedule_item_sequence_retry(state, fixed_t, false)
 				return
@@ -550,18 +558,20 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 			state.item_stage_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
 			_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = state.item_start_input })
 
-			_debug_log(
-				"fallback_item_profile:" .. ability_name .. ":" .. weapon_template_name,
-				fixed_t,
-				"fallback item selected profile "
-					.. tostring(state.item_profile_name)
-					.. " ("
-					.. tostring(selected_index)
-					.. "/"
-					.. tostring(candidate_count)
-					.. ") for "
-					.. ability_name
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_profile:" .. ability_name .. ":" .. weapon_template_name,
+					fixed_t,
+					"fallback item selected profile "
+						.. tostring(state.item_profile_name)
+						.. " ("
+						.. tostring(selected_index)
+						.. "/"
+						.. tostring(candidate_count)
+						.. ") for "
+						.. ability_name
+				)
+			end
 		end
 
 		if fixed_t >= (state.item_wait_t or 0) then
@@ -573,15 +583,17 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 	if state.item_stage == "waiting_start" then
 		if wielded_slot ~= "slot_combat_ability" then
-			_debug_log(
-				"fallback_item_start_lost_wield:" .. ability_name,
-				fixed_t,
-				"fallback item blocked "
-					.. ability_name
-					.. " (lost combat-ability wield before start; slot="
-					.. tostring(wielded_slot)
-					.. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_start_lost_wield:" .. ability_name,
+					fixed_t,
+					"fallback item blocked "
+						.. ability_name
+						.. " (lost combat-ability wield before start; slot="
+						.. tostring(wielded_slot)
+						.. ")"
+				)
+			end
 			_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "lost_wield_before_start" })
 			_schedule_item_sequence_retry(state, fixed_t, true)
 			return
@@ -592,22 +604,24 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 		if not supports_start_input then
 			if fixed_t >= (state.item_stage_deadline_t or 0) then
-				_debug_log(
-					"fallback_item_start_input_drift:"
-						.. ability_name
-						.. ":"
-						.. tostring(state.item_start_input)
-						.. ":"
-						.. tostring(current_template_name),
-					fixed_t,
-					"fallback item blocked "
-						.. ability_name
-						.. " (start input drift; input="
-						.. tostring(state.item_start_input)
-						.. ", template="
-						.. tostring(current_template_name)
-						.. ")"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"fallback_item_start_input_drift:"
+							.. ability_name
+							.. ":"
+							.. tostring(state.item_start_input)
+							.. ":"
+							.. tostring(current_template_name),
+						fixed_t,
+						"fallback item blocked "
+							.. ability_name
+							.. " (start input drift; input="
+							.. tostring(state.item_start_input)
+							.. ", template="
+							.. tostring(current_template_name)
+							.. ")"
+					)
+				end
 				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "start_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
@@ -626,15 +640,17 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 	if state.item_stage == "waiting_followup" then
 		if wielded_slot ~= "slot_combat_ability" then
-			_debug_log(
-				"fallback_item_followup_lost_wield:" .. ability_name,
-				fixed_t,
-				"fallback item blocked "
-					.. ability_name
-					.. " (lost combat-ability wield before followup; slot="
-					.. tostring(wielded_slot)
-					.. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_followup_lost_wield:" .. ability_name,
+					fixed_t,
+					"fallback item blocked "
+						.. ability_name
+						.. " (lost combat-ability wield before followup; slot="
+						.. tostring(wielded_slot)
+						.. ")"
+				)
+			end
 			_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "lost_wield_before_followup" })
 			_schedule_item_sequence_retry(state, fixed_t, true)
 			return
@@ -645,22 +661,24 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 		if not supports_followup_input then
 			if fixed_t >= (state.item_stage_deadline_t or 0) then
-				_debug_log(
-					"fallback_item_followup_input_drift:"
-						.. ability_name
-						.. ":"
-						.. tostring(state.item_followup_input)
-						.. ":"
-						.. tostring(current_template_name),
-					fixed_t,
-					"fallback item blocked "
-						.. ability_name
-						.. " (followup input drift; input="
-						.. tostring(state.item_followup_input)
-						.. ", template="
-						.. tostring(current_template_name)
-						.. ")"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"fallback_item_followup_input_drift:"
+							.. ability_name
+							.. ":"
+							.. tostring(state.item_followup_input)
+							.. ":"
+							.. tostring(current_template_name),
+						fixed_t,
+						"fallback item blocked "
+							.. ability_name
+							.. " (followup input drift; input="
+							.. tostring(state.item_followup_input)
+							.. ", template="
+							.. tostring(current_template_name)
+							.. ")"
+					)
+				end
 				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "followup_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
@@ -674,11 +692,13 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 		if state.item_followup_input then
 			_queue_weapon_action_input(state, state.item_followup_input)
-			_debug_log(
-				"fallback_item_followup:" .. ability_name,
-				fixed_t,
-				"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_followup_input)
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_followup:" .. ability_name,
+					fixed_t,
+					"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_followup_input)
+				)
+			end
 		end
 
 		state.item_stage = "waiting_unwield"
@@ -690,15 +710,17 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 	if state.item_stage == "waiting_unwield" then
 		if wielded_slot ~= "slot_combat_ability" then
-			_debug_log(
-				"fallback_item_unwield_lost_slot:" .. ability_name,
-				fixed_t,
-				"fallback item continuing charge confirmation for "
-					.. ability_name
-					.. " (lost combat-ability wield during unwield stage; slot="
-					.. tostring(wielded_slot)
-					.. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_unwield_lost_slot:" .. ability_name,
+					fixed_t,
+					"fallback item continuing charge confirmation for "
+						.. ability_name
+						.. " (lost combat-ability wield during unwield stage; slot="
+						.. tostring(wielded_slot)
+						.. ")"
+				)
+			end
 			_transition_to_charge_confirmation(state, fixed_t)
 			_emit_item_event("item_stage", unit, ability_name, state, fixed_t)
 			return
@@ -709,22 +731,24 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 		if not supports_unwield_input then
 			if fixed_t >= (state.item_stage_deadline_t or 0) then
-				_debug_log(
-					"fallback_item_unwield_input_drift:"
-						.. ability_name
-						.. ":"
-						.. tostring(state.item_unwield_input)
-						.. ":"
-						.. tostring(current_template_name),
-					fixed_t,
-					"fallback item blocked "
-						.. ability_name
-						.. " (unwield input drift; input="
-						.. tostring(state.item_unwield_input)
-						.. ", template="
-						.. tostring(current_template_name)
-						.. ")"
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"fallback_item_unwield_input_drift:"
+							.. ability_name
+							.. ":"
+							.. tostring(state.item_unwield_input)
+							.. ":"
+							.. tostring(current_template_name),
+						fixed_t,
+						"fallback item blocked "
+							.. ability_name
+							.. " (unwield input drift; input="
+							.. tostring(state.item_unwield_input)
+							.. ", template="
+							.. tostring(current_template_name)
+							.. ")"
+					)
+				end
 				_emit_item_event("blocked", unit, ability_name, state, fixed_t, { reason = "unwield_input_drift" })
 				_schedule_item_sequence_retry(state, fixed_t, true)
 			end
@@ -738,11 +762,13 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 		if state.item_unwield_input then
 			_queue_weapon_action_input(state, state.item_unwield_input)
-			_debug_log(
-				"fallback_item_unwield:" .. ability_name,
-				fixed_t,
-				"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_unwield_input)
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_unwield:" .. ability_name,
+					fixed_t,
+					"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_unwield_input)
+				)
+			end
 		end
 
 		_transition_to_charge_confirmation(state, fixed_t)
@@ -761,17 +787,19 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		end
 
 		local rotated = _rotate_item_cast_profile(state)
-		_debug_log(
-			"fallback_item_no_charge:" .. ability_name,
-			fixed_t,
-			"fallback item finished without charge consume for "
-				.. ability_name
-				.. " (profile="
-				.. tostring(state.item_profile_name)
-				.. ", rotated="
-				.. tostring(rotated)
-				.. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_item_no_charge:" .. ability_name,
+				fixed_t,
+				"fallback item finished without charge consume for "
+					.. ability_name
+					.. " (profile="
+					.. tostring(state.item_profile_name)
+					.. ", rotated="
+					.. tostring(rotated)
+					.. ")"
+			)
+		end
 		_reset_item_sequence_state(state, fixed_t + _ITEM_SEQUENCE_RETRY_S)
 		return
 	end
@@ -791,15 +819,17 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 			and current_weapon_template.action_inputs.combat_ability
 		)
 	then
-		_debug_log(
-			"fallback_item_no_wield_input:" .. ability_name .. ":" .. weapon_template_name,
-			fixed_t,
-			"fallback item blocked "
-				.. ability_name
-				.. " (weapon template lacks combat_ability input: "
-				.. tostring(weapon_template_name)
-				.. ")"
-		)
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_item_no_wield_input:" .. ability_name .. ":" .. weapon_template_name,
+				fixed_t,
+				"fallback item blocked "
+					.. ability_name
+					.. " (weapon template lacks combat_ability input: "
+					.. tostring(weapon_template_name)
+					.. ")"
+			)
+		end
 		state.next_try_t = fixed_t + _ITEM_SEQUENCE_RETRY_S
 		return
 	end
@@ -809,11 +839,13 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
 	_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "combat_ability" })
 
-	_debug_log(
-		"fallback_item_wield:" .. ability_name,
-		fixed_t,
-		"fallback item queued " .. ability_name .. " input=combat_ability (wield slot_combat_ability)"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"fallback_item_wield:" .. ability_name,
+			fixed_t,
+			"fallback item queued " .. ability_name .. " input=combat_ability (wield slot_combat_ability)"
+		)
+	end
 end
 
 return {
