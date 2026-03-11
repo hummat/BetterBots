@@ -1,5 +1,7 @@
--- grenade_fallback.lua — bot grenade throw state machine (#4)
--- Wields grenade slot, aims, throws, and returns to previous weapon.
+-- grenade_fallback.lua — bot blitz/grenade state machine (#4)
+-- Wields grenade slot, queues the appropriate input sequence, and returns to previous weapon.
+-- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
+-- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
 
 -- Dependencies (set via init/wire)
@@ -59,6 +61,22 @@ local SUPPORTED_THROW_TEMPLATES = {
 	broker_tox_grenade = DEFAULT_THROW_DELAY_S,
 	-- Arbites shock mine (mine generator, aim_hold chain_time=0.8)
 	adamant_shock_mine = 1.0,
+	-- Zealot throwing knives (auto-fires on wield via quick_throw, auto-unwields after last charge)
+	zealot_throwing_knives = {
+		auto_unwield = true,
+	},
+	-- Arbites whistle (companion order: aim_pressed/aim_released, no auto-unwield)
+	adamant_whistle = {
+		aim_input = "aim_pressed",
+		release_input = "aim_released",
+		throw_delay = 0.15,
+		auto_unwield = false,
+	},
+	-- Hive Scum missile launcher (queue shoot_charge, rest auto-chains; DLC-blocked)
+	broker_missile_launcher = {
+		aim_input = "shoot_charge",
+		auto_unwield = true,
+	},
 }
 
 local function _reset_state(state, next_try_t)
@@ -181,10 +199,29 @@ local function try_queue(unit, blackboard)
 
 	if state.stage == "wield" then
 		if wielded_slot == "slot_grenade_ability" then
-			state.stage = "wait_aim"
-			state.wait_t = fixed_t + AIM_DELAY_S
-			if _debug_enabled() then
-				_debug_log("grenade_wield_ok:" .. tostring(unit), fixed_t, "grenade wield confirmed, waiting for aim")
+			if not state.aim_input then
+				-- Auto-fire template: skip aim/throw, go straight to wait_unwield
+				state.stage = "wait_unwield"
+				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+				state.release_t = fixed_t
+				state.unwield_requested_t = nil
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_auto_fire:" .. tostring(unit),
+						fixed_t,
+						"grenade auto-fire, waiting for unwield"
+					)
+				end
+			else
+				state.stage = "wait_aim"
+				state.wait_t = fixed_t + AIM_DELAY_S
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_wield_ok:" .. tostring(unit),
+						fixed_t,
+						"grenade wield confirmed, waiting for aim"
+					)
+				end
 			end
 			return
 		end
@@ -217,11 +254,20 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			_queue_weapon_input(unit, "aim_hold")
-			state.stage = "wait_throw"
-			state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
+			local aim = state.aim_input or "aim_hold"
+			_queue_weapon_input(unit, aim)
+			if state.release_input then
+				state.stage = "wait_throw"
+				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
+			else
+				-- No release needed: skip to wait_unwield (e.g. missile auto-chains)
+				state.stage = "wait_unwield"
+				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+				state.release_t = fixed_t
+				state.unwield_requested_t = nil
+			end
 			if _debug_enabled() then
-				_debug_log("grenade_aim_hold:" .. tostring(unit), fixed_t, "grenade queued aim_hold")
+				_debug_log("grenade_aim:" .. tostring(unit), fixed_t, "grenade queued " .. aim)
 			end
 		end
 
@@ -242,13 +288,14 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			_queue_weapon_input(unit, "aim_released")
+			local release = state.release_input or "aim_released"
+			_queue_weapon_input(unit, release)
 			state.stage = "wait_unwield"
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 			state.release_t = fixed_t
 			state.unwield_requested_t = nil
 			if _debug_enabled() then
-				_debug_log("grenade_aim_released:" .. tostring(unit), fixed_t, "grenade queued aim_released")
+				_debug_log("grenade_release:" .. tostring(unit), fixed_t, "grenade queued " .. release)
 			end
 		end
 
@@ -265,6 +312,21 @@ local function try_queue(unit, blackboard)
 				)
 			end
 			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			return
+		end
+
+		-- For non-auto-unwield templates, force unwield immediately.
+		-- The engine won't auto-chain unwield_to_previous for these.
+		if state.auto_unwield == false and not state.unwield_requested_t then
+			_queue_weapon_input(unit, "unwield_to_previous")
+			state.unwield_requested_t = fixed_t
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_force_unwield:" .. tostring(unit),
+					fixed_t,
+					"grenade forced unwield_to_previous (no auto-unwield)"
+				)
+			end
 			return
 		end
 

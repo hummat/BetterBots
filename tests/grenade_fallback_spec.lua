@@ -450,5 +450,135 @@ describe("grenade_fallback", function()
 			assert.equals("grenade_ability", _recorded_inputs[1].input)
 			assert.equals("wield", _grenade_state_by_unit[unit].stage)
 		end)
+
+		it("queues custom aim_input from table profile", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "adamant_whistle" }
+				end,
+			})
+
+			-- Idle → wield
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			-- Wield confirmed → wait_aim
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+			-- wait_aim → queues aim_pressed (not aim_hold)
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("aim_pressed", _recorded_inputs[1].input)
+			assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+
+			-- wait_throw → queues aim_released
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("aim_released", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("skips aim/throw stages for auto-fire templates", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "zealot_throwing_knives" }
+				end,
+			})
+
+			-- Idle → wield
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			-- Wield confirmed → straight to wait_unwield (no wait_aim/wait_throw)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			_recorded_inputs = {}
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+			assert.equals(0, #_recorded_inputs) -- no aim/throw inputs queued
+		end)
+
+		it("skips wait_throw when release_input is nil", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "broker_missile_launcher" }
+				end,
+			})
+
+			-- Idle → wield
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			-- Wield confirmed → wait_aim
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+			-- wait_aim → queues shoot_charge, skips to wait_unwield
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shoot_charge", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("forces immediate unwield for non-auto-unwield templates", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "adamant_whistle" }
+				end,
+			})
+
+			-- Advance through wield → wait_aim → wait_throw → wait_unwield
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			-- Next tick: should immediately queue unwield_to_previous
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.05
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("unwield_to_previous", _recorded_inputs[1].input)
+		end)
 	end)
 end)
