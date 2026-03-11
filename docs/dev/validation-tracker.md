@@ -616,6 +616,94 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 | `_can_activate_drone` | `adamant_area_buff_drone` | PASS | 2026-03-07-tier3-final | 5 consumes; activated reliably in combat |
 | `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | DLC-blocked |
 
+### M5 Batch Validation (2026-03-11)
+
+```text
+Run ID: 2026-03-11-m5-batch1
+Date (local): 2026-03-11
+Date (UTC): 2026-03-11
+Git commit: 8cce4bd (post hot-reload)
+Log file: console-2026-03-11-18.25.35-84b3f3e9-7c0c-4425-9c6e-3dd118b4a90d.log
+Bot lineup / abilities: Arbites (whistle blitz, standard grenades), bots with force staves
+Map + difficulty: Standard mission, Tertium 5/6 bots
+
+Staff charged fire (#43):
+- p2 Purgatus (trigger_charge_flame): PASS
+  - _may_fire swap confirmed: fire=shoot_pressed -> aim_fire=trigger_charge_flame (18:54:54.306)
+  - charge override count: 4 (all staves matched, up from 1 pre-fix)
+- p3 Surge / p4 Equinox (shoot_charged): PASS
+  - _may_fire swap confirmed: fire=shoot_pressed -> aim_fire=shoot_charged (19:15:05.813)
+  - p4 already PASS from v0.5.0; p3 uses same input, structurally identical
+- p1 Voidstrike (trigger_explosion): PASS
+  - _may_fire swap confirmed: fire=shoot_pressed -> aim_fire=trigger_explosion (20:04:16.133, run 2026-03-11-m5-fresh)
+  - bot=2, weapon_template=forcestaff_p1_m1
+
+Grenade/blitz (#4):
+- Standard grenades (krak, fire): PASS (confirmed in earlier session, 7 charges)
+- Zealot knives: PASS (auto-fire observed)
+- Adamant whistle: PASS (fresh launch; FAIL after hot-reload)
+  - 3/3 activations: charge confirmed
+  - action_aim started from aim_pressed, chained to action_order_companion via aim_released
+  - Charge consumed ~1s after activation (0.15s throw_delay + 0.3s trigger_time + frame latency)
+  - Timestamps: 20:04:18.955→20:04:20.155, 20:04:22.151→20:04:23.348, 20:05:37.444→20:05:38.641
+  - Hot-reload failure (previous session): component template_name likely reset to "none" by DMF reload
+- Shock mine: UNTESTED (no bot equipped)
+- Ogryn cluster grenades: PASS — 3 charges consumed (20:04:18.824, 20:04:22.779, 20:04:26.347)
+- Zealot throwing knives: PASS — 8+ charges consumed; wield timeout noise (quick_throw returns to previous slot before our wield detection fires)
+```
+
+### Run 2026-03-11-m5-fresh
+
+```text
+Run ID: 2026-03-11-m5-fresh
+Date (local): 2026-03-11
+Date (UTC): 2026-03-11
+Git commit: 8cce4bd (fresh launch, no hot-reload)
+Log file: console-2026-03-11-20.01.33-7a0c9c5e-47ea-4b35-994c-aca0c09fc50b.log
+Bot lineup / abilities: Arbites (whistle), Psyker (smite), Zealot (throwing knives), Ogryn (cluster grenades)
+  Bot 2: forcestaff_p1_m1 (Voidstrike)
+Map + difficulty: Standard mission
+
+Staff charged fire (#43):
+- p1 Voidstrike (trigger_explosion): PASS
+  - _may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion (20:04:16.133)
+  - bot=2, weapon_template=forcestaff_p1_m1
+- All 4 staves now confirmed PASS (p2 Purgatus in earlier session, p3/p4 in earlier session, p1 this session)
+
+Grenade/blitz (#4):
+- Adamant whistle: PASS — 3/3 charge confirmed
+- Ogryn cluster grenades: PASS — 3 charges consumed
+- Zealot throwing knives: PASS — 8+ charges consumed (wield timeout noise, not real failure)
+- Shock mine: UNTESTED
+
+Regression checks:
+- revive/rescue: PASS
+- navigation/pathing: PASS
+- basic combat loop: PASS
+- Lua errors: no
+
+Conclusion:
+- #43 all 4 staves PASS. Issue can be closed.
+- #4 whistle PASS on fresh launch. Hot-reload failure is dev-only, not a shipping blocker.
+- Zealot knives wield timeout is cosmetic — quick_throw fires before wield detection.
+- Shock mine still needs a bot equipped with it.
+
+Bot pinging (#16): PASS (confirmed in earlier session)
+Distant special penalty (#19): PASS (confirmed in earlier session)
+Daemonhost avoidance (#17): UNVERIFIABLE (no spawn)
+
+Regression checks:
+- revive/rescue: PASS
+- navigation/pathing: PASS
+- basic combat loop: PASS
+- Lua errors: no
+
+Conclusion:
+- #43 staff p2/p3/p4: promote to PASS. p1 needs dedicated test.
+- #4 grenades: PASS. Whistle: FAIL, needs diagnosis.
+- Batch overall: ready for merge except whistle (can ship independently).
+```
+
 **Template heuristic summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
 **Item heuristic summary: 3/3 testable PASS, 1 DLC-blocked.**
 

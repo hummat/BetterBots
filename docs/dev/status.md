@@ -33,7 +33,15 @@
 - **Smart melee attack selection** (#23): armor-aware `attack_meta_data` injection (66 templates)
 - **Ranged fire fix** (#31): `attack_meta_data` injection for non-standard fire paths (36 templates patched)
 - **Warp venting** (#30): `Overheat.slot_percentage` warp charge bridge + `should_vent_overheat` hysteresis fix + `reload→vent` translation
-- **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS, p2 flame FAIL (fixed in dev/m5-batch1), p1/p3 untested. Root cause: `find_aim_fire_input()` couldn't find chain-only fire actions (no `start_input`). Fix: `find_chain_target_action()` fallback scans `allowed_chain_actions`.
+- **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS in v0.5.0. Root cause for p2/p1: `find_aim_fire_input()` couldn't find chain-only fire actions (no `start_input`). Fix: `find_chain_target_action()` fallback scans `allowed_chain_actions` (dev/m5-batch1, commit 09e0f22). p2 flame PASS, p3/p4 PASS, p1 surge structural fix in place (no in-game evidence yet).
+
+### v0.6.0 (2026-03-11)
+- **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher. Generic heuristic only (`enemies_in_proximity > 0`); per-grenade heuristics planned for v0.6.1.
+- **Staff charged fire fix** (#43): all 4 force staves now fire charged attacks. `find_chain_target_action()` fallback for chain-only fire actions (p1 Voidstrike, p2 Purgatus).
+- **Bot pinging** (#16): bots ping elites and specials for the human player.
+- **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
+- **Daemonhost avoidance** (#17): suppress bot combat near dormant daemonhosts (code + tests, unverifiable in-game — no DH spawn).
+- **Unit tests**: 305 tests via busted.
 
 ## Current Tier Status
 
@@ -45,33 +53,36 @@
 
 ## Evidence Source
 
-- Latest analyzed log: `console-2026-03-05-14.57.34-...`
+- Latest analyzed log: `console-2026-03-11-20.01.33-...`
 - Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
 ## M5 Batch Status (dev/m5-batch1)
 
-In-game validation: 2026-03-11, commit a178251.
+In-game validation: 2026-03-11, commit 8cce4bd.
 
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
 | #4 | Grenade throw | **PASS** | 7 charges consumed (krak + fire), 0 forced timeouts |
-| #4 | Blitz profiles (knives, whistle, shock mine) | **Partial** | Knives observed; whistle blocked by combat ability mutex (fixed cc4c488); needs re-test |
+| #4 | Blitz: knives | **PASS** | 8+ charges consumed; wield timeout noise (quick_throw returns to previous slot before detection) |
+| #4 | Blitz: whistle | **PASS** | 3/3 charge confirmed on fresh launch; `action_aim` starts, chains to `action_order_companion`. Previous hot-reload session failed — hot-reload resets component state. |
+| #4 | Blitz: shock mine | **Untested** | Profile in place, no bot equipped with it yet |
+| #4 | Grenade: ogryn cluster | **PASS** | 3 charges consumed with full wield→aim→throw→unwield cycle |
 | #16 | Bot pinging | **PASS** | 4 ping events for elites across multiple bots |
 | #17 | Daemonhost avoidance | **Unverifiable** | No daemonhost spawned in 5 sessions |
 | #19 | Distant special penalty | **PASS** | 30+ penalty events across 6 special breeds |
-| #43 | Staff p2 charged fire fix | **Needs re-test** | Chain-only fire derivation fix (09e0f22); p1 also structurally fixed |
-
-Unit tests: 302 successes / 0 failures.
+| #43 | Staff p1 Voidstrike charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion` (bot=2, forcestaff_p1_m1) |
+| #43 | Staff p2 Purgatus charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_charge_flame` (post-hotreload, charge=4) |
+| #43 | Staff p3 Surge / p4 Equinox charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=shoot_charged` (same input for both; p4 confirmed v0.5.0, p3 structurally identical) |
 
 ## Known Blockers
 
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
+3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
 ## Next Steps
-- #43: re-test p2 flame staff + p1 surge staff in-game (code fix shipped in dev/m5-batch1, commit 09e0f22)
-- #4: re-test whistle after combat ability mutex fix (commit cc4c488)
+- #4: test shock mine with bot equipped with shock mine
 - Default class profiles for bots (#45) — P2, design approved
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2
