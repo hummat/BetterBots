@@ -1,4 +1,4 @@
-# Status Snapshot (March 9, 2026)
+# Status Snapshot (March 11, 2026)
 
 ## What's shipped
 
@@ -49,15 +49,28 @@
 - Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
+## M5 Batch Status (dev/m5-batch1)
+
+In-game validation: 2026-03-11, commit a178251.
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #4 | Grenade throw | **PASS** | 7 charges consumed (krak + fire), 0 forced timeouts |
+| #16 | Bot pinging | **PASS** | 4 ping events for elites across multiple bots |
+| #17 | Daemonhost avoidance | **Unverifiable** | No daemonhost spawned in 5 sessions |
+| #19 | Distant special penalty | **PASS** | 30+ penalty events across 6 special breeds |
+
+Unit tests: 293 successes / 0 failures.
+
 ## Known Blockers
 
 1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
+2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 
 ## Next Steps
 - #43: inspect decompiled `forcestaff_p2_m1` action graph, write failing test for p2, then broaden `find_aim_action_for_fire()`
 - Default class profiles for bots (#45) — P2, design approved
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2
-- Investigate grenade/blitz approach (#4) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Objective-aware ability activation (#37) — P2

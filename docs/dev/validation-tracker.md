@@ -430,6 +430,68 @@ Conclusion:
 - #3 closed.
 ```
 
+### Run 2026-03-11-m5batch-01 (M5 batch: grenade, pinging, target selection, daemonhost)
+
+```text
+Run ID: 2026-03-11-m5batch-01
+Date (local): 2026-03-11
+Date (UTC): 2026-03-11
+Git commit: a178251 (dev/m5-batch1)
+Log files:
+  0: console-2026-03-11-17.40.36-...bf048e0d2bd0.log (post wield-block split fix)
+  3: console-2026-03-11-15.23.41-...d75639931113.log
+  4: console-2026-03-11-14.40.45-...c04eb02d483a.log
+Bot lineup / abilities: Veteran (VoC + krak grenade), Zealot (dash + fire grenade),
+  Psyker (Scrier's Gaze + chain lightning), + variable 4th
+Map + difficulty: mission (standard)
+
+#4 Grenade throw evidence:
+- veteran_krak_grenade: PASS
+  - charge consumed: yes (5 in log 0)
+  - forced unwield timeouts: 0
+  - wield lock active: yes (blocked weapon switch during sequence)
+  - key lines: 17:42:38 "grenade charge consumed for veteran_krak_grenade"
+               17:42:38 "grenade throw complete, slot returned to slot_secondary"
+- zealot_fire_grenade: PASS
+  - charge consumed: yes (3 in log 0)
+  - forced unwield timeouts: 0
+  - key lines: 17:42:38 "grenade charge consumed for zealot_fire_grenade"
+               17:42:48 "grenade throw complete, slot returned to slot_secondary"
+- psyker_chain_lightning: correctly blocked (unsupported blitz template)
+
+#16 Bot pinging evidence:
+- PASS
+  - 4 ping events in log 0 for cultist_berzerker (elite)
+  - multiple bots pinging (bot 2, 4, 5)
+  - key lines: 17:43:07 "bot 5 pinged cultist_berzerker (reason: target_enemy)"
+               17:43:11 "bot 4 pinged cultist_berzerker (reason: target_enemy)"
+
+#17 Daemonhost avoidance evidence:
+- UNVERIFIABLE
+  - no daemonhost spawned in any of today's 5 sessions
+  - no dh_suppress events in any log
+
+#19 Distant special penalty evidence:
+- PASS
+  - logs 3-4: 30+ penalty events across chaos_hound, cultist_mutant,
+    renegade_netgunner, renegade_flamer, renegade_grenadier, chaos_poxwalker_bomber
+  - distance range: 324–3567 dist_sq (18–60m)
+  - ammo check working: penalties only when ammo > 0.5
+  - key lines: 15:34:51 "penalizing melee score for distant special renegade_netgunner dist_sq=1721"
+               14:45:19 "penalizing melee score for distant special renegade_netgunner dist_sq=3567"
+
+Regression checks:
+- combat ability activation: PASS (17 fallback queued, 19 consumed in log 0)
+- basic combat loop: PASS
+- Lua errors: 0 error lines
+
+Conclusion:
+- #4 grenade PASS: krak + fire grenades confirmed, full throw cycle with charge consumed
+- #16 pinging PASS: bots ping elites during combat
+- #17 daemonhost: needs a daemonhost encounter to verify (opportunity-dependent)
+- #19 distant specials PASS: penalty firing across 6 special breeds at range
+```
+
 ## Reliability Snapshot (current)
 
 ```text
