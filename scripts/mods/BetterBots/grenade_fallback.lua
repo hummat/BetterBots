@@ -173,6 +173,26 @@ local function _queue_weapon_input(unit, input_name, component)
 	ext:bot_queue_action_input(component or "weapon_action", input_name, nil)
 end
 
+local function _describe_action_component_state(unit, component_name)
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return " (component=" .. tostring(component_name) .. ", template=no_unit_data, action=no_unit_data)"
+	end
+
+	local action_component = unit_data_extension:read_component(component_name)
+	if not action_component then
+		return " (component=" .. tostring(component_name) .. ", template=missing, action=missing)"
+	end
+
+	return " (component="
+		.. tostring(component_name)
+		.. ", template="
+		.. tostring(action_component.template_name)
+		.. ", action="
+		.. tostring(action_component.current_action_name)
+		.. ")"
+end
+
 local function try_queue(unit, blackboard)
 	local fixed_t = _fixed_time()
 
@@ -205,6 +225,31 @@ local function try_queue(unit, blackboard)
 	local wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
 
 	if state.stage == "wield" then
+		if not state.aim_input and _has_confirmed_charge(state, unit) then
+			if wielded_slot == "slot_grenade_ability" then
+				state.stage = "wait_unwield"
+				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+				state.unwield_requested_t = nil
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_auto_fire:" .. tostring(unit),
+						fixed_t,
+						"grenade auto-fire confirmed, waiting for unwield"
+					)
+				end
+			else
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_auto_fire_complete:" .. tostring(unit),
+						fixed_t,
+						"grenade auto-fire complete without stable grenade slot (slot=" .. tostring(wielded_slot) .. ")"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			end
+			return
+		end
+
 		if wielded_slot == "slot_grenade_ability" then
 			if not state.aim_input then
 				-- Auto-fire template: skip aim/throw, go straight to wait_unwield
@@ -302,7 +347,13 @@ local function try_queue(unit, blackboard)
 			state.release_t = fixed_t
 			state.unwield_requested_t = nil
 			if _debug_enabled() then
-				_debug_log("grenade_release:" .. tostring(unit), fixed_t, "grenade queued " .. release)
+				local component_state = state.component and _describe_action_component_state(unit, state.component)
+					or ""
+				_debug_log(
+					"grenade_release:" .. tostring(unit),
+					fixed_t,
+					"grenade queued " .. release .. component_state
+				)
 			end
 		end
 
@@ -316,10 +367,11 @@ local function try_queue(unit, blackboard)
 			if _has_confirmed_charge(state, unit) or fixed_t >= (state.deadline_t or 0) then
 				if _debug_enabled() then
 					local reason = _has_confirmed_charge(state, unit) and "charge confirmed" or "timeout"
+					local component_state = _describe_action_component_state(unit, state.component)
 					_debug_log(
 						"grenade_ability_complete:" .. tostring(unit),
 						fixed_t,
-						"ability blitz complete (" .. reason .. ")"
+						"ability blitz complete (" .. reason .. ")" .. component_state
 					)
 				end
 				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
@@ -467,6 +519,7 @@ local function try_queue(unit, blackboard)
 	state.grenade_name = grenade_name
 	state.aim_input = aim_input
 	state.release_input = release_input
+	state.release_t = nil
 	state.auto_unwield = auto_unwield
 	state.component = component
 
@@ -490,10 +543,18 @@ local function try_queue(unit, blackboard)
 			state.release_t = fixed_t
 		end
 		if _debug_enabled() then
+			local component_state = _describe_action_component_state(unit, component)
 			_debug_log(
 				"grenade_ability_activate:" .. tostring(unit),
 				fixed_t,
-				"ability blitz activated " .. grenade_name .. " on " .. component .. " (rule=" .. tostring(rule) .. ")"
+				"ability blitz activated "
+					.. grenade_name
+					.. " on "
+					.. component
+					.. " (rule="
+					.. tostring(rule)
+					.. ")"
+					.. component_state
 			)
 		end
 	else
@@ -501,6 +562,9 @@ local function try_queue(unit, blackboard)
 		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
 		state.stage = "wield"
 		state.deadline_t = fixed_t + WIELD_TIMEOUT_S
+		if not aim_input then
+			state.release_t = fixed_t
+		end
 		if _debug_enabled() then
 			_debug_log(
 				"grenade_wield:" .. tostring(unit),

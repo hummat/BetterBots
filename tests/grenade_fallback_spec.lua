@@ -8,6 +8,7 @@ local _extensions = {}
 
 -- Recorded action_input calls
 local _recorded_inputs = {}
+local _debug_logs = {}
 
 -- Mock ability_extension
 local _can_use_grenade = true
@@ -34,13 +35,14 @@ local mock_action_input_extension = {
 
 -- Mock unit_data_extension
 local _wielded_slot = "slot_secondary"
+local _component_state_by_name = {}
 
 local mock_unit_data_extension = {
 	read_component = function(_self, component_name)
 		if component_name == "inventory" then
 			return { wielded_slot = _wielded_slot }
 		end
-		return nil
+		return _component_state_by_name[component_name]
 	end,
 }
 
@@ -62,6 +64,7 @@ local _is_suppressed_reason = nil
 
 -- Mock combat ability lock
 local _combat_ability_active = false
+local _debug_enabled_result = false
 
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
@@ -73,6 +76,16 @@ local _last_grenade_charge_event_by_unit = {}
 local unit = "bot_unit_1"
 local blackboard = {}
 
+local function find_debug_log(pattern)
+	for i = 1, #_debug_logs do
+		if string.find(_debug_logs[i].message, pattern, 1, true) then
+			return _debug_logs[i]
+		end
+	end
+
+	return nil
+end
+
 local function reset()
 	_mock_time = 10.0
 	_can_use_grenade = true
@@ -82,9 +95,12 @@ local function reset()
 	_is_suppressed_result = false
 	_is_suppressed_reason = nil
 	_combat_ability_active = false
+	_debug_enabled_result = false
 	_recorded_inputs = {}
+	_debug_logs = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
+	_component_state_by_name = {}
 	blackboard = {}
 
 	_extensions[unit] = {
@@ -95,9 +111,15 @@ local function reset()
 
 	GrenadeFallback.init({
 		mod = { echo = function() end },
-		debug_log = function() end,
+		debug_log = function(key, fixed_t, message)
+			_debug_logs[#_debug_logs + 1] = {
+				key = key,
+				fixed_t = fixed_t,
+				message = message,
+			}
+		end,
 		debug_enabled = function()
-			return false
+			return _debug_enabled_result
 		end,
 		fixed_time = function()
 			return _mock_time
@@ -494,6 +516,67 @@ describe("grenade_fallback", function()
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 		end)
 
+		it("logs grenade ability component state when whistle activates", function()
+			_debug_enabled_result = true
+			_component_state_by_name.grenade_ability_action = {
+				template_name = "adamant_whistle",
+				current_action_name = "none",
+			}
+
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "adamant_whistle" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local log_entry = find_debug_log("ability blitz activated adamant_whistle")
+			assert.truthy(log_entry)
+			assert.truthy(string.find(log_entry.message, "template=adamant_whistle", 1, true))
+			assert.truthy(string.find(log_entry.message, "action=none", 1, true))
+		end)
+
+		it("logs grenade ability component state when whistle times out", function()
+			_debug_enabled_result = true
+			_component_state_by_name.grenade_ability_action = {
+				template_name = "adamant_whistle",
+				current_action_name = "none",
+			}
+
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "adamant_whistle" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_component_state_by_name.grenade_ability_action.current_action_name = "action_aim"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_mock_time = _mock_time + 5.0
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local log_entry = find_debug_log("ability blitz complete (timeout")
+			assert.truthy(log_entry)
+			assert.truthy(string.find(log_entry.message, "template=adamant_whistle", 1, true))
+			assert.truthy(string.find(log_entry.message, "action=action_aim", 1, true))
+		end)
+
 		it("skips aim/throw stages for auto-fire templates", function()
 			GrenadeFallback.wire({
 				build_context = function()
@@ -518,6 +601,34 @@ describe("grenade_fallback", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 			assert.equals(0, #_recorded_inputs) -- no aim/throw inputs queued
+		end)
+
+		it("completes auto-fire item templates on charge confirm without stable grenade slot", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "zealot_throwing_knives" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.record_charge_event(unit, "zealot_throwing_knives", _mock_time)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.05
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(0, #_recorded_inputs)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.truthy(_grenade_state_by_unit[unit].next_try_t)
 		end)
 
 		it("skips wait_throw when release_input is nil", function()
