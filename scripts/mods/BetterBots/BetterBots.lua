@@ -363,6 +363,9 @@ GrenadeFallback.wire({
 	build_context = Heuristics.build_context,
 	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
 	equipped_grenade_ability = _equipped_grenade_ability,
+	is_combat_ability_active = function(unit)
+		return (ItemFallback.should_lock_weapon_switch(unit))
+	end,
 })
 
 local function _should_lock_weapon_switch(unit)

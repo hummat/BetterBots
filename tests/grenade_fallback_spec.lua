@@ -60,6 +60,9 @@ local _heuristic_rule = "grenade_generic"
 local _is_suppressed_result = false
 local _is_suppressed_reason = nil
 
+-- Mock combat ability lock
+local _combat_ability_active = false
+
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
 
@@ -78,6 +81,7 @@ local function reset()
 	_heuristic_rule = "grenade_generic"
 	_is_suppressed_result = false
 	_is_suppressed_reason = nil
+	_combat_ability_active = false
 	_recorded_inputs = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
@@ -118,6 +122,9 @@ local function reset()
 		end,
 		equipped_grenade_ability = function(_u)
 			return mock_ability_extension, { name = "veteran_frag_grenade" }
+		end,
+		is_combat_ability_active = function()
+			return _combat_ability_active
 		end,
 	})
 end
@@ -401,6 +408,12 @@ describe("grenade_fallback", function()
 
 	it("blocks during interaction", function()
 		blackboard = { behavior = { current_interaction_unit = "revive_target" } }
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("defers to combat ability when weapon lock is active", function()
+		_combat_ability_active = true
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(0, #_recorded_inputs)
 	end)

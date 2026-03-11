@@ -17,6 +17,7 @@ local _is_suppressed
 local _build_context
 local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
+local _is_combat_ability_active
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
@@ -391,9 +392,12 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	-- NOTE: No mutual exclusion with AbilityQueue yet. Both state machines run
-	-- independently. In practice the heuristic + cooldown gates make simultaneous
-	-- activation rare, but a shared "ability_in_progress" flag would be cleaner.
+	-- Mutual exclusion: don't start a grenade sequence while the combat ability
+	-- holds the weapon lock — the wield_slot hook would redirect our wield to
+	-- slot_combat_ability and we'd time out. Defer until the combat sequence ends.
+	if _is_combat_ability_active and _is_combat_ability_active(unit) then
+		return
+	end
 
 	local ability_extension, grenade_ability = _equipped_grenade_ability(unit)
 	if not ability_extension or not grenade_ability then
@@ -480,6 +484,7 @@ return {
 		_build_context = refs.build_context
 		_evaluate_grenade_heuristic = refs.evaluate_grenade_heuristic
 		_equipped_grenade_ability = refs.equipped_grenade_ability
+		_is_combat_ability_active = refs.is_combat_ability_active
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,
