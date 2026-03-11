@@ -89,6 +89,16 @@ local function find_aim_input(weapon_template)
 	return nil, nil
 end
 
+local function find_chain_target_action(weapon_template, input_name)
+	for _, action in pairs(weapon_template.actions or {}) do
+		local chain_entry = (action.allowed_chain_actions or {})[input_name]
+		if chain_entry and chain_entry.action_name then
+			return chain_entry.action_name
+		end
+	end
+	return nil
+end
+
 local function find_aim_fire_input(weapon_template)
 	local action_inputs = weapon_template.action_inputs or {}
 
@@ -102,6 +112,7 @@ local function find_aim_fire_input(weapon_template)
 				and first.hold_input == "action_two_hold"
 			then
 				local action_name = find_action_for_input(weapon_template, input_name)
+					or find_chain_target_action(weapon_template, input_name)
 				if action_name then
 					return input_name, action_name
 				end
