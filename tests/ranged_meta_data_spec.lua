@@ -17,6 +17,7 @@ describe("ranged_meta_data", function()
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
 			debug_log = noop_debug_log,
+			debug_enabled = function() return false end,
 		})
 	end)
 
@@ -238,6 +239,56 @@ describe("ranged_meta_data", function()
 			local input, action = RangedMetaData._find_aim_fire_input(t)
 			assert.equals("trigger_explosion", input)
 			assert.equals("action_explode", action)
+		end)
+
+		it("finds chain-only fire input when action has no start_input", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					trigger_charge_flame = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					action_charge_flame = {
+						start_input = "charge_flame",
+						allowed_chain_actions = {
+							trigger_charge_flame = { action_name = "action_shoot_charged_flame" },
+						},
+					},
+					action_shoot_charged_flame = {
+						stop_input = "cancel_flame",
+					},
+				},
+			})
+			local input, action = RangedMetaData._find_aim_fire_input(t)
+			assert.equals("trigger_charge_flame", input)
+			assert.equals("action_shoot_charged_flame", action)
+		end)
+
+		it("prefers direct start_input over chain target", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_charged = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					action_shoot_charged = { start_input = "shoot_charged" },
+					action_charge = {
+						start_input = "charge",
+						allowed_chain_actions = {
+							shoot_charged = { action_name = "action_shoot_charged" },
+						},
+					},
+				},
+			})
+			local input, action = RangedMetaData._find_aim_fire_input(t)
+			assert.equals("shoot_charged", input)
+			assert.equals("action_shoot_charged", action)
 		end)
 
 		it("returns nil when no hold_input entries", function()
@@ -603,6 +654,56 @@ describe("ranged_meta_data", function()
 			-- Other fields unchanged
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
 			assert.equals("rapid_left", template.attack_meta_data.fire_action_name)
+		end)
+
+		it("overrides aim metadata for chain-only charge weapons (#43 p2 flame staff)", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					charge_flame = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					trigger_charge_flame = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+					action_charge_flame = {
+						start_input = "charge_flame",
+						stop_input = "charge_flame_release",
+						allowed_chain_actions = {
+							trigger_charge_flame = { action_name = "action_shoot_charged_flame" },
+						},
+					},
+					action_charge_flame_release = { start_input = "charge_flame_release" },
+					action_shoot_charged_flame = {
+						stop_input = "cancel_flame",
+					},
+				},
+			})
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				fire_action_name = "rapid_left",
+				aim_fire_action_input = "shoot_pressed",
+				aim_fire_action_name = "rapid_left",
+				unaim_action_name = "action_vent",
+			}
+			local templates = { forcestaff_p2 = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("trigger_charge_flame", template.attack_meta_data.aim_fire_action_input)
+			assert.equals("action_shoot_charged_flame", template.attack_meta_data.aim_fire_action_name)
+			assert.equals("charge_flame", template.attack_meta_data.aim_action_input)
+			assert.equals("action_charge_flame", template.attack_meta_data.aim_action_name)
+			assert.equals("charge_flame_release", template.attack_meta_data.unaim_action_input)
+			assert.equals("action_charge_flame_release", template.attack_meta_data.unaim_action_name)
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
 		end)
 
 		it("does not override aim_fire when it already matches hold_input input", function()

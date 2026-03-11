@@ -1,6 +1,7 @@
 local _mod -- luacheck: ignore 231
 local _patched_set
 local _debug_log
+local _debug_enabled
 
 local function resolve_vanilla_fallback(weapon_template)
 	local actions = weapon_template.actions or {}
@@ -88,6 +89,16 @@ local function find_aim_input(weapon_template)
 	return nil, nil
 end
 
+local function find_chain_target_action(weapon_template, input_name)
+	for _, action in pairs(weapon_template.actions or {}) do
+		local chain_entry = (action.allowed_chain_actions or {})[input_name]
+		if chain_entry and chain_entry.action_name then
+			return chain_entry.action_name
+		end
+	end
+	return nil
+end
+
 local function find_aim_fire_input(weapon_template)
 	local action_inputs = weapon_template.action_inputs or {}
 
@@ -101,6 +112,7 @@ local function find_aim_fire_input(weapon_template)
 				and first.hold_input == "action_two_hold"
 			then
 				local action_name = find_action_for_input(weapon_template, input_name)
+					or find_chain_target_action(weapon_template, input_name)
 				if action_name then
 					return input_name, action_name
 				end
@@ -272,19 +284,21 @@ local function inject(WeaponTemplates)
 	end
 
 	_patched_set[WeaponTemplates] = true
-	_debug_log(
-		"ranged_meta_injection:" .. tostring(WeaponTemplates),
-		0,
-		"ranged attack_meta_data patch installed (injected="
-			.. injected
-			.. ", patched="
-			.. patched
-			.. ", charge="
-			.. charge_overrides
-			.. ", skipped="
-			.. skipped
-			.. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"ranged_meta_injection:" .. tostring(WeaponTemplates),
+			0,
+			"ranged attack_meta_data patch installed (injected="
+				.. injected
+				.. ", patched="
+				.. patched
+				.. ", charge="
+				.. charge_overrides
+				.. ", skipped="
+				.. skipped
+				.. ")"
+		)
+	end
 end
 
 return {
@@ -292,6 +306,7 @@ return {
 		_mod = deps.mod
 		_patched_set = deps.patched_weapon_templates
 		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 	end,
 	inject = inject,
 	_resolve_vanilla_fallback = resolve_vanilla_fallback,

@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 230 unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -32,7 +32,16 @@ Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 ## Debugging
 
-See `docs/dev/debugging.md` for full debug tool reference. Key tools:
+Every new feature must include enough `_debug_log` calls to verify correctness from a single in-game session. Not exhaustive or verbose — just sufficient to confirm each code path fires when expected. This logging is **permanent** — it exists to catch regressions and validate working state across releases, not just during initial development. Before marking a feature complete, audit: can you grep `bb-log` output and tell with certainty that it works?
+
+**Writing `_debug_log` calls — mandatory rules:**
+- **Gate expensive reads**: never call `read_component()`, `has_extension()`, or build context strings unless `_debug_enabled()` is true. These run on the hot path every frame.
+- **One-shot dedup for repeated events**: use a weak-keyed set (`setmetatable({}, { __mode = "k" })`) keyed on scratchpad/unit, or a string-keyed set for `combo_key` patterns. Log each unique occurrence once per load, not per frame.
+- **Throttle key convention**: first arg to `_debug_log` is `"feature_tag:" .. discriminator` (e.g. `"may_fire_swap:" .. input_name`). This enables grep-based filtering.
+- **Log the confirmation signal**: the event that proves the feature fired correctly (e.g. "input was swapped", "grenade state transitioned", "target was penalized"), not intermediate state.
+- **Don't log no-ops**: idle paths, false conditions, and expected skips produce no output. Only log when something interesting happened.
+
+See `docs/dev/logging.md` for the full logging architecture, output channels, log line catalog, and analysis tools. See `docs/dev/debugging.md` for debug tool reference. Key tools:
 - **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
@@ -52,7 +61,7 @@ Use project-local tooling configs before handing off changes:
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
-- `make doc-check` → verify doc claims against code (function counts, test counts, issue states)
+- `make doc-check` → verify doc claims against code (heuristic function counts, closed issue state)
 - `make check` → runs all of the above
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
@@ -186,17 +195,16 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 
 **GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
-**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale function counts and test counts automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
+**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
 |---|---|
 | Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
-| Added/removed/moved tests | Per-file test counts in this file + `docs/dev/debugging.md` |
 | Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` |
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
 | Added a new hook or module | `docs/dev/architecture.md` |
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
-| Released a new version (`make release`) | Add changelog entry on Nexus (version + user-facing summary) |
+| Released a new version (`make release`) | Add changelog entry on Nexus (version + summary of user-facing changes) |
 
 ### Doc index by activity
 
@@ -234,6 +242,25 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 5. Decompiled source in `../Darktide-Source-Code/` for field-level verification
 
 Do not write trigger heuristics without first reading the tactics doc for that class.
+
+### No unsourced game knowledge claims
+
+Every factual claim about Darktide mechanics — talent effects, ability interactions, buff values, tree structure, weapon behavior, bot capabilities — must be sourced from a specific file before you state it. If you haven't read the source, you don't know the answer. Say so and go read it.
+
+**Verification chain (in priority order):**
+1. Decompiled source (`../Darktide-Source-Code/`) — ground truth for mechanics, tree structure, buff values
+2. In-repo docs (`docs/knowledge/`, `docs/classes/`) — curated summaries, cross-reference with (1) when uncertain
+3. Mod source (`scripts/mods/BetterBots/`) — ground truth for what BetterBots actually does
+4. Online sources (Games Lantern, wiki, Reddit) — community knowledge, may be wrong or outdated
+
+**Concrete rules:**
+- When analyzing a build: read the class doc, tactics doc, and relevant `buff_templates.md` / `class-talents.md` entries BEFORE writing any assessment. Not after. Not "I'll verify later." Before.
+- When a label or classification comes from scraped/generated data: cross-check it against decompiled source. Scraper heuristics have bugs. Generated labels are hypotheses, not facts.
+- When claiming what BetterBots can or cannot do: read the actual module source. The validation tracker and CLAUDE.md tier table exist for this purpose.
+- When stating a talent is a keystone, modifier, or regular node: verify against the decompiled tree layout file (node `type` field), not against display names or frame shapes.
+- If you haven't verified a claim and can't verify it right now, mark it explicitly: "(unverified)" or "I haven't read the source for this." Never present an unverified guess as fact.
+
+**Why this matters:** Wrong game knowledge propagates. It gets written into docs, shapes heuristic design, and wastes hours of debugging when the assumed behavior doesn't match reality. Reading one file takes seconds. Correcting a cascade of wrong assumptions takes sessions.
 
 ### Full doc listing
 
@@ -285,24 +312,36 @@ Do not write trigger heuristics without first reading the tactics doc for that c
 BetterBots.mod                              # DMF entry point
 bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
-  BetterBots.lua                            # Main: hooks, condition patch, fallback queue
+  BetterBots.lua                            # Main: module wiring, lifecycle hooks, BT hooks
+  condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
+  ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
   heuristics.lua                            # 18 per-template heuristic functions + build_context()
-  meta_data.lua                             # ability_meta_data injection
+  meta_data.lua                             # ability_meta_data injection (Tier 2 templates + Veteran overrides)
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
+  grenade_fallback.lua                      # Grenade throw state machine (wield/aim/throw/unwield)
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
-  melee_meta_data.lua                        # Melee attack_meta_data injection (arc/penetrating classification)
+  melee_meta_data.lua                       # Melee attack_meta_data injection (arc/penetrating classification)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
+  weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
+  target_selection.lua                      # Melee target selection distance penalty for specials
+  ping_system.lua                           # Bot elite/special pinging system
+  poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
+  vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
 tests/
   test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # 122 tests for all 18 heuristic functions
-  meta_data_spec.lua                        # 7 tests for injection/overrides/idempotency
-  resolve_decision_spec.lua                 # 8 tests for nil→fallback paths
-  event_log_spec.lua                        # 10 tests for event buffering/flush/lifecycle
-  sprint_spec.lua                           # 18 tests for sprint conditions + daemonhost safety
-  melee_meta_data_spec.lua                  # 33 tests for melee meta_data classification + injection
-  ranged_meta_data_spec.lua                 # 32 tests for ranged fallback, input derivation, injection + charge override
+  heuristics_spec.lua                       # all 18 heuristic functions + grenade heuristic
+  meta_data_spec.lua                        # injection/overrides/idempotency
+  resolve_decision_spec.lua                 # nil→fallback paths
+  event_log_spec.lua                        # event buffering/flush/lifecycle
+  sprint_spec.lua                           # sprint conditions + daemonhost safety
+  condition_patch_spec.lua                  # DH combat suppression wrappers
+  target_selection_spec.lua                 # melee target distance penalty
+  melee_meta_data_spec.lua                  # melee meta_data classification + injection
+  ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
+  grenade_fallback_spec.lua                 # grenade throw state machine
+  ping_system_spec.lua                      # bot pinging logic
 ```

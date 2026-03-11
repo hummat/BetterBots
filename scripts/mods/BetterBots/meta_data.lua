@@ -1,6 +1,7 @@
 local _mod
 local _patched_set
 local _debug_log
+local _debug_enabled
 local _patch_version
 
 -- Tier 2 templates exist but are missing ability_meta_data.
@@ -140,17 +141,19 @@ local function inject(AbilityTemplates)
 	end
 
 	_patched_set[AbilityTemplates] = true
-	_debug_log(
-		"meta_injection:" .. tostring(AbilityTemplates),
-		0,
-		"ability template metadata patch installed (version="
-			.. _patch_version
-			.. ", injected="
-			.. tostring(injected_count)
-			.. ", overridden="
-			.. tostring(overridden_count)
-			.. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"meta_injection:" .. tostring(AbilityTemplates),
+			0,
+			"ability template metadata patch installed (version="
+				.. _patch_version
+				.. ", injected="
+				.. tostring(injected_count)
+				.. ", overridden="
+				.. tostring(overridden_count)
+				.. ")"
+		)
+	end
 end
 
 return {
@@ -158,6 +161,7 @@ return {
 		_mod = deps.mod
 		_patched_set = deps.patched_ability_templates
 		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 		_patch_version = deps.META_PATCH_VERSION
 	end,
 	inject = inject,

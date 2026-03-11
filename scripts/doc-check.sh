@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verify documentation claims against code and GitHub issue state.
-# Catches stale counts, closed-but-listed-open issues, and phantom percentages.
+# Catches stale heuristic function counts and closed-but-listed-open issues.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,9 +17,8 @@ ok()   { echo "  ok:  $*"; }
 
 actual_heuristic_count=$(grep -c '^local function _can_activate_' scripts/mods/BetterBots/heuristics.lua)
 
-for f in AGENTS.md docs/DEBUGGING.md; do
+for f in AGENTS.md docs/dev/debugging.md; do
   # Match lines like "18 per-template heuristic functions" or "18 `_can_activate_*` heuristic functions"
-  # but NOT "117 tests for all 18 heuristic functions" (avoid test-count lines)
   while IFS= read -r match; do
     claimed=$(echo "$match" | grep -oP '\b\d+(?=\s+(per-template\s+)?heuristic\s+function)')
     if [[ -n "$claimed" && "$claimed" != "$actual_heuristic_count" ]]; then
@@ -30,52 +29,7 @@ done
 
 ok "heuristic function count: $actual_heuristic_count"
 
-# ── 2. Per-file test counts ──────────────────────────────────────────────────
-
-if [ -d tests ]; then
-  total_tests=0
-  for spec in tests/*_spec.lua; do
-    [ -f "$spec" ] || continue
-    base=$(basename "$spec")
-    count=$(grep -cP '^\s*it\(' "$spec")
-    total_tests=$((total_tests + count))
-
-    # Check AGENTS.md and DEBUGGING.md for stale per-file counts
-    for doc in AGENTS.md docs/DEBUGGING.md; do
-      match=$(grep -P "(^|\s)${base}.*#\s*\d+" "$doc" 2>/dev/null || true)
-      if [[ -n "$match" ]]; then
-        claimed=$(echo "$match" | grep -oP '\d+(?=\s+test)')
-        if [[ -n "$claimed" && "$claimed" != "$count" ]]; then
-          err "$doc claims $claimed tests in $base, actual: $count"
-        fi
-      fi
-    done
-  done
-
-  # Check total test count
-  for doc in AGENTS.md docs/STATUS.md; do
-    match=$(grep -oP '\d+(?=\s+unit tests|\s+tests via busted)' "$doc" 2>/dev/null | head -1 || true)
-    if [[ -n "$match" && "$match" != "$total_tests" ]]; then
-      err "$doc claims $match total tests, actual: $total_tests"
-    fi
-  done
-
-  ok "test counts: $total_tests total"
-fi
-
-# ── 3. Stale percentages in docs ─────────────────────────────────────────────
-
-# META_BUILDS_RESEARCH excluded: its ~nn% are community stats, not code claims
-for doc in AGENTS.md docs/STATUS.md docs/ROADMAP.md; do
-  matches=$(grep -nP '~\d+%' "$doc" 2>/dev/null || true)
-  if [[ -n "$matches" ]]; then
-    while IFS= read -r line; do
-      warn "$doc has approximate percentage (may be stale): $line"
-    done <<< "$matches"
-  fi
-done
-
-# ── 4. GitHub issue state vs docs ────────────────────────────────────────────
+# ── 2. GitHub issue state vs docs ────────────────────────────────────────────
 
 # NOTE: In CI, ensure GH_TOKEN or GITHUB_TOKEN is exported for issue state checks.
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -132,7 +86,7 @@ else
   echo " info: gh CLI not available or not authenticated — skipping issue state checks"
 fi
 
-# ── 5. Summary ───────────────────────────────────────────────────────────────
+# ── 3. Summary ───────────────────────────────────────────────────────────────
 
 echo ""
 if ((errors > 0)); then

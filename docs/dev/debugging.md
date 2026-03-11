@@ -53,7 +53,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
-| `suppressed poxburster target` | Bot cleared close-range (<5m) poxburster target (#34) |
+| `suppressed poxburster target (too close)` | Bot cleared close-range (<5m) poxburster `target_enemy` (#34) |
+| `suppressed poxburster opportunity/urgent/priority target` | Bot cleared close-range poxburster from secondary perception slots (#34) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
@@ -169,17 +170,18 @@ The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) create
 ```
 tests/
   test_helper.lua           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua       # 122 tests: all 18 heuristic functions (14 combat + 4 item)
-  meta_data_spec.lua        # 7 tests: injection, overrides, idempotency
-  resolve_decision_spec.lua # 8 tests: centralized nil→fallback paths
-  event_log_spec.lua        # 10 tests: buffer, flush, lifecycle, false-decision compression
-  sprint_spec.lua           # 18 tests: sprint conditions + daemonhost safety
+  heuristics_spec.lua       # all 18 heuristic functions (14 combat + 4 item)
+  meta_data_spec.lua        # injection, overrides, idempotency
+  resolve_decision_spec.lua # centralized nil→fallback paths
+  event_log_spec.lua        # buffer, flush, lifecycle, false-decision compression
+  sprint_spec.lua           # sprint conditions + daemonhost safety
+  target_selection_spec.lua # melee target distance penalty
 ```
 
 ### Running tests
 
 ```bash
-make test      # runs busted (auto-detected) — 160 tests
+make test      # runs busted (auto-detected)
 make check     # runs format + lint + lsp + test (full quality gate)
 ```
 

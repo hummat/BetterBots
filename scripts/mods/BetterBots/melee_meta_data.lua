@@ -1,6 +1,7 @@
 local _mod -- luacheck: ignore 231
 local _patched_set
 local _debug_log
+local _debug_enabled
 local _armored_type
 
 local DEFAULT_MELEE_RANGE = 2.5
@@ -140,11 +141,13 @@ local function inject(WeaponTemplates)
 	end
 
 	_patched_set[WeaponTemplates] = true
-	_debug_log(
-		"melee_meta_injection:" .. tostring(WeaponTemplates),
-		0,
-		"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
-	)
+	if _debug_enabled() then
+		_debug_log(
+			"melee_meta_injection:" .. tostring(WeaponTemplates),
+			0,
+			"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
+		)
+	end
 end
 
 return {
@@ -152,6 +155,7 @@ return {
 		_mod = deps.mod
 		_patched_set = deps.patched_weapon_templates
 		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 		_armored_type = deps.ARMOR_TYPE_ARMORED
 	end,
 	inject = inject,

@@ -9,6 +9,10 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 
+-- One-shot set: each unique bot:template:action:raw_input combo logged once
+-- per load. Mirrors the ability_queue.lua context dump pattern.
+local _weapon_logged_combos = {}
+
 local function _weapon_log_context(unit)
 	local bot_slot = _bot_slot_for_unit(unit) or "?"
 	local wielded_slot = "none"
@@ -40,6 +44,7 @@ end
 
 function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
+	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -90,6 +95,7 @@ function M.register_hooks(deps)
 			-- _fire() dispatches aim_fire_action_input while aiming. Swap only
 			-- for this validation call so ADS/charge weapons validate the input
 			-- they will actually queue.
+			local _may_fire_logged = setmetatable({}, { __mode = "k" })
 			_mod:hook(BtBotShootAction, "_may_fire", function(func, self, unit, scratchpad, range_squared, t)
 				if
 					not scratchpad
@@ -97,6 +103,18 @@ function M.register_hooks(deps)
 					or scratchpad.fire_action_input == scratchpad.aim_fire_action_input
 				then
 					return func(self, unit, scratchpad, range_squared, t)
+				end
+
+				if not _may_fire_logged[scratchpad] and _debug_enabled() then
+					_may_fire_logged[scratchpad] = true
+					_debug_log(
+						"may_fire_swap:" .. tostring(scratchpad.aim_fire_action_input),
+						_fixed_time(),
+						"_may_fire swap: fire="
+							.. tostring(scratchpad.fire_action_input)
+							.. " -> aim_fire="
+							.. tostring(scratchpad.aim_fire_action_input)
+					)
 				end
 
 				local fire_action_input = scratchpad.fire_action_input
@@ -126,20 +144,23 @@ function M.register_hooks(deps)
 				function(func, self, id, action_input, raw_input)
 					local unit = self._betterbots_player_unit
 					if unit and id == "weapon_action" and action_input == "wield" then
-						local should_lock, ability_name, lock_reason = should_lock_weapon_switch(unit)
-						if should_lock then
-							local fixed_t = _fixed_time()
-							_debug_log(
-								"lock_wield:" .. tostring(ability_name),
-								fixed_t,
-								"blocked weapon switch while keeping "
-									.. tostring(ability_name)
-									.. " "
-									.. tostring(lock_reason)
-									.. " (raw_input="
-									.. tostring(raw_input)
-									.. ")"
-							)
+						local should_block, ability_name = should_block_wield_input(unit)
+						if should_block then
+							if _debug_enabled() then
+								local fixed_t = _fixed_time()
+								local _, _, lock_reason = should_lock_weapon_switch(unit)
+								_debug_log(
+									"lock_wield:" .. tostring(ability_name),
+									fixed_t,
+									"blocked weapon switch while keeping "
+										.. tostring(ability_name)
+										.. " "
+										.. tostring(lock_reason or "sequence")
+										.. " (raw_input="
+										.. tostring(raw_input)
+										.. ")"
+								)
+							end
 							return nil
 						end
 					end
@@ -152,11 +173,13 @@ function M.register_hooks(deps)
 						if ude then
 							local tweaks = ude:read_component("weapon_tweak_templates")
 							if tweaks and tweaks.warp_charge_template_name ~= "none" then
-								_debug_log(
-									"vent_translate:" .. tostring(unit),
-									_fixed_time(),
-									"translated reload -> vent (warp weapon)"
-								)
+								if _debug_enabled() then
+									_debug_log(
+										"vent_translate:" .. tostring(unit),
+										_fixed_time(),
+										"translated reload -> vent (warp weapon)"
+									)
+								end
 								action_input = "vent"
 							end
 						end
@@ -169,51 +192,55 @@ function M.register_hooks(deps)
 							if warp and warp.current_percentage >= PERIL_CRITICAL_THRESHOLD then
 								local tweaks = ude:read_component("weapon_tweak_templates")
 								if tweaks and tweaks.warp_charge_template_name ~= "none" then
-									_debug_log(
-										"peril_block:" .. tostring(action_input),
-										_fixed_time(),
-										"blocked "
-											.. tostring(action_input)
-											.. " (peril="
-											.. string.format("%.0f%%", warp.current_percentage * 100)
-											.. ", warp weapon)"
-									)
+									if _debug_enabled() then
+										_debug_log(
+											"peril_block:" .. tostring(action_input),
+											_fixed_time(),
+											"blocked "
+												.. tostring(action_input)
+												.. " (peril="
+												.. string.format("%.0f%%", warp.current_percentage * 100)
+												.. ", warp weapon)"
+										)
+									end
 									return nil
 								end
 							end
 						end
 					end
 
-					-- DIAGNOSTIC (#43): log bot weapon actions (except wield) with
-					-- bot/template tags so charged inputs can be attributed to the
-					-- correct bot and staff family. Remove after validation.
-					if id == "weapon_action" and action_input ~= "wield" then
+					-- #43: log bot weapon actions (except wield) with bot/template
+					-- tags so charged inputs can be attributed to the correct bot
+					-- and staff family. One-shot per unique combo.
+					if id == "weapon_action" and action_input ~= "wield" and _debug_enabled() then
 						local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
 							_weapon_log_context(unit)
-						_debug_log(
-							"bot_weapon:"
-								.. tostring(bot_slot)
-								.. ":"
-								.. tostring(weapon_template_name)
-								.. ":"
-								.. tostring(action_input)
-								.. ":"
-								.. tostring(raw_input),
-							_fixed_time(),
-							"bot weapon: bot="
-								.. tostring(bot_slot)
-								.. " slot="
-								.. tostring(wielded_slot)
-								.. " weapon_template="
-								.. tostring(weapon_template_name)
-								.. " warp_template="
-								.. tostring(warp_charge_template_name)
-								.. " action="
-								.. tostring(action_input)
-								.. " raw_input="
-								.. tostring(raw_input),
-							0
-						)
+						local combo_key = tostring(bot_slot)
+							.. ":"
+							.. tostring(weapon_template_name)
+							.. ":"
+							.. tostring(action_input)
+							.. ":"
+							.. tostring(raw_input)
+						if not _weapon_logged_combos[combo_key] then
+							_weapon_logged_combos[combo_key] = true
+							_debug_log(
+								"bot_weapon:" .. combo_key,
+								_fixed_time(),
+								"bot weapon: bot="
+									.. tostring(bot_slot)
+									.. " slot="
+									.. tostring(wielded_slot)
+									.. " weapon_template="
+									.. tostring(weapon_template_name)
+									.. " warp_template="
+									.. tostring(warp_charge_template_name)
+									.. " action="
+									.. tostring(action_input)
+									.. " raw_input="
+									.. tostring(raw_input)
+							)
+						end
 					end
 
 					return func(self, id, action_input, raw_input)
@@ -230,21 +257,26 @@ function M.register_hooks(deps)
 				PlayerUnitVisualLoadout,
 				"wield_slot",
 				function(func, slot_to_wield, player_unit, t, skip_wield_action)
-					if slot_to_wield ~= "slot_combat_ability" then
-						local should_lock, ability_name, lock_reason = should_lock_weapon_switch(player_unit)
-						if should_lock then
-							local fixed_t = _fixed_time()
-							_debug_log(
-								"lock_wield_direct:" .. tostring(ability_name),
-								fixed_t,
-								"redirected wield_slot("
-									.. tostring(slot_to_wield)
-									.. ") -> slot_combat_ability while keeping "
-									.. tostring(ability_name)
-									.. " "
-									.. tostring(lock_reason)
-							)
-							return func("slot_combat_ability", player_unit, t, skip_wield_action)
+					local should_lock, ability_name, lock_reason, slot_to_keep = should_lock_weapon_switch(player_unit)
+					if should_lock then
+						slot_to_keep = slot_to_keep or "slot_combat_ability"
+						if slot_to_wield ~= slot_to_keep then
+							if _debug_enabled() then
+								local fixed_t = _fixed_time()
+								_debug_log(
+									"lock_wield_direct:" .. tostring(ability_name),
+									fixed_t,
+									"redirected wield_slot("
+										.. tostring(slot_to_wield)
+										.. ") -> "
+										.. tostring(slot_to_keep)
+										.. " while keeping "
+										.. tostring(ability_name)
+										.. " "
+										.. tostring(lock_reason)
+								)
+							end
+							return func(slot_to_keep, player_unit, t, skip_wield_action)
 						end
 					end
 

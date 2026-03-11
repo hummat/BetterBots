@@ -17,6 +17,8 @@ local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
 local _patched_weapon_templates_ranged = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
+local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
+local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_emitted = false
@@ -105,6 +107,11 @@ local function _is_suppressed(unit)
 		return true, "moving_platform"
 	end
 
+	-- #17: daemonhost combat suppression is handled target-specifically in
+	-- condition_patch.lua (melee/ranged suppression when targeting a dormant DH).
+	-- Blanket proximity suppression was removed — it blocked abilities in mixed
+	-- encounters where bots fight other enemies near a sleeping daemonhost.
+
 	return false
 end
 
@@ -120,6 +127,13 @@ local function _equipped_combat_ability_name(unit)
 	local _, combat_ability = _equipped_combat_ability(unit)
 
 	return combat_ability and combat_ability.name or "unknown"
+end
+
+local function _equipped_grenade_ability(unit)
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
+	local grenade_ability = equipped_abilities and equipped_abilities.grenade_ability
+	return ability_extension, grenade_ability
 end
 
 -- Sub-modules
@@ -147,6 +161,9 @@ assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
 assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
 
+local TargetSelection = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_selection")
+assert(TargetSelection, "BetterBots: failed to load target_selection module")
+
 local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
 assert(Poxburster, "BetterBots: failed to load poxburster module")
 
@@ -162,11 +179,18 @@ assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
 local AbilityQueue = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ability_queue")
 assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
 
+local GrenadeFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_fallback")
+assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
+
+local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
+assert(PingSystem, "BetterBots: failed to load ping_system module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
 	patched_ability_templates = _patched_ability_templates,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	META_PATCH_VERSION = META_PATCH_VERSION,
 })
 
@@ -196,6 +220,7 @@ ItemFallback.init({
 Debug.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	equipped_combat_ability_name = _equipped_combat_ability_name,
 	fallback_state_by_unit = _fallback_state_by_unit,
@@ -210,6 +235,7 @@ EventLog.init({
 Sprint.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 })
 
@@ -217,6 +243,7 @@ MeleeMetaData.init({
 	mod = mod,
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 })
 
@@ -224,17 +251,27 @@ RangedMetaData.init({
 	mod = mod,
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+})
+
+TargetSelection.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 })
 
 Poxburster.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 })
 
 VfxSuppression.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 })
 
 WeaponAction.init({
@@ -248,6 +285,7 @@ WeaponAction.init({
 ConditionPatch.init({
 	mod = mod,
 	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	is_suppressed = _is_suppressed,
 	equipped_combat_ability_name = _equipped_combat_ability_name,
@@ -269,6 +307,26 @@ AbilityQueue.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+})
+
+GrenadeFallback.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	event_log = EventLog,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_suppressed = _is_suppressed,
+	grenade_state_by_unit = _grenade_state_by_unit,
+	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+})
+
+PingSystem.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -301,11 +359,43 @@ AbilityQueue.wire({
 	EventLog = EventLog,
 })
 
+GrenadeFallback.wire({
+	build_context = Heuristics.build_context,
+	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
+	equipped_grenade_ability = _equipped_grenade_ability,
+	is_combat_ability_active = function(unit)
+		return (ItemFallback.should_lock_weapon_switch(unit))
+	end,
+})
+
+local function _should_lock_weapon_switch(unit)
+	local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+	if should_lock then
+		return should_lock, ability_name, lock_reason, slot_to_keep
+	end
+
+	return GrenadeFallback.should_lock_weapon_switch(unit)
+end
+
+-- Block BT wield inputs for the full grenade sequence (including wait_unwield).
+-- Separate from should_lock_weapon_switch so the wield_slot redirect can be
+-- lifted in wait_unwield without also letting the BT switch weapons mid-throw.
+local function _should_block_wield_input(unit)
+	local should_lock, ability_name = ItemFallback.should_lock_weapon_switch(unit)
+	if should_lock then
+		return true, ability_name
+	end
+
+	return GrenadeFallback.should_block_wield_input(unit)
+end
+
 -- Register hooks for extracted modules
+TargetSelection.register_hooks()
 Poxburster.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
-	should_lock_weapon_switch = ItemFallback.should_lock_weapon_switch,
+	should_lock_weapon_switch = _should_lock_weapon_switch,
+	should_block_wield_input = _should_block_wield_input,
 })
 ConditionPatch.register_hooks()
 
@@ -360,14 +450,16 @@ mod:hook_require(
 				local action_input = activation_data and activation_data.action_input or "?"
 				local fixed_t = _fixed_time()
 
-				_debug_log(
-					"enter:" .. tostring(ability_component_name) .. ":" .. tostring(action_input),
-					fixed_t,
-					"enter ability node component="
-						.. tostring(ability_component_name)
-						.. " action_input="
-						.. tostring(action_input)
-				)
+				if _debug_enabled() then
+					_debug_log(
+						"enter:" .. tostring(ability_component_name) .. ":" .. tostring(action_input),
+						fixed_t,
+						"enter ability node component="
+							.. tostring(ability_component_name)
+							.. " action_input="
+							.. tostring(action_input)
+					)
+				end
 
 				if EventLog.is_enabled() and unit then
 					local state = _fallback_state_by_unit[unit]
@@ -399,12 +491,39 @@ mod:hook_require(
 -- Charge consume tracking
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
-		if ability_type ~= "combat_ability" then
+		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 			return
 		end
 
 		local player = self._player
 		if not player or player:is_human_controlled() then
+			return
+		end
+
+		if ability_type == "grenade_ability" then
+			local grenade_name = "unknown"
+			local equipped_abilities = self._equipped_abilities
+			local grenade_ability = equipped_abilities and equipped_abilities.grenade_ability
+			if grenade_ability and grenade_ability.name then
+				grenade_name = grenade_ability.name
+			end
+
+			local unit = self._unit
+			if unit then
+				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
+			end
+
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_charge:" .. grenade_name,
+					_fixed_time(),
+					"grenade charge consumed for "
+						.. grenade_name
+						.. " (charges="
+						.. tostring(optional_num_charges or 1)
+						.. ")"
+				)
+			end
 			return
 		end
 
@@ -480,19 +599,21 @@ mod:hook_require(
 			local fixed_t = _fixed_time()
 			local ability_name = _equipped_combat_ability_name(unit)
 			ItemFallback.schedule_retry(unit, fixed_t, ABILITY_STATE_FAIL_RETRY_S)
-			_debug_log(
-				"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
-				fixed_t,
-				"combat ability state transition failed for "
-					.. tostring(ability_name)
-					.. " (wanted="
-					.. tostring(wanted_state_name)
-					.. ", current="
-					.. tostring(current_state_name)
-					.. ", reason="
-					.. tostring(reason)
-					.. "); scheduled fast retry"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
+					fixed_t,
+					"combat ability state transition failed for "
+						.. tostring(ability_name)
+						.. " (wanted="
+						.. tostring(wanted_state_name)
+						.. ", current="
+						.. tostring(current_state_name)
+						.. ", reason="
+						.. tostring(reason)
+						.. "); scheduled fast retry"
+				)
+			end
 		end)
 	end
 )
@@ -559,6 +680,8 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		end
 
 		AbilityQueue.try_queue(unit, blackboard)
+		GrenadeFallback.try_queue(unit, blackboard)
+		PingSystem.update(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
 
 		if EventLog.is_enabled() then
@@ -592,6 +715,9 @@ function mod.on_game_state_changed(status, state)
 		end
 		for unit in pairs(_decision_context_cache_by_unit) do
 			_decision_context_cache_by_unit[unit] = nil
+		end
+		for unit in pairs(_grenade_state_by_unit) do
+			_grenade_state_by_unit[unit] = nil
 		end
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
 		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
