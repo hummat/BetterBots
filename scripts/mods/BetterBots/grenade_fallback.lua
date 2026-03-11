@@ -1,5 +1,7 @@
 -- grenade_fallback.lua — bot blitz/grenade state machine (#4)
--- Wields grenade slot, queues the appropriate input sequence, and returns to previous weapon.
+-- Handles two activation modes:
+--   Item-based grenades: wield grenade slot → aim → throw → unwield (weapon_action component)
+--   Ability-based blitz: queue inputs directly on grenade_ability_action (no slot change)
 -- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
 -- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
@@ -33,12 +35,14 @@ local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
--- Table value: { aim_input, release_input, throw_delay, auto_unwield } for custom input chains.
+-- Table value: { aim_input, release_input, throw_delay, auto_unwield, component } for custom chains.
 --   aim_input:     input to queue after wield (nil = auto-fires, skip to wait_unwield)
 --   release_input: input to queue after throw_delay (nil = skip wait_throw)
 --   throw_delay:   seconds between aim and release (default DEFAULT_THROW_DELAY_S);
 --                  only used when both aim_input and release_input are non-nil
 --   auto_unwield:  engine auto-chains unwield? (default true; false = force immediately)
+--   component:     ActionInputParser component (nil = "weapon_action" with slot wield;
+--                  "grenade_ability_action" = ability-based, no slot change)
 local SUPPORTED_THROW_TEMPLATES = {
 	-- Veteran (standard generator, chain_time=0.1)
 	veteran_frag_grenade = DEFAULT_THROW_DELAY_S,
@@ -67,12 +71,12 @@ local SUPPORTED_THROW_TEMPLATES = {
 	zealot_throwing_knives = {
 		auto_unwield = true,
 	},
-	-- Arbites whistle (companion order: aim_pressed/aim_released, no auto-unwield)
+	-- Arbites whistle (ability-based: fires through grenade_ability_action, no slot wield)
 	adamant_whistle = {
+		component = "grenade_ability_action",
 		aim_input = "aim_pressed",
 		release_input = "aim_released",
 		throw_delay = 0.15,
-		auto_unwield = false,
 	},
 	-- Hive Scum missile launcher (queue shoot_charge, rest auto-chains; DLC-blocked)
 	broker_missile_launcher = {
@@ -92,6 +96,7 @@ local function _reset_state(state, next_try_t)
 	state.aim_input = nil
 	state.release_input = nil
 	state.auto_unwield = nil
+	state.component = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
@@ -153,7 +158,7 @@ local function should_lock_weapon_switch(unit)
 	return true, grenade_name or "grenade_ability", "sequence", "slot_grenade_ability"
 end
 
-local function _queue_weapon_input(unit, input_name)
+local function _queue_weapon_input(unit, input_name, component)
 	local ext = ScriptUnit.has_extension(unit, "action_input_system")
 	if not ext then
 		if _debug_enabled() then
@@ -165,7 +170,7 @@ local function _queue_weapon_input(unit, input_name)
 		end
 		return
 	end
-	ext:bot_queue_action_input("weapon_action", input_name, nil)
+	ext:bot_queue_action_input(component or "weapon_action", input_name, nil)
 end
 
 local function try_queue(unit, blackboard)
@@ -243,7 +248,7 @@ local function try_queue(unit, blackboard)
 	end
 
 	if state.stage == "wait_aim" then
-		if wielded_slot ~= "slot_grenade_ability" then
+		if not state.component and wielded_slot ~= "slot_grenade_ability" then
 			if _debug_enabled() then
 				_debug_log(
 					"grenade_aim_lost_wield:" .. tostring(unit),
@@ -257,7 +262,7 @@ local function try_queue(unit, blackboard)
 
 		if fixed_t >= (state.wait_t or 0) then
 			local aim = state.aim_input or "aim_hold"
-			_queue_weapon_input(unit, aim)
+			_queue_weapon_input(unit, aim, state.component)
 			if state.release_input then
 				state.stage = "wait_throw"
 				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
@@ -277,7 +282,7 @@ local function try_queue(unit, blackboard)
 	end
 
 	if state.stage == "wait_throw" then
-		if wielded_slot ~= "slot_grenade_ability" then
+		if not state.component and wielded_slot ~= "slot_grenade_ability" then
 			if _debug_enabled() then
 				_debug_log(
 					"grenade_throw_lost_wield:" .. tostring(unit),
@@ -291,7 +296,7 @@ local function try_queue(unit, blackboard)
 
 		if fixed_t >= (state.wait_t or 0) then
 			local release = state.release_input or "aim_released"
-			_queue_weapon_input(unit, release)
+			_queue_weapon_input(unit, release, state.component)
 			state.stage = "wait_unwield"
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 			state.release_t = fixed_t
@@ -305,6 +310,23 @@ local function try_queue(unit, blackboard)
 	end
 
 	if state.stage == "wait_unwield" then
+		-- Ability-based blitz: no slot change occurred, no unwield needed.
+		-- Just wait for charge confirmation or timeout, then reset.
+		if state.component then
+			if _has_confirmed_charge(state, unit) or fixed_t >= (state.deadline_t or 0) then
+				if _debug_enabled() then
+					local reason = _has_confirmed_charge(state, unit) and "charge confirmed" or "timeout"
+					_debug_log(
+						"grenade_ability_complete:" .. tostring(unit),
+						fixed_t,
+						"ability blitz complete (" .. reason .. ")"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			end
+			return
+		end
+
 		if wielded_slot ~= "slot_grenade_ability" then
 			if _debug_enabled() then
 				_debug_log(
@@ -416,7 +438,7 @@ local function try_queue(unit, blackboard)
 	end
 
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
-	local aim_input, release_input, throw_delay, auto_unwield
+	local aim_input, release_input, throw_delay, auto_unwield, component
 	if type(template_entry) == "number" then
 		aim_input = "aim_hold"
 		release_input = "aim_released"
@@ -427,6 +449,7 @@ local function try_queue(unit, blackboard)
 		release_input = template_entry.release_input
 		throw_delay = template_entry.throw_delay or DEFAULT_THROW_DELAY_S
 		auto_unwield = template_entry.auto_unwield ~= false -- default true
+		component = template_entry.component
 	end
 
 	local context = _build_context(unit, blackboard)
@@ -440,22 +463,51 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
-
-	state.stage = "wield"
-	state.deadline_t = fixed_t + WIELD_TIMEOUT_S
 	state.throw_delay = throw_delay
 	state.grenade_name = grenade_name
 	state.aim_input = aim_input
 	state.release_input = release_input
 	state.auto_unwield = auto_unwield
+	state.component = component
 
-	if _debug_enabled() then
-		_debug_log(
-			"grenade_wield:" .. tostring(unit),
-			fixed_t,
-			"grenade queued wield for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
-		)
+	if component then
+		-- Ability-based blitz: queue aim input directly on the ability component.
+		-- No slot wield needed — the ability fires from any weapon slot.
+		if aim_input then
+			action_input_extension:bot_queue_action_input(component, aim_input, nil)
+			if release_input then
+				state.stage = "wait_throw"
+				state.wait_t = fixed_t + (throw_delay or DEFAULT_THROW_DELAY_S)
+			else
+				state.stage = "wait_unwield"
+				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+				state.release_t = fixed_t
+			end
+		else
+			-- Ability-based auto-fire: just wait for charge confirmation
+			state.stage = "wait_unwield"
+			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+			state.release_t = fixed_t
+		end
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_ability_activate:" .. tostring(unit),
+				fixed_t,
+				"ability blitz activated " .. grenade_name .. " on " .. component .. " (rule=" .. tostring(rule) .. ")"
+			)
+		end
+	else
+		-- Item-based grenade: wield the grenade slot first.
+		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
+		state.stage = "wield"
+		state.deadline_t = fixed_t + WIELD_TIMEOUT_S
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_wield:" .. tostring(unit),
+				fixed_t,
+				"grenade queued wield for " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
+			)
+		end
 	end
 end
 
