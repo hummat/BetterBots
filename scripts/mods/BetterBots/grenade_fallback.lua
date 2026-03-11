@@ -28,12 +28,13 @@ local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exc
 -- Same cooldown for success and failure; split if tuning requires it.
 local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
--- Maps player-ability names → throw delay (seconds after aim_hold before aim_released).
--- grenade_ability.name returns the player-ability key (e.g. "veteran_frag_grenade"),
--- NOT the raw template name. Values derived from weapon template chain_time for aim_released:
--- standard generator default = 0.1s, handleless = 0.8s, plus per-template overrides.
--- Blitz abilities (knives, chain lightning, smite, whistle, mine, missile)
--- have different input chains and must NOT enter this state machine.
+-- Maps player-ability names → throw profile.
+-- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
+-- Table value: { aim_input, release_input, throw_delay, auto_unwield } for custom input chains.
+--   aim_input:     input to queue after wield (nil = auto-fires, skip to wait_unwield)
+--   release_input: input to queue after throw_delay (nil = skip wait_throw)
+--   throw_delay:   seconds between aim and release (default DEFAULT_THROW_DELAY_S)
+--   auto_unwield:  engine auto-chains unwield? (default true; false = force immediately)
 local SUPPORTED_THROW_TEMPLATES = {
 	-- Veteran (standard generator, chain_time=0.1)
 	veteran_frag_grenade = DEFAULT_THROW_DELAY_S,
@@ -56,6 +57,8 @@ local SUPPORTED_THROW_TEMPLATES = {
 	broker_flash_grenade = 1.0,
 	broker_flash_grenade_improved = 1.0,
 	broker_tox_grenade = DEFAULT_THROW_DELAY_S,
+	-- Arbites shock mine (mine generator, aim_hold chain_time=0.8)
+	adamant_shock_mine = 1.0,
 }
 
 local function _reset_state(state, next_try_t)
@@ -66,6 +69,9 @@ local function _reset_state(state, next_try_t)
 	state.grenade_name = nil
 	state.release_t = nil
 	state.unwield_requested_t = nil
+	state.aim_input = nil
+	state.release_input = nil
+	state.auto_unwield = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
@@ -337,12 +343,23 @@ local function try_queue(unit, blackboard)
 
 	local grenade_name = grenade_ability.name or "unknown"
 
-	-- Only enter the aim_hold/aim_released flow for standard+handleless grenades.
-	-- Blitz abilities (knives, smite, chain lightning, mine, whistle, missile)
-	-- have different input chains and would get wrong inputs from this state machine.
-	local throw_delay = SUPPORTED_THROW_TEMPLATES[grenade_name]
-	if not throw_delay then
+	local template_entry = SUPPORTED_THROW_TEMPLATES[grenade_name]
+	if not template_entry then
 		return
+	end
+
+	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
+	local aim_input, release_input, throw_delay, auto_unwield
+	if type(template_entry) == "number" then
+		aim_input = "aim_hold"
+		release_input = "aim_released"
+		throw_delay = template_entry
+		auto_unwield = true
+	else
+		aim_input = template_entry.aim_input
+		release_input = template_entry.release_input
+		throw_delay = template_entry.throw_delay or DEFAULT_THROW_DELAY_S
+		auto_unwield = template_entry.auto_unwield ~= false -- default true
 	end
 
 	local context = _build_context(unit, blackboard)
@@ -362,6 +379,9 @@ local function try_queue(unit, blackboard)
 	state.deadline_t = fixed_t + WIELD_TIMEOUT_S
 	state.throw_delay = throw_delay
 	state.grenade_name = grenade_name
+	state.aim_input = aim_input
+	state.release_input = release_input
+	state.auto_unwield = auto_unwield
 
 	if _debug_enabled() then
 		_debug_log(

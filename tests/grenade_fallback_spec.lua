@@ -430,4 +430,25 @@ describe("grenade_fallback", function()
 			assert.equals(5.0, _last_grenade_charge_event_by_unit[unit].fixed_t)
 		end)
 	end)
+
+	describe("profile-driven blitz templates", function()
+		it("treats number entries as default aim_hold/aim_released profile", function()
+			-- Wire with shock_mine (number entry = same as standard grenades)
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "adamant_shock_mine" }
+				end,
+			})
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+		end)
+	end)
 end)
