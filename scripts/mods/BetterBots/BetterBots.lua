@@ -26,6 +26,11 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
+local _perf_enabled = false
+local _perf_total_s = 0.0
+local _perf_calls = 0
+local _perf_report_t = 0.0
+local PERF_INTERVAL_S = 10
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
@@ -708,10 +713,28 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			end
 		end
 
+		local _t0 = _perf_enabled and os.clock()
 		AbilityQueue.try_queue(unit, blackboard)
 		GrenadeFallback.try_queue(unit, blackboard)
 		PingSystem.update(unit, blackboard)
 		EventLog.try_flush(_fixed_time())
+		if _t0 then
+			_perf_total_s = _perf_total_s + (os.clock() - _t0)
+			_perf_calls = _perf_calls + 1
+			local now = _fixed_time()
+			if now - _perf_report_t >= PERF_INTERVAL_S then
+				mod:echo(
+					string.format(
+						"bb-perf: %.1f µs/bot/frame avg (%d samples)",
+						_perf_total_s / _perf_calls * 1e6,
+						_perf_calls
+					)
+				)
+				_perf_total_s = 0.0
+				_perf_calls = 0
+				_perf_report_t = now
+			end
+		end
 
 		if EventLog.is_enabled() then
 			local fixed_t = _fixed_time()
@@ -735,6 +758,14 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			end
 		end
 	end)
+end)
+
+mod:command("bb_perf", "Toggle per-frame timing for BetterBots update work", function()
+	_perf_enabled = not _perf_enabled
+	_perf_total_s = 0.0
+	_perf_calls = 0
+	_perf_report_t = _fixed_time()
+	mod:echo("BetterBots perf timing: " .. (_perf_enabled and "ON — reporting every 10s" or "OFF"))
 end)
 
 function mod.on_game_state_changed(status, state)
