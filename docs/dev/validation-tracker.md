@@ -712,6 +712,32 @@ Conclusion:
 1. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
    - Covers: `broker_focus`, `broker_punk_rage`
 
+## dev/m5-batch2 Test Plan
+
+Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+
+### Features under test
+
+| Issue | Feature | What to verify |
+|-------|---------|---------------|
+| #40 | Tiered log levels | Off→silent; Info→patches only; Debug→decisions; Trace→sprint/suppression per-frame |
+| #15 | Dodge suppression | Research-only — close if audit confirms no interaction |
+| #34 | Poxburster targeting | Bots shoot at range, suppress when poxburster near human player |
+| #16 | Ping anti-spam | Tag holds on one elite until death; no flipping; closer elite triggers escalation |
+| #18 | Boss engagement | Vanilla deprioritization preserved; bot fights back when boss targets it |
+| #21 | Hazard abilities | Defensive ability (relic/shout) in fire/gas; Castigator's Stance suppressed in hazard |
+| #39 | Healing deferral | Bot defers health station/med-crate/pickup to human; emergency override at <25% bot HP |
+| #4 | Grenade heuristics | Krak→elite only; frag→horde 4+; smoke/shock→overwhelmed; psyker blitz channels with peril gate |
+
+### Pre-test checklist
+
+- [ ] All feature branches merged to `dev/m5-batch2`
+- [ ] `make check` PASS on merged branch
+- [ ] Bot loadouts cover: standard grenades, krak, smoke, throwing knives, psyker blitz, whistle
+- [ ] Mod settings: test each log level setting
+- [ ] Mission with mixed enemies (horde + elites + specials) for grenade heuristic validation
+- [ ] Mission with hazard zones (fire/gas) for #21 validation
+
 **New issue discovered in H-02b:**
 
 Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while active, and without Venting Shriek (different ability slot) the bot has no way to vent. The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance. Needs investigation — possible mitigations:

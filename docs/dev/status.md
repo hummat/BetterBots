@@ -81,8 +81,24 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
-## Next Steps
-- #4: test shock mine with bot equipped with shock mine
+## In Progress: dev/m5-batch2
+
+Target: v0.6.1+ (8 features, batch testing)
+
+| Issue | Feature | Scope | Status |
+|-------|---------|-------|--------|
+| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag 90 `_debug_log` calls | Planned |
+| #15 | Dodge suppression audit | Research whether dodge interrupts abilities; likely close as not-a-bug | Planned |
+| #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Planned |
+| #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Planned |
+| #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Planned |
+| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Planned |
+| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Planned |
+| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Planned |
+
+Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+
+## Next Steps (after batch2)
 - Default class profiles for bots (#45) — P2, design approved
 - Per-ability toggle settings (#6) — P2
 - Weapon/enemy-aware ADS (#41) — P2

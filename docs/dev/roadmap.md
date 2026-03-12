@@ -119,4 +119,5 @@ See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics
 3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
 4. **M4 (shipped v0.5.0):** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30), staff charged fire (#43 partial — p4 only).
 5. **M5 (shipped v0.6.0):** Scope expansion — grenade/blitz support (#4), staff charged fire complete (#43), bot pinging (#16), daemonhost avoidance (#17), distant special penalty (#19).
-6. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
+6. **M5-batch2 (in progress):** Grenade heuristics + psyker blitz (#4), ping anti-spam (#16), poxburster human proximity (#34), hazard-aware abilities (#21), boss engagement (#18), dodge suppression audit (#15), tiered log levels (#40), healing deferral (#39).
+7. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
