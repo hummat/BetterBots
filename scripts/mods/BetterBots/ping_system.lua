@@ -8,8 +8,10 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 
-local PING_COOLDOWN_S = 2.0
-local _last_ping_t_by_bot = setmetatable({}, { __mode = "k" })
+local PING_FAILURE_BACKOFF_S = 2.0
+local DISTANCE_ESCALATION_RATIO = 0.5
+local _last_ping_failure_t_by_bot = setmetatable({}, { __mode = "k" })
+local _last_tagged_by_bot = setmetatable({}, { __mode = "k" })
 local _missing_los_method_warned = false
 
 function M.init(deps)
@@ -43,14 +45,66 @@ local PING_SLOTS = {
 	"target_enemy",
 }
 
+local function _distance_sq_between_units(unit, target_unit)
+	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
+	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
+	local distance_squared = Vector3 and Vector3.distance_squared or nil
+
+	if not (unit_position and target_position and distance_squared) then
+		return nil
+	end
+
+	return distance_squared(unit_position, target_position)
+end
+
+local function _is_in_any_ping_slot(perception, target_unit)
+	if not (perception and target_unit) then
+		return false
+	end
+
+	for i = 1, #PING_SLOTS do
+		if perception[PING_SLOTS[i]] == target_unit then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _should_hold_last_tag(unit, perception, candidate_unit, candidate_distance_sq)
+	local last_tag = _last_tagged_by_bot[unit]
+	if not (last_tag and last_tag.target and Unit.alive(last_tag.target)) then
+		return false
+	end
+
+	local target_extension = ScriptUnit.has_extension(last_tag.target, "smart_tag_system")
+	local still_tagged = target_extension and target_extension:tag_id() or nil
+	local still_perceived = _is_in_any_ping_slot(perception, last_tag.target)
+
+	if not still_tagged and not still_perceived then
+		return false
+	end
+
+	if
+		candidate_unit
+		and candidate_unit ~= last_tag.target
+		and candidate_distance_sq
+		and last_tag.distance_sq
+		and candidate_distance_sq < last_tag.distance_sq * DISTANCE_ESCALATION_RATIO
+	then
+		return false
+	end
+
+	return true
+end
+
 function M.update(unit, blackboard)
 	if not _fixed_time then
 		return
 	end
 	local fixed_t = _fixed_time()
-	local last_ping_t = _last_ping_t_by_bot[unit] or -PING_COOLDOWN_S
-
-	if fixed_t - last_ping_t < PING_COOLDOWN_S then
+	local last_failure_t = _last_ping_failure_t_by_bot[unit]
+	if last_failure_t and fixed_t - last_failure_t < PING_FAILURE_BACKOFF_S then
 		return
 	end
 
@@ -61,6 +115,7 @@ function M.update(unit, blackboard)
 
 	local target_unit
 	local reason
+	local target_distance_sq
 
 	for i = 1, #PING_SLOTS do
 		local slot_name = PING_SLOTS[i]
@@ -90,6 +145,7 @@ function M.update(unit, blackboard)
 				if has_los then
 					target_unit = candidate
 					reason = slot_name
+					target_distance_sq = _distance_sq_between_units(unit, candidate)
 					break
 				end
 			end
@@ -97,6 +153,10 @@ function M.update(unit, blackboard)
 	end
 
 	if not target_unit then
+		return
+	end
+
+	if _should_hold_last_tag(unit, perception, target_unit, target_distance_sq) then
 		return
 	end
 
@@ -115,8 +175,15 @@ function M.update(unit, blackboard)
 	-- Wrap in pcall to prevent crash loops if the engine call fails.
 	local success, err = pcall(smart_tag_system.set_contextual_unit_tag, smart_tag_system, unit, target_unit)
 
-	-- Update cooldown timestamp unconditionally to prevent retry-on-crash loops.
-	_last_ping_t_by_bot[unit] = fixed_t
+	if success then
+		_last_tagged_by_bot[unit] = {
+			target = target_unit,
+			distance_sq = target_distance_sq,
+		}
+		_last_ping_failure_t_by_bot[unit] = nil
+	else
+		_last_ping_failure_t_by_bot[unit] = fixed_t
+	end
 
 	if _debug_enabled() then
 		local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
