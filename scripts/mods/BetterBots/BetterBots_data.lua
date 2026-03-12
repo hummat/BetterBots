@@ -86,6 +86,11 @@ return {
 				type = "checkbox",
 				default_value = false,
 			},
+			{
+				setting_id = "enable_perf_timing",
+				type = "checkbox",
+				default_value = false,
+			},
 		},
 	},
 }

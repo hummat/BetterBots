@@ -86,4 +86,7 @@ return {
 	enable_event_log = {
 		en = "Enable event log (JSONL)",
 	},
+	enable_perf_timing = {
+		en = "Enable per-frame timing (use /bb_perf to read)",
+	},
 }
