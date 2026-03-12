@@ -56,30 +56,39 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 ## Key BetterBots log lines
 
 - `BetterBots loaded`
-- `BetterBots DEBUG: logging enabled (force=...)`
+- `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
-- `decision ... -> true` (BT condition path activation — only `true` results are logged)
+- `decision ... -> true` (BT condition path activation — includes `hazard=<true|false>` in the debug line)
 - `enter ability node ...`
 - `fallback queued ...` (template fallback queued)
 - `fallback held ...` (heuristic withheld ability — only logged when `num_nearby > 0`)
 - `fallback blocked ...` (template fallback rejected)
-- `fallback item queued ...` (item fallback queued wield/cast/unwield input)
+- `fallback item queued ... (rule=...)` (item fallback queued wield/cast/unwield input with triggering rule)
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
+- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
 - `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
+- `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
 - `grenade throw complete, slot returned to <slot>` (grenade sequence fully completed)
 - `grenade forced unwield_to_previous on timeout` (cleanup fallback; indicates normal post-throw unwind did not complete)
+- `grenade released cleanup lock without explicit unwield (charge confirmed|timeout)` (templates such as Psyker blitz unwind via normal `wield`, not `unwield_to_previous`)
+- `grenade released cleanup lock without explicit unwield (action confirmed)` (external cleanup templates saw their target action, so BetterBots ends the protected sequence immediately)
+- `grenade released cleanup lock without explicit unwield (slot changed)` (external cleanup templates left grenade slot through the engine's normal unwind; BetterBots treats that as success)
+- `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
+- `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
+- `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)
+- `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
 
 ## Intentionally suppressed (noise reduction)
 
@@ -107,6 +116,17 @@ The following were removed/throttled to reduce chat spam during testing:
 
 Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every feature's logs must survive across releases to catch regressions and validate working state. Never mark logs as "remove after validation."
 
+### Log levels
+
+`enable_debug_logs` is a dropdown in DMF options:
+
+- `Off` — no `_debug_log` output
+- `Info` — one-shot patches and confirmations only
+- `Debug` — default diagnostic level for ability decisions and state changes
+- `Trace` — includes per-frame diagnostics such as sprint traces
+
+Poxburster suppression confirmations are logged at `Debug`, not `Trace`, so normal validation runs can confirm that path.
+
 ### Rules
 
 1. **Gate expensive reads behind `_debug_enabled()`**. `read_component()`, `has_extension()`, and string concatenation run on the hot path (multiple bots, every frame). Only pay that cost when debug mode is on.
@@ -115,7 +135,7 @@ Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every 
    - **Weak-keyed set** for object-keyed dedup (scratchpad, unit): `local _logged = setmetatable({}, { __mode = "k" })`. Entries auto-clear when the key is GC'd (e.g. scratchpad recycled between missions).
    - **String-keyed set** for combo dedup: `local _logged_combos = {}`. Build a key like `bot_slot .. ":" .. template .. ":" .. action` and skip if already seen. Use this when the discriminator is a value, not an object reference.
 
-3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
+3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg, interval, level)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
 
 4. **Log the confirmation signal**. Each feature should log the event that proves it fired correctly:
    - State machine transition → log the new state and trigger
@@ -193,6 +213,8 @@ Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)
 ### Correlation
 
 Events carry `attempt_id` (monotonic per session) to link decision → queued → consumed chains. `bot` field is the player slot index.
+
+`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation.
 
 ### Analysis
 

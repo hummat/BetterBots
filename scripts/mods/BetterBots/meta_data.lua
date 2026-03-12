@@ -151,7 +151,9 @@ local function inject(AbilityTemplates)
 				.. tostring(injected_count)
 				.. ", overridden="
 				.. tostring(overridden_count)
-				.. ")"
+				.. ")",
+			nil,
+			"info"
 		)
 	end
 end

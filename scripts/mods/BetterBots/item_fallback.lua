@@ -17,6 +17,7 @@ local _build_context
 local _context_snapshot
 local _fallback_state_snapshot
 local _evaluate_item_heuristic
+local _is_item_ability_enabled
 
 local function _emit_item_event(event_type, unit, ability_name, state, fixed_t, extra)
 	if not _event_log or not _event_log.is_enabled() then
@@ -28,6 +29,7 @@ local function _emit_item_event(event_type, unit, ability_name, state, fixed_t, 
 		event = event_type,
 		bot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
 		ability = ability_name,
+		rule = state.item_rule,
 		stage = state.item_stage,
 		profile = state.item_profile_name,
 		attempt_id = state.attempt_id,
@@ -149,6 +151,7 @@ local function _reset_item_sequence_state(state, next_try_t)
 	state.item_unwield_input = nil
 	state.item_unwield_delay = nil
 	state.item_charge_confirm_timeout = nil
+	state.item_rule = nil
 
 	if next_try_t then
 		state.next_try_t = next_try_t
@@ -295,6 +298,16 @@ local function schedule_retry(unit, fixed_t, retry_delay_s)
 	end
 end
 
+local function _interaction_pending_or_active(unit_data_extension)
+	local interaction_component = unit_data_extension:read_component("interaction")
+
+	-- Character-state interaction entry requests slot_unarmed before the
+	-- full interacting state is settled. Treat any live target as protected
+	-- so relic slot locking cannot override that transition and crash the
+	-- interaction state machine.
+	return interaction_component and interaction_component.target_unit ~= nil
+end
+
 local function should_lock_weapon_switch(unit)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
@@ -303,6 +316,10 @@ local function should_lock_weapon_switch(unit)
 
 	local inventory_component = unit_data_extension:read_component("inventory")
 	if not inventory_component or inventory_component.wielded_slot ~= "slot_combat_ability" then
+		return false
+	end
+
+	if _interaction_pending_or_active(unit_data_extension) then
 		return false
 	end
 
@@ -384,7 +401,13 @@ local function _queue_item_start_input(unit, ability_name, state, fixed_t, black
 		_debug_log(
 			"fallback_item_start:" .. ability_name,
 			fixed_t,
-			"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_start_input)
+			"fallback item queued "
+				.. ability_name
+				.. " input="
+				.. tostring(state.item_start_input)
+				.. " (rule="
+				.. tostring(state.item_rule)
+				.. ")"
 		)
 	end
 
@@ -447,6 +470,10 @@ local function _current_weapon_supports_action_input(unit_data_extension, Weapon
 end
 
 local function can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+	if _is_item_ability_enabled and not _is_item_ability_enabled(ability_name) then
+		return false, "item_disabled"
+	end
+
 	if not ability_extension:can_use_ability("combat_ability") then
 		return false, "item_cooldown_not_ready"
 	end
@@ -476,9 +503,11 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	end
 
 	if not state.item_stage then
-		if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
+		local can_use, rule = can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+		if not can_use then
 			return
 		end
+		state.item_rule = rule
 	end
 
 	local inventory_component = unit_data_extension:read_component("inventory")
@@ -501,6 +530,8 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					.. ability_name
 					.. " (profile="
 					.. tostring(state.item_profile_name)
+					.. ", rule="
+					.. tostring(state.item_rule)
 					.. ")"
 			)
 		end
@@ -869,6 +900,7 @@ return {
 		_context_snapshot = refs.context_snapshot
 		_fallback_state_snapshot = refs.fallback_state_snapshot
 		_evaluate_item_heuristic = refs.evaluate_item_heuristic
+		_is_item_ability_enabled = refs.is_item_ability_enabled
 	end,
 	try_queue_item = try_queue_item,
 	can_use_item_fallback = can_use_item_fallback,

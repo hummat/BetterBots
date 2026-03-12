@@ -2,6 +2,7 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _perf
 
 local SPRINT_FOLLOW_DISTANCE = 12
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
@@ -169,6 +170,7 @@ local function _should_sprint(self, unit, _input)
 end
 
 local function on_update_movement(func, self, unit, input, dt, t)
+	local perf_t0 = _perf and _perf.begin()
 	func(self, unit, input, dt, t)
 
 	local should, reason = _should_sprint(self, unit, input)
@@ -192,7 +194,9 @@ local function on_update_movement(func, self, unit, input, dt, t)
 				_debug_log(
 					"sprint:" .. tostring(unit),
 					fixed_t,
-					"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")"
+					"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")",
+					nil,
+					"trace"
 				)
 			end
 		end
@@ -200,6 +204,10 @@ local function on_update_movement(func, self, unit, input, dt, t)
 				and (reason == "catch_up" or reason == "ally_rescue" or reason == "daemonhost_nearby")
 				and reason
 			or nil
+	end
+
+	if perf_t0 then
+		_perf.finish("sprint.update_movement", perf_t0)
 	end
 end
 
@@ -210,6 +218,7 @@ Sprint.init = function(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
+	_perf = deps.perf
 end
 
 Sprint.register_hook = function()

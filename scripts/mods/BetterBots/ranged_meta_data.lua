@@ -296,7 +296,9 @@ local function inject(WeaponTemplates)
 				.. charge_overrides
 				.. ", skipped="
 				.. skipped
-				.. ")"
+				.. ")",
+			nil,
+			"info"
 		)
 	end
 end

@@ -2,6 +2,65 @@ local _fixed_time
 local _decision_context_cache
 local _super_armor_breed_cache
 local _armor_type_super_armor
+local _is_testing_profile
+local HAZARD_TEMPLATE_TOKENS = {
+	fire = true,
+	gas = true,
+	toxic = true,
+	corrupt = true,
+	slime = true,
+}
+
+local function _is_hazardous_liquid_area(liquid_area)
+	if not liquid_area then
+		return false
+	end
+
+	local source_side_name = liquid_area.source_side_name and liquid_area:source_side_name()
+	if source_side_name == "heroes" then
+		return false
+	end
+
+	local area_template_name = liquid_area.area_template_name and liquid_area:area_template_name()
+	if not area_template_name then
+		return source_side_name ~= nil
+	end
+
+	for token, _ in pairs(HAZARD_TEMPLATE_TOKENS) do
+		if string.find(area_template_name, token, 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _position_in_hostile_hazard(position)
+	local extension_manager = Managers and Managers.state and Managers.state.extension
+	if not extension_manager or not position then
+		return false
+	end
+
+	local liquid_area_system = extension_manager:system("liquid_area_system")
+	if not liquid_area_system then
+		return false
+	end
+
+	if liquid_area_system.find_liquid_areas_in_position then
+		local overlapping_liquids = {}
+		liquid_area_system:find_liquid_areas_in_position(position, overlapping_liquids)
+
+		for i = 1, #overlapping_liquids do
+			if _is_hazardous_liquid_area(overlapping_liquids[i]) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	return liquid_area_system.is_position_in_liquid and liquid_area_system:is_position_in_liquid(position) or false
+end
 
 local function _is_tagged(tags, tag_name)
 	return tags and tags[tag_name] == true
@@ -85,7 +144,13 @@ local function build_context(unit, blackboard)
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
+		in_hazard = false,
 	}
+
+	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit]
+	if unit_position then
+		context.in_hazard = _position_in_hostile_hazard(unit_position)
+	end
 
 	local perception_component = blackboard and blackboard.perception
 	if perception_component then
@@ -233,6 +298,9 @@ local function _can_activate_veteran_combat_ability(
 )
 	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
 	if class_tag == "squad_leader" then
+		if context.in_hazard and context.num_nearby >= 1 then
+			return true, "veteran_voc_hazard"
+		end
 		if context.num_nearby >= 3 then
 			return true, "veteran_voc_surrounded"
 		end
@@ -600,6 +668,9 @@ local function _can_activate_broker_rage(context)
 end
 
 local function _can_activate_zealot_relic(context)
+	if context.in_hazard and context.num_nearby >= 1 then
+		return true, "zealot_relic_hazard"
+	end
 	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
 		return false, "zealot_relic_block_overwhelmed"
 	end
@@ -729,7 +800,203 @@ local ITEM_HEURISTICS = {
 	broker_ability_stimm_field = _can_activate_stimm_field,
 }
 
-local GRENADE_HEURISTICS = {}
+local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix)
+	if context.num_nearby >= min_nearby and context.challenge_rating_sum >= min_challenge then
+		return true, rule_prefix .. "_horde"
+	end
+
+	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_priority_target(context, rule_prefix, opts)
+	opts = opts or {}
+
+	if opts.max_peril and context.peril_pct and context.peril_pct >= opts.max_peril then
+		return false, rule_prefix .. "_block_peril"
+	end
+
+	if opts.block_super_armor and context.target_is_super_armor then
+		return false, rule_prefix .. "_block_super_armor"
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local min_distance = opts.min_distance or 0
+	local has_priority_target = context.target_is_monster
+		or context.target_is_elite_special
+		or context.priority_target_enemy ~= nil
+		or context.opportunity_target_enemy ~= nil
+		or context.urgent_target_enemy ~= nil
+
+	if has_priority_target and target_distance >= min_distance then
+		return true, rule_prefix .. "_priority_target"
+	end
+
+	if (context.elite_count + context.special_count + context.monster_count) >= 1 then
+		return true, rule_prefix .. "_priority_pack"
+	end
+
+	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_defensive(context, rule_prefix)
+	if context.target_ally_needs_aid and context.num_nearby >= 2 then
+		return true, rule_prefix .. "_ally_aid"
+	end
+
+	if context.ranged_count >= 2 and context.toughness_pct < 0.50 then
+		return true, rule_prefix .. "_pressure"
+	end
+
+	if context.num_nearby >= 4 and context.toughness_pct < 0.35 then
+		return true, rule_prefix .. "_pressure"
+	end
+
+	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_mine(context, rule_prefix)
+	if context.elite_count >= 3 then
+		return true, rule_prefix .. "_elite_pack"
+	end
+
+	if context.num_nearby >= 5 and context.challenge_rating_sum >= 3.0 then
+		return true, rule_prefix .. "_hold_point"
+	end
+
+	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_whistle(context)
+	if context.target_is_elite_special or context.priority_target_enemy or context.urgent_target_enemy then
+		return true, "grenade_whistle_priority_target"
+	end
+
+	if (context.elite_count + context.special_count) >= 1 then
+		return true, "grenade_whistle_priority_pack"
+	end
+
+	return false, "grenade_whistle_hold"
+end
+
+local function _grenade_smite(context)
+	return _grenade_priority_target(context, "grenade_smite", {
+		max_peril = 0.85,
+		min_distance = 5,
+	})
+end
+
+local function _grenade_assail(context)
+	if context.peril_pct and context.peril_pct >= 0.85 then
+		return false, "grenade_assail_block_peril"
+	end
+
+	if context.target_is_super_armor then
+		return false, "grenade_assail_block_super_armor"
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local has_priority_target = context.target_is_monster
+		or context.target_is_elite_special
+		or context.priority_target_enemy ~= nil
+		or context.opportunity_target_enemy ~= nil
+		or context.urgent_target_enemy ~= nil
+
+	if has_priority_target then
+		return true, "grenade_assail_priority_target"
+	end
+
+	if context.target_enemy_type == "ranged" or context.ranged_count >= 2 then
+		return true, "grenade_assail_ranged_pressure"
+	end
+
+	if context.ranged_count >= 1 and target_distance >= 8 then
+		return true, "grenade_assail_ranged_pressure"
+	end
+
+	if (context.elite_count + context.special_count + context.monster_count) >= 1 then
+		return true, "grenade_assail_priority_pack"
+	end
+
+	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		return true, "grenade_assail_crowd_soften"
+	end
+
+	return false, "grenade_assail_hold"
+end
+
+local function _grenade_chain_lightning(context)
+	if context.peril_pct and context.peril_pct >= 0.85 then
+		return false, "grenade_chain_lightning_block_peril"
+	end
+
+	if context.num_nearby >= 4 then
+		return true, "grenade_chain_lightning_crowd"
+	end
+
+	if context.num_nearby >= 3 and (context.elite_count + context.special_count) >= 1 then
+		return true, "grenade_chain_lightning_crowd"
+	end
+
+	return false, "grenade_chain_lightning_hold"
+end
+
+local GRENADE_HEURISTICS = {
+	veteran_frag_grenade = function(context)
+		return _grenade_horde(context, 6, 2.5, "grenade_frag")
+	end,
+	veteran_krak_grenade = function(context)
+		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 })
+	end,
+	veteran_smoke_grenade = function(context)
+		return _grenade_defensive(context, "grenade_smoke")
+	end,
+	zealot_fire_grenade = function(context)
+		return _grenade_horde(context, 5, 2.5, "grenade_fire")
+	end,
+	zealot_shock_grenade = function(context)
+		return _grenade_defensive(context, "grenade_shock")
+	end,
+	zealot_throwing_knives = function(context)
+		return _grenade_priority_target(context, "grenade_knives", { min_distance = 5 })
+	end,
+	ogryn_grenade_box = function(context)
+		return _grenade_horde(context, 5, 3.0, "grenade_box")
+	end,
+	ogryn_grenade_box_cluster = function(context)
+		return _grenade_horde(context, 5, 3.0, "grenade_box_cluster")
+	end,
+	ogryn_grenade_frag = function(context)
+		return _grenade_horde(context, 5, 3.0, "grenade_ogryn_frag")
+	end,
+	ogryn_grenade_friend_rock = function(context)
+		return _grenade_priority_target(context, "grenade_rock", { min_distance = 6 })
+	end,
+	adamant_grenade = function(context)
+		return _grenade_horde(context, 4, 2.0, "grenade_adamant")
+	end,
+	adamant_grenade_improved = function(context)
+		return _grenade_horde(context, 4, 2.0, "grenade_adamant")
+	end,
+	adamant_shock_mine = function(context)
+		return _grenade_mine(context, "grenade_shock_mine")
+	end,
+	adamant_whistle = _grenade_whistle,
+	broker_flash_grenade = function(context)
+		return _grenade_defensive(context, "grenade_flash")
+	end,
+	broker_flash_grenade_improved = function(context)
+		return _grenade_defensive(context, "grenade_flash")
+	end,
+	broker_tox_grenade = function(context)
+		return _grenade_horde(context, 6, 3.0, "grenade_tox")
+	end,
+	broker_missile_launcher = function(context)
+		return _grenade_priority_target(context, "grenade_missile", { min_distance = 8 })
+	end,
+	psyker_throwing_knives = _grenade_assail,
+	psyker_smite = _grenade_smite,
+	psyker_chain_lightning = _grenade_chain_lightning,
+}
 
 local function _evaluate_template_heuristic(
 	ability_template_name,
@@ -773,6 +1040,85 @@ local function _evaluate_template_heuristic(
 		ability_extension,
 		context
 	)
+end
+
+local function _testing_profile_active(opts)
+	if opts and opts.behavior_profile then
+		return opts.behavior_profile == "testing"
+	end
+
+	return _is_testing_profile and _is_testing_profile() or false
+end
+
+local function _testing_profile_override(context)
+	if not context then
+		return false
+	end
+
+	if context.target_ally_needs_aid then
+		return true, "testing_profile_ally_aid"
+	end
+
+	if context.target_is_monster then
+		return true, "testing_profile_monster"
+	end
+
+	if context.target_is_elite_special or context.special_count > 0 or context.elite_count > 0 then
+		return true, "testing_profile_priority"
+	end
+
+	if context.num_nearby >= 2 then
+		return true, "testing_profile_crowd"
+	end
+
+	if context.num_nearby >= 1 and (context.toughness_pct < 0.80 or context.health_pct < 0.80) then
+		return true, "testing_profile_pressure"
+	end
+
+	return false
+end
+
+local function _testing_profile_can_override_rule(rule)
+	if rule == nil then
+		return true
+	end
+
+	rule = tostring(rule)
+
+	if string.find(rule, "_hold", 1, true) then
+		return true
+	end
+
+	if string.find(rule, "_block_safe", 1, true) then
+		return true
+	end
+
+	if string.find(rule, "_block_low_value", 1, true) then
+		return true
+	end
+
+	return false
+end
+
+local function _apply_behavior_profile(can_activate, rule, context, opts)
+	if can_activate ~= false or not _testing_profile_active(opts) then
+		return can_activate, rule
+	end
+
+	if not _testing_profile_can_override_rule(rule) then
+		return can_activate, rule
+	end
+
+	local should_override, override_rule = _testing_profile_override(context)
+	if not should_override then
+		return can_activate, rule
+	end
+
+	if rule then
+		return true, tostring(rule) .. "->" .. override_rule
+	end
+
+	return true, override_rule
 end
 
 -- Centralized decision evaluation with nil→fallback resolution.
@@ -820,7 +1166,9 @@ local function resolve_decision(
 		end
 	end
 
-	return can_activate, rule, context
+	local profiled_can_activate, profiled_rule = _apply_behavior_profile(can_activate, rule, context)
+
+	return profiled_can_activate, profiled_rule, context
 end
 
 -- Test-friendly entry point: evaluates a template heuristic against a pre-built
@@ -829,7 +1177,7 @@ end
 local function evaluate_heuristic(template_name, context, opts)
 	if template_name == "veteran_combat_ability" then
 		opts = opts or {}
-		return _can_activate_veteran_combat_ability(
+		local can_activate, rule = _can_activate_veteran_combat_ability(
 			opts.conditions or {},
 			opts.unit,
 			nil,
@@ -840,6 +1188,8 @@ local function evaluate_heuristic(template_name, context, opts)
 			opts.ability_extension,
 			context
 		)
+
+		return _apply_behavior_profile(can_activate, rule, context, opts)
 	end
 
 	local fn = TEMPLATE_HEURISTICS[template_name]
@@ -847,32 +1197,36 @@ local function evaluate_heuristic(template_name, context, opts)
 		return nil, "fallback_unhandled_template"
 	end
 
-	return fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
+	local can_activate, rule = fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
+	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
-local function evaluate_item_heuristic(ability_name, context)
+local function evaluate_item_heuristic(ability_name, context, opts)
 	local fn = ITEM_HEURISTICS[ability_name]
 	if not fn then
 		return false, "unknown_item_ability"
 	end
-	return fn(context)
+
+	local can_activate, rule = fn(context)
+	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
-local function evaluate_grenade_heuristic(grenade_template_name, context)
+local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 	if not context then
 		return false, "grenade_no_context"
 	end
 
 	local fn = GRENADE_HEURISTICS[grenade_template_name]
 	if fn then
-		return fn(context)
+		local can_activate, rule = fn(context)
+		return _apply_behavior_profile(can_activate, rule, context, opts)
 	end
 
 	if context.num_nearby > 0 then
-		return true, "grenade_generic"
+		return _apply_behavior_profile(true, "grenade_generic", context, opts)
 	end
 
-	return false, "grenade_no_enemies"
+	return _apply_behavior_profile(false, "grenade_no_enemies", context, opts)
 end
 
 return {
@@ -881,6 +1235,7 @@ return {
 		_decision_context_cache = deps.decision_context_cache
 		_super_armor_breed_cache = deps.super_armor_breed_cache
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
+		_is_testing_profile = deps.is_testing_profile
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

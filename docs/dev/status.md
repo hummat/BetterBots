@@ -1,4 +1,4 @@
-# Status Snapshot (March 11, 2026)
+# Status Snapshot (March 12, 2026)
 
 ## What's shipped
 
@@ -21,7 +21,7 @@
 - **Safety guards**: revive/interaction protection (#20), ability suppression (#11), warp weapon peril block (#27)
 
 ### v0.4.0 (2026-03-08)
-- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, close-range (<5m) suppression
+- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, suppresses shots when poxburster is close to the bot (<5m) or any human player (<8m)
 - **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
 - **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
 - **Charge/dash rescue aim** (#10): zealot dash, ogryn charge, and arbites charge aim toward disabled allies. 14 rescue activations confirmed in-game.
@@ -36,12 +36,13 @@
 - **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS in v0.5.0. Root cause for p2/p1: `find_aim_fire_input()` couldn't find chain-only fire actions (no `start_input`). Fix: `find_chain_target_action()` fallback scans `allowed_chain_actions` (dev/m5-batch1, commit 09e0f22). p2 flame PASS, p3/p4 PASS, p1 surge structural fix in place (no in-game evidence yet).
 
 ### v0.6.0 (2026-03-11)
-- **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher. Generic heuristic only (`enemies_in_proximity > 0`); per-grenade heuristics planned for v0.6.1.
+- **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher.
+- **Grenade heuristics + psyker blitz follow-up** (#4, dev/m5-batch2): per-grenade spending rules (horde / elite / defensive / mine) plus minimal Psyker blitz support for Assail, Smite, and Chain Lightning.
 - **Staff charged fire fix** (#43): all 4 force staves now fire charged attacks. `find_chain_target_action()` fallback for chain-only fire actions (p1 Voidstrike, p2 Purgatus).
 - **Bot pinging** (#16): bots ping elites and specials for the human player.
 - **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
 - **Daemonhost avoidance** (#17): suppress bot combat near dormant daemonhosts (code + tests, unverifiable in-game — no DH spawn).
-- **Unit tests**: 305 tests via busted.
+- **Unit tests**: 370 tests via busted.
 
 ## Current Tier Status
 
@@ -53,7 +54,7 @@
 
 ## Evidence Source
 
-- Latest analyzed log: `console-2026-03-11-20.01.33-...`
+- Latest analyzed logs: `console-2026-03-12-20.33.39-...` and `console-2026-03-12-20.44.32-...`
 - Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
@@ -81,10 +82,25 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
+## v0.7.0 (2026-03-12)
+
+| Issue | Feature | Scope | Status |
+|-------|---------|-------|--------|
+| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag `_debug_log` calls by level | Implemented, validated in-game |
+| #15 | Dodge suppression audit | Research whether dodge interrupts abilities | Closed as not-a-bug |
+| #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Implemented, validated in-game |
+| #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Implemented, validated in-game |
+| #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Implemented, validated in-game |
+| #48 | Player-tag smart-target response | Add a small score bonus for enemies tagged by a human player | Implemented, validated in-game |
+| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, validated in-game |
+| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
+| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, validated in-game |
+
+Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+
 ## Next Steps
-- #4: test shock mine with bot equipped with shock mine
 - Default class profiles for bots (#45) — P2, design approved
-- Per-ability toggle settings (#6) — P2
+- Broader settings work (#6) — partial settings shipped in-batch (`standard/testing` profile + tier/grenade toggles); remaining scope is per-ability toggles + calibrated multi-preset tuning
 - Weapon/enemy-aware ADS (#41) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Objective-aware ability activation (#37) — P2

@@ -52,6 +52,7 @@ function M.make_context(overrides)
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
+		in_hazard = false,
 	}
 
 	if overrides then

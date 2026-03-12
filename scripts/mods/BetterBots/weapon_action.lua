@@ -8,6 +8,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
+local _perf
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
@@ -40,11 +41,13 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
+	_perf = deps.perf
 end
 
 function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
+	local should_block_weapon_action_input = deps.should_block_weapon_action_input
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -97,12 +100,17 @@ function M.register_hooks(deps)
 			-- they will actually queue.
 			local _may_fire_logged = setmetatable({}, { __mode = "k" })
 			_mod:hook(BtBotShootAction, "_may_fire", function(func, self, unit, scratchpad, range_squared, t)
+				local perf_t0 = _perf and _perf.begin()
 				if
 					not scratchpad
 					or not scratchpad.aiming_shot
 					or scratchpad.fire_action_input == scratchpad.aim_fire_action_input
 				then
-					return func(self, unit, scratchpad, range_squared, t)
+					local result = func(self, unit, scratchpad, range_squared, t)
+					if perf_t0 then
+						_perf.finish("weapon_action.may_fire", perf_t0)
+					end
+					return result
 				end
 
 				if not _may_fire_logged[scratchpad] and _debug_enabled() then
@@ -123,6 +131,9 @@ function M.register_hooks(deps)
 				local may_fire = func(self, unit, scratchpad, range_squared, t)
 
 				scratchpad.fire_action_input = fire_action_input
+				if perf_t0 then
+					_perf.finish("weapon_action.may_fire", perf_t0)
+				end
 
 				return may_fire
 			end)
@@ -142,6 +153,7 @@ function M.register_hooks(deps)
 				PlayerUnitActionInputExtension,
 				"bot_queue_action_input",
 				function(func, self, id, action_input, raw_input)
+					local perf_t0 = _perf and _perf.begin()
 					local unit = self._betterbots_player_unit
 					if unit and id == "weapon_action" and action_input == "wield" then
 						local should_block, ability_name = should_block_wield_input(unit)
@@ -160,6 +172,38 @@ function M.register_hooks(deps)
 										.. tostring(raw_input)
 										.. ")"
 								)
+							end
+							if perf_t0 then
+								_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
+							end
+							return nil
+						end
+					end
+
+					if
+						unit
+						and id == "weapon_action"
+						and action_input ~= "wield"
+						and should_block_weapon_action_input
+					then
+						local should_block, ability_name, block_reason =
+							should_block_weapon_action_input(unit, action_input)
+						if should_block then
+							if _debug_enabled() then
+								local fixed_t = _fixed_time()
+								_debug_log(
+									"lock_weapon_action:" .. tostring(ability_name) .. ":" .. tostring(action_input),
+									fixed_t,
+									"blocked foreign weapon action "
+										.. tostring(action_input)
+										.. " while keeping "
+										.. tostring(ability_name)
+										.. " "
+										.. tostring(block_reason or "sequence")
+								)
+							end
+							if perf_t0 then
+								_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
 							end
 							return nil
 						end
@@ -203,6 +247,9 @@ function M.register_hooks(deps)
 												.. ", warp weapon)"
 										)
 									end
+									if perf_t0 then
+										_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
+									end
 									return nil
 								end
 							end
@@ -243,7 +290,11 @@ function M.register_hooks(deps)
 						end
 					end
 
-					return func(self, id, action_input, raw_input)
+					local result = func(self, id, action_input, raw_input)
+					if perf_t0 then
+						_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
+					end
+					return result
 				end
 			)
 		end
@@ -257,6 +308,7 @@ function M.register_hooks(deps)
 				PlayerUnitVisualLoadout,
 				"wield_slot",
 				function(func, slot_to_wield, player_unit, t, skip_wield_action)
+					local perf_t0 = _perf and _perf.begin()
 					local should_lock, ability_name, lock_reason, slot_to_keep = should_lock_weapon_switch(player_unit)
 					if should_lock then
 						slot_to_keep = slot_to_keep or "slot_combat_ability"
@@ -276,11 +328,19 @@ function M.register_hooks(deps)
 										.. tostring(lock_reason)
 								)
 							end
-							return func(slot_to_keep, player_unit, t, skip_wield_action)
+							local result = func(slot_to_keep, player_unit, t, skip_wield_action)
+							if perf_t0 then
+								_perf.finish("weapon_action.wield_slot", perf_t0)
+							end
+							return result
 						end
 					end
 
-					return func(slot_to_wield, player_unit, t, skip_wield_action)
+					local result = func(slot_to_wield, player_unit, t, skip_wield_action)
+					if perf_t0 then
+						_perf.finish("weapon_action.wield_slot", perf_t0)
+					end
+					return result
 				end
 			)
 		end

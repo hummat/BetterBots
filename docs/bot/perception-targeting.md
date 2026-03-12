@@ -33,7 +33,7 @@ The reevaluation timer is set to **t + 0.3s** after each full evaluation (source
 ### What Gets Tracked
 
 The bot iterates over `side.ai_target_units` -- all enemy units registered as targetable on the opposing side. A target is valid if:
-- `breed.not_bot_target` is **false** (vanilla: only `chaos_poxwalker_bomber` sets this true; **BetterBots #34 patches this to nil** and adds distance-based close-range suppression instead)
+- `breed.not_bot_target` is **false** (vanilla: only `chaos_poxwalker_bomber` sets this true; **BetterBots #34 patches this to nil** and suppresses unsafe poxburster targets near the bot/human players instead)
 - The enemy is in `aggroed_minion_target_units` (has been aggroed/alerted), **OR** is a player breed (PvP-relevant, not typical gameplay)
 
 ### Blackboard Output
@@ -313,7 +313,7 @@ Between update cycles, stale entries are removed if their unit leaves `aggroed_m
 | `bt_bot_conditions.can_activate_ability` (vanilla) | Iterates proximity list, sums `challenge_rating` to decide if zealot_relic should activate (threshold: 1.75) |
 | `bt_bot_conditions._is_there_threat_to_aid` | Checks if any proximity enemy is targeting the bot (decides if bot should abandon ally aid) |
 | `bt_bot_melee_action` | Stores `num_enemies_in_proximity` in scratchpad. Used for: attack selection (outnumbered at >1, massively at >3), push decision, dodge decision |
-| `BotTargetSelection.monster_weight` | If `num_enemies_in_proximity > 0`, monster weight returns 0 (bot won't chase monsters while surrounded) |
+| `BotTargetSelection.monster_weight` | If `num_enemies_in_proximity > 0`, monster weight returns 0 (bot won't chase monsters while surrounded). BetterBots #18 restores it only when the monster's own blackboard says it is aggroed on this bot. |
 | `_calculate_ally_need_type` | If bot has `>= 1` enemy in proximity, it won't aid other bots (`MAX_ENEMIES_IN_PROXIMITY_TO_AID_BOT = 1`) |
 | **BetterBots** | Uses `num_nearby > 0` as the generic ability trigger heuristic |
 

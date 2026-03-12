@@ -712,6 +712,265 @@ Conclusion:
 1. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
    - Covers: `broker_focus`, `broker_punk_rage`
 
+## dev/m5-batch2 Test Plan
+
+Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+
+### Features under test
+
+| Issue | Feature | What to verify |
+|-------|---------|---------------|
+| #40 | Tiered log levels | Off→silent; Info→patches only; Debug→decisions; Trace→sprint/suppression per-frame |
+| #15 | Dodge suppression | Research-only — close if audit confirms no interaction |
+| #34 | Poxburster targeting | Bots shoot at range, suppress when poxburster near human player |
+| #16 | Ping anti-spam | Tag holds on one elite until death; no flipping; closer elite triggers escalation |
+| #18 | Boss engagement | Vanilla deprioritization preserved; bot fights back when boss targets it |
+| #48 | Player-tag smart-target response | Human-tagged elite/special/monster gets a modest target-selection score bonus without yanking bots out of active melee |
+| #21 | Hazard abilities | Defensive ability (relic/shout) in fire/gas; no regression to Arbites stance defensive use |
+| #39 | Healing deferral | Bot defers health station/med-crate/pickup to human; emergency override at <25% bot HP |
+| #4 | Grenade heuristics | Krak→elite only; frag→horde 4+; smoke/shock→pressure tools; Psyker Assail/Smite/Chain Lightning fire with peril gate |
+
+### Pre-test checklist
+
+- [ ] All feature branches merged to `dev/m5-batch2`
+- [ ] `make check` PASS on merged branch
+- [ ] Bot loadouts cover: standard grenades, krak, smoke, throwing knives, psyker blitz, whistle
+- [ ] Mod settings: test each log level setting
+- [ ] Mission with mixed enemies (horde + elites + specials) for grenade heuristic validation
+- [ ] Mission with hazard zones (fire/gas) for #21 validation
+
+### Current status (2026-03-12)
+
+| Issue | Feature | Status | Evidence / gap |
+|-------|---------|--------|----------------|
+| #15 | Dodge suppression audit | PASS | Audit-only, closed as not-a-bug |
+| #16 | Ping anti-spam | PASS | Ping events seen in early `dev/m5-batch2` run |
+| #18 | Boss engagement | PASS | Consume/engagement evidence seen in early `dev/m5-batch2` run |
+| #48 | Player-tag smart-target response | PASS | Repeated `boosting score for player-tagged ... +3` lines in run `2026-03-12-m5-batch2-03` |
+| #21 | Hazard abilities | PASS | `zealot_relic_hazard` confirmed earlier; `veteran_voc_hazard` observed in latest `dev/m5-batch2` run |
+| #34 | Poxburster targeting | PASS | `suppressed poxburster target (near_human_player)` and `(too_close_to_bot)` at `Debug` |
+| #39 | Healing deferral | UNKNOWN | No in-mission trigger logged yet |
+| #40 | Tiered log levels | PASS | `Info/Debug/Trace` behavior exercised during batch2 validation; startup debug chatter now obeys level gating and event-log-backed post-run validation is usable |
+| #4 | Grenade heuristics + Psyker blitz | PASS | Grenades/knives/whistle work; Assail validated on both `shoot` and `zoom -> zoom_shoot`; Smite validated on `charge_power_sticky -> use_power`; Chain Lightning validated on `charge_heavy -> shoot_heavy_hold -> shoot_heavy_hold_release -> action_spread_charged` |
+
+### Run 2026-03-12-m5-batch2-05
+
+```text
+Run ID: 2026-03-12-m5-batch2-05
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post universal testing-profile leniency + Assail dual-path + foreign-input guard)
+Log file: console-2026-03-12-20.33.39-6cf09325-5a2b-46e1-81c1-1df9d57d8da9.log
+Bot lineup / abilities: included Psyker Assail, Psyker Smite, Veteran shout, Zealot relic, Psyker shield wall
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no BetterBots-specific error lines
+- basic combat loop: PASS
+
+#4 Grenade/blitz:
+- psyker_assail: PASS
+  - `bb-log summary`: 13 consumes for `psyker_throwing_knives`
+  - both paths observed:
+    - close/pressure path: `action=shoot`
+    - aimed path: `action=zoom` then `action=zoom_shoot`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_throwing_knives (action=action_rapid_zoomed)`
+- psyker_smite: PASS
+  - intended sequence observed:
+    - `weapon_template=psyker_smite ... action=charge_power_sticky`
+    - `weapon_template=psyker_smite ... action=use_power`
+  - old `charge_release` parser-noise no longer appears in this run
+- guard behavior:
+  - stray foreign inputs are now blocked and logged (`blocked foreign weapon action ... while keeping ...`) instead of being queued into the Psyker blitz templates
+
+#40 Tiered log levels:
+- PASS
+  - debug-level validation logs remain visible and actionable during this run
+  - startup debug chatter is gated behind Debug/Trace instead of always echoing at load
+
+Conclusion:
+- Assail and Smite are now validated in practice.
+- The shared foreign-input guard removed the old Psyker blitz parser-noise path.
+- #4 is ready for closure pending a final clean Chain Lightning confirmation.
+```
+
+### Run 2026-03-12-m5-batch2-06
+
+```text
+Run ID: 2026-03-12-m5-batch2-06
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post foreign-input guard)
+Log file: console-2026-03-12-20.44.32-4a4f2a96-387f-4ab4-9bbf-ddc54b64a498.log
+Bot lineup / abilities: included Psyker Chain Lightning
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no BetterBots-specific error lines
+- basic combat loop: PASS
+
+#4 Grenade/blitz:
+- psyker_chain_lightning: PASS
+  - intended heavy path observed:
+    - `charge_heavy`
+    - `shoot_heavy_hold`
+    - `shoot_heavy_hold_release`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_chain_lightning (action=action_spread_charged)`
+  - stray foreign inputs are blocked and logged instead of leaking into the template:
+    - `blocked foreign weapon action charge_release while keeping psyker_chain_lightning wield`
+
+Conclusion:
+- Chain Lightning is now validated on the charged crowd-control path.
+- With Assail and Smite already validated in the previous run, the Psyker blitz portion of #4 is complete.
+```
+
+### Run 2026-03-12-m5-batch2-04
+
+```text
+Run ID: 2026-03-12-m5-batch2-04
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post perf-instrumentation + Smite use_power fix)
+Log file: console-2026-03-12-19.26.03-abeda3ac-73d0-4ce4-82c9-341ad6a28ab1.log
+Bot lineup / abilities: included Veteran shout, Psyker dome + Smite, Zealot relic
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no
+- basic combat loop: PASS
+
+#21 Hazard abilities:
+- PASS
+  - `veteran_voc_hazard` observed once in this run
+  - `zealot_relic_hazard` continues to appear in the same run
+
+#4 Grenade/blitz:
+- psyker_smite: PARTIAL PASS
+  - repeated live sequence:
+    - `grenade queued charge_power_sticky`
+    - `grenade queued use_power`
+    - `grenade external action confirmed for psyker_smite (action=action_use_power)`
+  - residual issue:
+    - intermittent `Could not find matching input_sequence for queued action_input "charge_release" in template "psyker_smite"`
+- psyker_force_field_dome: PASS
+  - one full confirmed activation:
+    - `fallback item queued psyker_force_field_dome input=combat_ability`
+    - `aim_force_field`
+    - `place_force_field`
+    - `charge consumed for psyker_force_field_dome`
+    - `fallback item confirmed charge consume ... (rule=force_field_ranged_pressure)`
+  - a second dome attempt started in the same run but was not cleanly confirmed to completion from logs alone
+- psyker_assail:
+  - no in-game evidence yet in this run
+
+Conclusion:
+- #21 can be promoted to PASS.
+- Dome remains validated.
+- Smite now works in practice, but the residual `charge_release` parser-noise keeps the Psyker blitz work short of fully clean.
+- #4 remains open for Assail evidence and Smite cleanup.
+```
+
+### Run 2026-03-12-m5-batch2-02
+
+```text
+Run ID: 2026-03-12-m5-batch2-02
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post poxburster-debug + item-rule-attribution + grenade cleanup-lock fixes)
+Log file: console-2026-03-12-15.24.57-b0aee589-fffe-4c97-9b36-17973ef85b25.log
+Bot lineup / abilities: included Zealot relic, Veteran shout, Psyker Chain Lightning
+Map + difficulty: mixed-combat mission with hazards and multiple poxbursters
+
+#34 Poxburster targeting:
+- PASS
+  - `suppressed poxburster target (near_human_player)`
+  - `suppressed poxburster target (too_close_to_bot)`
+
+#21 Hazard abilities:
+- zealot_relic: PASS
+  - visual: yes
+  - rule-attributed log: yes
+  - key lines: `fallback item queued zealot_relic input=channel (rule=zealot_relic_hazard)`
+               `fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)`
+- veteran_combat_ability_shout: PARTIAL
+  - visual: yes (general shout use)
+  - hazard-specific rule: no
+  - key lines: repeated `hazard=true` decisions with `rule=veteran_voc_hold`; no `veteran_voc_hazard` observed
+
+#4 Grenade/blitz:
+- zealot_throwing_knives: PASS
+- adamant_whistle: PASS
+- ogryn_grenade_box_cluster: PASS
+- psyker_chain_lightning: FAIL
+  - visual: player observed only light-cast behavior
+  - strongest log signal: queued `shoot_light_pressed` then `shoot_light_hold_release`
+  - no charged-path evidence (`charge_heavy` / `shoot_heavy_hold`) in this run
+
+Regression checks:
+- Lua errors: no
+- basic combat loop: PASS
+
+Conclusion:
+- #34 is validated.
+- #21 is partially validated: hazard-triggered relic works, hazard-triggered veteran shout still needs an in-game hit.
+- #4 remains open because Chain Lightning is using the light path instead of the charged crowd-control path documented for bot use.
+```
+
+### Run 2026-03-12-m5-batch2-03
+
+```text
+Run ID: 2026-03-12-m5-batch2-03
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post Chain Lightning charged-path + relic interaction lock guard fixes)
+Log file: console-2026-03-12-17.25.56-9995a2c3-d860-4399-a7fa-5158b17afc61.log
+Bot lineup / abilities: included Zealot relic, Veteran shout, Psyker Chain Lightning
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no
+- basic combat loop: PASS
+
+#48 Player-tag smart-target response:
+- PASS
+  - repeated confirmation lines:
+    - `boosting score for player-tagged renegade_grenadier +3`
+    - `boosting score for player-tagged cultist_flamer +3`
+
+#21 Hazard abilities:
+- zealot_relic: PASS
+  - key lines:
+    - `fallback item queued zealot_relic input=channel (rule=zealot_relic_hazard)`
+    - `fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)`
+- veteran_combat_ability_shout: not re-observed on hazard-specific rule in this run
+
+#4 Grenade/blitz:
+- psyker_chain_lightning: PARTIAL
+  - charged heavy path observed:
+    - `grenade queued wield for psyker_chain_lightning (rule=grenade_chain_lightning_crowd)`
+    - `charge_heavy`
+    - `shoot_heavy_hold`
+    - `shoot_heavy_hold_release`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_chain_lightning (action=action_spread_charged)`
+    - `grenade released cleanup lock without explicit unwield (action confirmed)`
+  - gap:
+    - many later attempts still end with `grenade released cleanup lock without explicit unwield (slot changed)` and no matching `action confirmed` line, so reliability is still mixed
+
+Relic interaction crash guard:
+- PARTIAL
+  - no crash reproduced in this run
+  - the exact former crash path (interaction entry requesting `slot_unarmed` while relic lock is active) was not directly re-hit, so the guard fix is not yet specifically validated
+
+Conclusion:
+- #48 is validated.
+- #21 remains partial.
+- #4 improves from “light path only” to “charged path confirmed once, but inconsistent.”
+- The branch is stable in this run, but the relic interaction fix still needs a direct interaction-state re-test.
+```
+
 **New issue discovered in H-02b:**
 
 Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while active, and without Venting Shriek (different ability slot) the bot has no way to vent. The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance. Needs investigation — possible mitigations:

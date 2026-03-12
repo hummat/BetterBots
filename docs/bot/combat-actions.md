@@ -695,6 +695,8 @@ This fallback runs alongside the BT path. Both can attempt activation; the game'
 
 `hook` on `PlayerUnitActionInputExtension.bot_queue_action_input` intercepts `"wield"` inputs on `"weapon_action"` to prevent weapon switching during item-based ability sequences (Tier 3). This prevents the BT's `switch_to_proper_weapon` node from interrupting a relic channel or force field placement.
 
+The lock is intentionally disabled once the unit has a live interaction target. Interaction entry requests `slot_unarmed`, and overriding that request with `slot_combat_ability` can break the character-state interaction path.
+
 #### 6. State transition failure recovery (lines 1329-1374)
 
 `hook` on `ActionCharacterStateChange.finish` detects when a bot's combat ability activation fails due to character state transition rejection. Schedules a fast retry (0.35s) to re-attempt.

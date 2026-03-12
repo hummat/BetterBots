@@ -20,6 +20,7 @@ local _build_context
 local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
+local _is_grenade_enabled
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
@@ -35,8 +36,13 @@ local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
--- Table value: { aim_input, release_input, throw_delay, auto_unwield, component } for custom chains.
+-- Table value: {
+--   aim_input, followup_input, followup_delay, release_input, throw_delay,
+--   auto_unwield, component
+-- } for custom chains.
 --   aim_input:     input to queue after wield (nil = auto-fires, skip to wait_unwield)
+--   followup_input: optional second input before the final release (e.g. charged Chain Lightning)
+--   followup_delay: seconds between aim_input and followup_input
 --   release_input: input to queue after throw_delay (nil = skip wait_throw)
 --   throw_delay:   seconds between aim and release (default DEFAULT_THROW_DELAY_S);
 --                  only used when both aim_input and release_input are non-nil
@@ -52,7 +58,28 @@ local SUPPORTED_THROW_TEMPLATES = {
 	-- Zealot (standard/handleless)
 	zealot_fire_grenade = DEFAULT_THROW_DELAY_S,
 	zealot_shock_grenade = 1.0,
-	-- Psyker — no throwable grenades (smite/chain lightning/knives are blitz)
+	-- Psyker blitz (wielded grenade-slot weapon templates)
+	psyker_throwing_knives = true,
+	psyker_chain_lightning = {
+		-- Use the charged crowd-control path, not the light quick-stun path:
+		-- charge_heavy -> shoot_heavy_hold -> shoot_heavy_hold_release.
+		aim_input = "charge_heavy",
+		followup_input = "shoot_heavy_hold",
+		followup_delay = 0.8,
+		release_input = "shoot_heavy_hold_release",
+		throw_delay = 0.9,
+		auto_unwield = true,
+		allow_external_wield_cleanup = true,
+		confirmation_action = "action_spread_charged",
+	},
+	psyker_smite = {
+		aim_input = "charge_power_sticky",
+		followup_input = "use_power",
+		followup_delay = 2.0,
+		auto_unwield = true,
+		allow_external_wield_cleanup = true,
+		confirmation_action = "action_use_power",
+	},
 	-- Ogryn (standard generator with per-template overrides)
 	ogryn_grenade_box = 1.1, -- chain_time=0.9
 	ogryn_grenade_box_cluster = 1.1, -- chain_time=0.9
@@ -85,6 +112,39 @@ local SUPPORTED_THROW_TEMPLATES = {
 	},
 }
 
+local ASSAIL_FAST_PROFILE = {
+	aim_input = "shoot",
+	auto_unwield = true,
+	allow_external_wield_cleanup = true,
+}
+
+local ASSAIL_AIMED_PROFILE = {
+	aim_input = "zoom",
+	followup_input = "zoom_shoot",
+	followup_delay = 0.5,
+	auto_unwield = true,
+	allow_external_wield_cleanup = true,
+	confirmation_action = "action_rapid_zoomed",
+}
+
+local function _resolve_template_entry(grenade_name, context, rule)
+	if grenade_name ~= "psyker_throwing_knives" then
+		return SUPPORTED_THROW_TEMPLATES[grenade_name]
+	end
+
+	local target_distance = context and context.target_enemy_distance or 0
+	local rule_text = tostring(rule or "")
+
+	if
+		target_distance >= 8
+		and (string.find(rule_text, "priority", 1, true) or string.find(rule_text, "ranged_pressure", 1, true))
+	then
+		return ASSAIL_AIMED_PROFILE
+	end
+
+	return ASSAIL_FAST_PROFILE
+end
+
 local function _reset_state(state, next_try_t)
 	state.stage = nil
 	state.deadline_t = nil
@@ -94,9 +154,15 @@ local function _reset_state(state, next_try_t)
 	state.release_t = nil
 	state.unwield_requested_t = nil
 	state.aim_input = nil
+	state.followup_input = nil
+	state.followup_delay = nil
 	state.release_input = nil
 	state.auto_unwield = nil
 	state.component = nil
+	state.allow_external_wield_cleanup = nil
+	state.confirmation_action = nil
+	state.confirmation_logged = nil
+	state.last_blocked_foreign_input = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
@@ -122,6 +188,9 @@ end
 local function should_block_wield_input(unit)
 	local state = _grenade_state_by_unit[unit]
 	if not state or not state.stage then
+		return false
+	end
+	if state.stage == "wait_unwield" and state.allow_external_wield_cleanup then
 		return false
 	end
 	return true, state.grenade_name or "grenade_ability"
@@ -158,6 +227,44 @@ local function should_lock_weapon_switch(unit)
 	return true, grenade_name or "grenade_ability", "sequence", "slot_grenade_ability"
 end
 
+local function _expected_weapon_action_input(state)
+	if not state or not state.stage then
+		return nil
+	end
+
+	if state.stage == "wait_aim" then
+		return state.aim_input
+	end
+
+	if state.stage == "wait_followup" then
+		return state.followup_input
+	end
+
+	if state.stage == "wait_throw" then
+		return state.release_input
+	end
+
+	if state.stage == "wait_unwield" and not state.allow_external_wield_cleanup then
+		return "unwield_to_previous"
+	end
+
+	return nil
+end
+
+local function should_block_weapon_action_input(unit, action_input)
+	local state = _grenade_state_by_unit[unit]
+	if not state or not state.stage or action_input == "wield" then
+		return false
+	end
+
+	local expected_input = _expected_weapon_action_input(state)
+	if expected_input and action_input == expected_input then
+		return false
+	end
+
+	return true, state.grenade_name or "grenade_ability", state.stage
+end
+
 local function _queue_weapon_input(unit, input_name, component)
 	local ext = ScriptUnit.has_extension(unit, "action_input_system")
 	if not ext then
@@ -191,6 +298,23 @@ local function _describe_action_component_state(unit, component_name)
 		.. ", action="
 		.. tostring(action_component.current_action_name)
 		.. ")"
+end
+
+local function _emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
+	if not (_event_log and _event_log.is_enabled and _event_log.is_enabled() and _event_log.emit_decision) then
+		return
+	end
+
+	_event_log.emit_decision(
+		fixed_t,
+		_bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
+		grenade_name,
+		grenade_name,
+		should_throw,
+		rule,
+		"grenade",
+		context
+	)
 end
 
 local function try_queue(unit, blackboard)
@@ -308,7 +432,10 @@ local function try_queue(unit, blackboard)
 		if fixed_t >= (state.wait_t or 0) then
 			local aim = state.aim_input or "aim_hold"
 			_queue_weapon_input(unit, aim, state.component)
-			if state.release_input then
+			if state.followup_input then
+				state.stage = "wait_followup"
+				state.wait_t = fixed_t + (state.followup_delay or DEFAULT_THROW_DELAY_S)
+			elseif state.release_input then
 				state.stage = "wait_throw"
 				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
 			else
@@ -320,6 +447,39 @@ local function try_queue(unit, blackboard)
 			end
 			if _debug_enabled() then
 				_debug_log("grenade_aim:" .. tostring(unit), fixed_t, "grenade queued " .. aim)
+			end
+		end
+
+		return
+	end
+
+	if state.stage == "wait_followup" then
+		if not state.component and wielded_slot ~= "slot_grenade_ability" then
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_followup_lost_wield:" .. tostring(unit),
+					fixed_t,
+					"grenade lost wield during followup (slot=" .. tostring(wielded_slot) .. ")"
+				)
+			end
+			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			return
+		end
+
+		if fixed_t >= (state.wait_t or 0) then
+			local followup = state.followup_input
+			_queue_weapon_input(unit, followup, state.component)
+			if state.release_input then
+				state.stage = "wait_throw"
+				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
+			else
+				state.stage = "wait_unwield"
+				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+				state.release_t = fixed_t
+				state.unwield_requested_t = nil
+			end
+			if _debug_enabled() then
+				_debug_log("grenade_followup:" .. tostring(unit), fixed_t, "grenade queued " .. tostring(followup))
 			end
 		end
 
@@ -372,6 +532,79 @@ local function try_queue(unit, blackboard)
 						"grenade_ability_complete:" .. tostring(unit),
 						fixed_t,
 						"ability blitz complete (" .. reason .. ")" .. component_state
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			end
+			return
+		end
+
+		-- Psyker blitz templates like Chain Lightning and Smite exit on generic
+		-- wield transitions, not unwield_to_previous. Release our block and let
+		-- the normal weapon-switch path unwind them.
+		if state.allow_external_wield_cleanup then
+			if wielded_slot ~= "slot_grenade_ability" then
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_external_cleanup_slot:" .. tostring(unit),
+						fixed_t,
+						"grenade released cleanup lock without explicit unwield (slot changed)"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				return
+			end
+
+			local action_confirmed = false
+			if state.confirmation_action and unit_data_extension then
+				local weapon_action = unit_data_extension:read_component("weapon_action")
+				action_confirmed = weapon_action and weapon_action.current_action_name == state.confirmation_action
+			end
+
+			if _debug_enabled() and action_confirmed and not state.confirmation_logged then
+				state.confirmation_logged = true
+				_debug_log(
+					"grenade_external_action:" .. tostring(unit),
+					fixed_t,
+					"grenade external action confirmed for "
+						.. tostring(state.grenade_name)
+						.. " (action="
+						.. tostring(state.confirmation_action)
+						.. ")"
+				)
+			end
+
+			if action_confirmed then
+				if _debug_enabled() then
+					state.confirmation_logged = true
+					_debug_log(
+						"grenade_external_cleanup_action:" .. tostring(unit),
+						fixed_t,
+						"grenade released cleanup lock without explicit unwield (action confirmed)"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				return
+			end
+
+			if _has_confirmed_charge(state, unit) then
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_external_cleanup_charge:" .. tostring(unit),
+						fixed_t,
+						"grenade released cleanup lock without explicit unwield (charge confirmed)"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				return
+			end
+
+			if fixed_t >= (state.deadline_t or 0) then
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_external_cleanup_timeout:" .. tostring(unit),
+						fixed_t,
+						"grenade released cleanup lock without explicit unwield (timeout)"
 					)
 				end
 				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
@@ -483,14 +716,47 @@ local function try_queue(unit, blackboard)
 	end
 
 	local grenade_name = grenade_ability.name or "unknown"
-
-	local template_entry = SUPPORTED_THROW_TEMPLATES[grenade_name]
-	if not template_entry then
+	if _is_grenade_enabled and not _is_grenade_enabled(grenade_name) then
 		return
 	end
 
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
-	local aim_input, release_input, throw_delay, auto_unwield, component
+	local context = _build_context(unit, blackboard)
+	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
+	_emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
+	if not should_throw then
+		if
+			_debug_enabled()
+			and (
+				(context and context.num_nearby and context.num_nearby > 0)
+				or (context and context.target_enemy)
+				or (context and context.peril_pct ~= nil)
+			)
+		then
+			_debug_log(
+				"grenade_decision_block:" .. grenade_name,
+				fixed_t,
+				"grenade held "
+					.. grenade_name
+					.. " (rule="
+					.. tostring(rule)
+					.. ", nearby="
+					.. tostring(context and context.num_nearby or 0)
+					.. ", peril="
+					.. tostring(context and context.peril_pct)
+					.. ")"
+			)
+		end
+		return
+	end
+
+	local template_entry = _resolve_template_entry(grenade_name, context, rule)
+	if not template_entry then
+		return
+	end
+
+	local aim_input, followup_input, followup_delay, release_input, throw_delay
+	local auto_unwield, component, confirmation_action
 	if type(template_entry) == "number" then
 		aim_input = "aim_hold"
 		release_input = "aim_released"
@@ -498,16 +764,13 @@ local function try_queue(unit, blackboard)
 		auto_unwield = true
 	else
 		aim_input = template_entry.aim_input
+		followup_input = template_entry.followup_input
+		followup_delay = template_entry.followup_delay
 		release_input = template_entry.release_input
 		throw_delay = template_entry.throw_delay or DEFAULT_THROW_DELAY_S
 		auto_unwield = template_entry.auto_unwield ~= false -- default true
 		component = template_entry.component
-	end
-
-	local context = _build_context(unit, blackboard)
-	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
-	if not should_throw then
-		return
+		confirmation_action = template_entry.confirmation_action
 	end
 
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
@@ -518,10 +781,16 @@ local function try_queue(unit, blackboard)
 	state.throw_delay = throw_delay
 	state.grenade_name = grenade_name
 	state.aim_input = aim_input
+	state.followup_input = followup_input
+	state.followup_delay = followup_delay
 	state.release_input = release_input
 	state.release_t = nil
 	state.auto_unwield = auto_unwield
 	state.component = component
+	state.allow_external_wield_cleanup = type(template_entry) == "table"
+		and template_entry.allow_external_wield_cleanup == true
+	state.confirmation_action = confirmation_action
+	state.confirmation_logged = nil
 
 	if component then
 		-- Ability-based blitz: queue aim input directly on the ability component.
@@ -601,9 +870,11 @@ return {
 		_evaluate_grenade_heuristic = refs.evaluate_grenade_heuristic
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
+		_is_grenade_enabled = refs.is_grenade_enabled
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,
 	should_block_wield_input = should_block_wield_input,
 	should_lock_weapon_switch = should_lock_weapon_switch,
+	should_block_weapon_action_input = should_block_weapon_action_input,
 }

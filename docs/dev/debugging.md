@@ -53,8 +53,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
-| `suppressed poxburster target (too close)` | Bot cleared close-range (<5m) poxburster `target_enemy` (#34) |
-| `suppressed poxburster opportunity/urgent/priority target` | Bot cleared close-range poxburster from secondary perception slots (#34) |
+| `suppressed poxburster target (too_close_to_bot|near_human_player)` | Bot cleared poxburster `target_enemy` when it was unsafe to shoot (#34) |
+| `suppressed poxburster opportunity/urgent/priority target (...)` | Bot cleared unsafe poxburster targets from secondary perception slots (#34) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
@@ -100,10 +100,11 @@ rg "Script Error|Lua Stack" "$LATEST"
 
 ```lua
 -- Throttled logging gated by mod setting
-_debug_log(key, fixed_t, message, min_interval_s)
+_debug_log(key, fixed_t, message, min_interval_s, level)
 ```
 
-- Gated by `enable_debug_logs` mod setting (checkbox in DMF options)
+- Gated by `enable_debug_logs` mod setting (dropdown: Off / Info / Debug / Trace)
+- Omitted `level` defaults to `debug`
 - Throttled to 2s per unique key (avoids spam)
 - Outputs to chat via `mod:echo("BetterBots DEBUG: " .. message)`
 
@@ -121,6 +122,9 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 3. `/bb_brain`
    - Dumps deeper bot snapshot via `mod:dump()` (context + selected perception + fallback state).
    - Use only when `/bb_state` + logs are insufficient.
+4. `/bb_perf`
+   - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
+   - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
 
 ### Practical debug workflow
 

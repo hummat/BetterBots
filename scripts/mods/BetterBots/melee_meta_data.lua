@@ -145,7 +145,9 @@ local function inject(WeaponTemplates)
 		_debug_log(
 			"melee_meta_injection:" .. tostring(WeaponTemplates),
 			0,
-			"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")"
+			"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")",
+			nil,
+			"info"
 		)
 	end
 end
