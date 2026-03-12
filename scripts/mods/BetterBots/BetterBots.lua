@@ -746,9 +746,9 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	end)
 end)
 
-mod:command("bb_perf", "Print BetterBots per-frame timing stats (enable in mod settings)", function()
+mod:command("bb_perf", "Print BetterBots per-frame timing stats (enable before mission start)", function()
 	if _perf_calls == 0 then
-		mod:echo("bb-perf: no samples — enable 'per-frame timing' in mod settings first")
+		mod:echo("bb-perf: no samples — enable 'per-frame timing' before mission start")
 		return
 	end
 	mod:echo(

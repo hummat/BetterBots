@@ -298,6 +298,16 @@ local function schedule_retry(unit, fixed_t, retry_delay_s)
 	end
 end
 
+local function _interaction_pending_or_active(unit_data_extension)
+	local interaction_component = unit_data_extension:read_component("interaction")
+
+	-- Character-state interaction entry requests slot_unarmed before the
+	-- full interacting state is settled. Treat any live target as protected
+	-- so relic slot locking cannot override that transition and crash the
+	-- interaction state machine.
+	return interaction_component and interaction_component.target_unit ~= nil
+end
+
 local function should_lock_weapon_switch(unit)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
@@ -306,6 +316,10 @@ local function should_lock_weapon_switch(unit)
 
 	local inventory_component = unit_data_extension:read_component("inventory")
 	if not inventory_component or inventory_component.wielded_slot ~= "slot_combat_ability" then
+		return false
+	end
+
+	if _interaction_pending_or_active(unit_data_extension) then
 		return false
 	end
 

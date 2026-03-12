@@ -84,7 +84,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 
 ## In Progress: dev/m5-batch2
 
-Target: v0.6.1+ (8 features, batch testing)
+Target: v0.6.1+ (9 features, batch testing)
 
 | Issue | Feature | Scope | Status |
 |-------|---------|-------|--------|
@@ -93,9 +93,10 @@ Target: v0.6.1+ (8 features, batch testing)
 | #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Implemented, validated in-game |
 | #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Implemented, validated in-game |
 | #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Implemented, validated in-game |
+| #48 | Player-tag smart-target response | Add a small score bonus for enemies tagged by a human player | Implemented, validated in-game |
 | #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, partially validated (`zealot_relic_hazard` PASS; veteran hazard shout still unobserved) |
 | #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
-| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, partially validated (latest validated run showed Chain Lightning on light path; local charged-path fix pending re-test) |
+| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, partially validated (charged Chain Lightning path now confirmed once; reliability still mixed) |
 
 Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 

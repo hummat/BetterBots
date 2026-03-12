@@ -13,6 +13,8 @@ local _item_enabled_result = true
 local _heuristic_result = true
 local _heuristic_rule = "zealot_relic_hazard"
 local _inventory_component
+local _combat_ability_component
+local _interaction_component
 local _weapon_action_component
 local _weapon_templates
 
@@ -38,6 +40,12 @@ local mock_unit_data_extension = {
 	read_component = function(_self, component_name)
 		if component_name == "inventory" then
 			return _inventory_component
+		end
+		if component_name == "combat_ability" then
+			return _combat_ability_component
+		end
+		if component_name == "interaction" then
+			return _interaction_component
 		end
 		if component_name == "weapon_action" then
 			return _weapon_action_component
@@ -72,6 +80,8 @@ local function reset()
 	_heuristic_result = true
 	_heuristic_rule = "zealot_relic_hazard"
 	_inventory_component = { wielded_slot = "slot_primary" }
+	_combat_ability_component = { active = false }
+	_interaction_component = { target_unit = nil }
 	_weapon_action_component = { template_name = "dummy_primary" }
 	_weapon_templates = {
 		dummy_primary = {
@@ -91,6 +101,7 @@ local function reset()
 
 	_extensions[unit] = {
 		action_input_system = mock_action_input_extension,
+		unit_data_system = mock_unit_data_extension,
 	}
 
 	ItemFallback.init({
@@ -280,5 +291,26 @@ describe("item_fallback", function()
 		assert.is_not_nil(
 			find_log("fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)")
 		)
+	end)
+
+	it("locks active relic weapon switches outside interaction", function()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_combat_ability_component.active = true
+
+		local should_lock, ability_name, reason = ItemFallback.should_lock_weapon_switch(unit)
+
+		assert.is_true(should_lock)
+		assert.equals("zealot_relic", ability_name)
+		assert.equals("active", reason)
+	end)
+
+	it("does not lock active relic weapon switches while interaction is pending", function()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_combat_ability_component.active = true
+		_interaction_component.target_unit = "medicae_station"
+
+		local should_lock = ItemFallback.should_lock_weapon_switch(unit)
+
+		assert.is_false(should_lock)
 	end)
 end)

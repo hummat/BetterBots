@@ -35,6 +35,7 @@ Grenade abilities are still out of scope.
    - block bot `weapon_action:wield` while protected item abilities are active/in-sequence
 7. Adds `wield_slot` redirect for item abilities (via `weapon_action.lua`):
    - redirects non-combat-ability wield calls back to `slot_combat_ability` during item sequences (prevents cancel loop)
+   - exempts pending/active interactions so relic slot locking cannot override `slot_unarmed` on interaction entry
 8. Guards against overheat crash (via `weapon_action.lua`):
    - prevents crash when bots wield plasma guns with nested threshold config
 9. Guards against perils achievement crash (via `weapon_action.lua`):

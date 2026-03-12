@@ -725,6 +725,7 @@ Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 | #34 | Poxburster targeting | Bots shoot at range, suppress when poxburster near human player |
 | #16 | Ping anti-spam | Tag holds on one elite until death; no flipping; closer elite triggers escalation |
 | #18 | Boss engagement | Vanilla deprioritization preserved; bot fights back when boss targets it |
+| #48 | Player-tag smart-target response | Human-tagged elite/special/monster gets a modest target-selection score bonus without yanking bots out of active melee |
 | #21 | Hazard abilities | Defensive ability (relic/shout) in fire/gas; no regression to Arbites stance defensive use |
 | #39 | Healing deferral | Bot defers health station/med-crate/pickup to human; emergency override at <25% bot HP |
 | #4 | Grenade heuristics | Krak→elite only; frag→horde 4+; smoke/shock→pressure tools; Psyker Assail/Smite/Chain Lightning fire with peril gate |
@@ -745,11 +746,12 @@ Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 | #15 | Dodge suppression audit | PASS | Audit-only, closed as not-a-bug |
 | #16 | Ping anti-spam | PASS | Ping events seen in early `dev/m5-batch2` run |
 | #18 | Boss engagement | PASS | Consume/engagement evidence seen in early `dev/m5-batch2` run |
+| #48 | Player-tag smart-target response | PASS | Repeated `boosting score for player-tagged ... +3` lines in run `2026-03-12-m5-batch2-03` |
 | #21 | Hazard abilities | PARTIAL | `zealot_relic_hazard` confirmed; `veteran_voc_hazard` not yet observed |
 | #34 | Poxburster targeting | PASS | `suppressed poxburster target (near_human_player)` and `(too_close_to_bot)` at `Debug` |
 | #39 | Healing deferral | UNKNOWN | No in-mission trigger logged yet |
 | #40 | Tiered log levels | PARTIAL | `Debug` vs `Trace` paths validated indirectly; explicit menu-level sweep still missing |
-| #4 | Grenade heuristics + Psyker blitz | PARTIAL | Grenades/knives/whistle work; latest validated run had Chain Lightning on light path only, local charged-path fix pending re-test |
+| #4 | Grenade heuristics + Psyker blitz | PARTIAL | Grenades/knives/whistle work; Chain Lightning heavy path and one `action_spread_charged` confirmation seen in run `2026-03-12-m5-batch2-03`, but many attempts still exit via `slot changed` only |
 
 ### Run 2026-03-12-m5-batch2-02
 
@@ -795,6 +797,59 @@ Conclusion:
 - #34 is validated.
 - #21 is partially validated: hazard-triggered relic works, hazard-triggered veteran shout still needs an in-game hit.
 - #4 remains open because Chain Lightning is using the light path instead of the charged crowd-control path documented for bot use.
+```
+
+### Run 2026-03-12-m5-batch2-03
+
+```text
+Run ID: 2026-03-12-m5-batch2-03
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post Chain Lightning charged-path + relic interaction lock guard fixes)
+Log file: console-2026-03-12-17.25.56-9995a2c3-d860-4399-a7fa-5158b17afc61.log
+Bot lineup / abilities: included Zealot relic, Veteran shout, Psyker Chain Lightning
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no
+- basic combat loop: PASS
+
+#48 Player-tag smart-target response:
+- PASS
+  - repeated confirmation lines:
+    - `boosting score for player-tagged renegade_grenadier +3`
+    - `boosting score for player-tagged cultist_flamer +3`
+
+#21 Hazard abilities:
+- zealot_relic: PASS
+  - key lines:
+    - `fallback item queued zealot_relic input=channel (rule=zealot_relic_hazard)`
+    - `fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)`
+- veteran_combat_ability_shout: not re-observed on hazard-specific rule in this run
+
+#4 Grenade/blitz:
+- psyker_chain_lightning: PARTIAL
+  - charged heavy path observed:
+    - `grenade queued wield for psyker_chain_lightning (rule=grenade_chain_lightning_crowd)`
+    - `charge_heavy`
+    - `shoot_heavy_hold`
+    - `shoot_heavy_hold_release`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_chain_lightning (action=action_spread_charged)`
+    - `grenade released cleanup lock without explicit unwield (action confirmed)`
+  - gap:
+    - many later attempts still end with `grenade released cleanup lock without explicit unwield (slot changed)` and no matching `action confirmed` line, so reliability is still mixed
+
+Relic interaction crash guard:
+- PARTIAL
+  - no crash reproduced in this run
+  - the exact former crash path (interaction entry requesting `slot_unarmed` while relic lock is active) was not directly re-hit, so the guard fix is not yet specifically validated
+
+Conclusion:
+- #48 is validated.
+- #21 remains partial.
+- #4 improves from “light path only” to “charged path confirmed once, but inconsistent.”
+- The branch is stable in this run, but the relic interaction fix still needs a direct interaction-state re-test.
 ```
 
 **New issue discovered in H-02b:**
