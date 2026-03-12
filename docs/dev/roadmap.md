@@ -39,6 +39,9 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Daemonhost avoidance (#17): suppress combat near dormant daemonhosts.
 - 305 unit tests
 
+### v0.7.0 (2026-03-12)
+- Batch 2 shipped: grenade heuristics + Psyker blitz follow-up (#4), hazard-aware abilities (#21), boss engagement refinement (#18), tiered log levels (#40), healing deferral implementation (#39), player-tag smart-target response (#48), and follow-up validation/logging cleanup.
+
 ## Priority tiers
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P1: next`, `P2: later`, `P3: backlog`.
@@ -51,14 +54,12 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 |---|-------|-------|
 | 12 | Stance early cancellation | Researched — complex. Stances have no release input (`transition = "stay"`). Needs template injection or `stop_action()` + buff cleanup. |
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
-| 21 | Hazard avoidance during abilities | Don't stance in fire/gas/bomber puddles. |
 | 37 | Objective-aware ability activation | Protect allies during revive/interaction with defensive abilities (taunt, shout, stealth). |
 
 **Ability scope expansion:**
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | Grenade/blitz heuristics | Mechanism shipped in v0.6.0. Missing: per-grenade heuristics (krak→elite only, frag→horde, smoke→defensive), psyker blitz (smite/chain lightning/knives). |
 | 6 | Ability/settings control surface | Partial scope can ship earlier: `standard/testing` behavior profile + tier/grenade toggles. Remaining broader scope: per-ability toggles and calibrated multi-preset tuning. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
 
@@ -78,7 +79,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 18 | Boss engagement discipline | Don't focus boss when adds are up. |
 
 ### P3: Backlog — Nice to have, no timeline
 
@@ -118,5 +118,5 @@ See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics
 3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
 4. **M4 (shipped v0.5.0):** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30), staff charged fire (#43 partial — p4 only).
 5. **M5 (shipped v0.6.0):** Scope expansion — grenade/blitz support (#4), staff charged fire complete (#43), bot pinging (#16), daemonhost avoidance (#17), distant special penalty (#19).
-6. **M5-batch2 (in progress):** Grenade heuristics + psyker blitz (#4), ping anti-spam (#16), poxburster human proximity (#34), hazard-aware abilities (#21), boss engagement (#18), dodge suppression audit (#15), tiered log levels (#40), healing deferral (#39).
+6. **M5-batch2 (shipped v0.7.0):** Grenade heuristics + Psyker blitz (#4), ping anti-spam (#16), poxburster human proximity (#34), hazard-aware abilities (#21), boss engagement (#18), dodge suppression audit (#15), tiered log levels (#40), healing deferral implementation (#39), player-tag smart-target response (#48).
 7. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.

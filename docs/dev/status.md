@@ -54,7 +54,7 @@
 
 ## Evidence Source
 
-- Latest analyzed log: `console-2026-03-11-20.01.33-...`
+- Latest analyzed logs: `console-2026-03-12-20.33.39-...` and `console-2026-03-12-20.44.32-...`
 - Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
@@ -82,25 +82,23 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
-## In Progress: dev/m5-batch2
-
-Target: v0.6.1+ (9 features, batch testing)
+## v0.7.0 (2026-03-12)
 
 | Issue | Feature | Scope | Status |
 |-------|---------|-------|--------|
-| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag `_debug_log` calls by level | Implemented, partial in-game validation |
+| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag `_debug_log` calls by level | Implemented, validated in-game |
 | #15 | Dodge suppression audit | Research whether dodge interrupts abilities | Closed as not-a-bug |
 | #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Implemented, validated in-game |
 | #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Implemented, validated in-game |
 | #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Implemented, validated in-game |
 | #48 | Player-tag smart-target response | Add a small score bonus for enemies tagged by a human player | Implemented, validated in-game |
-| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, partially validated (`zealot_relic_hazard` PASS; veteran hazard shout still unobserved) |
+| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, validated in-game |
 | #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
-| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, partially validated (charged Chain Lightning path now confirmed once; reliability still mixed) |
+| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, validated in-game |
 
 Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
-## Next Steps (after batch2)
+## Next Steps
 - Default class profiles for bots (#45) — P2, design approved
 - Broader settings work (#6) — partial settings shipped in-batch (`standard/testing` profile + tier/grenade toggles); remaining scope is per-ability toggles + calibrated multi-preset tuning
 - Weapon/enemy-aware ADS (#41) — P2

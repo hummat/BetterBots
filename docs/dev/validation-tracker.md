@@ -747,11 +747,130 @@ Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 | #16 | Ping anti-spam | PASS | Ping events seen in early `dev/m5-batch2` run |
 | #18 | Boss engagement | PASS | Consume/engagement evidence seen in early `dev/m5-batch2` run |
 | #48 | Player-tag smart-target response | PASS | Repeated `boosting score for player-tagged ... +3` lines in run `2026-03-12-m5-batch2-03` |
-| #21 | Hazard abilities | PARTIAL | `zealot_relic_hazard` confirmed; `veteran_voc_hazard` not yet observed |
+| #21 | Hazard abilities | PASS | `zealot_relic_hazard` confirmed earlier; `veteran_voc_hazard` observed in latest `dev/m5-batch2` run |
 | #34 | Poxburster targeting | PASS | `suppressed poxburster target (near_human_player)` and `(too_close_to_bot)` at `Debug` |
 | #39 | Healing deferral | UNKNOWN | No in-mission trigger logged yet |
-| #40 | Tiered log levels | PARTIAL | `Debug` vs `Trace` paths validated indirectly; explicit menu-level sweep still missing |
-| #4 | Grenade heuristics + Psyker blitz | PARTIAL | Grenades/knives/whistle work; Chain Lightning heavy path and one `action_spread_charged` confirmation seen in run `2026-03-12-m5-batch2-03`, but many attempts still exit via `slot changed` only |
+| #40 | Tiered log levels | PASS | `Info/Debug/Trace` behavior exercised during batch2 validation; startup debug chatter now obeys level gating and event-log-backed post-run validation is usable |
+| #4 | Grenade heuristics + Psyker blitz | PASS | Grenades/knives/whistle work; Assail validated on both `shoot` and `zoom -> zoom_shoot`; Smite validated on `charge_power_sticky -> use_power`; Chain Lightning validated on `charge_heavy -> shoot_heavy_hold -> shoot_heavy_hold_release -> action_spread_charged` |
+
+### Run 2026-03-12-m5-batch2-05
+
+```text
+Run ID: 2026-03-12-m5-batch2-05
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post universal testing-profile leniency + Assail dual-path + foreign-input guard)
+Log file: console-2026-03-12-20.33.39-6cf09325-5a2b-46e1-81c1-1df9d57d8da9.log
+Bot lineup / abilities: included Psyker Assail, Psyker Smite, Veteran shout, Zealot relic, Psyker shield wall
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no BetterBots-specific error lines
+- basic combat loop: PASS
+
+#4 Grenade/blitz:
+- psyker_assail: PASS
+  - `bb-log summary`: 13 consumes for `psyker_throwing_knives`
+  - both paths observed:
+    - close/pressure path: `action=shoot`
+    - aimed path: `action=zoom` then `action=zoom_shoot`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_throwing_knives (action=action_rapid_zoomed)`
+- psyker_smite: PASS
+  - intended sequence observed:
+    - `weapon_template=psyker_smite ... action=charge_power_sticky`
+    - `weapon_template=psyker_smite ... action=use_power`
+  - old `charge_release` parser-noise no longer appears in this run
+- guard behavior:
+  - stray foreign inputs are now blocked and logged (`blocked foreign weapon action ... while keeping ...`) instead of being queued into the Psyker blitz templates
+
+#40 Tiered log levels:
+- PASS
+  - debug-level validation logs remain visible and actionable during this run
+  - startup debug chatter is gated behind Debug/Trace instead of always echoing at load
+
+Conclusion:
+- Assail and Smite are now validated in practice.
+- The shared foreign-input guard removed the old Psyker blitz parser-noise path.
+- #4 is ready for closure pending a final clean Chain Lightning confirmation.
+```
+
+### Run 2026-03-12-m5-batch2-06
+
+```text
+Run ID: 2026-03-12-m5-batch2-06
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post foreign-input guard)
+Log file: console-2026-03-12-20.44.32-4a4f2a96-387f-4ab4-9bbf-ddc54b64a498.log
+Bot lineup / abilities: included Psyker Chain Lightning
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no BetterBots-specific error lines
+- basic combat loop: PASS
+
+#4 Grenade/blitz:
+- psyker_chain_lightning: PASS
+  - intended heavy path observed:
+    - `charge_heavy`
+    - `shoot_heavy_hold`
+    - `shoot_heavy_hold_release`
+  - strongest success confirmation:
+    - `grenade external action confirmed for psyker_chain_lightning (action=action_spread_charged)`
+  - stray foreign inputs are blocked and logged instead of leaking into the template:
+    - `blocked foreign weapon action charge_release while keeping psyker_chain_lightning wield`
+
+Conclusion:
+- Chain Lightning is now validated on the charged crowd-control path.
+- With Assail and Smite already validated in the previous run, the Psyker blitz portion of #4 is complete.
+```
+
+### Run 2026-03-12-m5-batch2-04
+
+```text
+Run ID: 2026-03-12-m5-batch2-04
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post perf-instrumentation + Smite use_power fix)
+Log file: console-2026-03-12-19.26.03-abeda3ac-73d0-4ce4-82c9-341ad6a28ab1.log
+Bot lineup / abilities: included Veteran shout, Psyker dome + Smite, Zealot relic
+Map + difficulty: mixed-combat mission
+
+Stability:
+- Lua errors: no
+- basic combat loop: PASS
+
+#21 Hazard abilities:
+- PASS
+  - `veteran_voc_hazard` observed once in this run
+  - `zealot_relic_hazard` continues to appear in the same run
+
+#4 Grenade/blitz:
+- psyker_smite: PARTIAL PASS
+  - repeated live sequence:
+    - `grenade queued charge_power_sticky`
+    - `grenade queued use_power`
+    - `grenade external action confirmed for psyker_smite (action=action_use_power)`
+  - residual issue:
+    - intermittent `Could not find matching input_sequence for queued action_input "charge_release" in template "psyker_smite"`
+- psyker_force_field_dome: PASS
+  - one full confirmed activation:
+    - `fallback item queued psyker_force_field_dome input=combat_ability`
+    - `aim_force_field`
+    - `place_force_field`
+    - `charge consumed for psyker_force_field_dome`
+    - `fallback item confirmed charge consume ... (rule=force_field_ranged_pressure)`
+  - a second dome attempt started in the same run but was not cleanly confirmed to completion from logs alone
+- psyker_assail:
+  - no in-game evidence yet in this run
+
+Conclusion:
+- #21 can be promoted to PASS.
+- Dome remains validated.
+- Smite now works in practice, but the residual `charge_release` parser-noise keeps the Psyker blitz work short of fully clean.
+- #4 remains open for Assail evidence and Smite cleanup.
+```
 
 ### Run 2026-03-12-m5-batch2-02
 
