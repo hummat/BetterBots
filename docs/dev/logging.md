@@ -81,11 +81,14 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
+- `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
+- `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)
+- `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
 
 ## Intentionally suppressed (noise reduction)
 

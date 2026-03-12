@@ -12,7 +12,7 @@ return {
 		en = "Standard - conservative default behavior",
 	},
 	behavior_profile_testing = {
-		en = "Testing - more lenient triggers for faster validation",
+		en = "Testing - more lenient combat/item/grenade triggers for faster validation",
 	},
 	enable_tier_1_abilities = {
 		en = "Enable Tier 1 stance abilities",
@@ -87,6 +87,6 @@ return {
 		en = "Enable event log (JSONL)",
 	},
 	enable_perf_timing = {
-		en = "Enable per-frame timing before mission start (use /bb_perf to read)",
+		en = "Enable runtime timing (/bb_perf to read/reset)",
 	},
 }

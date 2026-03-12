@@ -6,6 +6,7 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _perf
 local CHASE_RANGE_SQ = 324
 local DEFAULT_MONSTER_WEIGHT = 2
 local PLAYER_TAG_BONUS = 3.0
@@ -44,6 +45,7 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
+	_perf = deps.perf
 end
 
 function M.register_hooks()
@@ -58,6 +60,7 @@ function M.register_hooks()
 			BotTargetSelection,
 			"slot_weight",
 			function(func, unit, target_unit, target_distance_sq, target_breed, target_ally)
+				local perf_t0 = _perf and _perf.begin()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
 
 				-- Issue #48: Boost score for player-tagged enemies
@@ -80,16 +83,25 @@ function M.register_hooks()
 				-- massively penalize melee score. This forces the bot to either shoot it
 				-- or pick a closer target for melee.
 				if target_distance_sq <= CHASE_RANGE_SQ then
+					if perf_t0 then
+						_perf.finish("target_selection.slot_weight", perf_t0)
+					end
 					return score
 				end
 
 				local tags = target_breed.tags
 				if not (tags and tags.special) then
+					if perf_t0 then
+						_perf.finish("target_selection.slot_weight", perf_t0)
+					end
 					return score
 				end
 
 				local ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
 				if not (ammo_percent and ammo_percent > 0.5) then
+					if perf_t0 then
+						_perf.finish("target_selection.slot_weight", perf_t0)
+					end
 					return score
 				end
 
@@ -106,19 +118,29 @@ function M.register_hooks()
 					)
 				end
 				-- Massive penalty to ensure melee_score loses to ranged_score
+				if perf_t0 then
+					_perf.finish("target_selection.slot_weight", perf_t0)
+				end
 				return score - 100
 			end
 		)
 
 		_mod:hook(BotTargetSelection, "monster_weight", function(func, unit, target_unit, target_breed, t)
+			local perf_t0 = _perf and _perf.begin()
 			local weight, override = func(unit, target_unit, target_breed, t)
 			local tags = target_breed and target_breed.tags or nil
 
 			if not (tags and tags.monster) or (weight and weight > 0) then
+				if perf_t0 then
+					_perf.finish("target_selection.monster_weight", perf_t0)
+				end
 				return weight, override
 			end
 
 			if not _is_monster_targeting_unit(target_unit, unit) then
+				if perf_t0 then
+					_perf.finish("target_selection.monster_weight", perf_t0)
+				end
 				return weight, override
 			end
 
@@ -130,6 +152,9 @@ function M.register_hooks()
 				)
 			end
 
+			if perf_t0 then
+				_perf.finish("target_selection.monster_weight", perf_t0)
+			end
 			return DEFAULT_MONSTER_WEIGHT, false
 		end)
 	end)

@@ -2,12 +2,11 @@
 
 ## Scope
 
-This mod targets bot `combat_ability` activation in two paths:
+This mod targets bot ability activation in three paths:
 
 1. Template-based abilities (`combat_ability_action.template_name ~= "none"`).
 2. Item-based abilities (`combat_ability_action.template_name == "none"` with an equipped combat-ability item).
-
-Grenade abilities are still out of scope.
+3. Grenade/blitz abilities (equipped grenade-ability items driven through explicit input sequences).
 
 ## Vanilla bot ability flow
 
@@ -18,7 +17,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does twenty-three things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty-four things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -43,7 +42,7 @@ Grenade abilities are still out of scope.
 10. Per-template heuristics (via `heuristics.lua`):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
-    - `standard/testing` behavior profile: testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing safety/validity guards
+    - `standard/testing` behavior profile: testing mode applies a narrow leniency override after heuristic evaluation across template, item, and grenade/blitz heuristics so bots produce validation events faster without bypassing hard safety/resource guards
     - `enemy_breed` export for breed classification
 11. Settings surface (`settings.lua`):
     - resolves DMF settings for behavior profile and coarse feature gates
@@ -98,6 +97,10 @@ Grenade abilities are still out of scope.
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
+24. Runtime perf measurement (`perf.lua`):
+    - central recorder keyed by the `enable_perf_timing` mod setting
+    - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
+    - `/bb_perf` prints and resets the current recording window instead of toggling recording state
 
 ## Why item fallback is needed
 
@@ -114,7 +117,7 @@ Result: item abilities need explicit queued inputs from the mod.
 | 1 | Whitelist bypass | Templates define usable `ability_meta_data` |
 | 2 | Runtime metadata injection | Includes template-specific `wait_action`/`end_condition` where needed |
 | 3a | Item-based combat fallback (experimental) | Driven via `weapon_action` sequence probing by action-input names |
-| 3b | Grenades | Not implemented |
+| 3b | Grenade/blitz fallback (experimental) | Driven via `grenade_fallback.lua` profiles and explicit grenade-ability input sequences |
 
 ## Class ability references
 
@@ -142,6 +145,8 @@ Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/de
 
 The mod piggybacks on data the engine already computes. There are no new per-frame scans, raycasts, or pathfinding queries.
 
+`/bb_perf` now reports the sum of instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters.
+
 **Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
 
 | Path | Cost | Notes |
@@ -152,6 +157,17 @@ The mod piggybacks on data the engine already computes. There are no new per-fra
 | `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, or state guard) |
 | Event logging (`emit`) | 1 table append per event | Buffered; flush to disk every 15s or 500 events. Off by default. |
 | Debug logging (`_debug_log`) | 1 string concat for key + 1 table lookup | Message body only built when debug enabled, but key argument is always evaluated |
+
+**Instrumented perf buckets:**
+- `ability_queue`, `grenade_fallback`, `ping_system`, `event_log_flush`, `event_log_snapshot`, `event_log_session_start`
+- `condition_patch.can_activate_ability`
+- `sprint.update_movement`
+- `target_selection.slot_weight`, `target_selection.monster_weight`
+- `weapon_action.may_fire`, `weapon_action.bot_queue_action_input`, `weapon_action.wield_slot`
+- `healing_deferral.health_stations`, `healing_deferral.health_deployables`
+- `poxburster.update_target_enemy`
+
+This is intentionally "sum of instrumented BetterBots hook time", not total process wall time for the whole mod or game frame. Any BetterBots work outside the instrumented hook set is excluded until explicitly wrapped.
 
 **What the mod does NOT do per frame:**
 - No new perception scans — reads `perception_extension:enemies_in_proximity()` which the engine already computed

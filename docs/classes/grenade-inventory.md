@@ -62,7 +62,7 @@ Each has a unique action hierarchy and input pattern. These are the most complex
 | `adamant_whistle` | `adamant_whistle.lua` | Arbites | `aim_pressed` -> `aim_released` | `ability_target_finder` | Only blitz with an `ability_template` field reference in related code |
 | `psyker_chain_lightning` | `psyker_chain_lightning.lua` | Psyker | Custom chain | `chain_lightning` | Warp charge gated |
 | `psyker_smite` | `psyker_smite.lua` | Psyker | Custom chain | `smite_targeting` | Warp charge gated, channeled |
-| `psyker_throwing_knives` | `psyker_throwing_knives.lua` | Psyker | `throw_pressed` (`grenade_ability_pressed`) | `spawn_projectile` | Multiple charges |
+| `psyker_throwing_knives` | `psyker_throwing_knives.lua` | Psyker | `shoot` (`action_one_pressed`) | `spawn_projectile` | Multiple charges |
 | `broker_missile_launcher` | `missile_launcher` (inventory item) | Hive Scum | Custom | `spawn_projectile` | Boom Bringer — burst damage at range |
 | `zealot_throwing_knives` | `zealot_throwing_knives.lua` | Zealot | `throw_pressed` (`grenade_ability_pressed`) | `spawn_projectile` | Multiple charges |
 

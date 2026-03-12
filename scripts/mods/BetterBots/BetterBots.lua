@@ -26,9 +26,6 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
-local _perf_recording = false
-local _perf_total_s = 0.0
-local _perf_calls = 0
 local PERF_SETTING_ID = "enable_perf_timing"
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
@@ -162,6 +159,9 @@ assert(Debug, "BetterBots: failed to load debug module")
 local EventLog = mod:io_dofile("BetterBots/scripts/mods/BetterBots/event_log")
 assert(EventLog, "BetterBots: failed to load event_log module")
 
+local Perf = mod:io_dofile("BetterBots/scripts/mods/BetterBots/perf")
+assert(Perf, "BetterBots: failed to load perf module")
+
 local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
 
@@ -250,11 +250,19 @@ EventLog.init({
 	context_snapshot = Debug.context_snapshot,
 })
 
+Perf.init({
+	get_setting = function(setting_id)
+		return mod:get(setting_id)
+	end,
+	setting_id = PERF_SETTING_ID,
+})
+
 Sprint.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	perf = Perf,
 })
 
 MeleeMetaData.init({
@@ -277,6 +285,7 @@ TargetSelection.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	perf = Perf,
 })
 
 Poxburster.init({
@@ -284,6 +293,7 @@ Poxburster.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	perf = Perf,
 })
 
 VfxSuppression.init({
@@ -298,6 +308,7 @@ WeaponAction.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	perf = Perf,
 })
 
 ConditionPatch.init({
@@ -312,6 +323,7 @@ ConditionPatch.init({
 	rescue_intent = _rescue_intent,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
+	perf = Perf,
 })
 
 AbilityQueue.init({
@@ -352,6 +364,7 @@ HealingDeferral.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	perf = Perf,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -418,6 +431,10 @@ local function _should_block_wield_input(unit)
 	return GrenadeFallback.should_block_wield_input(unit)
 end
 
+local function _should_block_weapon_action_input(unit, action_input)
+	return GrenadeFallback.should_block_weapon_action_input(unit, action_input)
+end
+
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
@@ -425,6 +442,7 @@ VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
 	should_block_wield_input = _should_block_wield_input,
+	should_block_weapon_action_input = _should_block_weapon_action_input,
 })
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
@@ -687,10 +705,14 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			return
 		end
 
+		Perf.sync_setting()
+		Perf.mark_bot_frame()
+
 		local brain = self._brain
 		local blackboard = brain and brain._blackboard or nil
 
 		if EventLog.is_enabled() and not _session_start_emitted then
+			local perf_t0 = Perf.begin()
 			local bots = Debug.collect_alive_bots()
 			if bots and #bots > 0 then
 				_session_start_emitted = true
@@ -710,22 +732,27 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 					bots = bot_info,
 				})
 			end
+			Perf.finish("event_log_session_start", perf_t0)
 		end
 
-		local _t0 = _perf_recording and os.clock()
+		local perf_t0 = Perf.begin()
 		AbilityQueue.try_queue(unit, blackboard)
+		Perf.finish("ability_queue", perf_t0)
+		perf_t0 = Perf.begin()
 		GrenadeFallback.try_queue(unit, blackboard)
+		Perf.finish("grenade_fallback", perf_t0)
+		perf_t0 = Perf.begin()
 		PingSystem.update(unit, blackboard)
+		Perf.finish("ping_system", perf_t0)
+		perf_t0 = Perf.begin()
 		EventLog.try_flush(_fixed_time())
-		if _t0 then
-			_perf_total_s = _perf_total_s + (os.clock() - _t0)
-			_perf_calls = _perf_calls + 1
-		end
+		Perf.finish("event_log_flush", perf_t0)
 
 		if EventLog.is_enabled() then
 			local fixed_t = _fixed_time()
 			local last_snap = _last_snapshot_t_by_unit[unit]
 			if not last_snap or fixed_t - last_snap >= _SNAPSHOT_INTERVAL_S then
+				local snapshot_t0 = Perf.begin()
 				_last_snapshot_t_by_unit[unit] = fixed_t
 				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
 				local bot_slot = Debug.bot_slot_for_unit(unit)
@@ -741,29 +768,67 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 					ctx = Debug.context_snapshot(Heuristics.build_context(unit, blackboard)),
 					item_stage = fb_state and fb_state.item_stage or nil,
 				})
+				Perf.finish("event_log_snapshot", snapshot_t0)
 			end
 		end
 	end)
 end)
 
-mod:command("bb_perf", "Print BetterBots per-frame timing stats (enable before mission start)", function()
-	if _perf_calls == 0 then
-		mod:echo("bb-perf: no samples — enable 'per-frame timing' before mission start")
+mod:command("bb_perf", "Print BetterBots runtime timing stats from the current recording window", function()
+	Perf.sync_setting()
+
+	local report = Perf.report_and_reset()
+	if not report then
+		if Perf.is_enabled() then
+			mod:echo("bb-perf: no samples yet")
+		else
+			mod:echo("bb-perf: no samples — enable 'per-frame timing' in mod settings")
+		end
 		return
 	end
+
 	mod:echo(
-		string.format("bb-perf: %.1f µs/bot/frame avg (%d samples)", _perf_total_s / _perf_calls * 1e6, _perf_calls)
+		string.format(
+			"bb-perf: %.1f µs/bot/frame total (%d bot frames, %d calls, %.3f ms total)",
+			report.total_us_per_bot_frame or 0,
+			report.bot_frames,
+			report.total_calls,
+			report.total_us / 1000
+		)
 	)
-	_perf_total_s = 0.0
-	_perf_calls = 0
+
+	local rows = {}
+	for tag, stats in pairs(report.tags) do
+		rows[#rows + 1] = {
+			tag = tag,
+			total_us = stats.total_us,
+			calls = stats.calls,
+			avg_us_per_call = stats.avg_us_per_call,
+		}
+	end
+
+	table.sort(rows, function(a, b)
+		return a.total_us > b.total_us
+	end)
+
+	for i = 1, #rows do
+		local row = rows[i]
+		mod:echo(
+			string.format(
+				"bb-perf: %s %.3f ms total (%d calls, %.1f µs/call)",
+				row.tag,
+				row.total_us / 1000,
+				row.calls,
+				row.avg_us_per_call
+			)
+		)
+	end
 end)
 
 function mod.on_game_state_changed(status, state)
 	if status == "enter" and state == "GameplayStateRun" then
 		_refresh_debug_log_level()
-		_perf_recording = mod:get(PERF_SETTING_ID) == true
-		_perf_total_s = 0.0
-		_perf_calls = 0
+		Perf.enter_run()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil
 		end
@@ -801,6 +866,4 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 end
 
 mod:echo("BetterBots loaded")
-if _debug_enabled() then
-	mod:echo("BetterBots DEBUG: logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")")
-end
+_debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")

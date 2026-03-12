@@ -59,10 +59,7 @@ local SUPPORTED_THROW_TEMPLATES = {
 	zealot_fire_grenade = DEFAULT_THROW_DELAY_S,
 	zealot_shock_grenade = 1.0,
 	-- Psyker blitz (wielded grenade-slot weapon templates)
-	psyker_throwing_knives = {
-		aim_input = "shoot",
-		auto_unwield = true,
-	},
+	psyker_throwing_knives = true,
 	psyker_chain_lightning = {
 		-- Use the charged crowd-control path, not the light quick-stun path:
 		-- charge_heavy -> shoot_heavy_hold -> shoot_heavy_hold_release.
@@ -77,8 +74,11 @@ local SUPPORTED_THROW_TEMPLATES = {
 	},
 	psyker_smite = {
 		aim_input = "charge_power_sticky",
+		followup_input = "use_power",
+		followup_delay = 2.0,
 		auto_unwield = true,
 		allow_external_wield_cleanup = true,
+		confirmation_action = "action_use_power",
 	},
 	-- Ogryn (standard generator with per-template overrides)
 	ogryn_grenade_box = 1.1, -- chain_time=0.9
@@ -112,6 +112,39 @@ local SUPPORTED_THROW_TEMPLATES = {
 	},
 }
 
+local ASSAIL_FAST_PROFILE = {
+	aim_input = "shoot",
+	auto_unwield = true,
+	allow_external_wield_cleanup = true,
+}
+
+local ASSAIL_AIMED_PROFILE = {
+	aim_input = "zoom",
+	followup_input = "zoom_shoot",
+	followup_delay = 0.5,
+	auto_unwield = true,
+	allow_external_wield_cleanup = true,
+	confirmation_action = "action_rapid_zoomed",
+}
+
+local function _resolve_template_entry(grenade_name, context, rule)
+	if grenade_name ~= "psyker_throwing_knives" then
+		return SUPPORTED_THROW_TEMPLATES[grenade_name]
+	end
+
+	local target_distance = context and context.target_enemy_distance or 0
+	local rule_text = tostring(rule or "")
+
+	if
+		target_distance >= 8
+		and (string.find(rule_text, "priority", 1, true) or string.find(rule_text, "ranged_pressure", 1, true))
+	then
+		return ASSAIL_AIMED_PROFILE
+	end
+
+	return ASSAIL_FAST_PROFILE
+end
+
 local function _reset_state(state, next_try_t)
 	state.stage = nil
 	state.deadline_t = nil
@@ -129,6 +162,7 @@ local function _reset_state(state, next_try_t)
 	state.allow_external_wield_cleanup = nil
 	state.confirmation_action = nil
 	state.confirmation_logged = nil
+	state.last_blocked_foreign_input = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
@@ -191,6 +225,44 @@ local function should_lock_weapon_switch(unit)
 	end
 
 	return true, grenade_name or "grenade_ability", "sequence", "slot_grenade_ability"
+end
+
+local function _expected_weapon_action_input(state)
+	if not state or not state.stage then
+		return nil
+	end
+
+	if state.stage == "wait_aim" then
+		return state.aim_input
+	end
+
+	if state.stage == "wait_followup" then
+		return state.followup_input
+	end
+
+	if state.stage == "wait_throw" then
+		return state.release_input
+	end
+
+	if state.stage == "wait_unwield" and not state.allow_external_wield_cleanup then
+		return "unwield_to_previous"
+	end
+
+	return nil
+end
+
+local function should_block_weapon_action_input(unit, action_input)
+	local state = _grenade_state_by_unit[unit]
+	if not state or not state.stage or action_input == "wield" then
+		return false
+	end
+
+	local expected_input = _expected_weapon_action_input(state)
+	if expected_input and action_input == expected_input then
+		return false
+	end
+
+	return true, state.grenade_name or "grenade_ability", state.stage
 end
 
 local function _queue_weapon_input(unit, input_name, component)
@@ -648,30 +720,7 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
-	local template_entry = SUPPORTED_THROW_TEMPLATES[grenade_name]
-	if not template_entry then
-		return
-	end
-
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
-	local aim_input, followup_input, followup_delay, release_input, throw_delay
-	local auto_unwield, component, confirmation_action
-	if type(template_entry) == "number" then
-		aim_input = "aim_hold"
-		release_input = "aim_released"
-		throw_delay = template_entry
-		auto_unwield = true
-	else
-		aim_input = template_entry.aim_input
-		followup_input = template_entry.followup_input
-		followup_delay = template_entry.followup_delay
-		release_input = template_entry.release_input
-		throw_delay = template_entry.throw_delay or DEFAULT_THROW_DELAY_S
-		auto_unwield = template_entry.auto_unwield ~= false -- default true
-		component = template_entry.component
-		confirmation_action = template_entry.confirmation_action
-	end
-
 	local context = _build_context(unit, blackboard)
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
 	_emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
@@ -699,6 +748,29 @@ local function try_queue(unit, blackboard)
 			)
 		end
 		return
+	end
+
+	local template_entry = _resolve_template_entry(grenade_name, context, rule)
+	if not template_entry then
+		return
+	end
+
+	local aim_input, followup_input, followup_delay, release_input, throw_delay
+	local auto_unwield, component, confirmation_action
+	if type(template_entry) == "number" then
+		aim_input = "aim_hold"
+		release_input = "aim_released"
+		throw_delay = template_entry
+		auto_unwield = true
+	else
+		aim_input = template_entry.aim_input
+		followup_input = template_entry.followup_input
+		followup_delay = template_entry.followup_delay
+		release_input = template_entry.release_input
+		throw_delay = template_entry.throw_delay or DEFAULT_THROW_DELAY_S
+		auto_unwield = template_entry.auto_unwield ~= false -- default true
+		component = template_entry.component
+		confirmation_action = template_entry.confirmation_action
 	end
 
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
@@ -804,4 +876,5 @@ return {
 	record_charge_event = record_charge_event,
 	should_block_wield_input = should_block_wield_input,
 	should_lock_weapon_switch = should_lock_weapon_switch,
+	should_block_weapon_action_input = should_block_weapon_action_input,
 }

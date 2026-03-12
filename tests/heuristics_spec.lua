@@ -1509,6 +1509,19 @@ describe("heuristics", function()
 			assert.matches("priority", rule)
 		end)
 
+		it("uses Assail under ranged pressure without a flagged priority target", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					num_nearby = 3,
+					ranged_count = 2,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("ranged", rule)
+		end)
+
 		it("holds Assail on super armor", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
@@ -1521,6 +1534,20 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("super_armor", rule)
+		end)
+
+		it("holds Assail at high peril", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+					peril_pct = 0.95,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("peril", rule)
 		end)
 
 		it("uses Smite on priority targets at safe peril", function()
@@ -1675,6 +1702,75 @@ describe("heuristics", function()
 
 			assert.is_true(ok)
 			assert.matches("testing_profile", rule)
+		end)
+
+		it("makes grenade heuristics more lenient in testing mode", function()
+			local ok, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					num_nearby = 3,
+					peril_pct = 0.30,
+				}),
+				{
+					behavior_profile = "testing",
+				}
+			)
+
+			assert.is_true(ok)
+			assert.matches("testing_profile", rule)
+		end)
+
+		it("keeps grenade peril blocks in testing mode", function()
+			local ok, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 12,
+					peril_pct = 0.90,
+				}),
+				{
+					behavior_profile = "testing",
+				}
+			)
+
+			assert.is_false(ok)
+			assert.matches("peril", rule)
+		end)
+
+		it("makes item heuristics more lenient in testing mode", function()
+			local ok, rule = Heuristics.evaluate_item_heuristic(
+				"psyker_force_field_dome",
+				helper.make_context({
+					num_nearby = 2,
+					toughness_pct = 0.50,
+				}),
+				{
+					behavior_profile = "testing",
+				}
+			)
+
+			assert.is_true(ok)
+			assert.matches("testing_profile", rule)
+		end)
+
+		it("keeps grenade super armor blocks in testing mode", function()
+			local ok, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "crusher",
+					target_enemy_distance = 10,
+					target_is_super_armor = true,
+					peril_pct = 0.30,
+					num_nearby = 3,
+				}),
+				{
+					behavior_profile = "testing",
+				}
+			)
+
+			assert.is_false(ok)
+			assert.matches("super_armor", rule)
 		end)
 	end)
 end)

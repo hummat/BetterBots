@@ -886,10 +886,42 @@ local function _grenade_smite(context)
 end
 
 local function _grenade_assail(context)
-	return _grenade_priority_target(context, "grenade_assail", {
-		max_peril = 0.85,
-		block_super_armor = true,
-	})
+	if context.peril_pct and context.peril_pct >= 0.85 then
+		return false, "grenade_assail_block_peril"
+	end
+
+	if context.target_is_super_armor then
+		return false, "grenade_assail_block_super_armor"
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local has_priority_target = context.target_is_monster
+		or context.target_is_elite_special
+		or context.priority_target_enemy ~= nil
+		or context.opportunity_target_enemy ~= nil
+		or context.urgent_target_enemy ~= nil
+
+	if has_priority_target then
+		return true, "grenade_assail_priority_target"
+	end
+
+	if context.target_enemy_type == "ranged" or context.ranged_count >= 2 then
+		return true, "grenade_assail_ranged_pressure"
+	end
+
+	if context.ranged_count >= 1 and target_distance >= 8 then
+		return true, "grenade_assail_ranged_pressure"
+	end
+
+	if (context.elite_count + context.special_count + context.monster_count) >= 1 then
+		return true, "grenade_assail_priority_pack"
+	end
+
+	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		return true, "grenade_assail_crowd_soften"
+	end
+
+	return false, "grenade_assail_hold"
 end
 
 local function _grenade_chain_lightning(context)
@@ -1046,8 +1078,34 @@ local function _testing_profile_override(context)
 	return false
 end
 
+local function _testing_profile_can_override_rule(rule)
+	if rule == nil then
+		return true
+	end
+
+	rule = tostring(rule)
+
+	if string.find(rule, "_hold", 1, true) then
+		return true
+	end
+
+	if string.find(rule, "_block_safe", 1, true) then
+		return true
+	end
+
+	if string.find(rule, "_block_low_value", 1, true) then
+		return true
+	end
+
+	return false
+end
+
 local function _apply_behavior_profile(can_activate, rule, context, opts)
 	if can_activate ~= false or not _testing_profile_active(opts) then
+		return can_activate, rule
+	end
+
+	if not _testing_profile_can_override_rule(rule) then
 		return can_activate, rule
 	end
 
@@ -1143,29 +1201,32 @@ local function evaluate_heuristic(template_name, context, opts)
 	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
-local function evaluate_item_heuristic(ability_name, context)
+local function evaluate_item_heuristic(ability_name, context, opts)
 	local fn = ITEM_HEURISTICS[ability_name]
 	if not fn then
 		return false, "unknown_item_ability"
 	end
-	return fn(context)
+
+	local can_activate, rule = fn(context)
+	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
-local function evaluate_grenade_heuristic(grenade_template_name, context)
+local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 	if not context then
 		return false, "grenade_no_context"
 	end
 
 	local fn = GRENADE_HEURISTICS[grenade_template_name]
 	if fn then
-		return fn(context)
+		local can_activate, rule = fn(context)
+		return _apply_behavior_profile(can_activate, rule, context, opts)
 	end
 
 	if context.num_nearby > 0 then
-		return true, "grenade_generic"
+		return _apply_behavior_profile(true, "grenade_generic", context, opts)
 	end
 
-	return false, "grenade_no_enemies"
+	return _apply_behavior_profile(false, "grenade_no_enemies", context, opts)
 end
 
 return {

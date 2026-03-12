@@ -226,6 +226,10 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 | Cooldown (recharge per knife) | 3s |
 | Can be wielded when depleted | Yes |
 
+**Input actions**:
+- `shoot` -> `action_rapid_right` (basic throw)
+- `zoom` -> `zoom_shoot` (aimed/homing variant)
+
 **What it does**: Throws homing psychic daggers that track enemies. Self-regenerating ammo (10 charges, 3s per charge). Less effective vs Carapace armor. The knives home in on targets near the crosshair.
 
 **Key modifying talents**:
@@ -239,10 +243,11 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 **Bot usage notes**: Assail is moderately bot-friendly.
 - Item-based (wielded), same Tier 3 challenge as Brain Burst
 - Homing behavior makes aiming less critical
+- BetterBots now splits between the fast `shoot` path at close pressure and the aimed `zoom -> zoom_shoot` homing chain for longer-range priority/ranged threats
 - Finite charges (10) require charge management
 - Use against specials and ranged threats
 - Good for softening groups before melee engagement
-- No Peril cost (charge-based instead)
+- Still generates Peril despite using charges rather than grenade pickups
 
 ### 3. Chain Lightning
 

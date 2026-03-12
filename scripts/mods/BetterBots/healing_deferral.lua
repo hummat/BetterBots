@@ -5,6 +5,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _health
+local _perf
 
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
@@ -145,22 +146,33 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_health = deps.health_module or rawget(_G, "Health")
+	_perf = deps.perf
 end
 
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
 		_mod:hook_safe(BotBehaviorExtension, "_update_health_stations", function(self, unit)
+			local perf_t0 = _perf and _perf.begin()
 			if not (_health and _health.current_health_percent) then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_stations", perf_t0)
+				end
 				return
 			end
 
 			local settings = _resolve_settings()
 			if not _mode_allows_resource(settings.mode, "health_station") then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_stations", perf_t0)
+				end
 				return
 			end
 
 			local health_station_component = self._health_station_component
 			if not (health_station_component and health_station_component.needs_health) then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_stations", perf_t0)
+				end
 				return
 			end
 
@@ -170,22 +182,35 @@ function M.register_hooks()
 			local bot_health_pct = _health.current_health_percent(unit)
 
 			if not _should_defer_resource("health_station", bot_health_pct, human_needs_healing, settings) then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_stations", perf_t0)
+				end
 				return
 			end
 
 			_apply_health_station_deferral(health_station_component)
 			_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
 		end)
 	end)
 
 	_mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 		_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
+			local perf_t0 = _perf and _perf.begin()
 			if not (_health and _health.current_health_percent) then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_deployables", perf_t0)
+				end
 				return
 			end
 
 			local settings = _resolve_settings()
 			if not _mode_allows_resource(settings.mode, "health_deployable") then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_deployables", perf_t0)
+				end
 				return
 			end
 
@@ -193,6 +218,9 @@ function M.register_hooks()
 			local human_needs_healing =
 				_any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
 			if not human_needs_healing then
+				if perf_t0 then
+					_perf.finish("healing_deferral.health_deployables", perf_t0)
+				end
 				return
 			end
 
@@ -205,6 +233,10 @@ function M.register_hooks()
 						_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
 					end
 				end
+			end
+
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_deployables", perf_t0)
 			end
 		end)
 	end)

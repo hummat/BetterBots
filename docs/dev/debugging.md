@@ -122,6 +122,9 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 3. `/bb_brain`
    - Dumps deeper bot snapshot via `mod:dump()` (context + selected perception + fallback state).
    - Use only when `/bb_state` + logs are insufficient.
+4. `/bb_perf`
+   - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
+   - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
 
 ### Practical debug workflow
 

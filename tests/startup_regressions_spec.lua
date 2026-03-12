@@ -43,4 +43,13 @@ describe("startup regressions", function()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/log_levels"%)', 1))
 	end)
+
+	it("routes startup debug chatter through the log-level gate instead of unconditional echo", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_nil(source:find('mod:echo%("BetterBots DEBUG: logging enabled %(level=', 1))
+		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
+	end)
 end)

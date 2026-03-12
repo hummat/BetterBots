@@ -10,6 +10,7 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _perf
 
 -- One-shot dedup: log poxburster suppression once per bot per encounter
 -- instead of every 2s frame. Weak-keyed so entries are GC'd when bots despawn.
@@ -101,6 +102,7 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
+	_perf = deps.perf
 end
 
 function M.register_hooks()
@@ -137,6 +139,7 @@ function M.register_hooks()
 				_enemies_in_proximity,
 				side
 			)
+				local perf_t0 = _perf and _perf.begin()
 				local suppress, reason =
 					_suppress_reason_for_target(perception_component.target_enemy, self_position, side)
 				if suppress then
@@ -202,6 +205,10 @@ function M.register_hooks()
 							"debug"
 						)
 					end
+				end
+
+				if perf_t0 then
+					_perf.finish("poxburster.update_target_enemy", perf_t0)
 				end
 			end
 		)

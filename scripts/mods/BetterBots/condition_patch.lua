@@ -13,6 +13,7 @@ local _MetaData
 local _Debug
 local _EventLog
 local _is_combat_template_enabled
+local _perf
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -58,18 +59,27 @@ local RESCUE_CHARGE_RULES = {
 	adamant_charge_ally_aid = true,
 }
 
+local function _return_with_perf(perf_t0, ...)
+	if perf_t0 and _perf then
+		_perf.finish("condition_patch.can_activate_ability", perf_t0)
+	end
+
+	return ...
+end
+
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	local perf_t0 = _perf and _perf.begin()
 	local ability_component_name = action_data.ability_component_name
 
 	-- Fast path: keep running ability nodes alive (e.g. charge mid-lunge)
 	if ability_component_name == scratchpad.ability_component_name then
-		return true
+		return _return_with_perf(perf_t0, true)
 	end
 
 	-- Guards below only apply to NEW activations
 	local behavior = blackboard and blackboard.behavior
 	if behavior and behavior.current_interaction_unit ~= nil then
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local suppressed, suppress_reason = _is_suppressed(unit)
@@ -81,7 +91,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"ability suppressed (" .. tostring(suppress_reason) .. ")"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
@@ -98,7 +108,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name) then
@@ -109,7 +119,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked " .. ability_template_name .. " (disabled by mod setting)"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")
@@ -124,7 +134,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked missing template " .. ability_template_name
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local ability_meta_data = ability_template.ability_meta_data
@@ -136,7 +146,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked " .. ability_template_name .. " (no ability_meta_data)"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local activation_data = ability_meta_data.activation
@@ -148,7 +158,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked " .. ability_template_name .. " (no activation data)"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local action_input = activation_data.action_input
@@ -160,7 +170,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked " .. ability_template_name .. " (activation.action_input missing)"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local used_input = activation_data.used_input
@@ -176,7 +186,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				"blocked " .. ability_template_name .. " (invalid action_input=" .. tostring(action_input) .. ")"
 			)
 		end
-		return false
+		return _return_with_perf(perf_t0, false)
 	end
 
 	local can_activate, rule, context = _Heuristics.resolve_decision(
@@ -215,7 +225,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		)
 	end
 
-	return can_activate
+	return _return_with_perf(perf_t0, can_activate)
 end
 
 local function _install_condition_patch(conditions, patched_set, patch_label)
@@ -324,6 +334,7 @@ function M.init(deps)
 	_rescue_intent = deps.rescue_intent
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
+	_perf = deps.perf
 end
 
 function M.wire(deps)
