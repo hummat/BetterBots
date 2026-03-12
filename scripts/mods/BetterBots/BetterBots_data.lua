@@ -8,8 +8,14 @@ return {
 		widgets = {
 			{
 				setting_id = "enable_debug_logs",
-				type = "checkbox",
-				default_value = false,
+				type = "dropdown",
+				default_value = "off",
+				options = {
+					{ text = "debug_log_level_off", value = "off" },
+					{ text = "debug_log_level_info", value = "info" },
+					{ text = "debug_log_level_debug", value = "debug" },
+					{ text = "debug_log_level_trace", value = "trace" },
+				},
 			},
 			{
 				setting_id = "enable_event_log",

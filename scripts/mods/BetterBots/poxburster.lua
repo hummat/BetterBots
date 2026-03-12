@@ -52,7 +52,7 @@ function M.register_hooks()
 		if breed_data.not_bot_target then
 			breed_data.not_bot_target = nil
 			_poxburster_breed_patched = true
-			_debug_log("poxburster_patch", 0, "patched poxburster breed: removed not_bot_target")
+			_debug_log("poxburster_patch", 0, "patched poxburster breed: removed not_bot_target", nil, "info")
 		end
 	end)
 
@@ -61,7 +61,7 @@ function M.register_hooks()
 	if ok and breed and breed.not_bot_target and not _poxburster_breed_patched then
 		breed.not_bot_target = nil
 		_poxburster_breed_patched = true -- luacheck: ignore 311 (read in hook_require callback above)
-		_debug_log("poxburster_patch_eager", 0, "patched poxburster breed (eager): removed not_bot_target")
+		_debug_log("poxburster_patch_eager", 0, "patched poxburster breed (eager): removed not_bot_target", nil, "info")
 	end
 
 	-- Close-range suppression: after target selection runs, if the chosen target
@@ -82,7 +82,9 @@ function M.register_hooks()
 						_debug_log(
 							"poxburster_suppress:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster target (too close)"
+							"suppressed poxburster target (too close)",
+							nil,
+							"trace"
 						)
 					end
 				end
@@ -94,7 +96,9 @@ function M.register_hooks()
 						_debug_log(
 							"poxburster_suppress_opp:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster opportunity target (too close)"
+							"suppressed poxburster opportunity target (too close)",
+							nil,
+							"trace"
 						)
 					end
 				end
@@ -106,7 +110,9 @@ function M.register_hooks()
 						_debug_log(
 							"poxburster_suppress_urg:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster urgent target (too close)"
+							"suppressed poxburster urgent target (too close)",
+							nil,
+							"trace"
 						)
 					end
 				end
@@ -118,7 +124,9 @@ function M.register_hooks()
 						_debug_log(
 							"poxburster_suppress_pri:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster priority target (too close)"
+							"suppressed poxburster priority target (too close)",
+							nil,
+							"trace"
 						)
 					end
 				end

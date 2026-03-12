@@ -56,7 +56,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 ## Key BetterBots log lines
 
 - `BetterBots loaded`
-- `BetterBots DEBUG: logging enabled (force=...)`
+- `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
 - `decision ... -> true` (BT condition path activation — only `true` results are logged)
@@ -107,6 +107,15 @@ The following were removed/throttled to reduce chat spam during testing:
 
 Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every feature's logs must survive across releases to catch regressions and validate working state. Never mark logs as "remove after validation."
 
+### Log levels
+
+`enable_debug_logs` is a dropdown in DMF options:
+
+- `Off` — no `_debug_log` output
+- `Info` — one-shot patches and confirmations only
+- `Debug` — default diagnostic level for ability decisions and state changes
+- `Trace` — includes per-frame diagnostics such as sprint/poxburster suppression traces
+
 ### Rules
 
 1. **Gate expensive reads behind `_debug_enabled()`**. `read_component()`, `has_extension()`, and string concatenation run on the hot path (multiple bots, every frame). Only pay that cost when debug mode is on.
@@ -115,7 +124,7 @@ Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every 
    - **Weak-keyed set** for object-keyed dedup (scratchpad, unit): `local _logged = setmetatable({}, { __mode = "k" })`. Entries auto-clear when the key is GC'd (e.g. scratchpad recycled between missions).
    - **String-keyed set** for combo dedup: `local _logged_combos = {}`. Build a key like `bot_slot .. ":" .. template .. ":" .. action` and skip if already seen. Use this when the discriminator is a value, not an object reference.
 
-3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
+3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg, interval, level)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
 
 4. **Log the confirmation signal**. Each feature should log the event that proves it fired correctly:
    - State machine transition → log the new state and trigger

@@ -100,10 +100,11 @@ rg "Script Error|Lua Stack" "$LATEST"
 
 ```lua
 -- Throttled logging gated by mod setting
-_debug_log(key, fixed_t, message, min_interval_s)
+_debug_log(key, fixed_t, message, min_interval_s, level)
 ```
 
-- Gated by `enable_debug_logs` mod setting (checkbox in DMF options)
+- Gated by `enable_debug_logs` mod setting (dropdown: Off / Info / Debug / Trace)
+- Omitted `level` defaults to `debug`
 - Throttled to 2s per unique key (avoids spam)
 - Outputs to chat via `mod:echo("BetterBots DEBUG: " .. message)`
 
