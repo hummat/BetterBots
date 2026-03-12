@@ -1580,8 +1580,10 @@ describe("heuristics", function()
 		local saved_managers
 		local saved_position_lookup
 		local saved_script_unit
+		local liquid_results_return_mode
 
 		before_each(function()
+			liquid_results_return_mode = "table"
 			saved_managers = rawget(_G, "Managers")
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
@@ -1591,22 +1593,27 @@ describe("heuristics", function()
 					extension = {
 						system = function(_, system_name)
 							assert.equals("liquid_area_system", system_name)
-							return {
-								find_liquid_areas_in_position = function(_, position, results)
-									assert.equals("hazard_pos", position)
-									results[1] = {
+								return {
+									find_liquid_areas_in_position = function(_, position, results)
+										assert.equals("hazard_pos", position)
+										results[1] = {
 										source_side_name = function()
 											return "enemy"
 										end,
-										area_template_name = function()
-											return "cultist_grenadier_gas"
-										end,
-									}
-									return 1
-								end,
-							}
-						end,
-					},
+											area_template_name = function()
+												return "cultist_grenadier_gas"
+											end,
+										}
+
+										if liquid_results_return_mode == "number" then
+											return 1
+										end
+
+										return results
+									end,
+								}
+							end,
+						},
 				},
 			}
 			_G.POSITION_LOOKUP = {
@@ -1638,6 +1645,15 @@ describe("heuristics", function()
 
 		it("marks context as hazardous when hostile liquid overlaps the bot position", function()
 			local context = Heuristics.build_context("hazard_bot", nil)
+			assert.is_true(context.in_hazard)
+		end)
+
+		it("handles liquid area api returning the results table instead of a count", function()
+			liquid_results_return_mode = "table"
+
+			local ok, context = pcall(Heuristics.build_context, "hazard_bot", nil)
+
+			assert.is_true(ok)
 			assert.is_true(context.in_hazard)
 		end)
 	end)

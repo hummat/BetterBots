@@ -45,25 +45,25 @@ return {
 		en = "Bot emergency override below",
 	},
 	healing_deferral_threshold_10 = {
-		en = "10% health",
+		en = "10%% health",
 	},
 	healing_deferral_threshold_25 = {
-		en = "25% health",
+		en = "25%% health",
 	},
 	healing_deferral_threshold_40 = {
-		en = "40% health",
+		en = "40%% health",
 	},
 	healing_deferral_threshold_50 = {
-		en = "50% health",
+		en = "50%% health",
 	},
 	healing_deferral_threshold_75 = {
-		en = "75% health",
+		en = "75%% health",
 	},
 	healing_deferral_threshold_90 = {
-		en = "90% health",
+		en = "90%% health",
 	},
 	healing_deferral_threshold_100 = {
-		en = "100% health",
+		en = "100%% health",
 	},
 	healing_deferral_emergency_never = {
 		en = "Never override (bots may die)",

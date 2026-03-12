@@ -217,6 +217,40 @@ describe("grenade_fallback", function()
 			advance_to_stage("wait_unwield")
 			assert.is_true(GrenadeFallback.should_block_wield_input(unit))
 		end)
+
+		it("does not block wield cleanup for chain lightning in wait_unwield", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 4, peril_pct = 0.2 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_chain_lightning_crowd"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_chain_lightning" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+			assert.is_false(GrenadeFallback.should_block_wield_input(unit))
+		end)
 	end)
 
 	describe("should_lock_weapon_switch", function()
@@ -747,7 +781,7 @@ describe("grenade_fallback", function()
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 		end)
 
-		it("supports Chain Lightning light-cast channel", function()
+		it("supports Chain Lightning charged crowd-control sequence", function()
 			GrenadeFallback.wire({
 				build_context = function()
 					return { num_nearby = 5 }
@@ -772,15 +806,62 @@ describe("grenade_fallback", function()
 			_mock_time = _mock_time + 0.5
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(1, #_recorded_inputs)
-			assert.equals("shoot_light_pressed", _recorded_inputs[1].input)
+			assert.equals("charge_heavy", _recorded_inputs[1].input)
+			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shoot_heavy_hold", _recorded_inputs[1].input)
 			assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
 
 			_recorded_inputs = {}
 			_mock_time = _mock_time + 1.0
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(1, #_recorded_inputs)
-			assert.equals("shoot_light_hold_release", _recorded_inputs[1].input)
+			assert.equals("shoot_heavy_hold_release", _recorded_inputs[1].input)
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("does not queue invalid unwield_to_previous cleanup for Chain Lightning", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 4, peril_pct = 0.2 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_chain_lightning_crowd"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_chain_lightning" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 3.1
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(0, #_recorded_inputs)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
 		end)
 
 		it("supports Smite sticky-charge startup", function()

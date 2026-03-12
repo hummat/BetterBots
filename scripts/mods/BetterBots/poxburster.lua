@@ -151,7 +151,7 @@ function M.register_hooks()
 							_fixed_time(),
 							"suppressed poxburster target (" .. tostring(reason) .. ")",
 							nil,
-							"trace"
+							"debug"
 						)
 					end
 				end
@@ -167,7 +167,7 @@ function M.register_hooks()
 							_fixed_time(),
 							"suppressed poxburster opportunity target (" .. tostring(reason) .. ")",
 							nil,
-							"trace"
+							"debug"
 						)
 					end
 				end
@@ -183,7 +183,7 @@ function M.register_hooks()
 							_fixed_time(),
 							"suppressed poxburster urgent target (" .. tostring(reason) .. ")",
 							nil,
-							"trace"
+							"debug"
 						)
 					end
 				end
@@ -199,7 +199,7 @@ function M.register_hooks()
 							_fixed_time(),
 							"suppressed poxburster priority target (" .. tostring(reason) .. ")",
 							nil,
-							"trace"
+							"debug"
 						)
 					end
 				end

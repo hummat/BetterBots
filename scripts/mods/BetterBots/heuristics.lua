@@ -48,9 +48,9 @@ local function _position_in_hostile_hazard(position)
 
 	if liquid_area_system.find_liquid_areas_in_position then
 		local overlapping_liquids = {}
-		local num_overlaps = liquid_area_system:find_liquid_areas_in_position(position, overlapping_liquids) or 0
+		liquid_area_system:find_liquid_areas_in_position(position, overlapping_liquids)
 
-		for i = 1, num_overlaps do
+		for i = 1, #overlapping_liquids do
 			if _is_hazardous_liquid_area(overlapping_liquids[i]) then
 				return true
 			end

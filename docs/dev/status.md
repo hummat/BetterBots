@@ -1,4 +1,4 @@
-# Status Snapshot (March 11, 2026)
+# Status Snapshot (March 12, 2026)
 
 ## What's shipped
 
@@ -88,14 +88,14 @@ Target: v0.6.1+ (8 features, batch testing)
 
 | Issue | Feature | Scope | Status |
 |-------|---------|-------|--------|
-| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag 90 `_debug_log` calls | Planned |
-| #15 | Dodge suppression audit | Research whether dodge interrupts abilities; likely close as not-a-bug | Planned |
-| #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Planned |
-| #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Planned |
-| #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Planned |
-| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Planned |
-| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Planned |
-| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Planned |
+| #40 | Tiered debug log levels | Replace checkbox with info/debug/trace dropdown; tag `_debug_log` calls by level | Implemented, partial in-game validation |
+| #15 | Dodge suppression audit | Research whether dodge interrupts abilities | Closed as not-a-bug |
+| #34 | Poxburster targeting fix | Add human-player proximity suppression (don't shoot poxbursters near human) | Implemented, validated in-game |
+| #16 | Ping system redesign | Replace 2s cooldown with target tracking + distance escalation anti-spam | Implemented, validated in-game |
+| #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Implemented, validated in-game |
+| #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, partially validated (`zealot_relic_hazard` PASS; veteran hazard shout still unobserved) |
+| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
+| #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, partially validated (latest validated run showed Chain Lightning on light path; local charged-path fix pending re-test) |
 
 Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 

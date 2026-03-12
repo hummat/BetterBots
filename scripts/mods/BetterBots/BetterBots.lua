@@ -1,7 +1,7 @@
 local mod = get_mod("BetterBots")
 local FixedFrame = require("scripts/utilities/fixed_frame")
 local ArmorSettings = require("scripts/settings/damage/armor_settings")
-local LogLevels = dofile("scripts/mods/BetterBots/log_levels.lua")
+local LogLevels = mod:io_dofile("BetterBots/scripts/mods/BetterBots/log_levels")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
@@ -577,6 +577,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 					bot = bot_slot,
 					ability = ability_name,
 					charges = optional_num_charges or 1,
+					rule = fb_state and fb_state.item_rule or nil,
 					attempt_id = fb_state and fb_state.attempt_id or nil,
 				})
 			end

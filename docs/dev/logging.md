@@ -64,16 +64,19 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback queued ...` (template fallback queued)
 - `fallback held ...` (heuristic withheld ability — only logged when `num_nearby > 0`)
 - `fallback blocked ...` (template fallback rejected)
-- `fallback item queued ...` (item fallback queued wield/cast/unwield input)
+- `fallback item queued ... (rule=...)` (item fallback queued wield/cast/unwield input with triggering rule)
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
 - `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
 - `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
+- `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
 - `grenade throw complete, slot returned to <slot>` (grenade sequence fully completed)
 - `grenade forced unwield_to_previous on timeout` (cleanup fallback; indicates normal post-throw unwind did not complete)
+- `grenade released cleanup lock without explicit unwield (charge confirmed|timeout)` (templates such as Psyker blitz unwind via normal `wield`, not `unwield_to_previous`)
+- `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
@@ -115,7 +118,9 @@ Debug logging is **permanent infrastructure**, not throwaway diagnostics. Every 
 - `Off` — no `_debug_log` output
 - `Info` — one-shot patches and confirmations only
 - `Debug` — default diagnostic level for ability decisions and state changes
-- `Trace` — includes per-frame diagnostics such as sprint/poxburster suppression traces
+- `Trace` — includes per-frame diagnostics such as sprint traces
+
+Poxburster suppression confirmations are logged at `Debug`, not `Trace`, so normal validation runs can confirm that path.
 
 ### Rules
 

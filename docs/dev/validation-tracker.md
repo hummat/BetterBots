@@ -738,6 +738,65 @@ Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 - [ ] Mission with mixed enemies (horde + elites + specials) for grenade heuristic validation
 - [ ] Mission with hazard zones (fire/gas) for #21 validation
 
+### Current status (2026-03-12)
+
+| Issue | Feature | Status | Evidence / gap |
+|-------|---------|--------|----------------|
+| #15 | Dodge suppression audit | PASS | Audit-only, closed as not-a-bug |
+| #16 | Ping anti-spam | PASS | Ping events seen in early `dev/m5-batch2` run |
+| #18 | Boss engagement | PASS | Consume/engagement evidence seen in early `dev/m5-batch2` run |
+| #21 | Hazard abilities | PARTIAL | `zealot_relic_hazard` confirmed; `veteran_voc_hazard` not yet observed |
+| #34 | Poxburster targeting | PASS | `suppressed poxburster target (near_human_player)` and `(too_close_to_bot)` at `Debug` |
+| #39 | Healing deferral | UNKNOWN | No in-mission trigger logged yet |
+| #40 | Tiered log levels | PARTIAL | `Debug` vs `Trace` paths validated indirectly; explicit menu-level sweep still missing |
+| #4 | Grenade heuristics + Psyker blitz | PARTIAL | Grenades/knives/whistle work; latest validated run had Chain Lightning on light path only, local charged-path fix pending re-test |
+
+### Run 2026-03-12-m5-batch2-02
+
+```text
+Run ID: 2026-03-12-m5-batch2-02
+Date (local): 2026-03-12
+Date (UTC): 2026-03-12
+Git commit: local (post poxburster-debug + item-rule-attribution + grenade cleanup-lock fixes)
+Log file: console-2026-03-12-15.24.57-b0aee589-fffe-4c97-9b36-17973ef85b25.log
+Bot lineup / abilities: included Zealot relic, Veteran shout, Psyker Chain Lightning
+Map + difficulty: mixed-combat mission with hazards and multiple poxbursters
+
+#34 Poxburster targeting:
+- PASS
+  - `suppressed poxburster target (near_human_player)`
+  - `suppressed poxburster target (too_close_to_bot)`
+
+#21 Hazard abilities:
+- zealot_relic: PASS
+  - visual: yes
+  - rule-attributed log: yes
+  - key lines: `fallback item queued zealot_relic input=channel (rule=zealot_relic_hazard)`
+               `fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)`
+- veteran_combat_ability_shout: PARTIAL
+  - visual: yes (general shout use)
+  - hazard-specific rule: no
+  - key lines: repeated `hazard=true` decisions with `rule=veteran_voc_hold`; no `veteran_voc_hazard` observed
+
+#4 Grenade/blitz:
+- zealot_throwing_knives: PASS
+- adamant_whistle: PASS
+- ogryn_grenade_box_cluster: PASS
+- psyker_chain_lightning: FAIL
+  - visual: player observed only light-cast behavior
+  - strongest log signal: queued `shoot_light_pressed` then `shoot_light_hold_release`
+  - no charged-path evidence (`charge_heavy` / `shoot_heavy_hold`) in this run
+
+Regression checks:
+- Lua errors: no
+- basic combat loop: PASS
+
+Conclusion:
+- #34 is validated.
+- #21 is partially validated: hazard-triggered relic works, hazard-triggered veteran shout still needs an in-game hit.
+- #4 remains open because Chain Lightning is using the light path instead of the charged crowd-control path documented for bot use.
+```
+
 **New issue discovered in H-02b:**
 
 Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while active, and without Venting Shriek (different ability slot) the bot has no way to vent. The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance. Needs investigation — possible mitigations:

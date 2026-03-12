@@ -29,6 +29,7 @@ local function _emit_item_event(event_type, unit, ability_name, state, fixed_t, 
 		event = event_type,
 		bot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
 		ability = ability_name,
+		rule = state.item_rule,
 		stage = state.item_stage,
 		profile = state.item_profile_name,
 		attempt_id = state.attempt_id,
@@ -150,6 +151,7 @@ local function _reset_item_sequence_state(state, next_try_t)
 	state.item_unwield_input = nil
 	state.item_unwield_delay = nil
 	state.item_charge_confirm_timeout = nil
+	state.item_rule = nil
 
 	if next_try_t then
 		state.next_try_t = next_try_t
@@ -385,7 +387,13 @@ local function _queue_item_start_input(unit, ability_name, state, fixed_t, black
 		_debug_log(
 			"fallback_item_start:" .. ability_name,
 			fixed_t,
-			"fallback item queued " .. ability_name .. " input=" .. tostring(state.item_start_input)
+			"fallback item queued "
+				.. ability_name
+				.. " input="
+				.. tostring(state.item_start_input)
+				.. " (rule="
+				.. tostring(state.item_rule)
+				.. ")"
 		)
 	end
 
@@ -481,9 +489,11 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	end
 
 	if not state.item_stage then
-		if not can_use_item_fallback(unit, ability_extension, ability_name, blackboard) then
+		local can_use, rule = can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+		if not can_use then
 			return
 		end
+		state.item_rule = rule
 	end
 
 	local inventory_component = unit_data_extension:read_component("inventory")
@@ -506,6 +516,8 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 					.. ability_name
 					.. " (profile="
 					.. tostring(state.item_profile_name)
+					.. ", rule="
+					.. tostring(state.item_rule)
 					.. ")"
 			)
 		end
