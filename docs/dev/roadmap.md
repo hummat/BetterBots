@@ -51,7 +51,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 |---|-------|-------|
 | 12 | Stance early cancellation | Researched — complex. Stances have no release input (`transition = "stay"`). Needs template injection or `stop_action()` + buff cleanup. |
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
-| 15 | Suppress dodge during ability hold | Unblocked — `movement_state.is_dodging` + `Dodge.is_dodging()` available. Prevent dodge from interrupting charge/hold phases. |
 | 21 | Hazard avoidance during abilities | Don't stance in fire/gas/bomber puddles. |
 | 37 | Objective-aware ability activation | Protect allies during revive/interaction with defensive abilities (taunt, shout, stealth). |
 
