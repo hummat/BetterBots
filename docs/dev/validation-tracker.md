@@ -714,7 +714,7 @@ Conclusion:
 
 ## dev/m5-batch2 Test Plan
 
-Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+Branch: `dev/m5-batch2` | Archived plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
 ### Features under test
 

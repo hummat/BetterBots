@@ -141,7 +141,7 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
 | 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence) |
 | 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
-| 3 | Not addressed | All grenades, Psyker Smite/Assail/Chain Lightning | No `ability_template` field → needs different approach |
+| 3 | Validated | Standard grenades, Psyker Smite/Assail/Chain Lightning, knives, whistle, mines | Grenade/blitz fallback + per-grenade heuristics |
 
 ### Decompiled source repo (Aussiemon/Darktide-Source-Code)
 

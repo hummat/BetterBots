@@ -32,7 +32,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Staff charged fire (#43, partial — p4 PASS in-game, p3 untested, p1/p2 need investigation)
 
 ### v0.6.0 (2026-03-11)
-- Grenade/blitz throw (#4): state machine for 19 templates, profile-driven. Standard/handleless/mine/knives/whistle/missile. Generic heuristic only; per-grenade heuristics in v0.6.1.
+- Grenade/blitz throw (#4): state machine for 19 templates, profile-driven. Standard/handleless/mine/knives/whistle/missile. Initial support only.
 - Staff charged fire complete (#43): all 4 staves PASS — chain-only fire derivation fix for p1 Voidstrike + p2 Purgatus.
 - Bot pinging (#16): bots ping elites/specials for human player.
 - Distant special penalty (#19): melee target distance penalty for specials.

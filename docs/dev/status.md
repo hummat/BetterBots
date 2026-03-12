@@ -37,7 +37,6 @@
 
 ### v0.6.0 (2026-03-11)
 - **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher.
-- **Grenade heuristics + psyker blitz follow-up** (#4, dev/m5-batch2): per-grenade spending rules (horde / elite / defensive / mine) plus minimal Psyker blitz support for Assail, Smite, and Chain Lightning.
 - **Staff charged fire fix** (#43): all 4 force staves now fire charged attacks. `find_chain_target_action()` fallback for chain-only fire actions (p1 Voidstrike, p2 Purgatus).
 - **Bot pinging** (#16): bots ping elites and specials for the human player.
 - **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
@@ -96,7 +95,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 | #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
 | #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, validated in-game |
 
-Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
+Archived implementation plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
 ## Next Steps
 - Default class profiles for bots (#45) — P2, design approved
