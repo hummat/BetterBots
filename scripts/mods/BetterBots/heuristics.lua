@@ -2,6 +2,7 @@ local _fixed_time
 local _decision_context_cache
 local _super_armor_breed_cache
 local _armor_type_super_armor
+local _is_testing_profile
 
 local function _is_tagged(tags, tag_name)
 	return tags and tags[tag_name] == true
@@ -775,6 +776,59 @@ local function _evaluate_template_heuristic(
 	)
 end
 
+local function _testing_profile_active(opts)
+	if opts and opts.behavior_profile then
+		return opts.behavior_profile == "testing"
+	end
+
+	return _is_testing_profile and _is_testing_profile() or false
+end
+
+local function _testing_profile_override(context)
+	if not context then
+		return false
+	end
+
+	if context.target_ally_needs_aid then
+		return true, "testing_profile_ally_aid"
+	end
+
+	if context.target_is_monster then
+		return true, "testing_profile_monster"
+	end
+
+	if context.target_is_elite_special or context.special_count > 0 or context.elite_count > 0 then
+		return true, "testing_profile_priority"
+	end
+
+	if context.num_nearby >= 2 then
+		return true, "testing_profile_crowd"
+	end
+
+	if context.num_nearby >= 1 and (context.toughness_pct < 0.80 or context.health_pct < 0.80) then
+		return true, "testing_profile_pressure"
+	end
+
+	return false
+end
+
+local function _apply_behavior_profile(can_activate, rule, context, opts)
+	if can_activate ~= false or not _testing_profile_active(opts) then
+		return can_activate, rule
+	end
+
+	local should_override, override_rule = _testing_profile_override(context)
+	if not should_override then
+		return can_activate, rule
+	end
+
+	if rule then
+		return true, tostring(rule) .. "->" .. override_rule
+	end
+
+	return true, override_rule
+end
+
 -- Centralized decision evaluation with nil→fallback resolution.
 -- Replaces the pattern previously duplicated in _can_activate_ability,
 -- _fallback_try_queue_combat_ability, and _resolve_current_heuristic_decision.
@@ -820,7 +874,9 @@ local function resolve_decision(
 		end
 	end
 
-	return can_activate, rule, context
+	local profiled_can_activate, profiled_rule = _apply_behavior_profile(can_activate, rule, context)
+
+	return profiled_can_activate, profiled_rule, context
 end
 
 -- Test-friendly entry point: evaluates a template heuristic against a pre-built
@@ -829,7 +885,7 @@ end
 local function evaluate_heuristic(template_name, context, opts)
 	if template_name == "veteran_combat_ability" then
 		opts = opts or {}
-		return _can_activate_veteran_combat_ability(
+		local can_activate, rule = _can_activate_veteran_combat_ability(
 			opts.conditions or {},
 			opts.unit,
 			nil,
@@ -840,6 +896,8 @@ local function evaluate_heuristic(template_name, context, opts)
 			opts.ability_extension,
 			context
 		)
+
+		return _apply_behavior_profile(can_activate, rule, context, opts)
 	end
 
 	local fn = TEMPLATE_HEURISTICS[template_name]
@@ -847,7 +905,8 @@ local function evaluate_heuristic(template_name, context, opts)
 		return nil, "fallback_unhandled_template"
 	end
 
-	return fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
+	local can_activate, rule = fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
+	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
 local function evaluate_item_heuristic(ability_name, context)
@@ -881,6 +940,7 @@ return {
 		_decision_context_cache = deps.decision_context_cache
 		_super_armor_breed_cache = deps.super_armor_breed_cache
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
+		_is_testing_profile = deps.is_testing_profile
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

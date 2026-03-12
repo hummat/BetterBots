@@ -65,6 +65,7 @@ local _is_suppressed_reason = nil
 -- Mock combat ability lock
 local _combat_ability_active = false
 local _debug_enabled_result = false
+local _grenades_enabled_result = true
 
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
@@ -96,6 +97,7 @@ local function reset()
 	_is_suppressed_reason = nil
 	_combat_ability_active = false
 	_debug_enabled_result = false
+	_grenades_enabled_result = true
 	_recorded_inputs = {}
 	_debug_logs = {}
 	_grenade_state_by_unit = {}
@@ -147,6 +149,9 @@ local function reset()
 		end,
 		is_combat_ability_active = function()
 			return _combat_ability_active
+		end,
+		is_grenade_enabled = function()
+			return _grenades_enabled_result
 		end,
 	})
 end
@@ -228,6 +233,12 @@ describe("grenade_fallback", function()
 
 	it("does nothing when grenade charges depleted", function()
 		_can_use_grenade = false
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("does nothing when grenade gating is disabled", function()
+		_grenades_enabled_result = false
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(0, #_recorded_inputs)
 	end)

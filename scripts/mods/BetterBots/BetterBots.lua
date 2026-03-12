@@ -143,6 +143,9 @@ end
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
 
+local Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
+assert(Settings, "BetterBots: failed to load settings module")
+
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
 assert(Heuristics, "BetterBots: failed to load heuristics module")
 
@@ -189,6 +192,10 @@ local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system
 assert(PingSystem, "BetterBots: failed to load ping_system module")
 
 -- Init each module with its dependencies
+Settings.init({
+	mod = mod,
+})
+
 MetaData.init({
 	mod = mod,
 	patched_ability_templates = _patched_ability_templates,
@@ -202,6 +209,7 @@ Heuristics.init({
 	decision_context_cache = _decision_context_cache_by_unit,
 	super_armor_breed_cache = _super_armor_breed_flag_by_name,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
+	is_testing_profile = Settings.is_testing_profile,
 })
 
 ItemFallback.init({
@@ -338,6 +346,7 @@ ItemFallback.wire({
 	context_snapshot = Debug.context_snapshot,
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
 	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
+	is_item_ability_enabled = Settings.is_item_ability_enabled,
 })
 
 Debug.wire({
@@ -352,6 +361,7 @@ ConditionPatch.wire({
 	MetaData = MetaData,
 	Debug = Debug,
 	EventLog = EventLog,
+	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
 AbilityQueue.wire({
@@ -360,6 +370,7 @@ AbilityQueue.wire({
 	ItemFallback = ItemFallback,
 	Debug = Debug,
 	EventLog = EventLog,
+	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
 GrenadeFallback.wire({
@@ -369,6 +380,7 @@ GrenadeFallback.wire({
 	is_combat_ability_active = function(unit)
 		return (ItemFallback.should_lock_weapon_switch(unit))
 	end,
+	is_grenade_enabled = Settings.is_grenade_enabled,
 })
 
 local function _should_lock_weapon_switch(unit)

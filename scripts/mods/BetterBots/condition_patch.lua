@@ -12,6 +12,7 @@ local _Heuristics
 local _MetaData
 local _Debug
 local _EventLog
+local _is_combat_template_enabled
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -95,6 +96,17 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 				fixed_t,
 				"blocked " .. ability_component_name .. " (template_name=none)",
 				DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+			)
+		end
+		return false
+	end
+
+	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name) then
+		if _debug_enabled() then
+			_debug_log(
+				"disabled_template:" .. ability_template_name,
+				fixed_t,
+				"blocked " .. ability_template_name .. " (disabled by mod setting)"
 			)
 		end
 		return false
@@ -319,6 +331,7 @@ function M.wire(deps)
 	_MetaData = deps.MetaData
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
+	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)

@@ -16,6 +16,7 @@ local _MetaData
 local _ItemFallback
 local _Debug
 local _EventLog
+local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 
@@ -64,6 +65,17 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			)
 		end
 
+		return
+	end
+
+	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name) then
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_disabled_template:" .. ability_template_name,
+				fixed_t,
+				"fallback blocked " .. ability_template_name .. " (disabled by mod setting)"
+			)
+		end
 		return
 	end
 
@@ -351,6 +363,7 @@ function M.wire(deps)
 	_ItemFallback = deps.ItemFallback
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
+	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 
 function M.try_queue(unit, blackboard)

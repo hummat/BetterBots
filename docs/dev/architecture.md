@@ -18,7 +18,7 @@ Grenade abilities are still out of scope.
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does twenty things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty-one things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -42,49 +42,53 @@ Grenade abilities are still out of scope.
 10. Per-template heuristics (via `heuristics.lua`):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
+    - `standard/testing` behavior profile: testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing safety/validity guards
     - `enemy_breed` export for breed classification
-11. Structured JSONL event logging (`event_log.lua`):
+11. Settings surface (`settings.lua`):
+    - resolves DMF settings for behavior profile and coarse feature gates
+    - gates Tier 1, Tier 2, Tier 3, and grenade/blitz activations in central paths instead of scattering checks across individual heuristics
+12. Structured JSONL event logging (`event_log.lua`):
     - opt-in via mod setting (`enable_event_log`)
     - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`
     - events carry `attempt_id` for cross-event correlation (decision → queued → consumed)
     - buffered with periodic flush (15s or 500 events); survives hot-reload via load-time recovery
-12. Revive/interaction protection (#20):
+13. Revive/interaction protection (#20):
     - blocks ability activation when `blackboard.behavior.current_interaction_unit ~= nil`
     - applied in both BT condition hook and fallback path (after in-progress state machines)
-13. Ability suppression / impulse control (#11):
+14. Ability suppression / impulse control (#11):
     - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
     - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
-14. Warp weapon peril block (#27, via `weapon_action.lua`):
+15. Warp weapon peril block (#27, via `weapon_action.lua`):
     - blocks `weapon_action` inputs (except `wield`) for warp weapons at ≥97% peril
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
-15. Poxburster targeting (#34, via `poxburster.lua`):
+16. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
     - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
-16. ADS fix for T5/T6 bots (#35):
+17. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
-17. Bot sprinting (#36, via `sprint.lua`):
+18. Bot sprinting (#36, via `sprint.lua`):
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-18. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
+19. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
-19. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+20. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
-20. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+21. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-21. Melee target selection distance penalty (#19, via `target_selection.lua`):
+22. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%)
     - biases the bot's behavior toward ranged engagement instead of chasing distant specials

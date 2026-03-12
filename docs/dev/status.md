@@ -84,7 +84,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 ## Next Steps
 - #4: test shock mine with bot equipped with shock mine
 - Default class profiles for bots (#45) — P2, design approved
-- Per-ability toggle settings (#6) — P2
+- Broader settings work (#6) — partial settings shipped in-batch (`standard/testing` profile + tier/grenade toggles); remaining scope is per-ability toggles + calibrated multi-preset tuning
 - Weapon/enemy-aware ADS (#41) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Objective-aware ability activation (#37) — P2
