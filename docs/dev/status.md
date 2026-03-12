@@ -36,12 +36,13 @@
 - **Staff charged fire** (#43, partial): `_may_fire()` hook + aim chain derivation. p4 trauma PASS in v0.5.0. Root cause for p2/p1: `find_aim_fire_input()` couldn't find chain-only fire actions (no `start_input`). Fix: `find_chain_target_action()` fallback scans `allowed_chain_actions` (dev/m5-batch1, commit 09e0f22). p2 flame PASS, p3/p4 PASS, p1 surge structural fix in place (no in-game evidence yet).
 
 ### v0.6.0 (2026-03-11)
-- **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher. Generic heuristic only (`enemies_in_proximity > 0`); per-grenade heuristics planned for v0.6.1.
+- **Grenade/blitz throw** (#4): state machine for 19 grenade/blitz templates — wield→aim→throw→unwield for item-based, direct `grenade_ability_action` for ability-based (whistle). Profiles for standard/handleless/mine/knives/whistle/missile launcher.
+- **Grenade heuristics + psyker blitz follow-up** (#4, dev/m5-batch2): per-grenade spending rules (horde / elite / defensive / mine) plus minimal Psyker blitz support for Assail, Smite, and Chain Lightning.
 - **Staff charged fire fix** (#43): all 4 force staves now fire charged attacks. `find_chain_target_action()` fallback for chain-only fire actions (p1 Voidstrike, p2 Purgatus).
 - **Bot pinging** (#16): bots ping elites and specials for the human player.
 - **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
 - **Daemonhost avoidance** (#17): suppress bot combat near dormant daemonhosts (code + tests, unverifiable in-game — no DH spawn).
-- **Unit tests**: 305 tests via busted.
+- **Unit tests**: 367 tests via busted.
 
 ## Current Tier Status
 

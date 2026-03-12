@@ -725,9 +725,9 @@ Branch: `dev/m5-batch2` | Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 | #34 | Poxburster targeting | Bots shoot at range, suppress when poxburster near human player |
 | #16 | Ping anti-spam | Tag holds on one elite until death; no flipping; closer elite triggers escalation |
 | #18 | Boss engagement | Vanilla deprioritization preserved; bot fights back when boss targets it |
-| #21 | Hazard abilities | Defensive ability (relic/shout) in fire/gas; Castigator's Stance suppressed in hazard |
+| #21 | Hazard abilities | Defensive ability (relic/shout) in fire/gas; no regression to Arbites stance defensive use |
 | #39 | Healing deferral | Bot defers health station/med-crate/pickup to human; emergency override at <25% bot HP |
-| #4 | Grenade heuristics | Krak→elite only; frag→horde 4+; smoke/shock→overwhelmed; psyker blitz channels with peril gate |
+| #4 | Grenade heuristics | Krak→elite only; frag→horde 4+; smoke/shock→pressure tools; Psyker Assail/Smite/Chain Lightning fire with peril gate |
 
 ### Pre-test checklist
 

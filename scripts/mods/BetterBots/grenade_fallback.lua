@@ -53,7 +53,21 @@ local SUPPORTED_THROW_TEMPLATES = {
 	-- Zealot (standard/handleless)
 	zealot_fire_grenade = DEFAULT_THROW_DELAY_S,
 	zealot_shock_grenade = 1.0,
-	-- Psyker — no throwable grenades (smite/chain lightning/knives are blitz)
+	-- Psyker blitz (wielded grenade-slot weapon templates)
+	psyker_throwing_knives = {
+		aim_input = "shoot",
+		auto_unwield = true,
+	},
+	psyker_chain_lightning = {
+		aim_input = "shoot_light_pressed",
+		release_input = "shoot_light_hold_release",
+		throw_delay = 0.8,
+		auto_unwield = true,
+	},
+	psyker_smite = {
+		aim_input = "charge_power_sticky",
+		auto_unwield = true,
+	},
 	-- Ogryn (standard generator with per-template overrides)
 	ogryn_grenade_box = 1.1, -- chain_time=0.9
 	ogryn_grenade_box_cluster = 1.1, -- chain_time=0.9

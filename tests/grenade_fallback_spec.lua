@@ -461,7 +461,7 @@ describe("grenade_fallback", function()
 				return true, "grenade_generic"
 			end,
 			equipped_grenade_ability = function()
-				return mock_ability_extension, { name = "psyker_chain_lightning" }
+				return mock_ability_extension, { name = "unknown_psyker_blitz" }
 			end,
 		})
 		GrenadeFallback.try_queue(unit, blackboard)
@@ -671,6 +671,100 @@ describe("grenade_fallback", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(1, #_recorded_inputs)
 			assert.equals("shoot_charge", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("supports Assail as a single-shot wielded blitz", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_anti_elite"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shoot", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("supports Chain Lightning light-cast channel", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 5 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_chain_lightning_crowd"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_chain_lightning" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shoot_light_pressed", _recorded_inputs[1].input)
+			assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shoot_light_hold_release", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("supports Smite sticky-charge startup", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 1 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_smite_priority"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_smite" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_aim", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("charge_power_sticky", _recorded_inputs[1].input)
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 		end)
 
