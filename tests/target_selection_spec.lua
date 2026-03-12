@@ -3,8 +3,36 @@ describe("TargetSelection", function()
 	local _mod
 	local original_slot_weight
 
+	local function make_smart_tag_system(target_unit, is_human)
+		return {
+			unit_tag = function(self, unit)
+				if unit == target_unit then
+					return {
+						tagger_player = function()
+							return { is_human_controlled = function() return is_human end }
+						end,
+					}
+				end
+				return nil
+			end,
+		}
+	end
+
 	before_each(function()
 		TargetSelection = require("scripts.mods.BetterBots.target_selection")
+
+		-- Default: no smart tags
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function(self, name)
+						if name == "smart_tag_system" then
+							return { unit_tag = function() return nil end }
+						end
+					end,
+				},
+			},
+		}
 
 		-- Mock the mod object
 		_mod = {
@@ -53,6 +81,7 @@ describe("TargetSelection", function()
 
 	after_each(function()
 		package.loaded["scripts/utilities/ammo"] = nil
+		_G.Managers = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -129,6 +158,81 @@ describe("TargetSelection", function()
 		local breed_special = { tags = { special = true } }
 
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
+		assert.are.equal(5, score)
+	end)
+
+	-- #48: player tag boost
+	it("has_human_player_tag returns true for human-tagged unit", function()
+		local target_unit = {}
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function(self, name)
+						if name == "smart_tag_system" then
+							return make_smart_tag_system(target_unit, true)
+						end
+					end,
+				},
+			},
+		}
+		assert.is_true(TargetSelection.has_human_player_tag(target_unit))
+	end)
+
+	it("boosts score when target is tagged by a human player", function()
+		local target_unit = {}
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function(self, name)
+						if name == "smart_tag_system" then
+							return make_smart_tag_system(target_unit, true)
+						end
+					end,
+				},
+			},
+		}
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(8, score) -- 5 + 3
+	end)
+
+	it("does not boost score when target is tagged by a bot (not human)", function()
+		local target_unit = {}
+		_G.Managers.state.extension.system = function(self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, false)
+			end
+		end
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("does not boost score when target has no tag", function()
+		local target_unit = {}
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("does not boost score when smart_tag_system is unavailable", function()
+		_G.Managers.state.extension.system = function() return nil end
+		local target_unit = {}
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("does not boost score when target_unit is nil", function()
+		local unit = { has_ammo = true }
+		local breed = { tags = {}, name = "cultist" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 100, breed, nil)
 		assert.are.equal(5, score)
 	end)
 end)

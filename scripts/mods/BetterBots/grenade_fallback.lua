@@ -471,20 +471,48 @@ local function try_queue(unit, blackboard)
 		-- wield transitions, not unwield_to_previous. Release our block and let
 		-- the normal weapon-switch path unwind them.
 		if state.allow_external_wield_cleanup then
-			if _debug_enabled() and state.confirmation_action and not state.confirmation_logged then
-				local weapon_action = unit_data_extension and unit_data_extension:read_component("weapon_action")
-				if weapon_action and weapon_action.current_action_name == state.confirmation_action then
-					state.confirmation_logged = true
+			if wielded_slot ~= "slot_grenade_ability" then
+				if _debug_enabled() then
 					_debug_log(
-						"grenade_external_action:" .. tostring(unit),
+						"grenade_external_cleanup_slot:" .. tostring(unit),
 						fixed_t,
-						"grenade external action confirmed for "
-							.. tostring(state.grenade_name)
-							.. " (action="
-							.. tostring(state.confirmation_action)
-							.. ")"
+						"grenade released cleanup lock without explicit unwield (slot changed)"
 					)
 				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				return
+			end
+
+			local action_confirmed = false
+			if state.confirmation_action and unit_data_extension then
+				local weapon_action = unit_data_extension:read_component("weapon_action")
+				action_confirmed = weapon_action and weapon_action.current_action_name == state.confirmation_action
+			end
+
+			if _debug_enabled() and action_confirmed and not state.confirmation_logged then
+				state.confirmation_logged = true
+				_debug_log(
+					"grenade_external_action:" .. tostring(unit),
+					fixed_t,
+					"grenade external action confirmed for "
+						.. tostring(state.grenade_name)
+						.. " (action="
+						.. tostring(state.confirmation_action)
+						.. ")"
+				)
+			end
+
+			if action_confirmed then
+				if _debug_enabled() then
+					state.confirmation_logged = true
+					_debug_log(
+						"grenade_external_cleanup_action:" .. tostring(unit),
+						fixed_t,
+						"grenade released cleanup lock without explicit unwield (action confirmed)"
+					)
+				end
+				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				return
 			end
 
 			if _has_confirmed_charge(state, unit) then

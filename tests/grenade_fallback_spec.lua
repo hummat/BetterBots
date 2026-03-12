@@ -864,6 +864,82 @@ describe("grenade_fallback", function()
 			assert.is_nil(_grenade_state_by_unit[unit].stage)
 		end)
 
+		it("completes Chain Lightning cleanup immediately on charged action confirmation", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 4, peril_pct = 0.2 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_chain_lightning_crowd"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_chain_lightning" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			_component_state_by_name.weapon_action = {
+				current_action_name = "action_spread_charged",
+			}
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(0, #_recorded_inputs)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.truthy(find_debug_log("grenade external action confirmed for psyker_chain_lightning"))
+			assert.truthy(find_debug_log("grenade released cleanup lock without explicit unwield (action confirmed)"))
+		end)
+
+		it("completes Chain Lightning cleanup when the engine unwields away from grenade slot", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 4, peril_pct = 0.2 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_chain_lightning_crowd"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_chain_lightning" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 1.0
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			_wielded_slot = "slot_secondary"
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(0, #_recorded_inputs)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.truthy(find_debug_log("grenade released cleanup lock without explicit unwield (slot changed)"))
+		end)
+
 		it("supports Smite sticky-charge startup", function()
 			GrenadeFallback.wire({
 				build_context = function()
