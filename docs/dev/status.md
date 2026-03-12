@@ -21,7 +21,7 @@
 - **Safety guards**: revive/interaction protection (#20), ability suppression (#11), warp weapon peril block (#27)
 
 ### v0.4.0 (2026-03-08)
-- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, close-range (<5m) suppression
+- **Poxburster targeting** (#34): removed `not_bot_target` breed flag, suppresses shots when poxburster is close to the bot (<5m) or any human player (<8m)
 - **ADS fix for T5/T6 bots** (#35): inject default `bot_gestalts` (`killshot`/`linesman`) when profile omits them
 - **Bot sprinting** (#36): sprint module with catch-up (>12m), rescue, traversal conditions + daemonhost safety
 - **Charge/dash rescue aim** (#10): zealot dash, ogryn charge, and arbites charge aim toward disabled allies. 14 rescue activations confirmed in-game.

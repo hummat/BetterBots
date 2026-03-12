@@ -60,7 +60,7 @@ Grenade abilities are still out of scope.
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
 15. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
-    - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
+    - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m of the bot or within 8m of any human player
 16. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights

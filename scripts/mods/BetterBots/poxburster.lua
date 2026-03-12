@@ -2,6 +2,7 @@
 -- not_bot_target on breed data. We patch the breed to re-enable targeting
 -- and suppress only at close range to avoid detonation.
 local POXBURSTER_SUPPRESS_DIST = 5
+local POXBURSTER_HUMAN_SUPPRESS_DIST = 8
 local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
 local _poxburster_breed_patched = false
 
@@ -14,27 +15,83 @@ local _fixed_time
 -- instead of every 2s frame. Weak-keyed so entries are GC'd when bots despawn.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
 
-local function _is_close_poxburster(unit, self_position)
-	if not unit then
+local function _is_near_any_position(origin_position, positions, threshold, distance_fn)
+	if not origin_position or not positions then
 		return false
+	end
+
+	local compute_distance = distance_fn or Vector3.distance
+
+	for i = 1, #positions do
+		local position = positions[i]
+		if position and compute_distance(origin_position, position) < threshold then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _should_suppress_poxburster_positions(
+	poxburster_position,
+	self_position,
+	human_positions,
+	bot_threshold,
+	human_threshold,
+	distance_fn
+)
+	if _is_near_any_position(poxburster_position, { self_position }, bot_threshold, distance_fn) then
+		return true, "too_close_to_bot"
+	end
+
+	if _is_near_any_position(poxburster_position, human_positions, human_threshold, distance_fn) then
+		return true, "near_human_player"
+	end
+
+	return false, nil
+end
+
+local function _suppress_reason_for_target(unit, self_position, side)
+	if not unit then
+		return false, nil
 	end
 
 	local data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not data_ext then
-		return false
+		return false, nil
 	end
 
 	local breed = data_ext:breed()
 	if not breed or breed.name ~= POXBURSTER_BREED_NAME then
-		return false
+		return false, nil
 	end
 
 	local pos = POSITION_LOOKUP[unit]
 	if not pos then
-		return false
+		return false, nil
 	end
 
-	return Vector3.distance(self_position, pos) < POXBURSTER_SUPPRESS_DIST
+	local human_positions = {}
+	local human_units = side and side.valid_human_units or nil
+
+	if human_units then
+		for i = 1, #human_units do
+			local human_unit = human_units[i]
+			local human_position = human_unit and POSITION_LOOKUP[human_unit] or nil
+
+			if human_position then
+				human_positions[#human_positions + 1] = human_position
+			end
+		end
+	end
+
+	return _should_suppress_poxburster_positions(
+		pos,
+		self_position,
+		human_positions,
+		POXBURSTER_SUPPRESS_DIST,
+		POXBURSTER_HUMAN_SUPPRESS_DIST
+	)
 end
 
 local M = {}
@@ -71,8 +128,18 @@ function M.register_hooks()
 		_mod:hook_safe(
 			BotPerceptionExtension,
 			"_update_target_enemy",
-			function(_self, self_unit, self_position, perception_component)
-				if _is_close_poxburster(perception_component.target_enemy, self_position) then
+			function(
+				_self,
+				self_unit,
+				self_position,
+				perception_component,
+				_behavior_component,
+				_enemies_in_proximity,
+				side
+			)
+				local suppress, reason =
+					_suppress_reason_for_target(perception_component.target_enemy, self_position, side)
+				if suppress then
 					perception_component.target_enemy = nil
 					perception_component.target_enemy_distance = math.huge
 					perception_component.target_enemy_type = "none"
@@ -82,43 +149,49 @@ function M.register_hooks()
 						_debug_log(
 							"poxburster_suppress:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster target (too close)"
+							"suppressed poxburster target (" .. tostring(reason) .. ")"
 						)
 					end
 				end
 
-				if _is_close_poxburster(perception_component.opportunity_target_enemy, self_position) then
+				suppress, reason =
+					_suppress_reason_for_target(perception_component.opportunity_target_enemy, self_position, side)
+				if suppress then
 					perception_component.opportunity_target_enemy = nil
 					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
 						_pox_suppress_logged[self_unit] = true
 						_debug_log(
 							"poxburster_suppress_opp:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster opportunity target (too close)"
+							"suppressed poxburster opportunity target (" .. tostring(reason) .. ")"
 						)
 					end
 				end
 
-				if _is_close_poxburster(perception_component.urgent_target_enemy, self_position) then
+				suppress, reason =
+					_suppress_reason_for_target(perception_component.urgent_target_enemy, self_position, side)
+				if suppress then
 					perception_component.urgent_target_enemy = nil
 					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
 						_pox_suppress_logged[self_unit] = true
 						_debug_log(
 							"poxburster_suppress_urg:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster urgent target (too close)"
+							"suppressed poxburster urgent target (" .. tostring(reason) .. ")"
 						)
 					end
 				end
 
-				if _is_close_poxburster(perception_component.priority_target_enemy, self_position) then
+				suppress, reason =
+					_suppress_reason_for_target(perception_component.priority_target_enemy, self_position, side)
+				if suppress then
 					perception_component.priority_target_enemy = nil
 					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
 						_pox_suppress_logged[self_unit] = true
 						_debug_log(
 							"poxburster_suppress_pri:" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster priority target (too close)"
+							"suppressed poxburster priority target (" .. tostring(reason) .. ")"
 						)
 					end
 				end
@@ -126,5 +199,7 @@ function M.register_hooks()
 		)
 	end)
 end
+
+M.should_suppress_poxburster_positions = _should_suppress_poxburster_positions
 
 return M
