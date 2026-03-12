@@ -15,16 +15,20 @@ describe("TargetSelection", function()
 				end
 			end,
 			hook = function(self, module, name, handler)
-				-- Store the handler so we can test it
-				_mod.stored_handler = handler
+				_mod.handlers = _mod.handlers or {}
+				_mod.handlers[name] = handler
 			end,
 		}
 
 		TargetSelection.init({
 			mod = _mod,
 			debug_log = function() end,
-			debug_enabled = function() return false end,
-			fixed_time = function() return 0 end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
 		})
 
 		original_slot_weight = function(unit, target_unit, target_distance_sq, target_breed, target_ally)
@@ -56,11 +60,11 @@ describe("TargetSelection", function()
 		local breed = { tags = {} } -- no special/elite tags
 
 		-- < 18m (324 sq)
-		local score1 = _mod.stored_handler(original_slot_weight, unit, nil, 100, breed, nil)
+		local score1 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 100, breed, nil)
 		assert.are.equal(5, score1)
 
 		-- > 18m
-		local score2 = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed, nil)
+		local score2 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed, nil)
 		assert.are.equal(5, score2)
 	end)
 
@@ -68,7 +72,7 @@ describe("TargetSelection", function()
 		local unit = { has_ammo = true }
 		local breed = {} -- nil tags
 
-		local score = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed, nil)
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed, nil)
 		assert.are.equal(5, score)
 	end)
 
@@ -76,7 +80,7 @@ describe("TargetSelection", function()
 		local unit = { has_ammo = true }
 		local breed_special = { tags = { special = true } }
 
-		local score1 = _mod.stored_handler(original_slot_weight, unit, nil, 324, breed_special, nil)
+		local score1 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 324, breed_special, nil)
 		assert.are.equal(5, score1)
 	end)
 
@@ -84,7 +88,7 @@ describe("TargetSelection", function()
 		local unit = { has_ammo = true }
 		local breed_elite = { tags = { elite = true } }
 
-		local score1 = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed_elite, nil)
+		local score1 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_elite, nil)
 		assert.are.equal(5, score1)
 	end)
 
@@ -93,7 +97,7 @@ describe("TargetSelection", function()
 		local breed_special = { tags = { special = true } }
 
 		-- 325 is just over 18m squared (324)
-		local score1 = _mod.stored_handler(original_slot_weight, unit, nil, 325, breed_special, nil)
+		local score1 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 325, breed_special, nil)
 		assert.are.equal(-95, score1) -- 5 - 100
 	end)
 
@@ -101,7 +105,7 @@ describe("TargetSelection", function()
 		local unit = { low_ammo = true }
 		local breed_special = { tags = { special = true } }
 
-		local score = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed_special, nil)
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
 		assert.are.equal(5, score)
 	end)
 
@@ -109,7 +113,7 @@ describe("TargetSelection", function()
 		local unit = { has_ammo = false }
 		local breed_special = { tags = { special = true } }
 
-		local score = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed_special, nil)
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
 		assert.are.equal(5, score)
 	end)
 
@@ -124,7 +128,7 @@ describe("TargetSelection", function()
 		local unit = {}
 		local breed_special = { tags = { special = true } }
 
-		local score = _mod.stored_handler(original_slot_weight, unit, nil, 400, breed_special, nil)
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
 		assert.are.equal(5, score)
 	end)
 end)

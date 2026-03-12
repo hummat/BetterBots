@@ -7,6 +7,14 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local CHASE_RANGE_SQ = 324
+local DEFAULT_MONSTER_WEIGHT = 2
+
+local function _is_monster_targeting_unit(target_unit, unit)
+	local enemy_blackboard = BLACKBOARDS and BLACKBOARDS[target_unit] or nil
+	local enemy_perception = enemy_blackboard and enemy_blackboard.perception or nil
+
+	return enemy_perception and enemy_perception.aggro_state == "aggroed" and enemy_perception.target_unit == unit
+end
 
 function M.init(deps)
 	_mod = deps.mod
@@ -63,7 +71,32 @@ function M.register_hooks()
 				return score - 100
 			end
 		)
+
+		_mod:hook(BotTargetSelection, "monster_weight", function(func, unit, target_unit, target_breed, t)
+			local weight, override = func(unit, target_unit, target_breed, t)
+			local tags = target_breed and target_breed.tags or nil
+
+			if not (tags and tags.monster) or (weight and weight > 0) then
+				return weight, override
+			end
+
+			if not _is_monster_targeting_unit(target_unit, unit) then
+				return weight, override
+			end
+
+			if _debug_enabled() then
+				_debug_log(
+					"boss_targeting_bot",
+					_fixed_time(),
+					"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
+				)
+			end
+
+			return DEFAULT_MONSTER_WEIGHT, false
+		end)
 	end)
 end
+
+M.is_monster_targeting_unit = _is_monster_targeting_unit
 
 return M
