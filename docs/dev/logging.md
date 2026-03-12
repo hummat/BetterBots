@@ -59,7 +59,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
-- `decision ... -> true` (BT condition path activation — only `true` results are logged)
+- `decision ... -> true` (BT condition path activation — includes `hazard=<true|false>` in the debug line)
 - `enter ability node ...`
 - `fallback queued ...` (template fallback queued)
 - `fallback held ...` (heuristic withheld ability — only logged when `num_nearby > 0`)
@@ -68,6 +68,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
+- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
 - `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
@@ -202,6 +203,8 @@ Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)
 ### Correlation
 
 Events carry `attempt_id` (monotonic per session) to link decision → queued → consumed chains. `bot` field is the player slot index.
+
+`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation.
 
 ### Analysis
 

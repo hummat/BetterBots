@@ -79,6 +79,7 @@ local function context_snapshot(context)
 		allies_in_coherency = context.allies_in_coherency,
 		avg_ally_toughness_pct = context.avg_ally_toughness_pct,
 		max_ally_corruption_pct = context.max_ally_corruption_pct,
+		in_hazard = context.in_hazard,
 	}
 end
 
@@ -203,6 +204,8 @@ local function log_ability_decision(ability_template_name, fixed_t, can_activate
 				.. fmt_percent(context.toughness_pct)
 				.. ", peril="
 				.. fmt_percent(context.peril_pct)
+				.. ", hazard="
+				.. tostring(context.in_hazard == true)
 				.. ", target_dist="
 				.. fmt_percent(context.target_enemy_distance)
 				.. ")"

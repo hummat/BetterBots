@@ -208,6 +208,23 @@ local function _describe_action_component_state(unit, component_name)
 		.. ")"
 end
 
+local function _emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
+	if not (_event_log and _event_log.is_enabled and _event_log.is_enabled() and _event_log.emit_decision) then
+		return
+	end
+
+	_event_log.emit_decision(
+		fixed_t,
+		_bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
+		grenade_name,
+		grenade_name,
+		should_throw,
+		rule,
+		"grenade",
+		context
+	)
+end
+
 local function try_queue(unit, blackboard)
 	local fixed_t = _fixed_time()
 
@@ -524,7 +541,30 @@ local function try_queue(unit, blackboard)
 
 	local context = _build_context(unit, blackboard)
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
+	_emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
 	if not should_throw then
+		if
+			_debug_enabled()
+			and (
+				(context and context.num_nearby and context.num_nearby > 0)
+				or (context and context.target_enemy)
+				or (context and context.peril_pct ~= nil)
+			)
+		then
+			_debug_log(
+				"grenade_decision_block:" .. grenade_name,
+				fixed_t,
+				"grenade held "
+					.. grenade_name
+					.. " (rule="
+					.. tostring(rule)
+					.. ", nearby="
+					.. tostring(context and context.num_nearby or 0)
+					.. ", peril="
+					.. tostring(context and context.peril_pct)
+					.. ")"
+			)
+		end
 		return
 	end
 

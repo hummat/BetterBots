@@ -42,7 +42,7 @@
 - **Bot pinging** (#16): bots ping elites and specials for the human player.
 - **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
 - **Daemonhost avoidance** (#17): suppress bot combat near dormant daemonhosts (code + tests, unverifiable in-game — no DH spawn).
-- **Unit tests**: 367 tests via busted.
+- **Unit tests**: 370 tests via busted.
 
 ## Current Tier Status
 

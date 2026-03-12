@@ -9,6 +9,7 @@ local _extensions = {}
 -- Recorded action_input calls
 local _recorded_inputs = {}
 local _debug_logs = {}
+local _event_decisions = {}
 
 -- Mock ability_extension
 local _can_use_grenade = true
@@ -100,6 +101,7 @@ local function reset()
 	_grenades_enabled_result = true
 	_recorded_inputs = {}
 	_debug_logs = {}
+	_event_decisions = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
 	_component_state_by_name = {}
@@ -126,7 +128,22 @@ local function reset()
 		fixed_time = function()
 			return _mock_time
 		end,
-		event_log = nil,
+		event_log = {
+			is_enabled = function()
+				return true
+			end,
+			emit_decision = function(_fixed_t, bot_slot, ability_name, template_name, result, rule, source, context)
+				_event_decisions[#_event_decisions + 1] = {
+					bot = bot_slot,
+					ability = ability_name,
+					template = template_name,
+					result = result,
+					rule = rule,
+					source = source,
+					context = context,
+				}
+			end,
+		},
 		bot_slot_for_unit = function()
 			return "slot1"
 		end,
@@ -249,6 +266,23 @@ describe("grenade_fallback", function()
 		assert.equals(0, #_recorded_inputs)
 	end)
 
+	it("emits grenade decision events when heuristic blocks", function()
+		_heuristic_result = false
+		_heuristic_rule = "grenade_smoke_hold"
+		_debug_enabled_result = true
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(1, #_event_decisions)
+		assert.equals("slot1", _event_decisions[1].bot)
+		assert.equals("veteran_frag_grenade", _event_decisions[1].ability)
+		assert.equals("veteran_frag_grenade", _event_decisions[1].template)
+		assert.is_false(_event_decisions[1].result)
+		assert.equals("grenade", _event_decisions[1].source)
+		assert.equals("grenade_smoke_hold", _event_decisions[1].rule)
+		assert.truthy(find_debug_log("grenade held veteran_frag_grenade"))
+	end)
+
 	it("queues grenade_ability wield when idle and heuristic passes", function()
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(1, #_recorded_inputs)
@@ -257,6 +291,16 @@ describe("grenade_fallback", function()
 		assert.is_nil(_recorded_inputs[1].extra)
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
+	end)
+
+	it("emits grenade decision events when heuristic passes", function()
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(1, #_event_decisions)
+		assert.equals("slot1", _event_decisions[1].bot)
+		assert.is_true(_event_decisions[1].result)
+		assert.equals("grenade_generic", _event_decisions[1].rule)
+		assert.equals("grenade", _event_decisions[1].source)
 	end)
 
 	it("waits in wield stage until slot changes", function()
