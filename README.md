@@ -11,6 +11,13 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 
 > **Solo Play only.** Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. It does **not** work in public matchmaking or any other online mode.
 
+## v0.7.0 highlights
+
+- Grenade/blitz heuristics are now live, including Psyker Assail, Smite, and Chain Lightning support
+- Bots react to player tags, hazards, bosses targeting them, and poxbursters near human players
+- New in-game settings surface: `standard/testing` profile, tier toggles, grenade/blitz toggle, healing deferral controls
+- Tiered logging and optional JSONL/perf diagnostics for post-run validation
+
 ## What bots can do with this mod
 
 **Stance abilities (reliable):**
@@ -32,8 +39,22 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Psyker: Telekine Shield (all 3 variants) — deploys under sustained fire
 - Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
 
+**Grenade / blitz support (reliable):**
+- Standard grenades: frag, krak, smoke, fire, shock, cluster, friend rock, flash, tox
+- Zealot: Throwing Knives
+- Arbites: Remote Detonation (whistle), Shock Mine
+- Psyker: Assail, Smite, Chain Lightning
+- Hive Scum: Missile Launcher (DLC-blocked for validation)
+
 **Smart trigger conditions:**
 Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
+
+**In-game settings and diagnostics:**
+- `standard` / `testing` behavior profile
+- Tier 1 / Tier 2 / Tier 3 / grenade-blitz enable toggles
+- Healing deferral mode + thresholds
+- `Info / Debug / Trace` log levels
+- Optional JSONL event log and `/bb_perf` runtime timing
 
 ## Roadmap
 
@@ -44,18 +65,18 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Item-based abilities (relic, force field, drone)
 - [x] Smart per-ability trigger heuristics
 - [x] Safety guards (revive protection, suppression, warp peril block)
-- [ ] Grenade / blitz support
-- [ ] Per-ability toggle settings
+- [x] Grenade / blitz support
+- [~] Ability settings surface (partial: profile + tier/grenade toggles shipped; full per-ability toggles still open)
 - [ ] Hive Scum validation (DLC-blocked)
 
 **Bot combat behavior**
 - [x] Charge/dash to rescue disabled allies
 - [x] Bot sprinting
-- [ ] Daemonhost avoidance
-- [ ] Bot pinging of elites/specials
-- [ ] Boss engagement discipline
+- [x] Daemonhost avoidance
+- [x] Bot pinging of elites/specials
+- [x] Boss engagement discipline
 - [x] Poxburster targeting
-- [ ] Stop chasing distant specials
+- [x] Stop chasing distant specials
 
 **Bot weapon/equipment fixes**
 - [x] Fix ADS for Tertium 5/6 bots
@@ -63,6 +84,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Bot warp charge venting
 - [x] Suppress bot VFX/SFX bleed to human player
 - [x] Smart melee attack selection (armor-aware)
+- [x] Tiered logging + event/perf diagnostics
 - [ ] Weapon/enemy-aware ADS vs hip-fire
 
 **Long-term**

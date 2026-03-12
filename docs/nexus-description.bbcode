@@ -20,6 +20,15 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
+[size=3][b]New in v0.7.0[/b][/size]
+
+[list]
+[*]Grenade / blitz heuristics are now live, including Psyker Assail, Smite, and Chain Lightning
+[*]Bots respond to player-tagged enemies, hazards, and bosses targeting them
+[*]New in-game settings: `standard/testing` profile, tier toggles, grenade/blitz toggle, healing deferral controls
+[*]Tiered logging plus optional JSONL event log and runtime timing diagnostics
+[/list]
+
 [size=3][b]What works[/b][/size]
 
 [b]Stance abilities (reliable):[/b]
@@ -59,6 +68,15 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 [b]Smart trigger conditions:[/b]
 Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
 
+[b]In-game settings and diagnostics:[/b]
+[list]
+[*]`Standard` / `Testing` behavior profile
+[*]Tier 1 / Tier 2 / Tier 3 / grenade-blitz enable toggles
+[*]Healing deferral mode and thresholds
+[*]`Info / Debug / Trace` log levels
+[*]Optional JSONL event log and `/bb_perf` runtime timing
+[/list]
+
 [size=3][b]Roadmap[/b][/size]
 
 See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]full roadmap[/url] for details.
@@ -70,7 +88,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Smart per-ability trigger heuristics
 [*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
 [*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz)
-[*]Per-ability toggle settings
+[*]Ability settings surface (partial: profile + tier/grenade toggles shipped; full per-ability toggles still open)
 [*]Hive Scum validation (DLC-blocked)
 [/list]
 
