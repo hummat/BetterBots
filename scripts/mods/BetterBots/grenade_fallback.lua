@@ -20,6 +20,7 @@ local _build_context
 local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
+local _is_grenade_enabled
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
@@ -483,6 +484,9 @@ local function try_queue(unit, blackboard)
 	end
 
 	local grenade_name = grenade_ability.name or "unknown"
+	if _is_grenade_enabled and not _is_grenade_enabled(grenade_name) then
+		return
+	end
 
 	local template_entry = SUPPORTED_THROW_TEMPLATES[grenade_name]
 	if not template_entry then
@@ -601,6 +605,7 @@ return {
 		_evaluate_grenade_heuristic = refs.evaluate_grenade_heuristic
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
+		_is_grenade_enabled = refs.is_grenade_enabled
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,

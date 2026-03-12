@@ -35,7 +35,9 @@ function M.register_hooks()
 							_debug_log(
 								"vfx_fix_ability:" .. tostring(unit),
 								0,
-								"patched ability effect context is_local_unit=false for bot"
+								"patched ability effect context is_local_unit=false for bot",
+								nil,
+								"info"
 							)
 						end
 					end
@@ -57,7 +59,9 @@ function M.register_hooks()
 							_debug_log(
 								"vfx_fix_loadout:" .. tostring(unit),
 								0,
-								"patched wieldable slot scripts context is_local_unit=false for bot"
+								"patched wieldable slot scripts context is_local_unit=false for bot",
+								nil,
+								"info"
 							)
 						end
 					end
@@ -77,7 +81,9 @@ function M.register_hooks()
 						_debug_log(
 							"vfx_fix_csm:" .. tostring(unit),
 							0,
-							"patched CharacterStateMachine _is_local_unit=false for bot"
+							"patched CharacterStateMachine _is_local_unit=false for bot",
+							nil,
+							"info"
 						)
 					end
 				end

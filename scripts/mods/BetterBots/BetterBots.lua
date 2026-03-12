@@ -1,10 +1,10 @@
 local mod = get_mod("BetterBots")
 local FixedFrame = require("scripts/utilities/fixed_frame")
 local ArmorSettings = require("scripts/settings/damage/armor_settings")
+local LogLevels = dofile("scripts/mods/BetterBots/log_levels.lua")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
-local DEBUG_FORCE_ENABLED = false
 local EVENT_LOG_SETTING_ID = "enable_event_log"
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
 local META_PATCH_VERSION = "2026-03-04-tier2-v3"
@@ -25,6 +25,7 @@ local _session_start_emitted = false
 local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
+local _log_level = 0
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
@@ -43,16 +44,16 @@ local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
 end
 
-local function _debug_enabled()
-	if DEBUG_FORCE_ENABLED then
-		return true
-	end
-
-	return mod:get(DEBUG_SETTING_ID) == true
+local function _refresh_debug_log_level()
+	_log_level = LogLevels.resolve_setting(mod:get(DEBUG_SETTING_ID))
 end
 
-local function _debug_log(key, fixed_t, message, min_interval_s)
-	if not _debug_enabled() then
+local function _debug_enabled()
+	return _log_level > 0
+end
+
+local function _debug_log(key, fixed_t, message, min_interval_s, level)
+	if not LogLevels.should_log(_log_level, level) then
 		return
 	end
 
@@ -66,6 +67,8 @@ local function _debug_log(key, fixed_t, message, min_interval_s)
 	_last_debug_log_t_by_key[key] = t
 	mod:echo("BetterBots DEBUG: " .. message:gsub("%%", "%%%%"))
 end
+
+_refresh_debug_log_level()
 
 local _SUPPRESSED_STATES = {
 	jumping = true,
@@ -140,6 +143,9 @@ end
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
 
+local Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
+assert(Settings, "BetterBots: failed to load settings module")
+
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
 assert(Heuristics, "BetterBots: failed to load heuristics module")
 
@@ -186,6 +192,10 @@ local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system
 assert(PingSystem, "BetterBots: failed to load ping_system module")
 
 -- Init each module with its dependencies
+Settings.init({
+	mod = mod,
+})
+
 MetaData.init({
 	mod = mod,
 	patched_ability_templates = _patched_ability_templates,
@@ -199,6 +209,7 @@ Heuristics.init({
 	decision_context_cache = _decision_context_cache_by_unit,
 	super_armor_breed_cache = _super_armor_breed_flag_by_name,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
+	is_testing_profile = Settings.is_testing_profile,
 })
 
 ItemFallback.init({
@@ -335,6 +346,7 @@ ItemFallback.wire({
 	context_snapshot = Debug.context_snapshot,
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
 	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
+	is_item_ability_enabled = Settings.is_item_ability_enabled,
 })
 
 Debug.wire({
@@ -349,6 +361,7 @@ ConditionPatch.wire({
 	MetaData = MetaData,
 	Debug = Debug,
 	EventLog = EventLog,
+	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
 AbilityQueue.wire({
@@ -357,6 +370,7 @@ AbilityQueue.wire({
 	ItemFallback = ItemFallback,
 	Debug = Debug,
 	EventLog = EventLog,
+	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
 GrenadeFallback.wire({
@@ -366,6 +380,7 @@ GrenadeFallback.wire({
 	is_combat_ability_active = function(unit)
 		return (ItemFallback.should_lock_weapon_switch(unit))
 	end,
+	is_grenade_enabled = Settings.is_grenade_enabled,
 })
 
 local function _should_lock_weapon_switch(unit)
@@ -634,7 +649,9 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 					_debug_log(
 						"gestalt_inject:" .. tostring(unit),
 						0,
-						"injected default bot_gestalts (ranged=killshot, melee=linesman)"
+						"injected default bot_gestalts (ranged=killshot, melee=linesman)",
+						nil,
+						"info"
 					)
 				end
 			else
@@ -710,6 +727,7 @@ end)
 
 function mod.on_game_state_changed(status, state)
 	if status == "enter" and state == "GameplayStateRun" then
+		_refresh_debug_log_level()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil
 		end
@@ -734,6 +752,7 @@ function mod.on_game_state_changed(status, state)
 end
 
 Debug.register_commands()
+_refresh_debug_log_level()
 
 -- Re-enable EventLog after hot-reload if we're mid-session.
 if mod:get(EVENT_LOG_SETTING_ID) == true then
@@ -747,5 +766,5 @@ end
 
 mod:echo("BetterBots loaded")
 if _debug_enabled() then
-	mod:echo("BetterBots DEBUG: logging enabled (force=" .. tostring(DEBUG_FORCE_ENABLED) .. ")")
+	mod:echo("BetterBots DEBUG: logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")")
 end

@@ -17,6 +17,7 @@ local _build_context
 local _context_snapshot
 local _fallback_state_snapshot
 local _evaluate_item_heuristic
+local _is_item_ability_enabled
 
 local function _emit_item_event(event_type, unit, ability_name, state, fixed_t, extra)
 	if not _event_log or not _event_log.is_enabled() then
@@ -447,6 +448,10 @@ local function _current_weapon_supports_action_input(unit_data_extension, Weapon
 end
 
 local function can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
+	if _is_item_ability_enabled and not _is_item_ability_enabled(ability_name) then
+		return false, "item_disabled"
+	end
+
 	if not ability_extension:can_use_ability("combat_ability") then
 		return false, "item_cooldown_not_ready"
 	end
@@ -869,6 +874,7 @@ return {
 		_context_snapshot = refs.context_snapshot
 		_fallback_state_snapshot = refs.fallback_state_snapshot
 		_evaluate_item_heuristic = refs.evaluate_item_heuristic
+		_is_item_ability_enabled = refs.is_item_ability_enabled
 	end,
 	try_queue_item = try_queue_item,
 	can_use_item_fallback = can_use_item_fallback,

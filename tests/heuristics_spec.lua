@@ -28,21 +28,27 @@ describe("heuristics", function()
 		end)
 
 		it("activates on ally aid within range", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_ally_needs_aid = true,
-				target_ally_distance = 15,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_ally_needs_aid = true,
+					target_ally_distance = 15,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("blocks ally aid when too far", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_ally_needs_aid = true,
-				target_ally_distance = 25,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_ally_needs_aid = true,
+					target_ally_distance = 25,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -71,106 +77,136 @@ describe("heuristics", function()
 		end)
 
 		it("blocks when target too close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 2,
-				num_nearby = 3,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 2,
+					num_nearby = 3,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_close", rule)
 		end)
 
 		it("blocks super armor targets", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				target_is_super_armor = true,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					target_is_super_armor = true,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("super_armor", rule)
 		end)
 
 		it("activates on priority target at range", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				priority_target_enemy = "priority_unit",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					priority_target_enemy = "priority_unit",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("priority_target", rule)
 		end)
 
 		it("activates on low toughness gap close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 10,
-				toughness_pct = 0.20,
-				num_nearby = 2,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 10,
+					toughness_pct = 0.20,
+					num_nearby = 2,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("low_toughness", rule)
 		end)
 
 		it("activates on elite at range", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 10,
-				target_is_elite_special = true,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 10,
+					target_is_elite_special = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("elite_special_gap", rule)
 		end)
 
 		it("activates on combat gap close with multiple enemies", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				num_nearby = 2,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					num_nearby = 2,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("combat_gap_close", rule)
 		end)
 
 		it("holds when conditions not met", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				toughness_pct = 0.80,
-				num_nearby = 1,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					toughness_pct = 0.80,
+					num_nearby = 1,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("activates for ally rescue at range", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				target_ally_needs_aid = true,
-				target_ally_distance = 10,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					target_ally_needs_aid = true,
+					target_ally_distance = 10,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				target_ally_needs_aid = true,
-				target_ally_distance = 2,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					target_ally_needs_aid = true,
+					target_ally_distance = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("blocks ally rescue when target too close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 2,
-				target_ally_needs_aid = true,
-				target_ally_distance = 10,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 2,
+					target_ally_needs_aid = true,
+					target_ally_distance = 10,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_close", rule)
 		end)
@@ -181,11 +217,14 @@ describe("heuristics", function()
 				"zealot_targeted_dash_improved",
 				"zealot_targeted_dash_improved_double",
 			}) do
-				local ok, rule = evaluate(variant, ctx({
-					target_enemy = "unit",
-					target_enemy_distance = 10,
-					target_is_elite_special = true,
-				}))
+				local ok, rule = evaluate(
+					variant,
+					ctx({
+						target_enemy = "unit",
+						target_enemy_distance = 10,
+						target_is_elite_special = true,
+					})
+				)
 				assert.is_true(ok, variant .. " should activate")
 				assert.matches("zealot_dash", rule)
 			end
@@ -221,11 +260,14 @@ describe("heuristics", function()
 		end)
 
 		it("activates for ally reposition", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_ally_needs_aid = true,
-				target_ally_distance = 10,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_ally_needs_aid = true,
+					target_ally_distance = 10,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_reposition", rule)
 		end)
@@ -266,11 +308,14 @@ describe("heuristics", function()
 		end)
 
 		it("blocks low-value use", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				peril_pct = 0.20,
-				toughness_pct = 0.60,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.20,
+					toughness_pct = 0.60,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("low_value", rule)
 		end)
@@ -309,61 +354,79 @@ describe("heuristics", function()
 		end)
 
 		it("activates with opportunity target in peril window", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				peril_pct = 0.50,
-				opportunity_target_enemy = "opp_unit",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.50,
+					opportunity_target_enemy = "opp_unit",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("target_window", rule)
 		end)
 
 		it("activates on high challenge rating in peril window", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 3,
-				peril_pct = 0.50,
-				challenge_rating_sum = 6.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					peril_pct = 0.50,
+					challenge_rating_sum = 6.0,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("threat_window", rule)
 		end)
 
 		it("bypasses peril gate when peril is 0 (bot no warp attacks)", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 3,
-				peril_pct = 0,
-				challenge_rating_sum = 6.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					peril_pct = 0,
+					challenge_rating_sum = 6.0,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("threat_window", rule)
 		end)
 
 		it("bypasses peril gate for target window at peril 0", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				peril_pct = 0,
-				opportunity_target_enemy = "opp_unit",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0,
+					opportunity_target_enemy = "opp_unit",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("target_window", rule)
 		end)
 
 		it("activates at peril 0 with combat density", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 3,
-				peril_pct = 0,
-				challenge_rating_sum = 2.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					peril_pct = 0,
+					challenge_rating_sum = 2.0,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("combat_density", rule)
 		end)
 
 		it("still blocks at peril 0 with low threat", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				peril_pct = 0,
-				challenge_rating_sum = 2.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0,
+					challenge_rating_sum = 2.0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -374,52 +437,67 @@ describe("heuristics", function()
 		local T = "ogryn_charge"
 
 		it("blocks when target too close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 3,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 3,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_close", rule)
 		end)
 
 		it("activates on priority target", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-				priority_target_enemy = "priority",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					priority_target_enemy = "priority",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("priority_target", rule)
 		end)
 
 		it("activates for ally aid", function()
-			local ok, rule = evaluate(T, ctx({
-				target_ally_needs_aid = true,
-				target_ally_distance = 10,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_ally_needs_aid = true,
+					target_ally_distance = 10,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("blocks when ally too close for charge", function()
-			local ok, rule = evaluate(T, ctx({
-				target_ally_needs_aid = true,
-				target_ally_distance = 5,
-				num_nearby = 1,
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_ally_needs_aid = true,
+					target_ally_distance = 5,
+					num_nearby = 1,
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("activates as escape when overwhelmed", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 4,
-				toughness_pct = 0.15,
-				target_enemy = "unit",
-				target_enemy_distance = 8,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 4,
+					toughness_pct = 0.15,
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("escape", rule)
 		end)
@@ -436,41 +514,53 @@ describe("heuristics", function()
 		local T = "ogryn_taunt_shout"
 
 		it("blocks when too fragile", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 3,
-				toughness_pct = 0.15,
-				health_pct = 0.25,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					toughness_pct = 0.15,
+					health_pct = 0.25,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_fragile", rule)
 		end)
 
 		it("activates for ally aid when healthy", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_ally_needs_aid = true,
-				toughness_pct = 0.50,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_ally_needs_aid = true,
+					toughness_pct = 0.50,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("activates for horde control", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 4,
-				toughness_pct = 0.50,
-				health_pct = 0.40,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 4,
+					toughness_pct = 0.50,
+					health_pct = 0.40,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("horde_control", rule)
 		end)
 
 		it("blocks low-value use", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				challenge_rating_sum = 1.0,
-				toughness_pct = 0.80,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					challenge_rating_sum = 1.0,
+					toughness_pct = 0.80,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("low_value", rule)
 		end)
@@ -487,45 +577,57 @@ describe("heuristics", function()
 		end)
 
 		it("blocks when target too close", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				target_enemy_distance = 3,
-				challenge_rating_sum = 3.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 3,
+					challenge_rating_sum = 3.0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_close", rule)
 		end)
 
 		it("blocks low threat", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				target_enemy_distance = 10,
-				challenge_rating_sum = 1.0,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 10,
+					challenge_rating_sum = 1.0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("low_threat", rule)
 		end)
 
 		it("activates on urgent target", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				target_enemy_distance = 8,
-				challenge_rating_sum = 3.0,
-				urgent_target_enemy = "urgent",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					challenge_rating_sum = 3.0,
+					urgent_target_enemy = "urgent",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("urgent_target", rule)
 		end)
 
 		it("activates on ranged pack", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_enemy_distance = 10,
-				target_enemy_type = "ranged",
-				challenge_rating_sum = 3.0,
-				elite_count = 1,
-				special_count = 1,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_distance = 10,
+					target_enemy_type = "ranged",
+					challenge_rating_sum = 3.0,
+					elite_count = 1,
+					special_count = 1,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ranged_pack", rule)
 		end)
@@ -548,10 +650,13 @@ describe("heuristics", function()
 		end)
 
 		it("activates on monster pressure", function()
-			local ok, rule = evaluate(T, ctx({
-				target_is_monster = true,
-				target_enemy_distance = 5,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_is_monster = true,
+					target_enemy_distance = 5,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("monster_pressure", rule)
 		end)
@@ -568,10 +673,13 @@ describe("heuristics", function()
 		local T = "adamant_charge"
 
 		it("blocks when target too close", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy = "unit",
-				target_enemy_distance = 2,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("too_close", rule)
 		end)
@@ -583,40 +691,52 @@ describe("heuristics", function()
 		end)
 
 		it("activates on density", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_enemy_distance = 6,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_distance = 6,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("density", rule)
 		end)
 
 		it("activates on elite at range", function()
-			local ok, rule = evaluate(T, ctx({
-				target_is_elite_special = true,
-				target_enemy_distance = 6,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_is_elite_special = true,
+					target_enemy_distance = 6,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("elite_special", rule)
 		end)
 
 		it("activates for ally rescue at range", function()
-			local ok, rule = evaluate(T, ctx({
-				target_enemy_distance = 6,
-				target_ally_needs_aid = true,
-				target_ally_distance = 10,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy_distance = 6,
+					target_ally_needs_aid = true,
+					target_ally_distance = 10,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 1,
-				target_enemy_distance = 6,
-				target_ally_needs_aid = true,
-				target_ally_distance = 2,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 6,
+					target_ally_needs_aid = true,
+					target_ally_distance = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -639,11 +759,14 @@ describe("heuristics", function()
 		end)
 
 		it("activates on elite pressure", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				elite_count = 1,
-				toughness_pct = 0.45,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					elite_count = 1,
+					toughness_pct = 0.45,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("elite_pressure", rule)
 		end)
@@ -672,10 +795,13 @@ describe("heuristics", function()
 		end)
 
 		it("activates on ranged pressure", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_enemy_type = "ranged",
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_type = "ranged",
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ranged_pressure", rule)
 		end)
@@ -722,11 +848,14 @@ describe("heuristics", function()
 		end)
 
 		it("blocks ranged-only low count", function()
-			local ok, rule = evaluate(T, ctx({
-				num_nearby = 2,
-				target_enemy_type = "ranged",
-				toughness_pct = 0.80,
-			}))
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.80,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("ranged_only", rule)
 		end)
@@ -763,21 +892,29 @@ describe("heuristics", function()
 			end)
 
 			it("activates for ally aid", function()
-				local ok, rule = evaluate(T, ctx({
-					target_ally_needs_aid = true,
-					target_ally_distance = 8,
-				}), voc_opts())
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						target_ally_needs_aid = true,
+						target_ally_distance = 8,
+					}),
+					voc_opts()
+				)
 				assert.is_true(ok)
 				assert.matches("voc_ally_aid", rule)
 			end)
 
 			it("blocks ally aid when too far", function()
-				local ok, rule = evaluate(T, ctx({
-					target_ally_needs_aid = true,
-					target_ally_distance = 15,
-					toughness_pct = 0.90,
-					num_nearby = 1,
-				}), voc_opts())
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						target_ally_needs_aid = true,
+						target_ally_distance = 15,
+						toughness_pct = 0.90,
+						num_nearby = 1,
+					}),
+					voc_opts()
+				)
 				assert.is_false(ok)
 				assert.matches("voc_block_safe_state", rule)
 			end)
@@ -798,10 +935,14 @@ describe("heuristics", function()
 			end
 
 			it("blocks when surrounded by melee", function()
-				local ok, rule = evaluate(T, ctx({
-					num_nearby = 6,
-					target_enemy_type = "melee",
-				}), ranger_opts(false))
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 6,
+						target_enemy_type = "melee",
+					}),
+					ranger_opts(false)
+				)
 				assert.is_false(ok)
 				assert.matches("block_surrounded", rule)
 			end)
@@ -813,10 +954,14 @@ describe("heuristics", function()
 			end)
 
 			it("activates on urgent target with few enemies", function()
-				local ok, rule = evaluate(T, ctx({
-					num_nearby = 2,
-					urgent_target_enemy = "urgent",
-				}), ranger_opts(false))
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 2,
+						urgent_target_enemy = "urgent",
+					}),
+					ranger_opts(false)
+				)
 				assert.is_true(ok)
 				assert.matches("urgent_target", rule)
 			end)
@@ -846,66 +991,106 @@ describe("heuristics", function()
 		local eval_item = Heuristics.evaluate_item_heuristic
 
 		it("blocks when overwhelmed and fragile", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 5, toughness_pct = 0.20, allies_in_coherency = 2,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 5,
+					toughness_pct = 0.20,
+					allies_in_coherency = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("overwhelmed", rule)
 		end)
 
 		it("does not block overwhelmed if toughness ok", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 6, toughness_pct = 0.50, allies_in_coherency = 2,
-				avg_ally_toughness_pct = 0.30,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 6,
+					toughness_pct = 0.50,
+					allies_in_coherency = 2,
+					avg_ally_toughness_pct = 0.30,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("activates on team low toughness", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 1, allies_in_coherency = 2, avg_ally_toughness_pct = 0.30,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 1,
+					allies_in_coherency = 2,
+					avg_ally_toughness_pct = 0.30,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("team_low_toughness", rule)
 		end)
 
 		it("activates on self critical toughness even without allies", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 2, toughness_pct = 0.20, allies_in_coherency = 0,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.20,
+					allies_in_coherency = 0,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("self_critical", rule)
 		end)
 
 		it("blocks with no allies when toughness is fine", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 2, toughness_pct = 0.60, allies_in_coherency = 0,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.60,
+					allies_in_coherency = 0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("no_allies", rule)
 		end)
 
 		it("holds in safe state with allies", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 1, allies_in_coherency = 2, avg_ally_toughness_pct = 0.80,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 1,
+					allies_in_coherency = 2,
+					avg_ally_toughness_pct = 0.80,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("blocks self_critical when num_nearby too high", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 3, toughness_pct = 0.20, allies_in_coherency = 0,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 3,
+					toughness_pct = 0.20,
+					allies_in_coherency = 0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("no_allies", rule)
 		end)
 
 		it("does not block overwhelmed at exact threshold", function()
-			local ok, rule = eval_item("zealot_relic", ctx({
-				num_nearby = 5, toughness_pct = 0.30, allies_in_coherency = 2,
-			}))
+			local ok, rule = eval_item(
+				"zealot_relic",
+				ctx({
+					num_nearby = 5,
+					toughness_pct = 0.30,
+					allies_in_coherency = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -928,34 +1113,51 @@ describe("heuristics", function()
 		end)
 
 		it("blocks when safe", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 2, toughness_pct = 0.90,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.90,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("safe", rule)
 		end)
 
 		it("activates under pressure", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 4, toughness_pct = 0.30,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 4,
+					toughness_pct = 0.30,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("pressure", rule)
 		end)
 
 		it("activates on ally aid", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 1, target_ally_needs_aid = true,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 1,
+					target_ally_needs_aid = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("activates on ranged pressure without num_nearby gate", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 0, target_enemy_type = "ranged", toughness_pct = 0.40,
-				target_enemy = true,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 0,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.40,
+					target_enemy = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ranged", rule)
 		end)
@@ -973,25 +1175,40 @@ describe("heuristics", function()
 		end)
 
 		it("holds in moderate state", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 2, toughness_pct = 0.60, target_enemy = true,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.60,
+					target_enemy = true,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("activates on ally aid even when toughness is high", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 1, toughness_pct = 0.95, target_ally_needs_aid = true,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 1,
+					toughness_pct = 0.95,
+					target_ally_needs_aid = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("does not block safe at exact boundary", function()
-			local ok, rule = eval_item("psyker_force_field", ctx({
-				num_nearby = 4, toughness_pct = 0.80, target_enemy = true,
-			}))
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 4,
+					toughness_pct = 0.80,
+					target_enemy = true,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -1002,57 +1219,88 @@ describe("heuristics", function()
 		local eval_item = Heuristics.evaluate_item_heuristic
 
 		it("blocks with no allies", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 5, allies_in_coherency = 0,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 5,
+					allies_in_coherency = 0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("no_allies", rule)
 		end)
 
 		it("blocks with few enemies", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 2, allies_in_coherency = 2,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 2,
+					allies_in_coherency = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("low_value", rule)
 		end)
 
 		it("activates on team horde", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 5, allies_in_coherency = 2,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 5,
+					allies_in_coherency = 2,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("team_horde", rule)
 		end)
 
 		it("activates on monster fight with ally", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 3, allies_in_coherency = 1, target_is_monster = true,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 3,
+					allies_in_coherency = 1,
+					target_is_monster = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("monster", rule)
 		end)
 
 		it("activates on monster fight even with few enemies", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 1, allies_in_coherency = 1, target_is_monster = true,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 1,
+					allies_in_coherency = 1,
+					target_is_monster = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("monster", rule)
 		end)
 
 		it("activates when overwhelmed", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 6, allies_in_coherency = 1, toughness_pct = 0.40,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 6,
+					allies_in_coherency = 1,
+					toughness_pct = 0.40,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("overwhelmed", rule)
 		end)
 
 		it("holds in moderate state", function()
-			local ok, rule = eval_item("adamant_area_buff_drone", ctx({
-				num_nearby = 3, allies_in_coherency = 1,
-			}))
+			local ok, rule = eval_item(
+				"adamant_area_buff_drone",
+				ctx({
+					num_nearby = 3,
+					allies_in_coherency = 1,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -1063,53 +1311,77 @@ describe("heuristics", function()
 		local eval_item = Heuristics.evaluate_item_heuristic
 
 		it("blocks with no allies", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 3, allies_in_coherency = 0,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 3,
+					allies_in_coherency = 0,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("no_allies", rule)
 		end)
 
 		it("activates on ally corruption", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 2, allies_in_coherency = 1,
-				max_ally_corruption_pct = 0.40,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 2,
+					allies_in_coherency = 1,
+					max_ally_corruption_pct = 0.40,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("corruption", rule)
 		end)
 
 		it("activates on ally corruption during lull", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 0, allies_in_coherency = 2,
-				max_ally_corruption_pct = 0.50,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 0,
+					allies_in_coherency = 2,
+					max_ally_corruption_pct = 0.50,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("corruption", rule)
 		end)
 
 		it("does not activate on low corruption", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 2, allies_in_coherency = 1,
-				max_ally_corruption_pct = 0.20,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 2,
+					allies_in_coherency = 1,
+					max_ally_corruption_pct = 0.20,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
 
 		it("activates on ally aid with pressure", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 3, allies_in_coherency = 1,
-				target_ally_needs_aid = true,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 3,
+					allies_in_coherency = 1,
+					target_ally_needs_aid = true,
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
 		end)
 
 		it("holds in safe state", function()
-			local ok, rule = eval_item("broker_ability_stimm_field", ctx({
-				num_nearby = 2, allies_in_coherency = 2,
-			}))
+			local ok, rule = eval_item(
+				"broker_ability_stimm_field",
+				ctx({
+					num_nearby = 2,
+					allies_in_coherency = 2,
+				})
+			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
@@ -1143,6 +1415,26 @@ describe("heuristics", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", nil)
 			assert.is_false(result)
 			assert.equals("grenade_no_context", rule)
+		end)
+	end)
+
+	describe("behavior_profile", function()
+		it("keeps standard combat behavior unchanged", function()
+			local ok, rule = evaluate("psyker_shout", helper.make_context({ num_nearby = 2 }), {
+				behavior_profile = "standard",
+			})
+
+			assert.is_false(ok)
+			assert.equals("psyker_shout_hold", rule)
+		end)
+
+		it("makes combat heuristics more lenient in testing mode", function()
+			local ok, rule = evaluate("psyker_shout", helper.make_context({ num_nearby = 2 }), {
+				behavior_profile = "testing",
+			})
+
+			assert.is_true(ok)
+			assert.matches("testing_profile", rule)
 		end)
 	end)
 end)

@@ -100,7 +100,7 @@ Plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
 ## Next Steps (after batch2)
 - Default class profiles for bots (#45) — P2, design approved
-- Per-ability toggle settings (#6) — P2
+- Broader settings work (#6) — partial settings shipped in-batch (`standard/testing` profile + tier/grenade toggles); remaining scope is per-ability toggles + calibrated multi-preset tuning
 - Weapon/enemy-aware ADS (#41) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Objective-aware ability activation (#37) — P2

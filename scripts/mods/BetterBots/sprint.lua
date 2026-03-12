@@ -192,7 +192,9 @@ local function on_update_movement(func, self, unit, input, dt, t)
 				_debug_log(
 					"sprint:" .. tostring(unit),
 					fixed_t,
-					"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")"
+					"sprint " .. (should and "START" or "STOP") .. " (" .. tostring(dominated_reason) .. ")",
+					nil,
+					"trace"
 				)
 			end
 		end

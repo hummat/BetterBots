@@ -60,7 +60,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with
 | # | Issue | Notes |
 |---|-------|-------|
 | 4 | Grenade/blitz heuristics | Mechanism shipped in v0.6.0. Missing: per-grenade heuristics (krak→elite only, frag→horde, smoke→defensive), psyker blitz (smite/chain lightning/knives). |
-| 6 | Per-ability toggle settings | DMF widget per ability for enable/disable. |
+| 6 | Ability/settings control surface | Partial scope can ship earlier: `standard/testing` behavior profile + tier/grenade toggles. Remaining broader scope: per-ability toggles and calibrated multi-preset tuning. |
 | 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
 
 **Bot weapon/equipment fixes:**
