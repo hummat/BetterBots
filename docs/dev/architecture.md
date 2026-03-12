@@ -64,7 +64,7 @@ Grenade abilities are still out of scope.
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
 16. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
-    - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
+    - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m of the bot or within 8m of any human player
 17. Healing deferral (#39, via `healing_deferral.lua`):
     - hook `BotBehaviorExtension._update_health_stations` (post-process): clears `needs_health` when any human player is below the configured threshold (default 90%) and the bot is not in the configured emergency override state (default <25%)
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
