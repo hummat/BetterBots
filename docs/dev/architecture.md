@@ -61,30 +61,35 @@ Grenade abilities are still out of scope.
 15. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
     - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m detonation range
-16. ADS fix for T5/T6 bots (#35):
+16. Healing deferral (#39, via `healing_deferral.lua`):
+    - hook `BotBehaviorExtension._update_health_stations` (post-process): clears `needs_health` when any human player is below the configured threshold (default 90%) and the bot is not in the configured emergency override state (default <25%)
+    - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
+    - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
+    - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
+17. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
-17. Bot sprinting (#36, via `sprint.lua`):
+18. Bot sprinting (#36, via `sprint.lua`):
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-18. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
+19. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
-19. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+20. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
-20. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+21. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-21. Melee target selection distance penalty (#19, via `target_selection.lua`):
+22. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%)
     - biases the bot's behavior toward ranged engagement instead of chasing distant specials

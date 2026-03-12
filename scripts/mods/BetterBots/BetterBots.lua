@@ -185,6 +185,9 @@ assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
 local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
 assert(PingSystem, "BetterBots: failed to load ping_system module")
 
+local HealingDeferral = mod:io_dofile("BetterBots/scripts/mods/BetterBots/healing_deferral")
+assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
+
 -- Init each module with its dependencies
 MetaData.init({
 	mod = mod,
@@ -329,6 +332,13 @@ PingSystem.init({
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 })
 
+HealingDeferral.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -398,6 +408,7 @@ WeaponAction.register_hooks({
 	should_block_wield_input = _should_block_wield_input,
 })
 ConditionPatch.register_hooks()
+HealingDeferral.register_hooks()
 
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
