@@ -95,8 +95,8 @@ Grenade abilities are still out of scope.
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
 23. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
-    - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%)
-    - biases the bot's behavior toward ranged engagement instead of chasing distant specials
+    - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
+    - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
 
 ## Why item fallback is needed
 
