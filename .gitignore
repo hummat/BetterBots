@@ -5,7 +5,6 @@ HANDOFF.md
 /tmp/
 *.log
 BetterBots.zip
-node_modules/
-package-lock.json
+.pytest_cache/
 .worktrees/
 .superpowers/

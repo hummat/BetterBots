@@ -2,7 +2,7 @@
 
 > Compiled 2026-03-06 from Games Lantern (20 builds), Reddit/Steam/Fatshark Forums, and decompiled source v1.10.7.
 > Updated 2026-03-09 with balance patch data, breakpoint tables, community tools, and additional builds.
-> Validated 2026-03-09: 12 GL builds machine-scraped via `scripts/extract-build.mjs` — full talent trees, perks, blessings corrected.
+> Validated 2026-03-09: 12 GL builds machine-scraped (scraper now in `hadrons-blessing` repo) — full talent trees, perks, blessings corrected.
 > Bot tags updated 2026-03-11: removed stale `BOT:NO_DODGE` (bots dodge natively), `BOT:NO_PERIL_MGT` (BetterBots v0.5.0 overheat bridge), `BOT:ABILITY_MISSING` (all abilities have heuristics). New tags: `BOT:ABILITY_UNVALIDATED` (DLC-blocked), `BOT:NO_BLITZ` (blitz unsupported), `BOT:DODGE_CENTRIC_PLAYSTYLE` (build relies on dodge-chaining beyond vanilla bot capability).
 > Talent classification fixed 2026-03-11: split `Keystones:` into `Ability:` (combat ability + hex_frame modifiers) and `Keystones:` (actual passive keystones from circular_frame, identified via decompiled talent tree). Previous scraper mapped hex_frame → "keystone" but hex_frame = ability section on GL.
 > Purpose: inform bot AI ability/weapon profiles for BetterBots mod.
@@ -614,7 +614,7 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 
 **Grade distribution:** S: 3, A: 12, B: 5 | **Bot-safe:** Good: 10, Partial: 10, Poor: 0
 
-> Scoring methodology: `docs/knowledge/build-scoring-rubric.md` | Mechanical scores: `node scripts/score-build.mjs scripts/builds/<file>.json --text`
+> Scoring methodology and tools migrated to `hadrons-blessing` repo.
 
 ---
 

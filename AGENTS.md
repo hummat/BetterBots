@@ -302,9 +302,6 @@ Every factual claim about Darktide mechanics — talent effects, ability interac
 - `research.md` — ability patterns, bot system docs, API gotchas, healing architecture
 - `patch-history.md` — balance changes Mar 2025–Mar 2026
 
-**Build research:**
-- `scripts/extract-build.mjs` — Playwright scraper for GamesLantern build profiles (talents, weapons, curios). See header for GL discovery tips (path routes, `site:` search).
-
 **Release:**
 - `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
 
