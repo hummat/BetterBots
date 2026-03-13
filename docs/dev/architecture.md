@@ -17,7 +17,7 @@ This mod targets bot ability activation in three paths:
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does twenty-six things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty-seven things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -82,30 +82,33 @@ This mod targets bot ability activation in three paths:
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
-21. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+21. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
+    - hook `BtBotMeleeAction._choose_attack`
+    - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
+22. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - enables existing `_choose_attack` scoring: +8 penetrating vs armored, +4 sweep vs hordes
-22. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+23. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-23. Melee target selection distance penalty (#19, via `target_selection.lua`):
+24. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
-24. Runtime perf measurement (`perf.lua`):
+25. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
-25. Tiered debug log levels (#40, via `log_levels.lua`):
+26. Tiered debug log levels (#40, via `log_levels.lua`):
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
     - backward-compatible: nil `call_level` defaults to `"debug"`
-26. Shared rule tables (`shared_rules.lua`):
+27. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
 
