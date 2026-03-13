@@ -177,6 +177,9 @@ assert(TargetSelection, "BetterBots: failed to load target_selection module")
 local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
 assert(Poxburster, "BetterBots: failed to load poxburster module")
 
+local SmartTargeting = mod:io_dofile("BetterBots/scripts/mods/BetterBots/smart_targeting")
+assert(SmartTargeting, "BetterBots: failed to load smart_targeting module")
+
 local AnimationGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/animation_guard")
 assert(AnimationGuard, "BetterBots: failed to load animation_guard module")
 
@@ -304,6 +307,10 @@ AnimationGuard.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+})
+
+SmartTargeting.init({
+	mod = mod,
 })
 
 VfxSuppression.init({
@@ -449,6 +456,7 @@ end
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
 AnimationGuard.register_hooks()
+SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,

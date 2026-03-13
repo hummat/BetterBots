@@ -10,6 +10,7 @@ local _extensions = {}
 local _recorded_inputs = {}
 local _debug_logs = {}
 local _event_decisions = {}
+local _aim_calls = {}
 
 -- Mock ability_extension
 local _can_use_grenade = true
@@ -31,6 +32,29 @@ local mock_action_input_extension = {
 			input = input_name,
 			extra = extra,
 		}
+	end,
+}
+
+local mock_bot_unit_input = {
+	set_aiming = function(_self, aiming, soft, use_rotation)
+		_aim_calls[#_aim_calls + 1] = {
+			method = "set_aiming",
+			aiming = aiming,
+			soft = soft,
+			use_rotation = use_rotation,
+		}
+	end,
+	set_aim_position = function(_self, position)
+		_aim_calls[#_aim_calls + 1] = {
+			method = "set_aim_position",
+			position = position,
+		}
+	end,
+}
+
+local mock_input_extension = {
+	bot_unit_input = function()
+		return mock_bot_unit_input
 	end,
 }
 
@@ -102,6 +126,7 @@ local function reset()
 	_recorded_inputs = {}
 	_debug_logs = {}
 	_event_decisions = {}
+	_aim_calls = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
 	_component_state_by_name = {}
@@ -110,7 +135,12 @@ local function reset()
 	_extensions[unit] = {
 		ability_system = mock_ability_extension,
 		action_input_system = mock_action_input_extension,
+		input_system = mock_input_extension,
 		unit_data_system = mock_unit_data_extension,
+	}
+
+	_G.POSITION_LOOKUP = {
+		enemy_1 = { x = 10, y = 0, z = 0 },
 	}
 
 	GrenadeFallback.init({
@@ -156,7 +186,7 @@ local function reset()
 
 	GrenadeFallback.wire({
 		build_context = function()
-			return { num_nearby = 3 }
+			return { num_nearby = 3, target_enemy = "enemy_1" }
 		end,
 		evaluate_grenade_heuristic = function(_name, _ctx)
 			return _heuristic_result, _heuristic_rule
@@ -613,6 +643,51 @@ describe("grenade_fallback", function()
 		assert.is_nil(state.stage)
 		assert.truthy(state.next_try_t)
 		assert.equals(0, #_recorded_inputs)
+	end)
+
+	it("drives bot aim toward the current target while waiting to throw", function()
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].aiming)
+		assert.is_false(_aim_calls[1].soft)
+		assert.is_false(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_position", _aim_calls[2].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("clears bot aim when the grenade state resets", function()
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+		_wielded_slot = "slot_secondary"
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[#_aim_calls].method)
+		assert.is_false(_aim_calls[#_aim_calls].aiming)
+	end)
+
+	it("abandons the throw if wait_aim revalidation fails", function()
+		advance_to_stage("wait_aim")
+		_recorded_inputs = {}
+		_aim_calls = {}
+		_heuristic_result = false
+		_heuristic_rule = "grenade_hold"
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+		assert.equals(0, #_recorded_inputs)
+		assert.equals("set_aiming", _aim_calls[#_aim_calls].method)
+		assert.is_false(_aim_calls[#_aim_calls].aiming)
 	end)
 
 	it("resets when wield lost during wait_throw", function()
