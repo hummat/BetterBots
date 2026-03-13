@@ -905,5 +905,6 @@ return {
 	try_queue_item = try_queue_item,
 	can_use_item_fallback = can_use_item_fallback,
 	should_lock_weapon_switch = should_lock_weapon_switch,
+	reset_item_sequence_state = _reset_item_sequence_state,
 	schedule_retry = schedule_retry,
 }

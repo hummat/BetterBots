@@ -64,7 +64,7 @@ function M.register_hooks()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
 
 				-- Issue #48: Boost score for player-tagged enemies
-				if target_unit and _has_human_player_tag(target_unit) then
+				if score > 0 and target_unit and _has_human_player_tag(target_unit) then
 					score = score + PLAYER_TAG_BONUS
 					if _debug_enabled() then
 						_debug_log(

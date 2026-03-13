@@ -1,3 +1,5 @@
+-- Healing deferral: lets human players take medicae stations and med-crates
+-- first unless the bot is below the configured emergency threshold.
 local M = {}
 
 local _mod
@@ -6,6 +8,9 @@ local _debug_enabled
 local _fixed_time
 local _health
 local _perf
+local _cached_settings
+local _cached_settings_fixed_t
+local _missing_health_warned
 
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
@@ -71,11 +76,19 @@ local function _read_emergency_threshold_setting()
 end
 
 local function _resolve_settings()
-	return {
+	local fixed_t = _fixed_time and _fixed_time() or nil
+	if _cached_settings and _cached_settings_fixed_t == fixed_t then
+		return _cached_settings
+	end
+
+	_cached_settings = {
 		mode = _read_mode_setting(),
 		human_threshold = _read_human_threshold_setting(),
 		emergency_threshold = _read_emergency_threshold_setting(),
 	}
+	_cached_settings_fixed_t = fixed_t
+
+	return _cached_settings
 end
 
 local function _any_human_needs_healing(human_units, threshold, health_pct_fn)
@@ -145,8 +158,30 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
-	_health = deps.health_module or rawget(_G, "Health")
+	_cached_settings = nil
+	_cached_settings_fixed_t = nil
+	_missing_health_warned = false
+	if deps.health_module then
+		_health = deps.health_module
+	else
+		local ok, health_module = pcall(require, "scripts/utilities/health")
+		_health = ok and health_module or nil
+	end
 	_perf = deps.perf
+end
+
+local function _warn_missing_health_once()
+	if _missing_health_warned then
+		return
+	end
+
+	_missing_health_warned = true
+
+	if _mod and _mod.warning then
+		_mod:warning("BetterBots: healing deferral disabled; failed to load scripts/utilities/health")
+	end
+
+	_log("healing_deferral_missing_health", "healing deferral disabled: health utility unavailable")
 end
 
 function M.register_hooks()
@@ -154,6 +189,7 @@ function M.register_hooks()
 		_mod:hook_safe(BotBehaviorExtension, "_update_health_stations", function(self, unit)
 			local perf_t0 = _perf and _perf.begin()
 			if not (_health and _health.current_health_percent) then
+				_warn_missing_health_once()
 				if perf_t0 then
 					_perf.finish("healing_deferral.health_stations", perf_t0)
 				end
@@ -200,6 +236,7 @@ function M.register_hooks()
 		_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
 			local perf_t0 = _perf and _perf.begin()
 			if not (_health and _health.current_health_percent) then
+				_warn_missing_health_once()
 				if perf_t0 then
 					_perf.finish("healing_deferral.health_deployables", perf_t0)
 				end

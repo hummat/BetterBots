@@ -198,6 +198,22 @@ describe("TargetSelection", function()
 		assert.are.equal(8, score) -- 5 + 3
 	end)
 
+	it("does not boost score when vanilla slot_weight is zero", function()
+		local target_unit = {}
+		_G.Managers.state.extension.system = function(self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(function()
+			return 0
+		end, unit, target_unit, 100, breed, nil)
+		assert.are.equal(0, score)
+	end)
+
 	it("does not boost score when target is tagged by a bot (not human)", function()
 		local target_unit = {}
 		_G.Managers.state.extension.system = function(self, name)

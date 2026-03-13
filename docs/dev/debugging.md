@@ -52,6 +52,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `one-shot context dump` | First-time context dump for a template (debug-only) |
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
+| `unsupported grenade template` | Grenade/blitz heuristic approved a template with no mapped throw profile |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
 | `suppressed poxburster target (too_close_to_bot|near_human_player)` | Bot cleared poxburster `target_enemy` when it was unsafe to shoot (#34) |
 | `suppressed poxburster opportunity/urgent/priority target (...)` | Bot cleared unsafe poxburster targets from secondary perception slots (#34) |

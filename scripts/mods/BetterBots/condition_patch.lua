@@ -1,6 +1,7 @@
 -- Condition patch: replaces bt_bot_conditions.can_activate_ability with
 -- BetterBots' version that checks heuristics, guards, and rescue intent.
 -- Also fixes should_vent_overheat hysteresis (#30).
+local SharedRules = require("scripts/mods/BetterBots/shared_rules")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -22,11 +23,11 @@ local _rescue_intent
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
 
--- #17: breed names for daemonhost target-specific combat suppression.
-local DAEMONHOST_BREED_NAMES = {
-	chaos_daemonhost = true,
-	chaos_mutator_daemonhost = true,
-}
+local DAEMONHOST_BREED_NAMES = SharedRules.DAEMONHOST_BREED_NAMES
+	or {
+		chaos_daemonhost = true,
+		chaos_mutator_daemonhost = true,
+	}
 
 -- Returns true when the bot's current target_enemy is a non-aggroed
 -- daemonhost. O(1) — no proximity scan needed since we only check
@@ -53,11 +54,12 @@ local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ign
 	return true
 end
 
-local RESCUE_CHARGE_RULES = {
-	ogryn_charge_ally_aid = true,
-	zealot_dash_ally_aid = true,
-	adamant_charge_ally_aid = true,
-}
+local RESCUE_CHARGE_RULES = SharedRules.RESCUE_CHARGE_RULES
+	or {
+		ogryn_charge_ally_aid = true,
+		zealot_dash_ally_aid = true,
+		adamant_charge_ally_aid = true,
+	}
 
 local function _return_with_perf(perf_t0, ...)
 	if perf_t0 and _perf then

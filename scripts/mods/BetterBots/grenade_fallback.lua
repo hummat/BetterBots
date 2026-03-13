@@ -752,6 +752,13 @@ local function try_queue(unit, blackboard)
 
 	local template_entry = _resolve_template_entry(grenade_name, context, rule)
 	if not template_entry then
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_unsupported:" .. grenade_name,
+				fixed_t,
+				"unsupported grenade template " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
+			)
+		end
 		return
 	end
 
@@ -845,7 +852,7 @@ local function try_queue(unit, blackboard)
 end
 
 -- Called from BetterBots.lua use_ability_charge hook for grenade_ability.
--- Stores the event for observability; no read path within this module yet.
+-- Used by _has_confirmed_charge() to confirm blitz/grenade completion.
 local function record_charge_event(unit, grenade_name, fixed_t)
 	_last_grenade_charge_event_by_unit[unit] = {
 		grenade_name = grenade_name,

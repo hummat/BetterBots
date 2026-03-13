@@ -1,4 +1,6 @@
 local Settings = dofile("scripts/mods/BetterBots/settings.lua")
+local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+local helper = require("tests.test_helper")
 
 describe("settings", function()
 	describe("resolve_behavior_profile", function()
@@ -129,6 +131,54 @@ describe("settings", function()
 			})
 
 			assert.is_false(Settings.is_grenade_enabled("unknown_grenade"))
+		end)
+	end)
+
+	describe("heuristic coverage", function()
+		it("keeps settings-exposed combat templates aligned with heuristic coverage", function()
+			local handle = assert(io.open("scripts/mods/BetterBots/settings.lua", "r"))
+			local source = assert(handle:read("*a"))
+			handle:close()
+
+			local template_names = {}
+			for block_name in source:gmatch("local%s+(TIER_[12]_COMBAT_TEMPLATES)%s*=%s*%b{}") do
+				local block = source:match("local%s+" .. block_name .. "%s*=%s*(%b{})")
+				for name in block:gmatch("([a-z0-9_]+)%s*=") do
+					template_names[name] = true
+				end
+			end
+
+			Heuristics.init({
+				fixed_time = function()
+					return 0
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+			})
+
+			for template_name in pairs(template_names) do
+				local result, rule = Heuristics.evaluate_heuristic(template_name, helper.make_context({
+					num_nearby = 1,
+				}), {
+					conditions = helper.make_conditions(false),
+					ability_extension = helper.make_veteran_ability_extension("ranger", template_name),
+				})
+
+				assert.are_not.equal(
+					"fallback_unhandled_template",
+					rule,
+					string.format(
+						"settings template %s is missing heuristic coverage (result=%s, rule=%s)",
+						template_name,
+						tostring(result),
+						tostring(rule)
+					)
+				)
+			end
 		end)
 	end)
 end)

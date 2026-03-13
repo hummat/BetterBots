@@ -135,7 +135,7 @@ describe("poxburster", function()
 			_G.Vector3 = saved_vector3
 		end)
 
-		it("logs suppression at debug level so it is visible in normal validation runs", function()
+		local function run_hook_with_target(slot_name)
 			Poxburster.register_hooks()
 			assert.is_not_nil(
 				captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"]
@@ -145,10 +145,10 @@ describe("poxburster", function()
 			assert.is_not_nil(captured_hook_safe)
 
 			local perception_component = {
-				target_enemy = "poxburster",
 				target_enemy_distance = 3,
 				target_enemy_type = "special",
 			}
+			perception_component[slot_name] = "poxburster"
 
 			captured_hook_safe(
 				nil,
@@ -160,12 +160,28 @@ describe("poxburster", function()
 				{ valid_human_units = { "human" } }
 			)
 
+			return perception_component
+		end
+
+		it("logs suppression at debug level so it is visible in normal validation runs", function()
+			local perception_component = run_hook_with_target("target_enemy")
+
 			assert.is_nil(perception_component.target_enemy)
 			assert.equals(math.huge, perception_component.target_enemy_distance)
 			assert.equals("none", perception_component.target_enemy_type)
 			assert.equals(1, #debug_logs)
 			assert.equals("debug", debug_logs[1].level)
 			assert.matches("suppressed poxburster target %(near_human_player%)", debug_logs[1].message)
+		end)
+
+		it("suppresses poxbursters from all secondary perception slots", function()
+			local opportunity = run_hook_with_target("opportunity_target_enemy")
+			local urgent = run_hook_with_target("urgent_target_enemy")
+			local priority = run_hook_with_target("priority_target_enemy")
+
+			assert.is_nil(opportunity.opportunity_target_enemy)
+			assert.is_nil(urgent.urgent_target_enemy)
+			assert.is_nil(priority.priority_target_enemy)
 		end)
 	end)
 end)

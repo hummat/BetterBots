@@ -3,6 +3,7 @@ local _decision_context_cache
 local _super_armor_breed_cache
 local _armor_type_super_armor
 local _is_testing_profile
+local _overlapping_liquids = {}
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
 	gas = true,
@@ -47,11 +48,13 @@ local function _position_in_hostile_hazard(position)
 	end
 
 	if liquid_area_system.find_liquid_areas_in_position then
-		local overlapping_liquids = {}
-		liquid_area_system:find_liquid_areas_in_position(position, overlapping_liquids)
+		for i = #_overlapping_liquids, 1, -1 do
+			_overlapping_liquids[i] = nil
+		end
+		liquid_area_system:find_liquid_areas_in_position(position, _overlapping_liquids)
 
-		for i = 1, #overlapping_liquids do
-			if _is_hazardous_liquid_area(overlapping_liquids[i]) then
+		for i = 1, #_overlapping_liquids do
+			if _is_hazardous_liquid_area(_overlapping_liquids[i]) then
 				return true
 			end
 		end
@@ -462,8 +465,8 @@ local function _can_activate_psyker_stance(context)
 		return false, "psyker_stance_block_low_health"
 	end
 
-	-- Bots don't use warp attacks, so peril stays at 0. Bypass peril gate
-	-- and use threat-only conditions. Revisit when blitz support (#4) lands.
+	-- Some bot loadouts still report 0 peril in live combat, so keep a
+	-- threat-only fallback instead of hard-blocking on the human peril window.
 	local bot_no_peril = context.peril_pct == 0
 
 	if not bot_no_peril and (context.peril_pct < 0.20 or context.peril_pct > 0.90) then

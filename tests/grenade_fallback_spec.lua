@@ -341,11 +341,41 @@ describe("grenade_fallback", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
 
-			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "use_power"))
-			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
-		end)
+				assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "use_power"))
+				assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
+			end)
 
-		it("allows the expected Chain Lightning release input", function()
+			it("aborts when grenade slot is lost during wait_followup", function()
+				_debug_enabled_result = true
+				GrenadeFallback.wire({
+					build_context = function()
+						return { num_nearby = 1, peril_pct = 0.1 }
+					end,
+					evaluate_grenade_heuristic = function()
+						return true, "grenade_smite_priority_target"
+					end,
+					equipped_grenade_ability = function()
+						return mock_ability_extension, { name = "psyker_smite" }
+					end,
+				})
+
+				GrenadeFallback.try_queue(unit, blackboard)
+				_wielded_slot = "slot_grenade_ability"
+				_mock_time = _mock_time + 0.5
+				GrenadeFallback.try_queue(unit, blackboard)
+				_mock_time = _mock_time + 0.5
+				GrenadeFallback.try_queue(unit, blackboard)
+				assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
+
+				_wielded_slot = "slot_secondary"
+				_mock_time = _mock_time + 0.1
+				GrenadeFallback.try_queue(unit, blackboard)
+
+				assert.is_nil(_grenade_state_by_unit[unit].stage)
+				assert.truthy(find_debug_log("grenade lost wield during followup"))
+			end)
+
+			it("allows the expected Chain Lightning release input", function()
 			GrenadeFallback.wire({
 				build_context = function()
 					return { num_nearby = 5 }
@@ -621,6 +651,7 @@ describe("grenade_fallback", function()
 	end)
 
 	it("blocks unsupported blitz templates", function()
+		_debug_enabled_result = true
 		-- Wire with a blitz template that uses a different input chain
 		GrenadeFallback.wire({
 			build_context = function()
@@ -635,6 +666,7 @@ describe("grenade_fallback", function()
 		})
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(0, #_recorded_inputs)
+		assert.truthy(find_debug_log("unsupported grenade template unknown_psyker_blitz"))
 	end)
 
 	describe("record_charge_event", function()

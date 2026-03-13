@@ -1,6 +1,7 @@
 -- Ability queue: fallback combat ability activation that runs every
 -- BotBehaviorExtension.update tick. Handles Tier 1/2 template-based
 -- abilities and delegates to ItemFallback for Tier 3 item-based abilities.
+local SharedRules = require("scripts/mods/BetterBots/shared_rules")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -20,11 +21,12 @@ local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 
-local RESCUE_CHARGE_RULES = {
-	ogryn_charge_ally_aid = true,
-	zealot_dash_ally_aid = true,
-	adamant_charge_ally_aid = true,
-}
+local RESCUE_CHARGE_RULES = SharedRules.RESCUE_CHARGE_RULES
+	or {
+		ogryn_charge_ally_aid = true,
+		zealot_dash_ally_aid = true,
+		adamant_charge_ally_aid = true,
+	}
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
@@ -80,22 +82,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	if state.item_stage then
-		state.item_stage = nil
-		state.item_ability_name = nil
-		state.item_wield_deadline_t = nil
-		state.item_stage_deadline_t = nil
-		state.item_attempt_t = nil
-		state.item_charge_confirmed = nil
-		state.item_profile_name = nil
-		state.item_profile_key = nil
-		state.item_profile_count = nil
-		state.item_start_input = nil
-		state.item_wait_t = nil
-		state.item_followup_input = nil
-		state.item_followup_delay = nil
-		state.item_unwield_input = nil
-		state.item_unwield_delay = nil
-		state.item_charge_confirm_timeout = nil
+		_ItemFallback.reset_item_sequence_state(state)
 	end
 
 	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")

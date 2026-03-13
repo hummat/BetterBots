@@ -1608,9 +1608,13 @@ describe("heuristics", function()
 		local saved_position_lookup
 		local saved_script_unit
 		local liquid_results_return_mode
+		local current_fixed_t
+		local captured_liquid_results
 
 		before_each(function()
 			liquid_results_return_mode = "table"
+			current_fixed_t = 42
+			captured_liquid_results = {}
 			saved_managers = rawget(_G, "Managers")
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
@@ -1619,13 +1623,14 @@ describe("heuristics", function()
 				state = {
 					extension = {
 						system = function(_, system_name)
-							assert.equals("liquid_area_system", system_name)
-								return {
-									find_liquid_areas_in_position = function(_, position, results)
-										assert.equals("hazard_pos", position)
-										results[1] = {
-										source_side_name = function()
-											return "enemy"
+								assert.equals("liquid_area_system", system_name)
+									return {
+										find_liquid_areas_in_position = function(_, position, results)
+											assert.equals("hazard_pos", position)
+											captured_liquid_results[#captured_liquid_results + 1] = results
+											results[1] = {
+											source_side_name = function()
+												return "enemy"
 										end,
 											area_template_name = function()
 												return "cultist_grenadier_gas"
@@ -1651,12 +1656,12 @@ describe("heuristics", function()
 					return nil
 				end,
 			}
-			Heuristics.init({
-				fixed_time = function()
-					return 42
-				end,
-				decision_context_cache = {},
-				super_armor_breed_cache = {},
+				Heuristics.init({
+					fixed_time = function()
+						return current_fixed_t
+					end,
+					decision_context_cache = {},
+					super_armor_breed_cache = {},
 				ARMOR_TYPE_SUPER_ARMOR = 6,
 				is_testing_profile = function()
 					return false
@@ -1682,6 +1687,17 @@ describe("heuristics", function()
 
 			assert.is_true(ok)
 			assert.is_true(context.in_hazard)
+		end)
+
+		it("reuses the liquid overlap buffer across frames", function()
+			local first_context = Heuristics.build_context("hazard_bot", nil)
+			current_fixed_t = 43
+			local second_context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(first_context.in_hazard)
+			assert.is_true(second_context.in_hazard)
+			assert.are.equal(2, #captured_liquid_results)
+			assert.are.equal(captured_liquid_results[1], captured_liquid_results[2])
 		end)
 	end)
 

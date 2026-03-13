@@ -1,3 +1,4 @@
+local SharedRules = require("scripts/mods/BetterBots/shared_rules")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -7,10 +8,11 @@ local _perf
 local SPRINT_FOLLOW_DISTANCE = 12
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
 local DAEMONHOST_COMBAT_RANGE_SQ = 10 * 10
-local DAEMONHOST_BREED_NAMES = {
-	chaos_daemonhost = true,
-	chaos_mutator_daemonhost = true,
-}
+local DAEMONHOST_BREED_NAMES = SharedRules.DAEMONHOST_BREED_NAMES
+	or {
+		chaos_daemonhost = true,
+		chaos_mutator_daemonhost = true,
+	}
 
 local _last_sprint_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
@@ -107,7 +109,7 @@ local function _nearest_dh_dist_sq(unit)
 end
 
 -- Check if a non-aggroed daemonhost is within range. Accepts optional
--- range_sq (default: 20m² for sprint/abilities, pass DAEMONHOST_COMBAT_RANGE_SQ
+-- range_sq (default: 20m radius for sprint/abilities, pass DAEMONHOST_COMBAT_RANGE_SQ
 -- for the tighter 10m combat suppression radius).
 local function _is_near_daemonhost(unit, range_sq)
 	return _nearest_dh_dist_sq(unit) < (range_sq or DAEMONHOST_SAFE_RANGE_SQ)

@@ -258,6 +258,69 @@ describe("ping_system", function()
 		assert.spy(set_contextual_unit_tag_mock).was_called(1)
 	end)
 
+	it("retags the same target after its previous tag expires", function()
+		local priority_target = { name = "priority" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = priority_target,
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+		local tag_state = {}
+
+		POSITION_LOOKUP[bot_unit] = { x = 0, y = 0, z = 0 }
+		POSITION_LOOKUP[priority_target] = { x = 20, y = 0, z = 0 }
+
+		_G.ScriptUnit.has_extension = function(unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return {
+					tag_id = function()
+						return tag_state[unit]
+					end,
+				}
+			elseif extension_name == "perception_system" then
+				return {
+					has_line_of_sight = function()
+						return true
+					end,
+				}
+			elseif extension_name == "unit_data_system" then
+				return {
+					breed = function()
+						return { tags = { elite = true } }
+					end,
+				}
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_contextual_unit_tag = function(_, user_unit, target_unit)
+						tag_state[target_unit] = 123
+						set_contextual_unit_tag_mock(_, user_unit, target_unit)
+					end,
+				}
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_called(1)
+
+		current_time = 0.1
+		tag_state[priority_target] = nil
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_called(2)
+		assert.spy(set_contextual_unit_tag_mock).was_called_with(
+			match.is_table(),
+			match.is_ref(bot_unit),
+			match.is_ref(priority_target)
+		)
+	end)
+
 	it("allows immediate retag when a new target is much closer", function()
 		local priority_target = { name = "priority" }
 		local opportunity_target = { name = "opportunity" }
@@ -677,5 +740,47 @@ describe("ping_system", function()
 			0.1,
 			"bot 1 skipped pinging (reason: failure_backoff)"
 		)
+	end)
+
+	it("warns once when smart_tag_system lookup fails", function()
+		local priority_target = { name = "priority" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = priority_target,
+			},
+		}
+
+		_G.ScriptUnit.has_extension = function(unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return {
+					tag_id = function()
+						return nil
+					end,
+				}
+			elseif extension_name == "perception_system" then
+				return {
+					has_line_of_sight = function()
+						return true
+					end,
+				}
+			elseif extension_name == "unit_data_system" then
+				return {
+					breed = function()
+						return { name = "renegade_grenadier", tags = { elite = true } }
+					end,
+				}
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function()
+			error("missing smart tag system")
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		current_time = 0.1
+		PingSystem.update(bot_unit, blackboard)
+
+		assert.spy(mod_mock.warning).was_called(1)
 	end)
 end)

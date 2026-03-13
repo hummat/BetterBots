@@ -1,6 +1,40 @@
 local HealingDeferral = dofile("scripts/mods/BetterBots/healing_deferral.lua")
 
 describe("healing_deferral", function()
+	describe("init", function()
+		it("loads Health via require when no explicit dependency is passed", function()
+			local saved_preload = package.preload["scripts/utilities/health"]
+			local saved_loaded = package.loaded["scripts/utilities/health"]
+
+			package.loaded["scripts/utilities/health"] = nil
+			package.preload["scripts/utilities/health"] = function()
+				return {
+					current_health_percent = function(unit)
+						return unit.health_pct
+					end,
+				}
+			end
+
+			HealingDeferral.init({
+				mod = {
+					get = function()
+						return nil
+					end,
+				},
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			assert.is_true(HealingDeferral.any_human_needs_healing({
+				{ health_pct = 0.7 },
+			}, 0.9))
+
+			package.preload["scripts/utilities/health"] = saved_preload
+			package.loaded["scripts/utilities/health"] = saved_loaded
+		end)
+	end)
+
 	describe("resolve_settings", function()
 		it("returns defaults when settings are absent", function()
 			HealingDeferral.init({
@@ -82,6 +116,46 @@ describe("healing_deferral", function()
 			assert.are.equal("stations_and_deployables", settings.mode)
 			assert.are.equal(0.9, settings.human_threshold)
 			assert.are.equal(0.25, settings.emergency_threshold)
+		end)
+
+		it("caches settings within the same fixed frame and refreshes on the next frame", function()
+			local current_t = 10
+			local get_calls = 0
+
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						get_calls = get_calls + 1
+						if setting_id == "healing_deferral_mode" then
+							return "stations_only"
+						end
+						if setting_id == "healing_deferral_human_threshold" then
+							return "75"
+						end
+						if setting_id == "healing_deferral_emergency_threshold" then
+							return "10"
+						end
+					end,
+				},
+				fixed_time = function()
+					return current_t
+				end,
+			})
+
+			local settings_a = HealingDeferral.resolve_settings()
+			local settings_b = HealingDeferral.resolve_settings()
+
+			assert.are.equal(3, get_calls)
+			assert.are.equal(settings_a, settings_b)
+
+			current_t = 11
+			local settings_c = HealingDeferral.resolve_settings()
+
+			assert.are.equal(6, get_calls)
+			assert.are_not.equal(settings_a, settings_c)
+			assert.are.equal("stations_only", settings_c.mode)
+			assert.are.equal(0.75, settings_c.human_threshold)
+			assert.are.equal(0.10, settings_c.emergency_threshold)
 		end)
 	end)
 

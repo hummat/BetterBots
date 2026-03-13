@@ -14,6 +14,7 @@ local _last_ping_failure_t_by_bot = setmetatable({}, { __mode = "k" })
 local _last_tagged_by_bot = setmetatable({}, { __mode = "k" })
 local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
 local _missing_los_method_warned = false
+local _smart_tag_system_warned = false
 
 function M.init(deps)
 	_mod = deps.mod
@@ -21,6 +22,7 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
+	_smart_tag_system_warned = false
 end
 
 local function _is_elite_special_monster(unit)
@@ -115,7 +117,11 @@ local function _should_hold_last_tag(unit, perception, candidate_unit, candidate
 	local still_tagged = target_extension and target_extension:tag_id() or nil
 	local still_perceived = _is_in_any_ping_slot(perception, last_tag.target)
 
-	if not still_tagged and not still_perceived then
+	if not still_tagged then
+		return false
+	end
+
+	if not still_perceived then
 		return false
 	end
 
@@ -208,6 +214,10 @@ function M.update(unit, blackboard)
 
 	local ok, smart_tag_system = pcall(extension_manager.system, extension_manager, "smart_tag_system")
 	if not ok or not smart_tag_system then
+		if not _smart_tag_system_warned and _mod and _mod.warning then
+			_smart_tag_system_warned = true
+			_mod:warning("BetterBots: failed to get smart_tag_system for bot pinging")
+		end
 		return
 	end
 
