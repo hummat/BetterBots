@@ -1,3 +1,5 @@
+-- melee_attack_choice.lua — replace vanilla melee attack scoring so bots stop
+-- over-valuing wide heavies into unarmored horde trash.
 local M = {}
 
 local _mod
@@ -95,6 +97,8 @@ local function _armor_api()
 	local ok, armor = pcall(require, "scripts/utilities/attack/armor")
 	if ok then
 		_armor = armor
+	elseif _mod and _mod.warning then
+		_mod:warning("BetterBots: melee attack-choice disabled; failed to load scripts/utilities/attack/armor")
 	end
 
 	return _armor

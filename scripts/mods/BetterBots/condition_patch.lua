@@ -82,6 +82,18 @@ local function _override_ranged_ammo_condition_args(condition_args)
 	end
 	adjusted_args.ammo_percentage = BETTERBOTS_RANGED_AMMO_THRESHOLD
 
+	if _debug_enabled() then
+		_debug_log(
+			"ranged_ammo_threshold_override",
+			_fixed_time(),
+			"ranged ammo gate lowered from "
+				.. tostring(NORMAL_RANGED_AMMO_THRESHOLD)
+				.. " to "
+				.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD),
+			10
+		)
+	end
+
 	return adjusted_args
 end
 

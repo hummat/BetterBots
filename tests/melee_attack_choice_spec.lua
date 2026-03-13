@@ -50,15 +50,36 @@ describe("melee_attack_choice", function()
 		assert.equals("light_attack", chosen.action_inputs[2].action_input)
 	end)
 
+	it("prefers medium-arc control swings against a small crowd when armor is equal", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			jab_attack = attack_meta({ arc = 0, penetrating = false }),
+			control_attack = attack_meta({ arc = 1, penetrating = false }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, ARMORED, 2, ARMORED)
+
+		assert.equals(weapon_meta_data.control_attack, chosen)
+	end)
+
+	it("prefers non-damaging wide control swings only when massively outnumbered", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			light_attack = attack_meta({ arc = 0, penetrating = false, no_damage = true }),
+			control_attack = attack_meta({ arc = 2, penetrating = false, no_damage = true }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, ARMORED, 4, ARMORED)
+
+		assert.equals(weapon_meta_data.control_attack, chosen)
+	end)
+
 	it("registers a _choose_attack hook", function()
 		local MeleeAttackChoice = load_module()
 		local hooked_method
 		local stub_mod = {
 			hook_require = function(_, path, callback)
-				assert.equals(
-					"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
-					path
-				)
+				assert.equals("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", path)
 				callback({})
 			end,
 			hook = function(_, _, method_name, _handler)

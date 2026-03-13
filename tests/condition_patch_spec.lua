@@ -3,6 +3,8 @@
 -- current target IS a dormant daemonhost, not when any DH is nearby.
 local _extensions = {}
 local _blackboards = {}
+local _debug_logs = {}
+local _debug_enabled_result = false
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -39,7 +41,11 @@ _G.ALIVE = setmetatable({}, {
 		return _alive[unit]
 	end,
 })
-_G.Managers = { state = { extension = { system = function() return nil end } } }
+_G.Managers = { state = { extension = {
+	system = function()
+		return nil
+	end,
+} } }
 
 -- Stub require so condition_patch.lua doesn't crash on game modules
 local _orig_require = require
@@ -59,11 +65,25 @@ rawset(_G, "require", _orig_require)
 -- Initialize with minimal deps
 ConditionPatch.init({
 	mod = { echo = function() end, hook_require = function() end },
-	debug_log = function() end,
-	debug_enabled = function() return false end,
-	fixed_time = function() return 0 end,
-	is_suppressed = function() return false end,
-	equipped_combat_ability_name = function() return "none" end,
+	debug_log = function(key, fixed_t, message)
+		_debug_logs[#_debug_logs + 1] = {
+			key = key,
+			fixed_t = fixed_t,
+			message = message,
+		}
+	end,
+	debug_enabled = function()
+		return _debug_enabled_result
+	end,
+	fixed_time = function()
+		return 0
+	end,
+	is_suppressed = function()
+		return false
+	end,
+	equipped_combat_ability_name = function()
+		return "none"
+	end,
 	patched_bt_bot_conditions = {},
 	patched_bt_conditions = {},
 	rescue_intent = {},
@@ -72,10 +92,23 @@ ConditionPatch.init({
 })
 
 ConditionPatch.wire({
-	Heuristics = { resolve_decision = function() return false end },
+	Heuristics = {
+		resolve_decision = function()
+			return false
+		end,
+	},
 	MetaData = { inject = function() end },
-	Debug = { log_ability_decision = function() end, bot_slot_for_unit = function() return 1 end },
-	EventLog = { is_enabled = function() return false end },
+	Debug = {
+		log_ability_decision = function() end,
+		bot_slot_for_unit = function()
+			return 1
+		end,
+	},
+	EventLog = {
+		is_enabled = function()
+			return false
+		end,
+	},
 })
 
 -- Helper: set up unit_data extension for a breed (marks unit alive)
@@ -114,6 +147,18 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	_debug_logs = {}
+	_debug_enabled_result = false
+end
+
+local function find_debug_log(pattern)
+	for i = 1, #_debug_logs do
+		if string.find(_debug_logs[i].message, pattern, 1, true) then
+			return _debug_logs[i]
+		end
+	end
+
+	return nil
 end
 
 describe("condition_patch", function()
@@ -193,7 +238,9 @@ describe("condition_patch", function()
 					melee_called = true
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
@@ -214,7 +261,9 @@ describe("condition_patch", function()
 					orig_called = true
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
@@ -236,7 +285,9 @@ describe("condition_patch", function()
 					orig_called = true
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
@@ -258,7 +309,9 @@ describe("condition_patch", function()
 					orig_called = true
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
@@ -280,7 +333,9 @@ describe("condition_patch", function()
 					orig_called = true
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
@@ -302,7 +357,9 @@ describe("condition_patch", function()
 					seen_ammo_percentage = condition_args.ammo_percentage
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 			local condition_args = { ammo_percentage = 0.5 }
 
@@ -325,7 +382,9 @@ describe("condition_patch", function()
 					seen_ammo_percentage = condition_args.ammo_percentage
 					return true
 				end,
-				can_activate_ability = function() return false end,
+				can_activate_ability = function()
+					return false
+				end,
 			}
 			local condition_args = { ammo_percentage = 0 }
 
@@ -334,6 +393,30 @@ describe("condition_patch", function()
 			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, condition_args, {}, false)
 			assert.is_true(result)
 			assert.equals(0, seen_ammo_percentage)
+		end)
+
+		it("logs when BetterBots overrides the vanilla ranged ammo threshold", function()
+			_debug_enabled_result = true
+			local target = "gunner1"
+			setup_breed(target, "renegade_gunner")
+
+			local bb = make_blackboard(target)
+			bb.perception.target_enemy_type = "ranged"
+			local conditions = {
+				has_target_and_ammo_greater_than = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+			local condition_args = { ammo_percentage = 0.5 }
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, condition_args, {}, false)
+			assert.is_true(result)
+			assert.is_truthy(find_debug_log("ranged ammo gate lowered"))
 		end)
 	end)
 end)

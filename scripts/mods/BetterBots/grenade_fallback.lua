@@ -5,6 +5,7 @@
 -- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
 -- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
+local BotTargeting = require("scripts/mods/BetterBots/bot_targeting")
 
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
@@ -146,30 +147,29 @@ local function _resolve_template_entry(grenade_name, context, rule)
 end
 
 local function _resolve_aim_unit(context)
-	if not context then
-		return nil
-	end
-
-	return context.target_enemy
-		or context.priority_target_enemy
-		or context.opportunity_target_enemy
-		or context.urgent_target_enemy
+	return BotTargeting.resolve_bot_target_unit(context)
 end
 
+-- Aim the bot toward a concrete unit so the grenade/blitz release uses a valid
+-- facing direction instead of the bot's stale movement heading.
 local function _set_bot_aim(unit, aim_unit)
-	if not aim_unit or not POSITION_LOOKUP then
-		return false
+	if not aim_unit then
+		return false, "no target unit"
+	end
+
+	if not POSITION_LOOKUP then
+		return false, "position lookup unavailable"
 	end
 
 	local aim_position = POSITION_LOOKUP[aim_unit]
 	if not aim_position then
-		return false
+		return false, "target position missing"
 	end
 
 	local input_extension = ScriptUnit.has_extension(unit, "input_system")
 	local bot_unit_input = input_extension and input_extension.bot_unit_input and input_extension:bot_unit_input()
 	if not bot_unit_input then
-		return false
+		return false, "bot input missing"
 	end
 
 	bot_unit_input:set_aiming(true, false, false)
@@ -178,18 +178,54 @@ local function _set_bot_aim(unit, aim_unit)
 	return true
 end
 
+-- Release explicit bot aim state on reset so grenade sequences do not leave the
+-- bot stuck in an aimed posture after completion or abort.
 local function _clear_bot_aim(unit)
 	local input_extension = ScriptUnit.has_extension(unit, "input_system")
 	local bot_unit_input = input_extension and input_extension.bot_unit_input and input_extension:bot_unit_input()
 	if not bot_unit_input then
-		return
+		return false, "bot input missing"
 	end
 
 	bot_unit_input:set_aiming(false, false, false)
+	return true
+end
+
+local function _refresh_bot_aim(unit, state, context, fixed_t)
+	local resolved_aim_unit = _resolve_aim_unit(context)
+	if resolved_aim_unit then
+		state.aim_unit = resolved_aim_unit
+	end
+
+	if not state.aim_unit then
+		return true
+	end
+
+	local aim_ok, aim_reason = _set_bot_aim(unit, state.aim_unit)
+	if aim_ok then
+		return true
+	end
+
+	if _debug_enabled() then
+		_debug_log(
+			"grenade_aim_unavailable:" .. tostring(unit),
+			fixed_t,
+			"grenade aim unavailable (" .. tostring(aim_reason) .. ")"
+		)
+	end
+
+	return false
 end
 
 local function _reset_state(unit, state, next_try_t)
-	_clear_bot_aim(unit)
+	local cleared_aim, clear_reason = _clear_bot_aim(unit)
+	if not cleared_aim and _debug_enabled() and state and state.stage then
+		_debug_log(
+			"grenade_clear_aim:" .. tostring(unit),
+			_fixed_time(),
+			"grenade aim cleanup skipped (" .. tostring(clear_reason) .. ")"
+		)
+	end
 	state.stage = nil
 	state.deadline_t = nil
 	state.wait_t = nil
@@ -395,8 +431,10 @@ local function try_queue(unit, blackboard)
 	local active_context
 	if state.stage and state.stage ~= "wait_unwield" then
 		active_context = _build_context(unit, blackboard)
-		state.aim_unit = _resolve_aim_unit(active_context) or state.aim_unit
-		_set_bot_aim(unit, state.aim_unit)
+		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+			return
+		end
 	end
 
 	if state.stage == "wield" then

@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -312,6 +312,7 @@ BetterBots.mod                              # DMF entry point
 bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
   BetterBots.lua                            # Main: module wiring, lifecycle hooks, BT hooks
+  bot_targeting.lua                         # Shared bot target resolver for grenade aim and smart-target seeding
   condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
   ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
   heuristics.lua                            # 18 per-template heuristic functions + build_context()
@@ -328,6 +329,7 @@ scripts/mods/BetterBots/
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
   animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
+  smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   settings.lua                              # DMF settings resolution (behavior profile, tier/grenade feature gates)
@@ -356,6 +358,7 @@ tests/
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
   animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
+  smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder

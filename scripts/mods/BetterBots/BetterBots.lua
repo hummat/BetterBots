@@ -168,6 +168,9 @@ assert(Sprint, "BetterBots: failed to load sprint module")
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 
+local MeleeAttackChoice = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_attack_choice")
+assert(MeleeAttackChoice, "BetterBots: failed to load melee_attack_choice module")
+
 local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
 assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
 
@@ -276,6 +279,14 @@ MeleeMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+})
+
+MeleeAttackChoice.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 })
 
@@ -455,6 +466,7 @@ end
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
+MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()
 SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()

@@ -350,6 +350,23 @@ describe("grenade_fallback", function()
 			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "wield"))
 		end)
 
+		it("aborts instead of throwing blind when bot aim cannot be established", function()
+			_debug_enabled_result = true
+			_extensions[unit].input_system = nil
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.is_truthy(find_debug_log("grenade aim unavailable"))
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("grenade_ability", _recorded_inputs[1].input)
+		end)
+
 		it("allows the expected Smite followup input", function()
 			GrenadeFallback.wire({
 				build_context = function()
@@ -371,41 +388,41 @@ describe("grenade_fallback", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
 
-				assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "use_power"))
-				assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
-			end)
+			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "use_power"))
+			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
+		end)
 
-			it("aborts when grenade slot is lost during wait_followup", function()
-				_debug_enabled_result = true
-				GrenadeFallback.wire({
-					build_context = function()
-						return { num_nearby = 1, peril_pct = 0.1 }
-					end,
-					evaluate_grenade_heuristic = function()
-						return true, "grenade_smite_priority_target"
-					end,
-					equipped_grenade_ability = function()
-						return mock_ability_extension, { name = "psyker_smite" }
-					end,
-				})
+		it("aborts when grenade slot is lost during wait_followup", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 1, peril_pct = 0.1 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_smite_priority_target"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_smite" }
+				end,
+			})
 
-				GrenadeFallback.try_queue(unit, blackboard)
-				_wielded_slot = "slot_grenade_ability"
-				_mock_time = _mock_time + 0.5
-				GrenadeFallback.try_queue(unit, blackboard)
-				_mock_time = _mock_time + 0.5
-				GrenadeFallback.try_queue(unit, blackboard)
-				assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
 
-				_wielded_slot = "slot_secondary"
-				_mock_time = _mock_time + 0.1
-				GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_secondary"
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
 
-				assert.is_nil(_grenade_state_by_unit[unit].stage)
-				assert.truthy(find_debug_log("grenade lost wield during followup"))
-			end)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.truthy(find_debug_log("grenade lost wield during followup"))
+		end)
 
-			it("allows the expected Chain Lightning release input", function()
+		it("allows the expected Chain Lightning release input", function()
 			GrenadeFallback.wire({
 				build_context = function()
 					return { num_nearby = 5 }
