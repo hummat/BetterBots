@@ -95,6 +95,8 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 | #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
 | #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, validated in-game |
 
+**Unit tests**: 418 tests via busted.
+
 Archived implementation plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
 ## Next Steps

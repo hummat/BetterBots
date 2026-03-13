@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -328,6 +328,11 @@ scripts/mods/BetterBots/
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
+  healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
+  settings.lua                              # DMF settings resolution (behavior profile, tier/grenade feature gates)
+  log_levels.lua                            # Tiered debug log level constants and resolution (#40)
+  perf.lua                                  # Per-hook runtime recorder + /bb_perf command
+  shared_rules.lua                          # Shared rule tables (daemonhost breeds, rescue charge rules)
   debug.lua                                 # Debug commands + context/state snapshots
   BetterBots_data.lua                       # Mod options / widget definitions
   BetterBots_localization.lua               # Display strings
@@ -339,9 +344,18 @@ tests/
   event_log_spec.lua                        # event buffering/flush/lifecycle
   sprint_spec.lua                           # sprint conditions + daemonhost safety
   condition_patch_spec.lua                  # DH combat suppression wrappers
-  target_selection_spec.lua                 # melee target distance penalty
+  target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
   melee_meta_data_spec.lua                  # melee meta_data classification + injection
   ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                 # grenade throw state machine
-  ping_system_spec.lua                      # bot pinging logic
+  ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff
+  boss_engagement_spec.lua                  # boss/miniboss targeting self-defense exception
+  healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
+  item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
+  poxburster_spec.lua                       # poxburster suppression (all perception slots)
+  settings_spec.lua                         # tier gates, behavior profile, grenade toggle
+  log_levels_spec.lua                       # log level resolution
+  perf_spec.lua                             # perf timing recorder
+  debug_spec.lua                            # debug command registration
+  startup_regressions_spec.lua              # structural regression guards
 ```

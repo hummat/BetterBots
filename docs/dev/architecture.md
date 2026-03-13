@@ -17,7 +17,7 @@ This mod targets bot ability activation in three paths:
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does twenty-four things:
+`scripts/mods/BetterBots/BetterBots.lua` does twenty-six things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -101,6 +101,13 @@ This mod targets bot ability activation in three paths:
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
+25. Tiered debug log levels (#40, via `log_levels.lua`):
+    - replaces boolean debug toggle with info/debug/trace dropdown
+    - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
+    - backward-compatible: nil `call_level` defaults to `"debug"`
+26. Shared rule tables (`shared_rules.lua`):
+    - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
+    - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
 
 ## Why item fallback is needed
 
