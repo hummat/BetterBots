@@ -219,7 +219,6 @@ scripts/mods/BetterBots/          # Mod source
   BetterBots_localization.lua     #   Display strings
 tests/                            # Unit tests (busted)
 bb-log                            # Log analysis CLI
-scripts/extract-build.mjs         # GamesLantern build scraper (Playwright)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status
