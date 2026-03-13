@@ -296,7 +296,7 @@ Not every heuristic needs one. Functions with purely boolean logic (e.g., "has p
 - `_can_activate_broker_rage` — DLC-blocked, no calibration data
 - `_can_activate_stimm_field` — DLC-blocked, no calibration data
 - `_grenade_whistle` — binary priority-target check
-- `_grenade_smite` — delegates to `_grenade_priority_target` (gets thresholds there)
+- `_grenade_smite` — delegates to `_grenade_priority_target` (gets offset via helper)
 - `_grenade_assail` — many checks are binary (has priority target, is ranged, has super armor); density check can be revisited post-ship
 
 DLC-blocked abilities (broker/stimm) can get threshold tables when they become testable.
@@ -327,7 +327,12 @@ end
 
 Callers in `GRENADE_HEURISTICS` pass their per-type base values unchanged. The helper applies the preset offset. This preserves the per-grenade differentiation (frag=6/2.5 is harder to trigger than adamant=4/2.0) while letting presets shift all thresholds in the same direction.
 
-Same pattern for `_grenade_priority_target` (distance offset), `_grenade_defensive` (toughness offset, count offset), `_grenade_mine` (elite count offset, density offset).
+Same offset pattern for the other grenade helpers:
+- `_grenade_priority_target` — distance offset on `min_distance`
+- `_grenade_defensive` — toughness offset, count offset
+- `_grenade_mine` — elite count offset, density offset
+
+All four helpers (`_grenade_horde`, `_grenade_priority_target`, `_grenade_defensive`, `_grenade_mine`) receive a `preset` parameter and apply their respective offset tables.
 
 ### Preset plumbing
 
