@@ -139,7 +139,7 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 | 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance | Whitelist removal only |
 | 1 | Untested (DLC) | Broker Focus/Rage | Whitelist removal only — DLC-blocked for validation |
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
-| 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence) |
+| 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence). Note: Drone can crash with 3 Arbites bots (#50) |
 | 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
 | 3 | Validated | Standard grenades, Psyker Smite/Assail/Chain Lightning, knives, whistle, mines | Grenade/blitz fallback + per-grenade heuristics |
 
@@ -200,10 +200,12 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 | You just... | Update |
 |---|---|
 | Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
-| Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` |
+| Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` + `docs/nexus-description.bbcode` ("What works" + "Known issues") |
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
 | Added a new hook or module | `docs/dev/architecture.md` |
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
+| Fixed a user-reported bug or known issue | `docs/nexus-description.bbcode` ("Known issues") + relevant GitHub issue |
+| Added/changed user-visible behavior | `docs/nexus-description.bbcode` (roadmap, "What works", version notes) |
 | Released a new version (`make release`) | Add changelog entry on Nexus (version + summary of user-facing changes) |
 
 ### Doc index by activity
@@ -216,7 +218,7 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 | Understand what vanilla bots can/cannot do | `docs/bot/vanilla-capabilities.md` |
 | Modify bot behavior (targeting, movement, weapons) | Relevant `docs/bot/*.md` file(s) |
 | Modify input queueing or action sequences | `docs/bot/input-system.md` |
-| Assess what works / what's broken | `docs/dev/validation-tracker.md` + `docs/dev/known-issues.md` |
+| Assess what works / what's broken | `docs/dev/validation-tracker.md` + `docs/dev/known-issues.md` + `docs/nexus-description.bbcode` ("Known issues") |
 | Work on Tier 3 item abilities | `docs/bot/input-system.md` + `docs/related-mods.md` |
 | Work on grenade/blitz support | `docs/classes/grenade-inventory.md` + `docs/bot/input-system.md` |
 | Gate ability activation on bot state | `docs/classes/character-state-api.md` |

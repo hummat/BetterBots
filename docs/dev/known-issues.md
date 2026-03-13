@@ -7,6 +7,23 @@
    - No disable/unload restore path is implemented.
    - Toggling off in-session may require reload/restart to fully restore vanilla behavior.
 
+2. Animation crash with 3 Arbites bots (#50).
+   - `anim_event_with_variable_float` (singular) has no nil guard — unlike `_floats` (plural).
+   - Bot dodges during drone wield → `dodge_time` variable missing from drone animation state machine → `animation_find_variable` returns `0xFFFFFFFF` → crash at `authoritative_player_unit_animation_extension.lua:89`.
+   - BB-triggered vanilla bug: only reachable because `item_fallback.lua` wields drone into `slot_combat_ability`.
+   - Fix: hook `anim_event_with_variable_float`, guard `variable_index == 0xFFFFFFFF`.
+
+3. Bots stop shooting at 50% reserve ammo (#51).
+   - Vanilla BT gates normal ranged on `ammo_percentage > 0.5` (reserve-only ratio).
+   - Bots only seek ammo at 10% in combat → 40% dead zone where bot is melee-only.
+   - Bots CAN pick up ground ammo automatically (full pipeline in `bot_group.lua`), but do NOT have infinite ammo outside prologue.
+   - Fix: lower shoot gate + raise combat resupply gate + configurable slider.
+
+4. Heavy attack overuse in horde (#52).
+   - BB-caused: `melee_meta_data.lua` injects heavy entries, exposing vanilla `_choose_attack()` arc scoring asymmetry (+4 for `arc > 1` when outnumbered).
+   - Push-follow attacks never injected (chain off `action_push`, not `start_attack`).
+   - Fix: hook `_choose_attack()` with light-preference bias for horde; extend injector for push attacks.
+
 ## Medium severity
 
 1. ~~Tier 3 item fallback timing mismatch.~~ **Fixed** (#3): Wield_slot hook redirects to `slot_combat_ability` instead of blocking (prevents cancel loop). Followup delays shortened to 0.35s (aim actions chain immediately). Coherency self-exclusion fixes dead `allies_in_coherency == 0` guards. Validated 8/8 consumes (5 drone, 1 shield, 2 relic).

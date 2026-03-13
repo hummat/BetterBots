@@ -8,3 +8,4 @@ BetterBots.zip
 node_modules/
 package-lock.json
 .worktrees/
+.superpowers/
