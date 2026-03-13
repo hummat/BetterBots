@@ -1,3 +1,4 @@
+-- luacheck: globals Unit
 local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled

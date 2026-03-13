@@ -5,6 +5,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _armored_type
+local _armor
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
 local LIGHT_HORDE_BIAS = 4
@@ -36,7 +37,8 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 	elseif attack_meta_data.no_damage and massively_outnumbered and attack_meta_data.arc > 1 then
 		utility = utility + 2
 	elseif
-		not attack_meta_data.no_damage and ((outnumbered and attack_meta_data.arc > 1) or (not outnumbered and attack_meta_data.arc == 0))
+		not attack_meta_data.no_damage
+		and ((outnumbered and attack_meta_data.arc > 1) or (not outnumbered and attack_meta_data.arc == 0))
 	then
 		utility = utility + 4
 	end
@@ -45,7 +47,12 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 		utility = utility + 8
 	end
 
-	if outnumbered and target_armor ~= armored_type and attack_input == "light_attack" and not attack_meta_data.no_damage then
+	if
+		outnumbered
+		and target_armor ~= armored_type
+		and attack_input == "light_attack"
+		and not attack_meta_data.no_damage
+	then
 		utility = utility + LIGHT_HORDE_BIAS
 	end
 
@@ -60,7 +67,9 @@ local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemi
 
 	for attack_input, attack_meta_data in pairs(meta_data) do
 		local utility = _score_attack(attack_input, attack_meta_data, target_armor, num_enemies, armored_type)
-		local prefer_light_tie = utility == best_utility and attack_input == "light_attack" and best_attack_input ~= "light_attack"
+		local prefer_light_tie = utility == best_utility
+			and attack_input == "light_attack"
+			and best_attack_input ~= "light_attack"
 
 		if best_utility < utility or prefer_light_tie then
 			best_attack_input = attack_input
@@ -70,6 +79,25 @@ local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemi
 	end
 
 	return best_attack_meta_data
+end
+
+local function _armor_api()
+	if _armor then
+		return _armor
+	end
+
+	local global_armor = rawget(_G, "Armor")
+	if global_armor then
+		_armor = global_armor
+		return _armor
+	end
+
+	local ok, armor = pcall(require, "scripts/utilities/attack/armor")
+	if ok then
+		_armor = armor
+	end
+
+	return _armor
 end
 
 function M.init(deps)
@@ -84,15 +112,23 @@ function M.register_hooks()
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
 		function(BtBotMeleeAction)
-			_mod:hook(BtBotMeleeAction, "_choose_attack", function(_func, self, target_unit, target_breed, scratchpad)
+			_mod:hook(BtBotMeleeAction, "_choose_attack", function(_func, _self, target_unit, target_breed, scratchpad)
 				local num_enemies = scratchpad.num_enemies_in_proximity or 0
-				local target_armor = Armor.armor_type(target_unit, target_breed)
+				local armor = _armor_api()
+				local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
 				local weapon_template = scratchpad.weapon_template or {}
-				local chosen = choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
+				local chosen =
+					choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
 
-				if _debug_enabled() and target_armor ~= _armored_type and num_enemies > 1 and chosen == (weapon_template.attack_meta_data or {}).light_attack then
+				if
+					_debug_enabled()
+					and target_armor ~= _armored_type
+					and num_enemies > 1
+					and chosen == (weapon_template.attack_meta_data or {}).light_attack
+				then
 					_debug_log(
-						"melee_light_bias:" .. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
+						"melee_light_bias:"
+							.. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
 						_fixed_time(),
 						"melee light-bias selected light attack for unarmored horde target"
 					)
