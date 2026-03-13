@@ -109,9 +109,11 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
 [*][color=green]✓[/color] Bot warp charge venting
 [*][color=green]✓[/color] Suppress bot VFX/SFX bleed to human player
-[*][color=green]✓[/color] Smart melee attack selection (armor-aware)
+[*][color=green]✓[/color] Smart melee attack selection (armor-aware) — light/heavy balance being improved ([url=https://github.com/hummat/BetterBots/issues/52]#52[/url])
 [*][color=green]✓[/color] Force staff charged fire (all 4 staves)
 [*]Weapon/enemy-aware ADS vs hip-fire
+[*]Poxburster push ([url=https://github.com/hummat/BetterBots/issues/54]#54[/url])
+[*]Ammo management and conservation settings ([url=https://github.com/hummat/BetterBots/issues/51]#51[/url])
 [/list]
 
 [b]Long-term[/b]
@@ -142,12 +144,28 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 
 Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]injected meta_data for ...[/font] in game chat on mission start.
 
-[size=3][b]Known limitations[/b][/size]
+[size=3][b]Known issues[/b][/size]
+
+[b]Bugs being fixed:[/b]
 [list]
-[*]~~Psyker Scrier's Gaze warp overcharge~~ — fixed in v0.3.0 (warp weapon attacks blocked at ≥97% peril)
+[*][b]Crash with 3 Arbites bots[/b] — running 3 Arbitrators with drone and dog can cause an animation crash. Workaround: use fewer Arbites bots or avoid the drone ability for now. ([url=https://github.com/hummat/BetterBots/issues/50]#50[/url])
+[*][b]Bots stop shooting at ~50% ammo[/b] — a vanilla threshold makes bots go melee-only once reserve ammo drops below 50%, even though ammo pickups are nearby. They still shoot specials and elites. Fix and configurable slider coming. ([url=https://github.com/hummat/BetterBots/issues/51]#51[/url])
+[*][b]Bots overuse heavy attacks[/b] — bots prefer heavy attacks in hordes when spamming lights would be better for toughness regen and cleave. Caused by the melee improvements in v0.5.0. Smarter light/heavy/push attack selection coming. ([url=https://github.com/hummat/BetterBots/issues/52]#52[/url])
+[*][b]Rumbler projectile arc visible[/b] — the Ogryn Rumbler's aim trajectory can be visible to the player when a bot aims it. ([url=https://github.com/hummat/BetterBots/issues/53]#53[/url])
+[/list]
+
+[b]Vanilla bot limitations being addressed:[/b]
+[list]
+[*][b]Bots don't push poxbursters[/b] — vanilla bots never push approaching poxbursters, which is the standard human counterplay. Bots now shoot them at range (v0.7.0), but melee push support is coming. ([url=https://github.com/hummat/BetterBots/issues/54]#54[/url])
+[*][b]Bots ignore mastiff-pounced enemies[/b] — when the cyber mastiff pins an enemy, bots stand around instead of attacking the immobilized target. ([url=https://github.com/hummat/BetterBots/issues/55]#55[/url])
+[/list]
+
+[b]Other limitations:[/b]
+[list]
 [*]Item-based abilities use a heuristic wield/use/unwield sequence — new or changed weapon templates may not be recognized
 [*]Mods are disabled after every Darktide update — re-patch required
 [*]Hive Scum abilities (Enhanced Desperado, Rampage, Stimm Field) are untested — DLC required for validation
+[*]Bot mastiff names may appear to the player despite the "mine only" companion name setting — this is a vanilla issue with how bots share network identity
 [/list]
 
 [size=3][b]Source & feedback[/b][/size]
