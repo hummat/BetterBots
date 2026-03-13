@@ -1,7 +1,6 @@
 -- Condition patch: replaces bt_bot_conditions.can_activate_ability with
 -- BetterBots' version that checks heuristics, guards, and rescue intent.
 -- Also fixes should_vent_overheat hysteresis (#30).
-local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -25,11 +24,10 @@ local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
-local DAEMONHOST_BREED_NAMES = SharedRules.DAEMONHOST_BREED_NAMES
-	or {
-		chaos_daemonhost = true,
-		chaos_mutator_daemonhost = true,
-	}
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
 
 -- Returns true when the bot's current target_enemy is a non-aggroed
 -- daemonhost. O(1) — no proximity scan needed since we only check
@@ -56,12 +54,11 @@ local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ign
 	return true
 end
 
-local RESCUE_CHARGE_RULES = SharedRules.RESCUE_CHARGE_RULES
-	or {
-		ogryn_charge_ally_aid = true,
-		zealot_dash_ally_aid = true,
-		adamant_charge_ally_aid = true,
-	}
+local RESCUE_CHARGE_RULES = {
+	ogryn_charge_ally_aid = true,
+	zealot_dash_ally_aid = true,
+	adamant_charge_ally_aid = true,
+}
 
 local function _return_with_perf(perf_t0, ...)
 	if perf_t0 and _perf then
@@ -372,6 +369,9 @@ function M.init(deps)
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf
+	local shared_rules = deps.shared_rules or {}
+	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 end
 
 function M.wire(deps)

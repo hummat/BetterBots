@@ -5,8 +5,6 @@
 -- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
 -- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
-local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
-
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
 local _debug_log
@@ -22,6 +20,7 @@ local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
+local _resolve_bot_target_unit_fn
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
@@ -147,7 +146,18 @@ local function _resolve_template_entry(grenade_name, context, rule)
 end
 
 local function _resolve_aim_unit(context)
-	return BotTargeting.resolve_bot_target_unit(context)
+	if _resolve_bot_target_unit_fn then
+		return _resolve_bot_target_unit_fn(context)
+	end
+
+	if not context then
+		return nil
+	end
+
+	return context.target_enemy
+		or context.priority_target_enemy
+		or context.opportunity_target_enemy
+		or context.urgent_target_enemy
 end
 
 -- Aim the bot toward a concrete unit so the grenade/blitz release uses a valid
@@ -981,6 +991,8 @@ return {
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
+		local bot_targeting = refs.bot_targeting
+		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,

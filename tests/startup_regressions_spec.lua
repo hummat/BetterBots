@@ -44,6 +44,15 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/log_levels"%)', 1))
 	end)
 
+	it("loads shared helper modules through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/shared_rules"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/bot_targeting"%)', 1))
+	end)
+
 	it("loads smart_targeting through mod io", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
