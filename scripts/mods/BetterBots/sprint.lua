@@ -1,4 +1,4 @@
-local SharedRules = require("scripts/mods/BetterBots/shared_rules")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local _mod
 local _debug_log
 local _debug_enabled

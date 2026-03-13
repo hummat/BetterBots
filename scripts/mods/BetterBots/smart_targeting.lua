@@ -1,7 +1,7 @@
 -- smart_targeting.lua — seed bot precision targeting from bot perception.
 -- Keeps vanilla sticky/range validation by swapping the candidate unit only
 -- for the duration of SmartTargetingActionModule.fixed_update().
-local BotTargeting = require("scripts/mods/BetterBots/bot_targeting")
+local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
 local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled

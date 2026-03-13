@@ -1,7 +1,7 @@
 -- Condition patch: replaces bt_bot_conditions.can_activate_ability with
 -- BetterBots' version that checks heuristics, guards, and rescue intent.
 -- Also fixes should_vent_overheat hysteresis (#30).
-local SharedRules = require("scripts/mods/BetterBots/shared_rules")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local _mod
 local _debug_log
 local _debug_enabled

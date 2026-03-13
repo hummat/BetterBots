@@ -1,7 +1,7 @@
 -- Ability queue: fallback combat ability activation that runs every
 -- BotBehaviorExtension.update tick. Handles Tier 1/2 template-based
 -- abilities and delegates to ItemFallback for Tier 3 item-based abilities.
-local SharedRules = require("scripts/mods/BetterBots/shared_rules")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local _mod
 local _debug_log
 local _debug_enabled

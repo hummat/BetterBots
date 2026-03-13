@@ -5,7 +5,7 @@
 -- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
 -- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
-local BotTargeting = require("scripts/mods/BetterBots/bot_targeting")
+local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
 
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
