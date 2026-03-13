@@ -40,10 +40,10 @@ Three DMF `group` widgets with `sub_widgets`:
 
 | Setting ID | Label | Default | Templates |
 |---|---|---|---|
-| `enable_stances` | Stance abilities | `true` | `veteran_combat_ability`¹, `veteran_stealth_combat_ability`, `psyker_overcharge_stance`, `ogryn_gunlugger_stance`, `adamant_stance`, `broker_focus`, `broker_punk_rage` |
+| `enable_stances` | Stance abilities | `true` | `veteran_combat_ability`¹, `psyker_overcharge_stance`, `ogryn_gunlugger_stance`, `adamant_stance`, `broker_focus`, `broker_punk_rage` |
 | `enable_charges` | Charge & dash abilities | `true` | `zealot_dash`, `zealot_targeted_dash`, `zealot_targeted_dash_improved`, `zealot_targeted_dash_improved_double`, `ogryn_charge`, `ogryn_charge_increased_distance`, `adamant_charge` |
 | `enable_shouts` | Shout abilities | `true` | `veteran_combat_ability`¹, `psyker_shout`, `ogryn_taunt_shout`, `adamant_shout` |
-| `enable_stealth` | Stealth abilities | `true` | `zealot_invisibility` |
+| `enable_stealth` | Stealth abilities | `true` | `veteran_stealth_combat_ability`, `zealot_invisibility` |
 | `enable_deployables` | Deployable abilities | `true` | `zealot_relic`, `psyker_force_field`, `psyker_force_field_improved`, `psyker_force_field_dome`, `adamant_area_buff_drone`, `broker_ability_stimm_field` |
 | `enable_grenades` | Grenades & blitz | `true` | All `GRENADE_HEURISTICS` keys |
 
@@ -59,7 +59,7 @@ Three DMF `group` widgets with `sub_widgets`:
 
 This requires `is_combat_template_enabled` to accept an optional `ability_extension` parameter for the veteran special case. Callers (`condition_patch.lua`, `ability_queue.lua`) already have access to `ability_extension` in their call context. Non-veteran templates ignore this parameter.
 
-**Decision: `veteran_stealth_combat_ability` stays in Stances.** It's a self-buff (no movement, no repositioning), unlike Zealot Invisibility which is a defensive escape. The category gate is a pure settings lookup — if users report confusion, moving it to Stealth is a one-line change.
+**Decision: `veteran_stealth_combat_ability` goes in Stealth.** Users read "Stealth abilities" as "abilities that make the bot invisible/hidden" — Veteran stealth fits that better than "Stance abilities" even though it's mechanically a self-buff. This means `veteran_combat_ability` and `veteran_stealth_combat_ability` land in different categories, but that matches their behavioral difference.
 
 ### Group: Bot Behavior
 
@@ -167,8 +167,7 @@ Sprint.init({
 
 ```lua
 local CATEGORY_STANCES = {
-    veteran_combat_ability = true,
-    veteran_stealth_combat_ability = true,
+    -- veteran_combat_ability is NOT here — uses dual-category gate
     psyker_overcharge_stance = true,
     ogryn_gunlugger_stance = true,
     adamant_stance = true,
@@ -193,6 +192,7 @@ local CATEGORY_SHOUTS = {
 }
 
 local CATEGORY_STEALTH = {
+    veteran_stealth_combat_ability = true,
     zealot_invisibility = true,
 }
 
@@ -361,18 +361,15 @@ All four helpers (`_grenade_horde`, `_grenade_priority_target`, `_grenade_defens
 
 **Item heuristic threshold path:** `evaluate_item_heuristic` looks up `ITEM_THRESHOLDS[ability_name][preset]` (for abilities that have threshold tables) and passes thresholds to the heuristic function, same as the combat path. Item heuristic functions change from `(context)` to `(context, thresholds)` for functions with threshold tables. Functions without tables receive `nil` for thresholds (DLC-blocked abilities).
 
-### Heuristic function signature change
+### Heuristic function signature — no broad refactor
 
-Currently: `function(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running, ability_extension, context)`
+The existing 9-arg dispatch signature and `TEMPLATE_HEURISTICS` table stay unchanged. Thresholds are resolved in `_evaluate_template_heuristic` and passed as an extra argument to each heuristic function:
 
-The preset work requires passing thresholds to each function. Most functions (all except `veteran_combat_ability`) ignore the first 8 arguments. The new signature is:
+- Functions that need thresholds add a `thresholds` parameter (e.g., `_can_activate_veteran_stealth(context, thresholds)`)
+- Functions without threshold tables keep their current `(context)` signature — `_evaluate_template_heuristic` passes `nil` which Lua silently ignores
+- `_can_activate_veteran_combat_ability` keeps its full 9-arg signature; `_evaluate_template_heuristic` passes thresholds as arg 10
 
-**Most functions:** `function(context, thresholds)`
-**`veteran_combat_ability`:** `function(context, thresholds, veteran_extras)` where `veteran_extras = { conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running, ability_extension }`. The vanilla VoC fallback (`conditions._can_activate_veteran_ranger_ability(...)`) needs these arguments passed through.
-
-`_evaluate_template_heuristic` builds the `veteran_extras` table only for `veteran_combat_ability` and passes `nil` for all other functions. The `TEMPLATE_HEURISTICS` dispatch table adapts: most entries are `function(context, thresholds) return _can_activate_X(context, thresholds) end`.
-
-This is not a separate refactor — it's a direct consequence of the `(context, thresholds)` calling convention. The 9-arg signature naturally collapses.
+The `TEMPLATE_HEURISTICS` dispatch table and its 9-arg wrapper lambdas stay as-is. The evaluation wrapper extracts `context` from arg 9, looks up thresholds, and appends them when calling each function. This avoids rewriting every dispatch entry and every test that touches the table directly.
 
 ### Migration
 
@@ -395,7 +392,7 @@ User-facing labels describe outcomes, not implementation:
 | `enable_stances` | Stance abilities | Self-buff abilities (Veteran Focus, Psyker Overcharge, Ogryn Gunlugger, Arbites Stance) |
 | `enable_charges` | Charge & dash abilities | Gap-closing abilities (Zealot Dash, Ogryn Charge, Arbites Charge) |
 | `enable_shouts` | Shout abilities | Area-of-effect abilities (Psyker Shriek, Ogryn Taunt, Arbites Shout) |
-| `enable_stealth` | Stealth abilities | Invisibility abilities (Zealot Invisibility) |
+| `enable_stealth` | Stealth abilities | Invisibility and stealth abilities (Veteran Stealth, Zealot Invisibility) |
 | `enable_deployables` | Deployable abilities | Placed items (Zealot Relic, Psyker Force Field, Arbites Drone) |
 | `enable_grenades` | Grenades & blitz | All throwable and blitz abilities |
 | `enable_sprint` | Bot sprinting | Bots sprint to catch up, during traversal, and for ally rescue |
@@ -419,7 +416,7 @@ User-facing labels describe outcomes, not implementation:
 
 ### Regression strategy
 
-- All existing 418 tests must pass. Existing heuristic tests that call `evaluate_heuristic` without an `opts.preset` will automatically use `"balanced"` thresholds (identical to current hardcoded values), so **behavioral output is identical with no test logic changes**. The only mechanical updates needed: if any test constructs `TEMPLATE_HEURISTICS` function calls directly (bypassing `evaluate_heuristic`), those calls need the new `(context, thresholds)` signature.
+- All existing 418 tests must pass. Existing heuristic tests that call `evaluate_heuristic` without an `opts.preset` will automatically use `"balanced"` thresholds (identical to current hardcoded values), so **behavioral output is identical with no test logic changes**. The `TEMPLATE_HEURISTICS` dispatch table and 9-arg signature are unchanged, so no tests need mechanical updates.
 - `make check` (format + lint + lsp + test) must pass
 - In-game validation: one mission with `balanced` preset to verify no behavior change from v0.7.0
 
