@@ -289,5 +289,51 @@ describe("condition_patch", function()
 			assert.is_true(result)
 			assert.is_true(orig_called)
 		end)
+
+		it("lowers the normal ranged ammo gate from 50% to the BetterBots threshold", function()
+			local target = "gunner1"
+			setup_breed(target, "renegade_gunner")
+
+			local bb = make_blackboard(target)
+			bb.perception.target_enemy_type = "ranged"
+			local seen_ammo_percentage
+			local conditions = {
+				has_target_and_ammo_greater_than = function(_unit, _bb, _scratchpad, condition_args)
+					seen_ammo_percentage = condition_args.ammo_percentage
+					return true
+				end,
+				can_activate_ability = function() return false end,
+			}
+			local condition_args = { ammo_percentage = 0.5 }
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, condition_args, {}, false)
+			assert.is_true(result)
+			assert.equals(0.2, seen_ammo_percentage)
+		end)
+
+		it("leaves non-default ammo thresholds untouched", function()
+			local target = "gunner1"
+			setup_breed(target, "renegade_gunner")
+
+			local bb = make_blackboard(target)
+			bb.perception.target_enemy_type = "ranged"
+			local seen_ammo_percentage
+			local conditions = {
+				has_target_and_ammo_greater_than = function(_unit, _bb, _scratchpad, condition_args)
+					seen_ammo_percentage = condition_args.ammo_percentage
+					return true
+				end,
+				can_activate_ability = function() return false end,
+			}
+			local condition_args = { ammo_percentage = 0 }
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, condition_args, {}, false)
+			assert.is_true(result)
+			assert.equals(0, seen_ammo_percentage)
+		end)
 	end)
 end)
