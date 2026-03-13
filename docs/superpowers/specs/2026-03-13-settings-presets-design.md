@@ -26,7 +26,7 @@ Closes GitHub issue #6.
 
 - Per-ability or per-template individual toggles (UI would be too large)
 - Preset auto-selection based on difficulty
-- The 9-argument heuristic dispatch signature cleanup (separate refactor; only done if the preset `(context, thresholds)` calling convention naturally eliminates it)
+- Standalone refactoring of unrelated code not touched by this feature
 - `has_extension` guards in ability_queue/condition_patch (flagged in audit, separate fix)
 - Grenade fallback event logging (flagged in audit, separate fix)
 
@@ -49,7 +49,7 @@ Three DMF `group` widgets with `sub_widgets`:
 
 ¹ `veteran_combat_ability` covers both Veteran Voice of Command (shout) and Veteran Stance/Focus (stance). It maps to stances because the template is shared and the stance variant is more common. Veteran VoC is resolved dynamically at heuristic evaluation time via `_resolve_veteran_class_tag`, not at the settings gate level.
 
-**Note on `veteran_stealth_combat_ability` vs `zealot_invisibility`:** Both are "stealth" abilities from a player perspective, but `veteran_stealth_combat_ability` is Tier 1 (whitelist removal only) while `zealot_invisibility` is Tier 2 (meta_data injection). They end up in different categories because Veteran Stealth is a stance-like ability (self-buff, no movement) while Zealot Invisibility is a defensive escape. If this creates user confusion, both can be moved to the same category — the gate is purely a settings lookup, not tied to implementation tier.
+**Decision: `veteran_stealth_combat_ability` stays in Stances.** It's a self-buff (no movement, no repositioning), unlike Zealot Invisibility which is a defensive escape. The category gate is a pure settings lookup — if users report confusion, moving it to Stealth is a one-line change.
 
 ### Group: Bot Behavior
 
@@ -58,13 +58,36 @@ Preset dropdown + 4 feature checkboxes + healing deferral cluster.
 | Setting ID | Type | Label | Default | Notes |
 |---|---|---|---|---|
 | `behavior_preset` | dropdown | Behavior preset | `balanced` | Options: testing, aggressive, balanced, conservative |
-| `enable_sprint` | checkbox | Bot sprinting | `true` | Gates `Sprint.register_hook()` |
-| `enable_pinging` | checkbox | Elite & special pinging | `true` | Gates `PingSystem` update calls |
-| `enable_special_penalty` | checkbox | Prioritize shooting distant specials | `true` | Gates `TargetSelection.register_hooks()` |
-| `enable_poxburster` | checkbox | Poxburster safe targeting | `true` | Gates `Poxburster.register_hooks()` |
-| `healing_deferral_mode` | dropdown | Healing deferral | `stations_and_deployables` | Options: off, stations_only, stations_and_deployables. Acts as master gate. |
-| `healing_deferral_human_threshold` | dropdown | Defer when any player below | `90` | `show_widgets`: visible when mode ≠ off |
-| `healing_deferral_emergency_threshold` | dropdown | Bot emergency override below | `25` | `show_widgets`: visible when mode ≠ off |
+| `enable_sprint` | checkbox | Bot sprinting | `true` | Runtime gate inside hook callback |
+| `enable_pinging` | checkbox | Elite & special pinging | `true` | Runtime gate inside `PingSystem.update()` |
+| `enable_special_penalty` | checkbox | Prioritize shooting distant specials | `true` | Runtime gate inside hook callbacks |
+| `enable_poxburster` | checkbox | Poxburster safe targeting | `true` | Runtime gate inside hook callbacks |
+| `healing_deferral_mode` | dropdown | Healing deferral | `stations_and_deployables` | Options: off, stations_only, stations_and_deployables. Acts as master gate. Sub-widget parent. |
+
+The healing deferral threshold dropdowns are **`sub_widgets` of the `healing_deferral_mode` dropdown**, using `show_widgets` to conditionally reveal them:
+
+```lua
+{
+    setting_id = "healing_deferral_mode",
+    type = "dropdown",
+    default_value = "stations_and_deployables",
+    options = {
+        { text = "healing_deferral_mode_off", value = "off" },
+        { text = "healing_deferral_mode_stations_only", value = "stations_only",
+          show_widgets = { 1, 2 } },
+        { text = "healing_deferral_mode_stations_and_deployables",
+          value = "stations_and_deployables", show_widgets = { 1, 2 } },
+    },
+    sub_widgets = {
+        { setting_id = "healing_deferral_human_threshold", type = "dropdown",
+          default_value = "90", options = { ... } },
+        { setting_id = "healing_deferral_emergency_threshold", type = "dropdown",
+          default_value = "25", options = { ... } },
+    },
+}
+```
+
+When mode = "off", both sub-widgets are hidden. When mode = "stations_only" or "stations_and_deployables", both are visible.
 
 ### Group: Diagnostics
 
@@ -112,11 +135,21 @@ end
 
 | Module | Gate location | Notes |
 |---|---|---|
-| Sprint | Inside `on_update_movement` hook callback | Early return if disabled |
-| PingSystem | Inside `PingSystem.update()` call in BetterBots.lua update tick | Early return if disabled |
-| TargetSelection | Inside hook callbacks registered by `TargetSelection.register_hooks()` | Hooks call original function and return if disabled |
-| Poxburster | Inside hook callbacks registered by `Poxburster.register_hooks()` | Hooks call original function and return if disabled |
+| Sprint | Inside `on_update_movement` hook callback | Receives `is_feature_enabled` via deps; early return if disabled |
+| PingSystem | Inside `PingSystem.update()` call in BetterBots.lua update tick | Gate check in BetterBots.lua before calling `PingSystem.update()` |
+| TargetSelection | Inside hook callbacks | Receives `is_feature_enabled` via deps; hooks call original function and skip BetterBots logic if disabled |
+| Poxburster | Inside hook callbacks | Receives `is_feature_enabled` via deps; hooks call original function and skip BetterBots logic if disabled |
 | Healing deferral | Already runtime-gated via `_resolve_settings().mode` | Mode "off" = no deferral. No change needed. |
+
+**Dependency injection pattern:** Each gated module receives its gate check function through its existing `init(deps)` call, consistent with the project's DI pattern. No module imports `settings.lua` directly.
+
+```lua
+-- In BetterBots.lua init block:
+Sprint.init({
+    ...existing deps...,
+    is_enabled = function() return Settings.is_feature_enabled("sprint") end,
+})
+```
 
 ### Ability category gates
 
@@ -157,9 +190,15 @@ local TEMPLATE_TO_CATEGORY_SETTING = {}
 -- Populated at module load from the above tables
 ```
 
-A single `TEMPLATE_TO_CATEGORY_SETTING` reverse lookup maps any template name to its setting ID. `is_combat_template_enabled` does one table lookup + one `mod:get()`. Same API surface as today — callers don't change.
+A single `TEMPLATE_TO_CATEGORY_SETTING` reverse lookup maps any combat template name to its setting ID. Built at module load time from the category tables above.
 
-Item abilities map to `enable_deployables`. Grenade abilities map to `enable_grenades`. Both use the same pattern.
+**API: three functions stay separate.** The current three-function API is preserved because callers are different modules with different call sites:
+
+- `is_combat_template_enabled(template_name)` — used by `condition_patch.lua` and `ability_queue.lua`. Looks up `TEMPLATE_TO_CATEGORY_SETTING[template_name]` → `mod:get(setting_id)`.
+- `is_item_ability_enabled(ability_name)` — used by `item_fallback.lua`. All item abilities map to `enable_deployables`. Replaces the old `TIER_3_ITEM_ABILITIES` check.
+- `is_grenade_enabled(grenade_name)` — used by `grenade_fallback.lua`. All grenades map to `enable_grenades`. Unchanged behavior (was already a single setting).
+
+Unifying into one function would require callers to know which "namespace" their template belongs to, adding complexity for no benefit.
 
 ## Behavior Preset System
 
@@ -250,7 +289,7 @@ Not every heuristic needs one. Functions with purely boolean logic (e.g., "has p
 - `_can_activate_zealot_relic`
 - `_can_activate_force_field`
 - `_can_activate_drone`
-- Grenade helpers: `_grenade_horde`, `_grenade_priority_target`, `_grenade_defensive`, `_grenade_mine`
+- `_grenade_chain_lightning` (density check that should vary by preset)
 
 **No threshold table (purely boolean or identical across presets):**
 - `_can_activate_broker_focus` — DLC-blocked, no calibration data
@@ -258,19 +297,54 @@ Not every heuristic needs one. Functions with purely boolean logic (e.g., "has p
 - `_can_activate_stimm_field` — DLC-blocked, no calibration data
 - `_grenade_whistle` — binary priority-target check
 - `_grenade_smite` — delegates to `_grenade_priority_target` (gets thresholds there)
-- `_grenade_assail` — many checks are binary (has priority target, is ranged, has super armor)
-- `_grenade_chain_lightning` — simple density check
+- `_grenade_assail` — many checks are binary (has priority target, is ranged, has super armor); density check can be revisited post-ship
 
 DLC-blocked abilities (broker/stimm) can get threshold tables when they become testable.
+
+### Grenade helper threshold composition
+
+Grenade helpers (`_grenade_horde`, `_grenade_priority_target`, `_grenade_defensive`, `_grenade_mine`) are shared functions called with per-grenade-type arguments. The preset system composes with these by **scaling the per-grenade-type arguments, not replacing them.**
+
+Each helper gets a preset-specific multiplier/offset table:
+
+```lua
+local GRENADE_HORDE_PRESETS = {
+    aggressive   = { nearby_offset = -1, challenge_offset = -0.5 },
+    balanced     = { nearby_offset =  0, challenge_offset =  0   },
+    conservative = { nearby_offset =  1, challenge_offset =  0.5 },
+}
+
+local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, preset)
+    local t = GRENADE_HORDE_PRESETS[preset] or GRENADE_HORDE_PRESETS.balanced
+    local adj_nearby = min_nearby + t.nearby_offset
+    local adj_challenge = min_challenge + t.challenge_offset
+    if context.num_nearby >= adj_nearby and context.challenge_rating_sum >= adj_challenge then
+        return true, rule_prefix .. "_horde"
+    end
+    return false, rule_prefix .. "_hold"
+end
+```
+
+Callers in `GRENADE_HEURISTICS` pass their per-type base values unchanged. The helper applies the preset offset. This preserves the per-grenade differentiation (frag=6/2.5 is harder to trigger than adamant=4/2.0) while letting presets shift all thresholds in the same direction.
+
+Same pattern for `_grenade_priority_target` (distance offset), `_grenade_defensive` (toughness offset, count offset), `_grenade_mine` (elite count offset, density offset).
 
 ### Preset plumbing
 
 1. `settings.lua` exposes `resolve_behavior_preset()` — returns `"testing"` / `"aggressive"` / `"balanced"` / `"conservative"`
-2. `heuristics.lua` init receives `resolve_preset` function reference
-3. `build_context()` resolves the preset name once per unit per frame and stores it in the context: `context.preset = resolve_preset()`
-4. `_evaluate_template_heuristic()` looks up the per-heuristic threshold table using `context.preset` and passes it to the heuristic function
+2. `heuristics.lua` init receives `resolve_preset` as a function reference, stored as module-local `_resolve_preset`
+3. `build_context()` calls `_resolve_preset()` (the module-local) once per unit per frame and stores the result as `context.preset`. This is the only place preset resolution occurs in the hot path.
+4. `_evaluate_template_heuristic()` looks up the per-heuristic threshold table using `context.preset` (e.g., `VETERAN_STEALTH_THRESHOLDS[context.preset]`) and passes it to the heuristic function. Falls back to `balanced` if the preset name is unknown.
 5. For `balanced`, the threshold table contains the same values as the current hardcoded constants — zero behavior change for existing users
-6. For `testing`, `_apply_behavior_profile` continues to work as an override layer *after* threshold evaluation, same as today
+6. For `testing`, thresholds are `balanced` (not `aggressive`). The existing `_apply_behavior_profile` override layer runs *after* threshold evaluation and overrides `_hold`/`_block_safe`/`_block_low_value` rules when combat triggers are present. Testing = balanced thresholds + override escape hatch. This preserves exact current testing behavior and avoids double-relaxation.
+
+**Test entry points and preset resolution:**
+- `evaluate_heuristic(template_name, context, opts)` — test-facing function. Resolves thresholds from `opts.preset` (defaults to `"balanced"` if absent). Tests pass `opts = { preset = "aggressive" }` to test preset behavior. Does NOT read module-local `_resolve_preset`.
+- `evaluate_item_heuristic(ability_name, context, opts)` — same pattern: `opts.preset` for threshold lookup.
+- `evaluate_grenade_heuristic(grenade_template_name, context, opts)` — same pattern.
+- Test-constructed contexts do not need a `preset` field — the `opts.preset` parameter is the injection point.
+
+**Item heuristic threshold path:** `evaluate_item_heuristic` looks up `ITEM_THRESHOLDS[ability_name][preset]` (for abilities that have threshold tables) and passes thresholds to the heuristic function, same as the combat path. Item heuristic functions change from `(context)` to `(context, thresholds)` for functions with threshold tables. Functions without tables receive `nil` for thresholds (DLC-blocked abilities).
 
 ### Heuristic function signature change
 
@@ -279,17 +353,22 @@ Currently: `function(conditions, unit, blackboard, scratchpad, condition_args, a
 The preset work requires passing thresholds to each function. Most functions (all except `veteran_combat_ability`) ignore the first 8 arguments. The new signature is:
 
 **Most functions:** `function(context, thresholds)`
-**`veteran_combat_ability`:** `function(context, thresholds, conditions, ability_extension)` (needs these for vanilla VoC fallback)
+**`veteran_combat_ability`:** `function(context, thresholds, veteran_extras)` where `veteran_extras = { conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running, ability_extension }`. The vanilla VoC fallback (`conditions._can_activate_veteran_ranger_ability(...)`) needs these arguments passed through.
 
-The `TEMPLATE_HEURISTICS` dispatch table and `_evaluate_template_heuristic` adapt the call. `evaluate_heuristic` (test entry point) already takes `(template_name, context, opts)` — it resolves thresholds internally.
+`_evaluate_template_heuristic` builds the `veteran_extras` table only for `veteran_combat_ability` and passes `nil` for all other functions. The `TEMPLATE_HEURISTICS` dispatch table adapts: most entries are `function(context, thresholds) return _can_activate_X(context, thresholds) end`.
 
 This is not a separate refactor — it's a direct consequence of the `(context, thresholds)` calling convention. The 9-arg signature naturally collapses.
 
 ### Migration
 
-- `settings.lua` recognizes `standard` and silently returns `balanced`
-- `behavior_profile` setting ID renamed to `behavior_preset` for clarity
-- Old `VALID_BEHAVIOR_PROFILES` replaced with `VALID_PRESETS`
+DMF persists settings by `setting_id` key. Renaming `behavior_profile` → `behavior_preset` would orphan existing user settings (`mod:get("behavior_preset")` returns `nil` for users with `behavior_profile` saved).
+
+**Approach: keep `behavior_profile` as the setting ID.** The internal constant name changes to `BEHAVIOR_PRESET_SETTING_ID = "behavior_profile"` but the persisted key stays the same. This avoids any DMF migration complexity. The user-facing label changes via localization (not setting ID).
+
+- `resolve_behavior_preset()` reads `mod:get("behavior_profile")`
+- Recognizes `"standard"` → returns `"balanced"` (silent value migration)
+- `VALID_PRESETS = { testing=true, aggressive=true, balanced=true, conservative=true }`
+- Unknown values fall back to `"balanced"`
 - `is_testing_profile()` updated to check against `"testing"` preset (functionally identical)
 
 ## Settings Label Guidelines
@@ -325,7 +404,7 @@ User-facing labels describe outcomes, not implementation:
 
 ### Regression strategy
 
-- All existing 418 tests must pass with zero changes (balanced = current behavior)
+- All existing 418 tests must pass. Existing heuristic tests that call `evaluate_heuristic` without an `opts.preset` will automatically use `"balanced"` thresholds (identical to current hardcoded values), so **behavioral output is identical with no test logic changes**. The only mechanical updates needed: if any test constructs `TEMPLATE_HEURISTICS` function calls directly (bypassing `evaluate_heuristic`), those calls need the new `(context, thresholds)` signature.
 - `make check` (format + lint + lsp + test) must pass
 - In-game validation: one mission with `balanced` preset to verify no behavior change from v0.7.0
 
@@ -343,9 +422,8 @@ User-facing labels describe outcomes, not implementation:
 
 ## Open Questions
 
-1. **Veteran Stealth in Stances vs Stealth category:** Currently mapped to Stances (Tier 1 stance-like self-buff). Could map to Stealth alongside Zealot Invisibility if users find it confusing. Low-stakes decision — can be changed post-ship.
-2. **Threshold calibration for aggressive/conservative:** Initial values are hand-tuned estimates based on the current balanced thresholds (relaxed/tightened by ~30-50%). Real calibration requires in-game testing across difficulties. Ship with best estimates, tune in patches.
-3. **`_grenade_assail` threshold table:** Assail has many binary checks but also a density+challenge check (`num_nearby >= 4 and challenge_rating_sum >= 2.0`) that could benefit from preset tuning. Revisit during implementation.
+1. **Threshold calibration for aggressive/conservative:** Initial values are hand-tuned estimates based on the current balanced thresholds (relaxed/tightened by ~30-50%). Real calibration requires in-game testing across difficulties. Ship with best estimates, tune in patches.
+2. **`_grenade_assail` threshold table:** Assail has many binary checks but also a density+challenge check (`num_nearby >= 4 and challenge_rating_sum >= 2.0`) that could benefit from preset tuning. Deferred — add post-ship if assail behavior needs differentiation across presets.
 
 ## DMF Widget Reference
 
