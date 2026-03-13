@@ -110,4 +110,66 @@ describe("melee_attack_choice", function()
 		assert.equals("_choose_attack", hooked_method)
 		_G.Armor = nil
 	end)
+
+	it("logs the chosen attack context for unarmored horde targets", function()
+		local MeleeAttackChoice = load_module()
+		local hook_handler
+		local debug_logs = {}
+		local stub_mod = {
+			hook_require = function(_, _, callback)
+				callback({})
+			end,
+			hook = function(_, _, _, handler)
+				hook_handler = handler
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return 1
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function(key, fixed_t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = function()
+				return 42
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+		})
+
+		MeleeAttackChoice.register_hooks()
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({ arc = 2, penetrating = true })
+		local scratchpad = {
+			num_enemies_in_proximity = 4,
+			weapon_template = {
+				name = "powermaul_shield_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+		}
+
+		local chosen = hook_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", {}, scratchpad)
+
+		assert.equals(light_attack, chosen)
+		assert.equals(1, #debug_logs)
+		assert.matches("melee choice light_attack vs unarmored target", debug_logs[1].message, 1, true)
+		_G.Armor = nil
+	end)
 end)

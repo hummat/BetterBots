@@ -143,4 +143,65 @@ describe("smart_targeting", function()
 
 		assert.equals(1, original_calls)
 	end)
+
+	it("logs target confirmation even when vanilla targeting already matches bot perception", function()
+		local SmartTargeting = load_smart_targeting()
+		local hook_handler
+		local debug_logs = {}
+		local stub_mod = {
+			hook_require = function(_, _, callback)
+				callback({})
+			end,
+			hook = function(_, _, _, handler)
+				hook_handler = handler
+			end,
+		}
+
+		SmartTargeting.init({
+			mod = stub_mod,
+			debug_log = function(key, fixed_t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = function()
+				return 7
+			end,
+		})
+		SmartTargeting.register_hooks()
+
+		local targeting_data = { unit = "bot_target" }
+		local self = {
+			_component = {},
+			_unit_data_extension = {
+				is_resimulating = false,
+				read_component = function(_, component_name)
+					assert.equals("perception", component_name)
+					return {
+						target_enemy = "bot_target",
+					}
+				end,
+			},
+			_smart_targeting_extension = {
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				targeting_data = function()
+					return targeting_data
+				end,
+			},
+		}
+
+		hook_handler(function() end, self, 0.1, 99)
+
+		assert.equals(1, #debug_logs)
+		assert.matches("smart targeting using bot perception target", debug_logs[1].message, 1, true)
+	end)
 end)

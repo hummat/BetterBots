@@ -8,6 +8,7 @@ local _debug_enabled
 local _fixed_time
 local _armored_type
 local _armor
+local _logged_choice_keys = {}
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
 local LIGHT_HORDE_BIAS = 4
@@ -83,6 +84,26 @@ local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemi
 	return best_attack_meta_data
 end
 
+local function _enemy_bucket(num_enemies)
+	if num_enemies > 3 then
+		return "horde"
+	end
+	if num_enemies > 1 then
+		return "pack"
+	end
+	return "solo"
+end
+
+local function _chosen_attack_input(weapon_meta_data, chosen_attack_meta_data)
+	for attack_input, attack_meta_data in pairs(weapon_meta_data or DEFAULT_ATTACK_META_DATA) do
+		if attack_meta_data == chosen_attack_meta_data then
+			return attack_input
+		end
+	end
+
+	return "unknown"
+end
+
 local function _armor_api()
 	if _armor then
 		return _armor
@@ -123,8 +144,41 @@ function M.register_hooks()
 				local weapon_template = scratchpad.weapon_template or {}
 				local chosen =
 					choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
+				local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
 
 				if
+					_debug_enabled()
+					and ((target_armor ~= _armored_type and num_enemies > 1) or target_armor == _armored_type)
+				then
+					local weapon_name = tostring(weapon_template.name or weapon_template.display_name or "weapon")
+					local armor_bucket = target_armor == _armored_type and "armored" or "unarmored"
+					local choice_key = weapon_name
+						.. ":"
+						.. tostring(chosen_attack)
+						.. ":"
+						.. armor_bucket
+						.. ":"
+						.. _enemy_bucket(num_enemies)
+
+					if not _logged_choice_keys[choice_key] then
+						_logged_choice_keys[choice_key] = true
+						_debug_log(
+							"melee_choice:" .. choice_key,
+							_fixed_time(),
+							"melee choice "
+								.. tostring(chosen_attack)
+								.. " vs "
+								.. armor_bucket
+								.. " target (crowd="
+								.. tostring(num_enemies)
+								.. ", bucket="
+								.. _enemy_bucket(num_enemies)
+								.. ", weapon="
+								.. weapon_name
+								.. ")"
+						)
+					end
+				elseif
 					_debug_enabled()
 					and target_armor ~= _armored_type
 					and num_enemies > 1

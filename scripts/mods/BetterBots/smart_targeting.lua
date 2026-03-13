@@ -47,22 +47,26 @@ local function register_hooks()
 				end
 
 				local original_target_unit = targeting_data.unit
-				if original_target_unit == bot_target_unit then
-					return func(self, dt, t)
-				end
-
-				targeting_data.unit = bot_target_unit
-
 				if _debug_enabled() and _last_logged_target_by_component[self._component] ~= bot_target_unit then
 					_last_logged_target_by_component[self._component] = bot_target_unit
 					_debug_log(
 						"smart_targeting:" .. tostring(bot_target_unit),
 						_fixed_time(),
-						"smart targeting seeded bot perception target " .. tostring(bot_target_unit),
+						"smart targeting using bot perception target "
+							.. tostring(bot_target_unit)
+							.. " (already_seeded="
+							.. tostring(original_target_unit == bot_target_unit)
+							.. ")",
 						nil,
 						"info"
 					)
 				end
+
+				if original_target_unit == bot_target_unit then
+					return func(self, dt, t)
+				end
+
+				targeting_data.unit = bot_target_unit
 
 				local ok, err = pcall(func, self, dt, t)
 				targeting_data.unit = original_target_unit

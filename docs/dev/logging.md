@@ -71,6 +71,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
 - `unsupported grenade template <grenade> (rule=<rule>)` (heuristic approved a grenade/blitz template that BetterBots has no throw profile for)
 - `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
+- `grenade releasing toward <unit> via <input> (dist_bucket=<close|mid|far|unknown>)` (throw release with resolved aim target; primary validation signal for aimed grenade/blitz releases)
 - `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
@@ -80,6 +81,9 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade released cleanup lock without explicit unwield (action confirmed)` (external cleanup templates saw their target action, so BetterBots ends the protected sequence immediately)
 - `grenade released cleanup lock without explicit unwield (slot changed)` (external cleanup templates left grenade slot through the engine's normal unwind; BetterBots treats that as success)
 - `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
+- `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
+- `ranged dead-zone override kept normal shot (ammo=<0.xx>, target=<breed>, weapon=<template>, action=<input>)` (bot fired a normal ranged shot while reserve ammo was in the old 20%-50% dead zone; direct validation signal for `#51`)
+- `melee choice <attack> vs <armored|unarmored> target (crowd=<N>, bucket=<solo|pack|horde>, weapon=<template>)` (interesting `_choose_attack` decision; use to validate `#52` without per-swing spam)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)

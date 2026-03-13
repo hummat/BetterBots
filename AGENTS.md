@@ -352,6 +352,7 @@ tests/
   target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
   melee_meta_data_spec.lua                  # melee meta_data classification + injection
   melee_attack_choice_spec.lua              # melee attack-choice bias for unarmored hordes
+  weapon_action_spec.lua                    # weapon-action logging, dead-zone ranged fire confirmation
   ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                 # grenade throw state machine
   ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff

@@ -562,6 +562,17 @@ describe("grenade_fallback", function()
 		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 	end)
 
+	it("logs grenade release target context once per actual throw", function()
+		_debug_enabled_result = true
+		advance_to_stage("wait_throw")
+		_recorded_inputs = {}
+
+		_mock_time = _mock_time + 1.0
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.truthy(find_debug_log("grenade releasing toward enemy_1"))
+	end)
+
 	it("completes when slot leaves grenade in wait_unwield", function()
 		advance_to_stage("wait_unwield")
 		assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)

@@ -206,6 +206,7 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 	if resolved_aim_unit then
 		state.aim_unit = resolved_aim_unit
 	end
+	state.aim_distance = context and context.target_enemy_distance or nil
 
 	if not state.aim_unit then
 		return true
@@ -254,9 +255,23 @@ local function _reset_state(unit, state, next_try_t)
 	state.confirmation_logged = nil
 	state.last_blocked_foreign_input = nil
 	state.aim_unit = nil
+	state.aim_distance = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
+end
+
+local function _distance_bucket(distance)
+	if not distance then
+		return "unknown"
+	end
+	if distance < 8 then
+		return "close"
+	end
+	if distance < 16 then
+		return "mid"
+	end
+	return "far"
 end
 
 local function _has_confirmed_charge(state, unit)
@@ -625,7 +640,14 @@ local function try_queue(unit, blackboard)
 				_debug_log(
 					"grenade_release:" .. tostring(unit),
 					fixed_t,
-					"grenade queued " .. release .. component_state
+					"grenade releasing toward "
+						.. tostring(state.aim_unit or "none")
+						.. " via "
+						.. release
+						.. component_state
+						.. " (dist_bucket="
+						.. _distance_bucket(state.aim_distance)
+						.. ")"
 				)
 			end
 		end
@@ -683,6 +705,10 @@ local function try_queue(unit, blackboard)
 						.. tostring(state.grenade_name)
 						.. " (action="
 						.. tostring(state.confirmation_action)
+						.. ", aim_target="
+						.. tostring(state.aim_unit or "none")
+						.. ", dist_bucket="
+						.. _distance_bucket(state.aim_distance)
 						.. ")"
 				)
 			end
