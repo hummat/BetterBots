@@ -1057,28 +1057,71 @@ threshold table."
 
 ---
 
-### Task 4: Item heuristic thresholds
+### Task 4: Wire item heuristic preset plumbing + tests
 
 **Files:**
 - Modify: `scripts/mods/BetterBots/heuristics.lua`
 - Modify: `tests/heuristics_spec.lua`
 
-- [ ] **Step 1: Add threshold tables for zealot_relic, force_field, drone**
+**Context:** Item threshold tables (ZEALOT_RELIC_THRESHOLDS, FORCE_FIELD_THRESHOLDS, DRONE_THRESHOLDS) and function signature updates were already done in Task 2. This task wires the lookup/dispatch and adds item-specific tests.
 
-Place above each function, same pattern as combat heuristics. `stimm_field` gets no table (DLC-blocked).
+- [ ] **Step 1: Add `ITEM_THRESHOLDS` lookup table and wire `evaluate_item_heuristic`**
 
-- [ ] **Step 2: Update function signatures to `(context, thresholds)`**
+Add a master lookup keyed by ability name, same pattern as `HEURISTIC_THRESHOLDS` for combat:
 
-- [ ] **Step 3: Update `ITEM_HEURISTICS` and `evaluate_item_heuristic` to resolve thresholds**
+```lua
+local ITEM_THRESHOLDS = {
+    zealot_relic = ZEALOT_RELIC_THRESHOLDS,
+    psyker_force_field = FORCE_FIELD_THRESHOLDS,
+    psyker_force_field_improved = FORCE_FIELD_THRESHOLDS,
+    psyker_force_field_dome = FORCE_FIELD_THRESHOLDS,
+    adamant_area_buff_drone = DRONE_THRESHOLDS,
+    -- broker_ability_stimm_field: no table (DLC-blocked)
+}
+```
 
-Add an `ITEM_THRESHOLDS` lookup table (keyed by ability_name) and have `evaluate_item_heuristic` look up + pass thresholds.
+Update `evaluate_item_heuristic` to resolve thresholds from `opts.preset` and pass to the heuristic function:
 
-- [ ] **Step 4: Add item preset directional tests**
+```lua
+local function evaluate_item_heuristic(ability_name, context, opts)
+    local fn = ITEM_HEURISTICS[ability_name]
+    if not fn then
+        return false, "unknown_item_ability"
+    end
 
-- [ ] **Step 5: Run tests, commit**
+    local preset = (opts and opts.preset) or context.preset or "balanced"
+    local threshold_table = ITEM_THRESHOLDS[ability_name]
+    local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
+    local can_activate, rule = fn(context, thresholds)
+    return _apply_behavior_profile(can_activate, rule, context, opts)
+end
+```
+
+- [ ] **Step 2: Add item preset directional tests**
+
+```lua
+describe("item preset thresholds", function()
+    it("aggressive relic triggers at higher team toughness than balanced", function()
+        local c = ctx({ num_nearby = 3, toughness_pct = 0.50 })
+        local ok_agg = evaluate_item("zealot_relic", c, { preset = "aggressive" })
+        local ok_bal = evaluate_item("zealot_relic", c, { preset = "balanced" })
+        assert.is_true(ok_agg)
+        assert.is_false(ok_bal)
+    end)
+end)
+```
+
+- [ ] **Step 3: Run tests, commit**
+
+Run: `make test`
+Expected: All PASS.
 
 ```bash
-git commit -m "feat(heuristics): item heuristic threshold tables (#6)"
+git add scripts/mods/BetterBots/heuristics.lua tests/heuristics_spec.lua
+git commit -m "feat(heuristics): wire item heuristic preset plumbing + tests (#6)
+
+ITEM_THRESHOLDS lookup table + evaluate_item_heuristic preset
+resolution. Directional tests for item presets."
 ```
 
 ---
