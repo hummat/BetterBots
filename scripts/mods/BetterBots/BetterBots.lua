@@ -177,6 +177,9 @@ assert(TargetSelection, "BetterBots: failed to load target_selection module")
 local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
 assert(Poxburster, "BetterBots: failed to load poxburster module")
 
+local AnimationGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/animation_guard")
+assert(AnimationGuard, "BetterBots: failed to load animation_guard module")
+
 local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
 assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 
@@ -294,6 +297,13 @@ Poxburster.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+})
+
+AnimationGuard.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 })
 
 VfxSuppression.init({
@@ -438,6 +448,7 @@ end
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
+AnimationGuard.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,

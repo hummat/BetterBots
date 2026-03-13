@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -326,6 +326,7 @@ scripts/mods/BetterBots/
   target_selection.lua                      # Melee target selection distance penalty for specials
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
+  animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   settings.lua                              # DMF settings resolution (behavior profile, tier/grenade feature gates)
@@ -352,6 +353,7 @@ tests/
   healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
+  animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder
