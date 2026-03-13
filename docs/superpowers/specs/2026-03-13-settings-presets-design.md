@@ -42,12 +42,22 @@ Three DMF `group` widgets with `sub_widgets`:
 |---|---|---|---|
 | `enable_stances` | Stance abilities | `true` | `veteran_combat_ability`¹, `veteran_stealth_combat_ability`, `psyker_overcharge_stance`, `ogryn_gunlugger_stance`, `adamant_stance`, `broker_focus`, `broker_punk_rage` |
 | `enable_charges` | Charge & dash abilities | `true` | `zealot_dash`, `zealot_targeted_dash`, `zealot_targeted_dash_improved`, `zealot_targeted_dash_improved_double`, `ogryn_charge`, `ogryn_charge_increased_distance`, `adamant_charge` |
-| `enable_shouts` | Shout abilities | `true` | `psyker_shout`, `ogryn_taunt_shout`, `adamant_shout` |
+| `enable_shouts` | Shout abilities | `true` | `veteran_combat_ability`¹, `psyker_shout`, `ogryn_taunt_shout`, `adamant_shout` |
 | `enable_stealth` | Stealth abilities | `true` | `zealot_invisibility` |
 | `enable_deployables` | Deployable abilities | `true` | `zealot_relic`, `psyker_force_field`, `psyker_force_field_improved`, `psyker_force_field_dome`, `adamant_area_buff_drone`, `broker_ability_stimm_field` |
 | `enable_grenades` | Grenades & blitz | `true` | All `GRENADE_HEURISTICS` keys |
 
-¹ `veteran_combat_ability` covers both Veteran Voice of Command (shout) and Veteran Stance/Focus (stance). It maps to stances because the template is shared and the stance variant is more common. Veteran VoC is resolved dynamically at heuristic evaluation time via `_resolve_veteran_class_tag`, not at the settings gate level.
+¹ **`veteran_combat_ability` dual-category gate:** This single template covers both Veteran Voice of Command (shout) and Veteran Stance/Focus (stance), resolved at runtime via `_resolve_veteran_class_tag`. Because the gate operates on template names and this template maps to two categories, `is_combat_template_enabled("veteran_combat_ability")` must check both `enable_stances` and `enable_shouts` depending on the bot's equipped ability:
+
+```lua
+-- Special case in is_combat_template_enabled for veteran_combat_ability:
+-- 1. Look up the bot's class_tag via ability_extension
+-- 2. If class_tag == "squad_leader" → check enable_shouts
+-- 3. If class_tag == "ranger" or "base" → check enable_stances
+-- 4. If unknown → check enable_stances (default)
+```
+
+This requires `is_combat_template_enabled` to accept an optional `ability_extension` parameter for the veteran special case. Callers (`condition_patch.lua`, `ability_queue.lua`) already have access to `ability_extension` in their call context. Non-veteran templates ignore this parameter.
 
 **Decision: `veteran_stealth_combat_ability` stays in Stances.** It's a self-buff (no movement, no repositioning), unlike Zealot Invisibility which is a defensive escape. The category gate is a pure settings lookup — if users report confusion, moving it to Stealth is a one-line change.
 
@@ -57,11 +67,11 @@ Preset dropdown + 4 feature checkboxes + healing deferral cluster.
 
 | Setting ID | Type | Label | Default | Notes |
 |---|---|---|---|---|
-| `behavior_preset` | dropdown | Behavior preset | `balanced` | Options: testing, aggressive, balanced, conservative |
+| `behavior_profile` | dropdown | Behavior preset | `balanced` | Options: testing, aggressive, balanced, conservative. Keeps existing persisted key to avoid orphaning saved settings. |
 | `enable_sprint` | checkbox | Bot sprinting | `true` | Runtime gate inside hook callback |
 | `enable_pinging` | checkbox | Elite & special pinging | `true` | Runtime gate inside `PingSystem.update()` |
 | `enable_special_penalty` | checkbox | Prioritize shooting distant specials | `true` | Runtime gate inside hook callbacks |
-| `enable_poxburster` | checkbox | Poxburster safe targeting | `true` | Runtime gate inside hook callbacks |
+| `enable_poxburster` | checkbox | Poxburster safe targeting | `true` | Runtime gate inside hook callbacks. Note: breed patch (`not_bot_target` removal) is always-on; gate controls suppression logic only. See tooltip. |
 | `healing_deferral_mode` | dropdown | Healing deferral | `stations_and_deployables` | Options: off, stations_only, stations_and_deployables. Acts as master gate. Sub-widget parent. |
 
 The healing deferral threshold dropdowns are **`sub_widgets` of the `healing_deferral_mode` dropdown**, using `show_widgets` to conditionally reveal them:
@@ -190,11 +200,11 @@ local TEMPLATE_TO_CATEGORY_SETTING = {}
 -- Populated at module load from the above tables
 ```
 
-A single `TEMPLATE_TO_CATEGORY_SETTING` reverse lookup maps any combat template name to its setting ID. Built at module load time from the category tables above.
+A single `TEMPLATE_TO_CATEGORY_SETTING` reverse lookup maps any combat template name to its setting ID. Built at module load time from the category tables above. `veteran_combat_ability` is NOT in this table — it uses the dual-category gate described in footnote ¹.
 
 **API: three functions stay separate.** The current three-function API is preserved because callers are different modules with different call sites:
 
-- `is_combat_template_enabled(template_name)` — used by `condition_patch.lua` and `ability_queue.lua`. Looks up `TEMPLATE_TO_CATEGORY_SETTING[template_name]` → `mod:get(setting_id)`.
+- `is_combat_template_enabled(template_name, ability_extension)` — used by `condition_patch.lua` and `ability_queue.lua`. Looks up `TEMPLATE_TO_CATEGORY_SETTING[template_name]` → `mod:get(setting_id)`. For `veteran_combat_ability`, resolves the class_tag via `ability_extension` to check either `enable_stances` or `enable_shouts`.
 - `is_item_ability_enabled(ability_name)` — used by `item_fallback.lua`. All item abilities map to `enable_deployables`. Replaces the old `TIER_3_ITEM_ABILITIES` check.
 - `is_grenade_enabled(grenade_name)` — used by `grenade_fallback.lua`. All grenades map to `enable_grenades`. Unchanged behavior (was already a single setting).
 
@@ -336,7 +346,7 @@ All four helpers (`_grenade_horde`, `_grenade_priority_target`, `_grenade_defens
 
 ### Preset plumbing
 
-1. `settings.lua` exposes `resolve_behavior_preset()` — returns `"testing"` / `"aggressive"` / `"balanced"` / `"conservative"`
+1. `settings.lua` exposes `resolve_preset()` — returns `"testing"` / `"aggressive"` / `"balanced"` / `"conservative"`. Reads from `mod:get("behavior_profile")` internally.
 2. `heuristics.lua` init receives `resolve_preset` as a function reference, stored as module-local `_resolve_preset`
 3. `build_context()` calls `_resolve_preset()` (the module-local) once per unit per frame and stores the result as `context.preset`. This is the only place preset resolution occurs in the hot path.
 4. `_evaluate_template_heuristic()` looks up the per-heuristic threshold table using `context.preset` (e.g., `VETERAN_STEALTH_THRESHOLDS[context.preset]`) and passes it to the heuristic function. Falls back to `balanced` if the preset name is unknown.
@@ -366,11 +376,11 @@ This is not a separate refactor — it's a direct consequence of the `(context, 
 
 ### Migration
 
-DMF persists settings by `setting_id` key. Renaming `behavior_profile` → `behavior_preset` would orphan existing user settings (`mod:get("behavior_preset")` returns `nil` for users with `behavior_profile` saved).
+DMF persists settings by `setting_id` key. The existing key is `behavior_profile` and we keep it.
 
-**Approach: keep `behavior_profile` as the setting ID.** The internal constant name changes to `BEHAVIOR_PRESET_SETTING_ID = "behavior_profile"` but the persisted key stays the same. This avoids any DMF migration complexity. The user-facing label changes via localization (not setting ID).
+**Approach: keep `behavior_profile` as the setting ID throughout.** The user-facing label changes to "Behavior preset" via localization, but the persisted key stays `behavior_profile`. No migration needed for the key itself.
 
-- `resolve_behavior_preset()` reads `mod:get("behavior_profile")`
+- `resolve_preset()` reads `mod:get("behavior_profile")`
 - Recognizes `"standard"` → returns `"balanced"` (silent value migration)
 - `VALID_PRESETS = { testing=true, aggressive=true, balanced=true, conservative=true }`
 - Unknown values fall back to `"balanced"`
@@ -391,12 +401,12 @@ User-facing labels describe outcomes, not implementation:
 | `enable_sprint` | Bot sprinting | Bots sprint to catch up, during traversal, and for ally rescue |
 | `enable_pinging` | Elite & special pinging | Bots ping elites and specials they detect |
 | `enable_special_penalty` | Prioritize shooting distant specials | Bots prefer ranged attacks against distant specials instead of charging into melee |
-| `enable_poxburster` | Poxburster safe targeting | Bots target and suppress poxbursters at safe range. Disabling reverts to vanilla targeting. |
-| `behavior_preset` | Behavior preset | How aggressively bots use abilities |
-| `behavior_preset_testing` | Testing | Very lenient — bots use abilities at every opportunity (for development/validation) |
-| `behavior_preset_aggressive` | Aggressive | Liberal ability use, suited for lower difficulties |
-| `behavior_preset_balanced` | Balanced | Tuned for challenging content (default) |
-| `behavior_preset_conservative` | Conservative | Emergency-only ability use, suited for Auric/Maelstrom |
+| `enable_poxburster` | Poxburster safe targeting | Bots suppress fire on poxbursters within detonation range of bots or humans. Disabling removes this safety check — bots will still target poxbursters but without close-range suppression. |
+| `behavior_profile` | Behavior preset | How aggressively bots use abilities |
+| `behavior_profile_testing` | Testing | Very lenient — bots use abilities at every opportunity (for development/validation) |
+| `behavior_profile_aggressive` | Aggressive | Liberal ability use, suited for lower difficulties |
+| `behavior_profile_balanced` | Balanced | Tuned for challenging content (default) |
+| `behavior_profile_conservative` | Conservative | Emergency-only ability use, suited for Auric/Maelstrom |
 
 ## Test Strategy
 
@@ -404,7 +414,7 @@ User-facing labels describe outcomes, not implementation:
 
 | Test file | What it covers |
 |---|---|
-| `settings_spec.lua` (extend) | Category mapping: every template resolves to correct category. Feature gate: `is_feature_enabled` returns correct values. Preset resolution: `resolve_behavior_preset` handles all values including `standard` migration. |
+| `settings_spec.lua` (extend) | Category mapping: every template resolves to correct category (including veteran dual-category gate). Feature gate: `is_feature_enabled` returns correct values. Preset resolution: `resolve_preset` handles all values including `standard` migration. |
 | `heuristics_spec.lua` (extend) | Each heuristic function tested with `balanced` thresholds produces identical output to current behavior. Each heuristic tested with `aggressive` and `conservative` thresholds produces expected directional changes (aggressive activates more readily, conservative less). |
 
 ### Regression strategy
