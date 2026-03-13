@@ -188,6 +188,8 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 - For condition tables loaded via `require()`, directly replace the function on the table (not via `mod:hook`)
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
+- BetterBots-local modules must be loaded in `scripts/mods/BetterBots/BetterBots.lua` via `mod:io_dofile("BetterBots/scripts/mods/BetterBots/<name>")`
+- Leaf modules must not `require("scripts/mods/BetterBots/...")` or `dofile("scripts/mods/BetterBots/...")` other BetterBots files; pass shared helpers through `init({...})` / `wire({...})` instead
 
 ## MANDATORY: Read relevant docs before acting, update them after
 

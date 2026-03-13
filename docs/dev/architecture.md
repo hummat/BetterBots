@@ -119,6 +119,13 @@ This mod targets bot ability activation in three paths:
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
 
+## DMF module loading pattern
+
+- Load BetterBots-local modules only in `scripts/mods/BetterBots/BetterBots.lua` via `mod:io_dofile("BetterBots/scripts/mods/BetterBots/<name>")`.
+- Do not call `require("scripts/mods/BetterBots/...")` from leaf modules. DMF's in-game loader does not resolve those paths reliably, even if local tests pass.
+- Do not call `dofile("scripts/mods/BetterBots/...")` from leaf modules for shared helpers. That path can also fail under DMF resource loading.
+- Share common tables/functions by dependency injection through `init({...})` and `wire({...})`. `shared_rules.lua` and `bot_targeting.lua` are the canonical examples.
+
 ## Why item fallback is needed
 
 Item-based abilities rely heavily on weapon `conditional_state_to_action_input` chains (for example wield -> channel/place).
