@@ -105,19 +105,18 @@ In-game validation: 2026-03-13, latest analyzed log `console-2026-03-13-13.21.23
 
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
-| #50 | Arbites drone crash guard | **Closed after validation** | Extended 4-Arbites stress run, repeated drone + whistle activations, 0 Lua errors |
-| #51 | Ranged ammo threshold override | **Implemented, needs testing** | Live log confirms `ranged ammo gate lowered from 0.5 to 0.2`, but no direct 20%-50% reserve behavior proof yet |
-| #52 | Melee heavy-bias reduction | **Implemented, needs testing** | Automated coverage is strong; no direct in-game horde-behavior evidence yet |
-| #61 | Assail smart-target seeding | **Implemented, needs testing** | Structural fix + tests in place; not exercised in the Arbites-only run |
-| #62 | Grenade aim direction | **Implemented, needs testing** | Structural fix + tests in place; not exercised in the Arbites-only run |
+| #50 | Arbites drone crash guard | **Closed** | Extended 4-Arbites stress run, repeated drone + whistle activations, 0 Lua errors |
+| #51 | Ranged ammo threshold override | **Closed** | 270 "ranged permitted with lowered ammo gate" in standard-profile mission (2026-03-14) |
+| #52 | Melee heavy-bias reduction | **Closed** | 0 heavies vs unarmored in horde across 2 sessions; all heavies vs armored targets |
+| #61 | Assail smart-target seeding | **Closed** | 87 queued → 92 consumed, 0 aim_target=none, both zoom and shoot paths active |
+| #62 | Grenade aim direction | **Closed** | 55 aimed releases all with real targets, 0 blind throws, 0 aim unavailable aborts |
 
-**Unit tests**: 447 tests via busted.
+**Unit tests**: 461 tests via busted.
+
+All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 ## Next Steps
-- In-game validate `#51` with a ranged-heavy bot in the 20% to 50% reserve window
-- In-game validate `#61` / `#62` with a Psyker Assail bot plus at least one standard grenade bot
-- In-game validate `#52` with a melee-heavy lineup against mixed unarmored hordes
-- Merge `dev/p0-p1-stabilization` after those passes, then resume broader settings work (`#6`)
+- Settings presets (#6) — spec + plan committed, remaining: per-ability toggles + calibrated presets
 - Default class profiles for bots (#45) — P2, design approved
 - Weapon/enemy-aware ADS (#41) — P2
 - Hive Scum ability validation (#8) — requires DLC

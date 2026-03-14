@@ -42,18 +42,12 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 ### v0.7.0 (2026-03-12)
 - Batch 2 shipped: grenade heuristics + Psyker blitz follow-up (#4), hazard-aware abilities (#21), boss engagement refinement (#18), tiered log levels (#40), healing deferral implementation (#39), player-tag smart-target response (#48), and follow-up validation/logging cleanup.
 
+### v0.7.1 (2026-03-14)
+- P0/P1 stabilization: animation crash guard (#50), ammo threshold (#51), melee horde bias (#52), Assail void throws (#61), grenade misaim (#62), unarmed defer, smart blitz targeting, ADS fire fix. Repo cleanup (scrapers migrated to hadrons-blessing). 461 tests.
+
 ## Priority tiers
 
-Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P1: next`, `P2: later`, `P3: backlog`.
-
-### P1: Implemented, awaiting in-game validation
-
-| # | Issue | Notes |
-|---|-------|-------|
-| 51 | Bots stop shooting at 50% reserve ammo | Fix is in `dev/p0-p1-stabilization`; direct 20%-50% reserve combat proof still missing. |
-| 52 | Bots overuse heavy attacks in horde | Fix is in `dev/p0-p1-stabilization`; needs direct horde-behavior validation. |
-| 61 | Assail knives fire into void | Smart-target seeding fix is implemented; needs live Assail verification. |
-| 62 | Grenade throw misaim | Aim-direction fix is implemented; needs live grenade verification. |
+Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P2: later`, `P3: backlog`.
 
 ### P2: Later — Planned, not urgent
 

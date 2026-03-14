@@ -7,26 +7,13 @@
    - No disable/unload restore path is implemented.
    - Toggling off in-session may require reload/restart to fully restore vanilla behavior.
 
-2. Bots stop shooting at 50% reserve ammo (#51).
-   - Vanilla BT gates normal ranged on `ammo_percentage > 0.5` (reserve-only ratio).
-   - Bots only seek ammo at 10% in combat → 40% dead zone where bot is melee-only.
-   - Bots CAN pick up ground ammo automatically (full pipeline in `bot_group.lua`), but do NOT have infinite ammo outside prologue.
-   - The 0.2 override is implemented on `dev/p0-p1-stabilization`, but direct 20%-50% reserve behavior proof is still missing.
+2. ~~Bots stop shooting at 50% reserve ammo (#51).~~ **Fixed in v0.7.1**: threshold lowered to 20%. Validated: 270 permitted shots with lowered gate in standard-profile mission.
 
-3. Heavy attack overuse in horde (#52).
-   - BB-caused: `melee_meta_data.lua` injects heavy entries, exposing vanilla `_choose_attack()` arc scoring asymmetry (+4 for `arc > 1` when outnumbered).
-   - Push-follow attacks never injected (chain off `action_push`, not `start_attack`).
-   - The light-bias fix is implemented on `dev/p0-p1-stabilization`, but still needs direct in-game horde validation.
+3. ~~Heavy attack overuse in horde (#52).~~ **Fixed in v0.7.1**: `melee_attack_choice.lua` biases lights into unarmored hordes. Validated: 0 heavies vs unarmored across 2 sessions.
 
-4. Precision blitz targeting still needs live proof (#61).
-   - The bot-only smart-target seeding fix is implemented and covered by unit tests.
-   - No mixed Psyker validation run has confirmed real Assail target seeding yet.
-   - Direct in-game proof matters here because sticky/range behavior is engine-driven, not pure Lua logic.
+4. ~~Precision blitz targeting (#61).~~ **Fixed in v0.7.1**: charge-lock + pre-flight target check + aim control. Validated: 87 queued → 92 consumed, 0 blind throws, both aimed and fast paths active.
 
-5. Grenade aim direction still needs live proof (#62).
-   - The bot aim-control fix is implemented and covered by unit tests.
-   - No mixed grenade validation run has confirmed that standard grenade throws reliably face and lead targets before release.
-   - Direct in-game proof matters here because first-person aim and projectile arcs are engine-driven.
+5. ~~Grenade aim direction (#62).~~ **Fixed in v0.7.1**: `_set_bot_aim` drives aim for all throws, pre-flight gate prevents entry without target. Validated: 55 aimed releases all with real targets.
 
 ## Medium severity
 
