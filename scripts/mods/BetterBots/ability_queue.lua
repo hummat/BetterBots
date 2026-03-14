@@ -1,7 +1,6 @@
 -- Ability queue: fallback combat ability activation that runs every
 -- BotBehaviorExtension.update tick. Handles Tier 1/2 template-based
 -- abilities and delegates to ItemFallback for Tier 3 item-based abilities.
-local SharedRules = require("scripts/mods/BetterBots/shared_rules")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -21,12 +20,11 @@ local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 
-local RESCUE_CHARGE_RULES = SharedRules.RESCUE_CHARGE_RULES
-	or {
-		ogryn_charge_ally_aid = true,
-		zealot_dash_ally_aid = true,
-		adamant_charge_ally_aid = true,
-	}
+local RESCUE_CHARGE_RULES = {
+	ogryn_charge_ally_aid = true,
+	zealot_dash_ally_aid = true,
+	adamant_charge_ally_aid = true,
+}
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
@@ -342,6 +340,8 @@ function M.init(deps)
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_fallback_queue_dumped_by_key = deps.fallback_queue_dumped_by_key
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+	local shared_rules = deps.shared_rules or {}
+	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 end
 
 function M.wire(deps)

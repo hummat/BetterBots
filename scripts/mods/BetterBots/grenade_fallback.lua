@@ -5,7 +5,6 @@
 -- Supports standard grenades (aim_hold/aim_released), whistle (aim_pressed/aim_released),
 -- auto-fire (zealot knives), and fire-and-wait (missile launcher) patterns.
 -- Only activates when charges are available and the heuristic permits.
-
 -- Dependencies (set via init/wire)
 local _mod -- luacheck: ignore 231
 local _debug_log
@@ -21,6 +20,7 @@ local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
+local _resolve_bot_target_unit_fn
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
@@ -116,6 +116,7 @@ local ASSAIL_FAST_PROFILE = {
 	aim_input = "shoot",
 	auto_unwield = true,
 	allow_external_wield_cleanup = true,
+	require_charge_confirmation = true,
 }
 
 local ASSAIL_AIMED_PROFILE = {
@@ -125,6 +126,7 @@ local ASSAIL_AIMED_PROFILE = {
 	auto_unwield = true,
 	allow_external_wield_cleanup = true,
 	confirmation_action = "action_rapid_zoomed",
+	require_charge_confirmation = true,
 }
 
 local function _resolve_template_entry(grenade_name, context, rule)
@@ -145,7 +147,105 @@ local function _resolve_template_entry(grenade_name, context, rule)
 	return ASSAIL_FAST_PROFILE
 end
 
-local function _reset_state(state, next_try_t)
+local function _resolve_aim_unit(context)
+	if _resolve_bot_target_unit_fn then
+		return _resolve_bot_target_unit_fn(context)
+	end
+
+	if not context then
+		return nil
+	end
+
+	return context.target_enemy
+		or context.priority_target_enemy
+		or context.opportunity_target_enemy
+		or context.urgent_target_enemy
+end
+
+-- Aim the bot toward a concrete unit so the grenade/blitz release uses a valid
+-- facing direction instead of the bot's stale movement heading.
+local function _set_bot_aim(unit, aim_unit)
+	if not aim_unit then
+		return false, "no target unit"
+	end
+
+	if not POSITION_LOOKUP then
+		return false, "position lookup unavailable"
+	end
+
+	local aim_position = POSITION_LOOKUP[aim_unit]
+	if not aim_position then
+		return false, "target position missing"
+	end
+
+	local input_extension = ScriptUnit.has_extension(unit, "input_system")
+	local bot_unit_input = input_extension and input_extension.bot_unit_input and input_extension:bot_unit_input()
+	if not bot_unit_input then
+		return false, "bot input missing"
+	end
+
+	bot_unit_input:set_aiming(true, false, false)
+	bot_unit_input:set_aim_position(aim_position)
+
+	return true
+end
+
+-- Release explicit bot aim state on reset so grenade sequences do not leave the
+-- bot stuck in an aimed posture after completion or abort.
+local function _clear_bot_aim(unit)
+	local input_extension = ScriptUnit.has_extension(unit, "input_system")
+	local bot_unit_input = input_extension and input_extension.bot_unit_input and input_extension:bot_unit_input()
+	if not bot_unit_input then
+		return false, "bot input missing"
+	end
+
+	bot_unit_input:set_aiming(false, false, false)
+	return true
+end
+
+local function _refresh_bot_aim(unit, state, context, fixed_t)
+	local resolved_aim_unit = _resolve_aim_unit(context)
+	if resolved_aim_unit then
+		state.aim_unit = resolved_aim_unit
+	end
+	state.aim_distance = context and context.target_enemy_distance or nil
+
+	if not state.aim_unit then
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_aim_no_target:" .. tostring(unit),
+				fixed_t,
+				"grenade aim unavailable (no target unit resolved)"
+			)
+		end
+		return false
+	end
+
+	local aim_ok, aim_reason = _set_bot_aim(unit, state.aim_unit)
+	if aim_ok then
+		return true
+	end
+
+	if _debug_enabled() then
+		_debug_log(
+			"grenade_aim_unavailable:" .. tostring(unit),
+			fixed_t,
+			"grenade aim unavailable (" .. tostring(aim_reason) .. ")"
+		)
+	end
+
+	return false
+end
+
+local function _reset_state(unit, state, next_try_t)
+	local cleared_aim, clear_reason = _clear_bot_aim(unit)
+	if not cleared_aim and _debug_enabled() and state and state.stage then
+		_debug_log(
+			"grenade_clear_aim:" .. tostring(unit),
+			_fixed_time(),
+			"grenade aim cleanup skipped (" .. tostring(clear_reason) .. ")"
+		)
+	end
 	state.stage = nil
 	state.deadline_t = nil
 	state.wait_t = nil
@@ -162,10 +262,26 @@ local function _reset_state(state, next_try_t)
 	state.allow_external_wield_cleanup = nil
 	state.confirmation_action = nil
 	state.confirmation_logged = nil
+	state.require_charge_confirmation = nil
 	state.last_blocked_foreign_input = nil
+	state.aim_unit = nil
+	state.aim_distance = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
+end
+
+local function _distance_bucket(distance)
+	if not distance then
+		return "unknown"
+	end
+	if distance < 8 then
+		return "close"
+	end
+	if distance < 16 then
+		return "mid"
+	end
+	return "far"
 end
 
 local function _has_confirmed_charge(state, unit)
@@ -191,6 +307,16 @@ local function should_block_wield_input(unit)
 		return false
 	end
 	if state.stage == "wait_unwield" and state.allow_external_wield_cleanup then
+		-- Assail: keep blocking until charge is consumed; the wield chain
+		-- on action_rapid_zoomed has no chain_time gate, so the BT can
+		-- switch away before the projectile fires at fire_time=0.25.
+		if
+			state.require_charge_confirmation
+			and not _has_confirmed_charge(state, unit)
+			and (not state.deadline_t or _fixed_time() < state.deadline_t)
+		then
+			return true, state.grenade_name or "grenade_ability"
+		end
 		return false
 	end
 	return true, state.grenade_name or "grenade_ability"
@@ -341,12 +467,20 @@ local function try_queue(unit, blackboard)
 				"grenade aborted stage=" .. tostring(state.stage) .. ": unit_data_system missing"
 			)
 		end
-		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+		_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
 
 	local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
 	local wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
+	local active_context
+	if state.stage and state.stage ~= "wait_unwield" then
+		active_context = _build_context(unit, blackboard)
+		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+			return
+		end
+	end
 
 	if state.stage == "wield" then
 		if not state.aim_input and _has_confirmed_charge(state, unit) then
@@ -369,7 +503,7 @@ local function try_queue(unit, blackboard)
 						"grenade auto-fire complete without stable grenade slot (slot=" .. tostring(wielded_slot) .. ")"
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
 		end
@@ -410,7 +544,7 @@ local function try_queue(unit, blackboard)
 					"grenade wield timeout, resetting with retry"
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
 		return
@@ -425,11 +559,25 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during aim (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
+			local context = active_context or _build_context(unit, blackboard)
+			local should_throw, rule = _evaluate_grenade_heuristic(state.grenade_name, context)
+			if not should_throw then
+				if _debug_enabled() then
+					_debug_log(
+						"grenade_revalidate_block:" .. tostring(unit),
+						fixed_t,
+						"grenade aim aborted after revalidation (rule=" .. tostring(rule) .. ")"
+					)
+				end
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+				return
+			end
+
 			local aim = state.aim_input or "aim_hold"
 			_queue_weapon_input(unit, aim, state.component)
 			if state.followup_input then
@@ -462,7 +610,7 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during followup (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
 
@@ -495,7 +643,7 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during throw (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
 
@@ -512,7 +660,14 @@ local function try_queue(unit, blackboard)
 				_debug_log(
 					"grenade_release:" .. tostring(unit),
 					fixed_t,
-					"grenade queued " .. release .. component_state
+					"grenade releasing toward "
+						.. tostring(state.aim_unit or "none")
+						.. " via "
+						.. release
+						.. component_state
+						.. " (dist_bucket="
+						.. _distance_bucket(state.aim_distance)
+						.. ")"
 				)
 			end
 		end
@@ -534,7 +689,7 @@ local function try_queue(unit, blackboard)
 						"ability blitz complete (" .. reason .. ")" .. component_state
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
 		end
@@ -551,7 +706,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (slot changed)"
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
 
@@ -570,11 +725,15 @@ local function try_queue(unit, blackboard)
 						.. tostring(state.grenade_name)
 						.. " (action="
 						.. tostring(state.confirmation_action)
+						.. ", aim_target="
+						.. tostring(state.aim_unit or "none")
+						.. ", dist_bucket="
+						.. _distance_bucket(state.aim_distance)
 						.. ")"
 				)
 			end
 
-			if action_confirmed then
+			if action_confirmed and not state.require_charge_confirmation then
 				if _debug_enabled() then
 					state.confirmation_logged = true
 					_debug_log(
@@ -583,7 +742,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (action confirmed)"
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
 
@@ -595,7 +754,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (charge confirmed)"
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
 
@@ -607,7 +766,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (timeout)"
 					)
 				end
-				_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
 		end
@@ -620,7 +779,7 @@ local function try_queue(unit, blackboard)
 					"grenade throw complete, slot returned to " .. tostring(wielded_slot)
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
 
@@ -661,7 +820,7 @@ local function try_queue(unit, blackboard)
 					"grenade forced unwield_to_previous on timeout"
 				)
 			end
-			_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
 		return
@@ -676,7 +835,7 @@ local function try_queue(unit, blackboard)
 				"grenade unknown stage=" .. tostring(state.stage) .. ", resetting"
 			)
 		end
-		_reset_state(state, fixed_t + RETRY_COOLDOWN_S)
+		_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
 
@@ -780,6 +939,16 @@ local function try_queue(unit, blackboard)
 		confirmation_action = template_entry.confirmation_action
 	end
 
+	-- Pre-flight: don't enter the state machine without a target for aimed throws.
+	-- Wielding auto-fire templates (zealot knives) triggers the throw immediately,
+	-- so aborting after wield is too late — the charge is already consumed.
+	if aim_input then
+		local aim_unit = _resolve_aim_unit(context)
+		if not aim_unit then
+			return
+		end
+	end
+
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
 		return
@@ -798,6 +967,8 @@ local function try_queue(unit, blackboard)
 		and template_entry.allow_external_wield_cleanup == true
 	state.confirmation_action = confirmation_action
 	state.confirmation_logged = nil
+	state.require_charge_confirmation = type(template_entry) == "table"
+		and template_entry.require_charge_confirmation == true
 
 	if component then
 		-- Ability-based blitz: queue aim input directly on the ability component.
@@ -834,6 +1005,24 @@ local function try_queue(unit, blackboard)
 			)
 		end
 	else
+		local weapon_action = unit_data_extension and unit_data_extension:read_component("weapon_action")
+		local weapon_template_name = weapon_action and weapon_action.template_name or "none"
+
+		if wielded_slot == "slot_unarmed" or weapon_template_name == "unarmed" then
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_unarmed:" .. grenade_name,
+					fixed_t,
+					"grenade deferred while unarmed (slot="
+						.. tostring(wielded_slot)
+						.. ", template="
+						.. tostring(weapon_template_name)
+						.. ")"
+				)
+			end
+			return
+		end
+
 		-- Item-based grenade: wield the grenade slot first.
 		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
 		state.stage = "wield"
@@ -878,6 +1067,8 @@ return {
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
+		local bot_targeting = refs.bot_targeting
+		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,

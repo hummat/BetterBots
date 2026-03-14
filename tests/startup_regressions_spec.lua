@@ -22,6 +22,14 @@ local function has_bare_percent(str)
 	return false
 end
 
+local function each_mod_source_file(callback)
+	local handle = assert(io.popen("find scripts/mods/BetterBots -maxdepth 1 -name '*.lua' | sort"))
+	for path in handle:lines() do
+		callback(path)
+	end
+	handle:close()
+end
+
 describe("startup regressions", function()
 	it("escapes percent signs in localized setting labels", function()
 		for key, entry in pairs(Localization) do
@@ -42,6 +50,71 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/log_levels"%)', 1))
+	end)
+
+	it("loads shared helper modules through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/shared_rules"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/bot_targeting"%)', 1))
+	end)
+
+	it("loads smart_targeting through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/smart_targeting"%)', 1))
+	end)
+
+	it("loads animation_guard through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/animation_guard"%)', 1))
+	end)
+
+	it("loads melee_attack_choice through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/melee_attack_choice"%)', 1))
+	end)
+
+	it("initializes and registers extracted runtime modules", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("AnimationGuard%.init%(", 1))
+		assert.is_truthy(source:find("AnimationGuard%.register_hooks%(", 1))
+		assert.is_truthy(source:find("SmartTargeting%.init%(", 1))
+		assert.is_truthy(source:find("SmartTargeting%.register_hooks%(", 1))
+		assert.is_truthy(source:find("MeleeAttackChoice%.init%(", 1))
+		assert.is_truthy(source:find("MeleeAttackChoice%.register_hooks%(", 1))
+	end)
+
+	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()
+		each_mod_source_file(function(path)
+			if path ~= "scripts/mods/BetterBots/BetterBots.lua" then
+				local handle = assert(io.open(path, "r"))
+				local source = assert(handle:read("*a"))
+				handle:close()
+
+				assert.is_nil(
+					source:find('require%("scripts/mods/BetterBots/', 1),
+					path .. " must not require BetterBots local modules directly"
+				)
+				assert.is_nil(
+					source:find('dofile%("scripts/mods/BetterBots/', 1),
+					path .. " must not dofile BetterBots local modules directly"
+				)
+			end
+		end)
 	end)
 
 	it("routes startup debug chatter through the log-level gate instead of unconditional echo", function()

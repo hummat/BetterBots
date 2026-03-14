@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -139,7 +139,7 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 | 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance | Whitelist removal only |
 | 1 | Untested (DLC) | Broker Focus/Rage | Whitelist removal only — DLC-blocked for validation |
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
-| 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence). Note: Drone can crash with 3 Arbites bots (#50) |
+| 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence). Drone crash guard for #50 validated in a 2026-03-13 Arbites stress run. |
 | 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
 | 3 | Validated | Standard grenades, Psyker Smite/Assail/Chain Lightning, knives, whistle, mines | Grenade/blitz fallback + per-grenade heuristics |
 
@@ -188,6 +188,8 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 - For condition tables loaded via `require()`, directly replace the function on the table (not via `mod:hook`)
 - `mod:echo(msg)` — print to game chat (useful for debug)
 - `require()` returns cached singletons — mutating the returned table affects the game globally
+- BetterBots-local modules must be loaded in `scripts/mods/BetterBots/BetterBots.lua` via `mod:io_dofile("BetterBots/scripts/mods/BetterBots/<name>")`
+- Leaf modules must not `require("scripts/mods/BetterBots/...")` or `dofile("scripts/mods/BetterBots/...")` other BetterBots files; pass shared helpers through `init({...})` / `wire({...})` instead
 
 ## MANDATORY: Read relevant docs before acting, update them after
 
@@ -312,6 +314,7 @@ BetterBots.mod                              # DMF entry point
 bb-log                                      # Log analysis CLI (bash)
 scripts/mods/BetterBots/
   BetterBots.lua                            # Main: module wiring, lifecycle hooks, BT hooks
+  bot_targeting.lua                         # Shared bot target resolver for grenade aim and smart-target seeding
   condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
   ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
   heuristics.lua                            # 18 per-template heuristic functions + build_context()
@@ -321,11 +324,14 @@ scripts/mods/BetterBots/
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
   melee_meta_data.lua                       # Melee attack_meta_data injection (arc/penetrating classification)
+  melee_attack_choice.lua                   # Melee attack-choice hook: bias lights into unarmored hordes while preserving armored heavy preference (#52)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
   target_selection.lua                      # Melee target selection distance penalty for specials
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
+  animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
+  smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   settings.lua                              # DMF settings resolution (behavior profile, tier/grenade feature gates)
@@ -345,6 +351,8 @@ tests/
   condition_patch_spec.lua                  # DH combat suppression wrappers
   target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
   melee_meta_data_spec.lua                  # melee meta_data classification + injection
+  melee_attack_choice_spec.lua              # melee attack-choice bias for unarmored hordes
+  weapon_action_spec.lua                    # weapon-action logging, dead-zone ranged fire confirmation
   ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                 # grenade throw state machine
   ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff
@@ -352,6 +360,8 @@ tests/
   healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
+  animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
+  smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder

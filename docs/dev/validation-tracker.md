@@ -971,6 +971,55 @@ Conclusion:
 - The branch is stable in this run, but the relic interaction fix still needs a direct interaction-state re-test.
 ```
 
+### Run 2026-03-13-p0-p1-stabilization-01
+
+```text
+Run ID: 2026-03-13-p0-p1-stabilization-01
+Date (local): 2026-03-13
+Date (UTC): 2026-03-13
+Git commit: local (exact SHA not captured in run log)
+Log file: console-2026-03-13-13.21.23-06323070-33d6-49e5-9e07-a918eea1e556.log
+Bot lineup / abilities: 4 Arbites bots; repeated Nuncio-Aquila drone + whistle usage
+Map + difficulty: extended mission session (stress run)
+
+Stability:
+- Lua errors: no
+- basic combat loop: PASS
+- startup/load: PASS (`BetterBots loaded`)
+
+#50 Arbites drone crash guard:
+- PASS
+  - no `Script Error`, `Lua Stack`, or crash lines in the session log
+  - repeated successful drone sequences observed:
+    - `fallback item queued adamant_area_buff_drone input=combat_ability`
+    - `fallback item queued adamant_area_buff_drone input=aim_drone`
+    - `fallback item queued adamant_area_buff_drone input=release_drone`
+    - `charge consumed for adamant_area_buff_drone (charges=1)`
+  - summary counts:
+    - 12 consumes for `adamant_area_buff_drone`
+    - 12 consumes for `adamant_whistle`
+  - note: the specific animation-guard fallback branch did not log in this run, so this is strong no-crash evidence rather than direct proof of the fallback path
+
+#51 Ranged ammo threshold override:
+- PARTIAL
+  - live-session evidence only:
+    - repeated `ranged ammo gate lowered from 0.5 to 0.2`
+  - this confirms the override is active in-game, but this run does not prove user-visible ranged behavior across the full 20%-50% reserve window
+
+#61/#62 Precision targeting / grenade aim:
+- UNKNOWN
+  - not meaningfully exercised in this Arbites-only run
+
+#52 Melee heavy-bias reduction:
+- UNKNOWN
+  - not evidenced in log and not isolated by this run composition
+
+Conclusion:
+- The branch survives an extended 4-Arbites stress run with repeated drone and whistle activations and no crash signature.
+- #50 now has strong in-game stability evidence.
+- Remaining validation should focus on a mixed lineup that can exercise smart targeting, grenade aim, and melee attack choice.
+```
+
 **New issue discovered in H-02b:**
 
 Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while active, and without Venting Shriek (different ability slot) the bot has no way to vent. The `block_peril_window` gate correctly prevents re-activation at high peril, but cannot cancel an active stance. Needs investigation — possible mitigations:

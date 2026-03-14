@@ -2,6 +2,8 @@ local mod = get_mod("BetterBots")
 local FixedFrame = require("scripts/utilities/fixed_frame")
 local ArmorSettings = require("scripts/settings/damage/armor_settings")
 local LogLevels = mod:io_dofile("BetterBots/scripts/mods/BetterBots/log_levels")
+local SharedRules = mod:io_dofile("BetterBots/scripts/mods/BetterBots/shared_rules")
+local BotTargeting = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_targeting")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
@@ -168,6 +170,9 @@ assert(Sprint, "BetterBots: failed to load sprint module")
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
 assert(MeleeMetaData, "BetterBots: failed to load melee_meta_data module")
 
+local MeleeAttackChoice = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_attack_choice")
+assert(MeleeAttackChoice, "BetterBots: failed to load melee_attack_choice module")
+
 local RangedMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_meta_data")
 assert(RangedMetaData, "BetterBots: failed to load ranged_meta_data module")
 
@@ -176,6 +181,12 @@ assert(TargetSelection, "BetterBots: failed to load target_selection module")
 
 local Poxburster = mod:io_dofile("BetterBots/scripts/mods/BetterBots/poxburster")
 assert(Poxburster, "BetterBots: failed to load poxburster module")
+
+local SmartTargeting = mod:io_dofile("BetterBots/scripts/mods/BetterBots/smart_targeting")
+assert(SmartTargeting, "BetterBots: failed to load smart_targeting module")
+
+local AnimationGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/animation_guard")
+assert(AnimationGuard, "BetterBots: failed to load animation_guard module")
 
 local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
 assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
@@ -263,6 +274,7 @@ Sprint.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	shared_rules = SharedRules,
 })
 
 MeleeMetaData.init({
@@ -270,6 +282,14 @@ MeleeMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+})
+
+MeleeAttackChoice.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 })
 
@@ -294,6 +314,21 @@ Poxburster.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+})
+
+AnimationGuard.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+})
+
+SmartTargeting.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_targeting = BotTargeting,
 })
 
 VfxSuppression.init({
@@ -324,6 +359,7 @@ ConditionPatch.init({
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
 	perf = Perf,
+	shared_rules = SharedRules,
 })
 
 AbilityQueue.init({
@@ -337,6 +373,7 @@ AbilityQueue.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+	shared_rules = SharedRules,
 })
 
 GrenadeFallback.init({
@@ -408,6 +445,7 @@ GrenadeFallback.wire({
 		return (ItemFallback.should_lock_weapon_switch(unit))
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
+	bot_targeting = BotTargeting,
 })
 
 local function _should_lock_weapon_switch(unit)
@@ -438,6 +476,9 @@ end
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 Poxburster.register_hooks()
+MeleeAttackChoice.register_hooks()
+AnimationGuard.register_hooks()
+SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
@@ -865,5 +906,9 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 	end
 end
 
-mod:echo("BetterBots loaded")
+-- All modules are assert-guarded above; if any failed to load we'd have
+-- crashed already.  The count serves as a deployment sanity check in logs.
+-- Bump when adding/removing modules.
+local _MODULE_COUNT = 25
+mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")

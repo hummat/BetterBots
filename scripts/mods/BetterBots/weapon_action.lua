@@ -9,6 +9,10 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 local _perf
+local _ammo
+
+local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
+local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
@@ -42,6 +46,92 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_perf = deps.perf
+	_ammo = deps.ammo
+end
+
+local function _ammo_api()
+	if _ammo then
+		return _ammo
+	end
+
+	local ok, ammo = pcall(require, "scripts/utilities/ammo")
+	if ok then
+		_ammo = ammo
+	end
+
+	return _ammo
+end
+
+local function _dead_zone_target_breed(unit)
+	local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+	local perception = blackboard and blackboard.perception
+	local target_unit = perception and perception.target_enemy
+	if not target_unit then
+		return nil
+	end
+
+	local target_unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+	if not target_unit_data_extension or not target_unit_data_extension.breed then
+		return nil
+	end
+
+	return target_unit_data_extension:breed()
+end
+
+function M.dead_zone_ranged_fire_context(unit, action_input)
+	if action_input ~= "shoot_pressed" and action_input ~= "shoot_charge" then
+		return nil
+	end
+
+	local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name = _weapon_log_context(unit)
+	if wielded_slot ~= "slot_secondary" or warp_charge_template_name ~= "none" then
+		return nil
+	end
+
+	local ammo = _ammo_api()
+	local ammo_pct = ammo and ammo.current_slot_percentage and ammo.current_slot_percentage(unit, "slot_secondary")
+		or nil
+	if not ammo_pct or ammo_pct <= BETTERBOTS_RANGED_AMMO_THRESHOLD or ammo_pct > NORMAL_RANGED_AMMO_THRESHOLD then
+		return nil
+	end
+
+	local breed = _dead_zone_target_breed(unit)
+	local tags = breed and breed.tags or nil
+	if tags and (tags.elite or tags.special or tags.monster) then
+		return nil
+	end
+
+	return {
+		action_input = action_input,
+		ammo_pct = ammo_pct,
+		bot_slot = bot_slot,
+		target_breed_name = breed and breed.name or "unknown",
+		weapon_template_name = weapon_template_name,
+	}
+end
+
+function M.log_dead_zone_ranged_fire(unit, action_input)
+	local context = M.dead_zone_ranged_fire_context(unit, action_input)
+	if not context then
+		return false
+	end
+
+	_debug_log(
+		"ranged_dead_zone_fire:" .. tostring(context.bot_slot) .. ":" .. tostring(context.weapon_template_name),
+		_fixed_time(),
+		"ranged dead-zone override kept normal shot (ammo="
+			.. string.format("%.2f", context.ammo_pct)
+			.. ", target="
+			.. tostring(context.target_breed_name)
+			.. ", weapon="
+			.. tostring(context.weapon_template_name)
+			.. ", action="
+			.. tostring(context.action_input)
+			.. ")",
+		10
+	)
+
+	return true
 end
 
 function M.register_hooks(deps)
@@ -288,6 +378,8 @@ function M.register_hooks(deps)
 									.. tostring(raw_input)
 							)
 						end
+
+						M.log_dead_zone_ranged_fire(unit, action_input)
 					end
 
 					local result = func(self, id, action_input, raw_input)

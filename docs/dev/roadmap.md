@@ -46,6 +46,15 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P1: next`, `P2: later`, `P3: backlog`.
 
+### P1: Implemented, awaiting in-game validation
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 51 | Bots stop shooting at 50% reserve ammo | Fix is in `dev/p0-p1-stabilization`; direct 20%-50% reserve combat proof still missing. |
+| 52 | Bots overuse heavy attacks in horde | Fix is in `dev/p0-p1-stabilization`; needs direct horde-behavior validation. |
+| 61 | Assail knives fire into void | Smart-target seeding fix is implemented; needs live Assail verification. |
+| 62 | Grenade throw misaim | Aim-direction fix is implemented; needs live grenade verification. |
+
 ### P2: Later — Planned, not urgent
 
 **Ability activation quality:**

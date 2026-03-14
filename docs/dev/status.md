@@ -1,4 +1,4 @@
-# Status Snapshot (March 12, 2026)
+# Status Snapshot (March 13, 2026)
 
 ## What's shipped
 
@@ -53,7 +53,7 @@
 
 ## Evidence Source
 
-- Latest analyzed logs: `console-2026-03-12-20.33.39-...` and `console-2026-03-12-20.44.32-...`
+- Latest analyzed log: `console-2026-03-13-13.21.23-06323070-33d6-49e5-9e07-a918eea1e556.log`
 - Full evidence matrix: `docs/dev/validation-tracker.md`
 - Log timestamps are UTC, not local timezone
 
@@ -99,9 +99,26 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 
 Archived implementation plan: `docs/superpowers/plans/2026-03-12-m5-batch2.md`
 
+## P0/P1 Stabilization (dev/p0-p1-stabilization)
+
+In-game validation: 2026-03-13, latest analyzed log `console-2026-03-13-13.21.23-06323070-33d6-49e5-9e07-a918eea1e556.log`.
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #50 | Arbites drone crash guard | **Closed after validation** | Extended 4-Arbites stress run, repeated drone + whistle activations, 0 Lua errors |
+| #51 | Ranged ammo threshold override | **Implemented, needs testing** | Live log confirms `ranged ammo gate lowered from 0.5 to 0.2`, but no direct 20%-50% reserve behavior proof yet |
+| #52 | Melee heavy-bias reduction | **Implemented, needs testing** | Automated coverage is strong; no direct in-game horde-behavior evidence yet |
+| #61 | Assail smart-target seeding | **Implemented, needs testing** | Structural fix + tests in place; not exercised in the Arbites-only run |
+| #62 | Grenade aim direction | **Implemented, needs testing** | Structural fix + tests in place; not exercised in the Arbites-only run |
+
+**Unit tests**: 447 tests via busted.
+
 ## Next Steps
+- In-game validate `#51` with a ranged-heavy bot in the 20% to 50% reserve window
+- In-game validate `#61` / `#62` with a Psyker Assail bot plus at least one standard grenade bot
+- In-game validate `#52` with a melee-heavy lineup against mixed unarmored hordes
+- Merge `dev/p0-p1-stabilization` after those passes, then resume broader settings work (`#6`)
 - Default class profiles for bots (#45) — P2, design approved
-- Broader settings work (#6) — partial settings shipped in-batch (`standard/testing` profile + tier/grenade toggles); remaining scope is per-ability toggles + calibrated multi-preset tuning
 - Weapon/enemy-aware ADS (#41) — P2
 - Hive Scum ability validation (#8) — requires DLC
 - Objective-aware ability activation (#37) — P2

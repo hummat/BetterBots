@@ -1,7 +1,6 @@
 -- Condition patch: replaces bt_bot_conditions.can_activate_ability with
 -- BetterBots' version that checks heuristics, guards, and rescue intent.
 -- Also fixes should_vent_overheat hysteresis (#30).
-local SharedRules = require("scripts/mods/BetterBots/shared_rules")
 local _mod
 local _debug_log
 local _debug_enabled
@@ -22,12 +21,13 @@ local _rescue_intent
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
+local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
+local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
-local DAEMONHOST_BREED_NAMES = SharedRules.DAEMONHOST_BREED_NAMES
-	or {
-		chaos_daemonhost = true,
-		chaos_mutator_daemonhost = true,
-	}
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
 
 -- Returns true when the bot's current target_enemy is a non-aggroed
 -- daemonhost. O(1) — no proximity scan needed since we only check
@@ -54,12 +54,11 @@ local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ign
 	return true
 end
 
-local RESCUE_CHARGE_RULES = SharedRules.RESCUE_CHARGE_RULES
-	or {
-		ogryn_charge_ally_aid = true,
-		zealot_dash_ally_aid = true,
-		adamant_charge_ally_aid = true,
-	}
+local RESCUE_CHARGE_RULES = {
+	ogryn_charge_ally_aid = true,
+	zealot_dash_ally_aid = true,
+	adamant_charge_ally_aid = true,
+}
 
 local function _return_with_perf(perf_t0, ...)
 	if perf_t0 and _perf then
@@ -67,6 +66,32 @@ local function _return_with_perf(perf_t0, ...)
 	end
 
 	return ...
+end
+
+local function _override_ranged_ammo_condition_args(condition_args)
+	if not condition_args or condition_args.ammo_percentage ~= NORMAL_RANGED_AMMO_THRESHOLD then
+		return condition_args
+	end
+
+	local adjusted_args = {}
+	for key, value in pairs(condition_args) do
+		adjusted_args[key] = value
+	end
+	adjusted_args.ammo_percentage = BETTERBOTS_RANGED_AMMO_THRESHOLD
+
+	if _debug_enabled() then
+		_debug_log(
+			"ranged_ammo_threshold_override",
+			_fixed_time(),
+			"ranged ammo gate lowered from "
+				.. tostring(NORMAL_RANGED_AMMO_THRESHOLD)
+				.. " to "
+				.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD),
+			10
+		)
+	end
+
+	return adjusted_args
 end
 
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -307,7 +332,20 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 				end
 				return false
 			end
-			return orig_has_target_and_ammo(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+			local adjusted_args = _override_ranged_ammo_condition_args(condition_args)
+			local result =
+				orig_has_target_and_ammo(unit, blackboard, scratchpad, adjusted_args, action_data, is_running)
+			if result and adjusted_args ~= condition_args and _debug_enabled() then
+				_debug_log(
+					"ranged_ammo_override_active:" .. tostring(unit),
+					_fixed_time(),
+					"ranged permitted with lowered ammo gate (threshold="
+						.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD)
+						.. ")",
+					10
+				)
+			end
+			return result
 		end
 	end
 
@@ -337,6 +375,9 @@ function M.init(deps)
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf
+	local shared_rules = deps.shared_rules or {}
+	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 end
 
 function M.wire(deps)
