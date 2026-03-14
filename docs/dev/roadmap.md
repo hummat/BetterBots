@@ -45,55 +45,74 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 ### v0.7.1 (2026-03-14)
 - P0/P1 stabilization: animation crash guard (#50), ammo threshold (#51), melee horde bias (#52), Assail void throws (#61), grenade misaim (#62), unarmed defer, smart blitz targeting, ADS fire fix. Repo cleanup (scrapers migrated to hadrons-blessing). 461 tests.
 
-## Priority tiers
+## Planned batches
 
-Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues) with labels `P2: later`, `P3: backlog`.
+Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
-### P2: Later — Planned, not urgent
+### v0.8.0 — "Player Control"
 
-**Ability activation quality:**
-
-| # | Issue | Notes |
-|---|-------|-------|
-| 12 | Stance early cancellation | Researched — complex. Stances have no release input (`transition = "stay"`). Needs template injection or `stop_action()` + buff cleanup. |
-| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. |
-| 37 | Objective-aware ability activation | Protect allies during revive/interaction with defensive abilities (taunt, shout, stealth). |
-
-**Ability scope expansion:**
+*Theme: give users knobs + make the mod work out-of-the-box for more players.*
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 6 | Ability/settings control surface | Partial scope can ship earlier: `standard/testing` behavior profile + tier/grenade toggles. Remaining broader scope: per-ability toggles and calibrated multi-preset tuning. |
-| 8 | Hive Scum ability support | Tier 1 (Focus/Rampage) likely works already — needs DLC for validation. Stimm Field (Tier 3) also DLC-blocked. |
+| 57 | Toggle safety audit | Prerequisite for #6 — ensure disable reverts table mutations cleanly. |
+| 6 | Settings control surface | Full spec + plan committed. Category checkboxes, behavior presets, feature gates, healing deferral UI. |
+| 45 | Default class profiles | Hardcoded Zealot/Psyker/Ogryn/Veteran profiles for players without leveled characters. ~150-200 LOC, design doc ready. |
+| 60 | Simplify heuristic dispatch | Refactor `fn(context)` signature — pays down tech debt before settings adds more call sites. |
+| 59 | Grenade fallback logging | Per-stage lifecycle events (queued/stage/complete/failed) matching item_fallback pattern. |
 
-**Bot weapon/equipment fixes:**
+### v0.9.0 — "Combat Awareness"
 
-| # | Issue | Notes |
-|---|-------|-------|
-| 41 | Weapon/enemy-aware ADS vs hip-fire | Static `killshot` gestalt for all weapons. Need per-weapon gestalt + enemy-aware fire cadence. |
-
-**Bot profiles:**
-
-| # | Issue | Notes |
-|---|-------|-------|
-| 45 | Default class profiles for bots | Ship hardcoded Zealot/Psyker/Ogryn/Veteran profiles so players without leveled characters get class-diverse bots with abilities. Complements #28. |
-
-**General bot behavior:**
+*Theme: bots perceive and react to combat situations better.*
 
 | # | Issue | Notes |
 |---|-------|-------|
+| 54 | Push poxbursters | **P1.** Bypass `_should_push` outnumbered gate for poxburster breed. Standard human counterplay. |
+| 47 | Combat-aware engagement leash | Hook `_allow_engage()` for context-aware range extension: stickiness, post-charge grace, under-attack override. Root cause analyzed, 4-layer fix proposed. |
+| 37 | Objective-aware ability activation | Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
+| 55 | Prioritize mastiff-pounced enemies | Score boost for immobilized targets in target_selection.lua. |
+| 53 | Rumbler VFX timing gap | `hook_safe` on loadout init fires too late for `AimProjectileEffects.init` cache. Fix: pre-call hook or separate `AimProjectileEffects.init` hook. |
 
-### P3: Backlog — Nice to have, no timeline
+### v0.10.0 — "Team Coordination"
+
+*Theme: bots coordinate with each other and fight smarter per-weapon.*
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 7 | Revive-with-ability | Inject ability BT node before revive (stealth/taunt/shout to protect revive). |
-| 14 | Ability cooldown staggering | Team-level coordination: don't stack all abilities simultaneously. |
-| 22 | Utility-based ability scoring | Replace boolean conditions with spline-interpolated utility curves (90+ considerations in VT2). Architectural upgrade. |
-| 24 | Healing item management | Don't waste medicae, distribute healing to wounded allies, stim usage. |
-| 28 | Built-in bot profile management | Replace Tertium4Or5 dependency with integrated profile selection. |
-| 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch (`bot_group.lua:26` reads wrong field). Not a one-flag fix. |
-| 33 | Weapon special actions | Parry, bayonet, etc. Input mechanism trivial; decision logic is the work. |
+| 14 | Ability cooldown staggering | Post-activation category cooldown (~100-150 LOC). Emergency overrides for critical abilities. Feasibility analysis complete. |
+| 7 | Revive-with-ability | Inject defensive ability (taunt/stealth/shout) before revive interact node. Requires BT injection research. |
+| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
+| 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
+| 58 | ScriptUnit.extension guard | 2-line `has_extension` guard on 2 hot paths. Defensive fix. |
+
+### v1.0.0 — "Bot Identity"
+
+*Theme: bots feel like teammates, not automatons. VT2 Bot Improvements parity.*
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
+| 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. |
+| 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
+| 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch. Settings toggle for grimoire carrying. |
+| 33 | Weapon special actions | Parry, heavy sweep, racking slide. Input mechanism trivial; decision logic (when to parry) is the work. |
+
+### Post-1.0 — "Intelligence Architecture"
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 22 | Utility-based ability scoring | Replace boolean heuristics with spline-interpolated utility curves. Darktide has native `utility.lua` + `bot_utility_considerations.lua` — framework exists, needs wiring. Architectural upgrade. |
+| 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
+| 56 | Communication wheel response | React to com wheel commands (battle cry → aggression boost, need help → converge). `Vo.on_demand_vo_event` hook for detection. ForTheEmperor compat. |
+
+### Validation-gated — slot into any batch when testable
+
+| # | Issue | Blocker |
+|---|-------|---------|
+| 8 | Hive Scum ability support | DLC-blocked (Arbites/Hive Scum requires `adamant` DLC) |
+| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0. Needs in-game daemonhost encounter to verify. |
+| 39 | Healing deferral | Implemented v0.7.0. Needs in-game trigger to validate deferral path. |
+| 49 | Arbites companion-command smart tag | DLC-blocked. Direct mastiff via `enemy_companion_target` tag. |
 
 ## Design principles
 
@@ -114,12 +133,12 @@ Heuristics and feature ideas are sourced from:
 
 See `docs/related-mods.md` for detailed mod analysis and `docs/classes/*-tactics.md` for per-ability heuristics.
 
-## Milestones
+## Milestone history
 
-1. **M1 (shipped v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
-2. **M2 (shipped v0.2.0–v0.3.0):** Per-career threat heuristics (#2, closed) + Tier 3 reliability (#3, closed) + structured event logging (#29, closed). 18 heuristic functions, all testable tiers at 100%.
-3. **M3 (shipped v0.4.0):** Ability quality + bot fixes — suppression (#11), charge rescue (#10), Psyker overcharge (#27), revive protection (#20), poxburster targeting (#34), ADS fix (#35), bot sprinting (#36).
-4. **M4 (shipped v0.5.0):** Ability polish + weapon fixes — VFX/SFX bleed (#42), melee meta_data (#23), ranged meta_data (#31), warp venting (#30), staff charged fire (#43 partial — p4 only).
-5. **M5 (shipped v0.6.0):** Scope expansion — grenade/blitz support (#4), staff charged fire complete (#43), bot pinging (#16), daemonhost avoidance (#17), distant special penalty (#19).
-6. **M5-batch2 (shipped v0.7.0):** Grenade heuristics + Psyker blitz (#4), ping anti-spam (#16), poxburster human proximity (#34), hazard-aware abilities (#21), boss engagement (#18), dodge suppression audit (#15), tiered log levels (#40), healing deferral implementation (#39), player-tag smart-target response (#48).
-7. **M6 (aspirational):** Utility-based scoring (#22). VT2-level bot intelligence.
+1. **M1 (v0.1.0):** Tier 1 + Tier 2 abilities activate in solo play. Published on Nexus.
+2. **M2 (v0.2.0–v0.3.0):** Per-career threat heuristics + Tier 3 reliability + structured event logging.
+3. **M3 (v0.4.0):** Ability quality + bot fixes — suppression, charge rescue, Psyker overcharge, revive protection, poxburster targeting, ADS fix, bot sprinting.
+4. **M4 (v0.5.0):** Ability polish + weapon fixes — VFX/SFX bleed, melee/ranged meta_data, warp venting, staff charged fire (partial).
+5. **M5 (v0.6.0):** Scope expansion — grenade/blitz, staff charged fire complete, bot pinging, daemonhost avoidance, distant special penalty.
+6. **M5-batch2 (v0.7.0):** Grenade heuristics + Psyker blitz, ping anti-spam, hazard-aware abilities, boss engagement, healing deferral, player-tag response.
+7. **v0.7.1:** P0/P1 stabilization — animation crash guard, ammo threshold, melee horde bias, Assail void throws, grenade misaim. 461 tests.

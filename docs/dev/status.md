@@ -1,4 +1,4 @@
-# Status Snapshot (March 13, 2026)
+# Status Snapshot (March 14, 2026)
 
 ## What's shipped
 
@@ -116,8 +116,23 @@ In-game validation: 2026-03-13, latest analyzed log `console-2026-03-13-13.21.23
 All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 ## Next Steps
-- Settings presets (#6) — spec + plan committed, remaining: per-ability toggles + calibrated presets
-- Default class profiles for bots (#45) — P2, design approved
-- Weapon/enemy-aware ADS (#41) — P2
-- Hive Scum ability validation (#8) — requires DLC
-- Objective-aware ability activation (#37) — P2
+
+### v0.8.0 — "Player Control" (next release)
+
+| # | Feature | Status |
+|---|---------|--------|
+| 57 | Toggle safety audit | Not started — prerequisite for #6 |
+| 6 | Settings control surface | Spec + plan committed, ready to execute (8 tasks) |
+| 45 | Default class profiles | Design doc ready, ~150-200 LOC |
+| 60 | Simplify heuristic dispatch | Not started — internal refactor |
+| 59 | Grenade fallback logging | Not started — observability |
+
+### Later batches
+
+- **v0.9.0 "Combat Awareness"**: #54 (push poxbursters, P1), #47 (engagement leash), #37 (objective-aware), #55 (mastiff-pounced priority), #53 (rumbler VFX)
+- **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS), #58 (ScriptUnit guard)
+- **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
+- **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)
+- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #39 (healing deferral), #49 (Arbites companion tag, DLC)
+
+See `docs/dev/roadmap.md` for full batch details.

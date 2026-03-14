@@ -19,11 +19,7 @@
 
 1. ~~Tier 3 item fallback timing mismatch.~~ **Fixed** (#3): Wield_slot hook redirects to `slot_combat_ability` instead of blocking (prevents cancel loop). Followup delays shortened to 0.35s (aim actions chain immediately). Coherency self-exclusion fixes dead `allies_in_coherency == 0` guards. Validated 8/8 consumes (5 drone, 1 shield, 2 relic).
 
-2. Stance cancellation complexity.
-   - Tier 1 stances have NO release input defined in their `action_inputs`.
-   - `transition = "stay"` creates a one-way hierarchy with no exit path.
-   - Stance effects persist via buff system, decoupled from action lifecycle.
-   - Early cancellation requires either: (a) injecting release input into templates, or (b) force-stopping via `PlayerUnitAbilityExtension.stop_action()` + manual buff cleanup.
+2. ~~Stance cancellation complexity (#12).~~ **Closed.** Stances have no release input (`transition = "stay"`). Early cancellation would require template injection or `stop_action()` + buff cleanup — decided not to pursue.
 
 3. BT preemption during revive.
    - BT re-evaluates every frame even while a node is running.
