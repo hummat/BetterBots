@@ -332,14 +332,20 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 				end
 				return false
 			end
-			return orig_has_target_and_ammo(
-				unit,
-				blackboard,
-				scratchpad,
-				_override_ranged_ammo_condition_args(condition_args),
-				action_data,
-				is_running
-			)
+			local adjusted_args = _override_ranged_ammo_condition_args(condition_args)
+			local result =
+				orig_has_target_and_ammo(unit, blackboard, scratchpad, adjusted_args, action_data, is_running)
+			if result and adjusted_args ~= condition_args and _debug_enabled() then
+				_debug_log(
+					"ranged_ammo_override_active:" .. tostring(unit),
+					_fixed_time(),
+					"ranged permitted with lowered ammo gate (threshold="
+						.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD)
+						.. ")",
+					10
+				)
+			end
+			return result
 		end
 	end
 

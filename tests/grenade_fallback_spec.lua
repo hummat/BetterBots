@@ -130,6 +130,10 @@ local function reset()
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
 	_component_state_by_name = {}
+	_component_state_by_name.weapon_action = {
+		template_name = "autogun_p1_m1",
+		current_action_name = "none",
+	}
 	blackboard = {}
 
 	_extensions[unit] = {
@@ -251,7 +255,7 @@ describe("grenade_fallback", function()
 		it("does not block wield cleanup for chain lightning in wait_unwield", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 4, peril_pct = 0.2 }
+					return { target_enemy = "enemy_1", num_nearby = 4, peril_pct = 0.2 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -320,7 +324,7 @@ describe("grenade_fallback", function()
 		it("blocks foreign weapon actions during Assail cleanup", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_assail_ranged_pressure"
@@ -367,10 +371,38 @@ describe("grenade_fallback", function()
 			assert.equals("grenade_ability", _recorded_inputs[1].input)
 		end)
 
+		it("never enters state machine when no target_enemy is available", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					-- ranged_count triggers the heuristic, but no target_enemy
+					return { num_nearby = 3, ranged_count = 2, target_enemy_distance = 12 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_assail_ranged_pressure"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Should never have entered the state machine — no wield queued
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.equals(0, #_recorded_inputs)
+		end)
+
 		it("allows the expected Smite followup input", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 1, peril_pct = 0.1 }
+					return { target_enemy = "enemy_1", num_nearby = 1, peril_pct = 0.1 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_smite_priority_target"
@@ -396,7 +428,7 @@ describe("grenade_fallback", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 1, peril_pct = 0.1 }
+					return { target_enemy = "enemy_1", num_nearby = 1, peril_pct = 0.1 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_smite_priority_target"
@@ -425,7 +457,7 @@ describe("grenade_fallback", function()
 		it("allows the expected Chain Lightning release input", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 5 }
+					return { target_enemy = "enemy_1", num_nearby = 5 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -493,6 +525,37 @@ describe("grenade_fallback", function()
 		assert.is_nil(_recorded_inputs[1].extra)
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
+	end)
+
+	it("defers item grenade activation while the bot is unarmed", function()
+		_wielded_slot = "slot_unarmed"
+		_component_state_by_name.weapon_action.template_name = "unarmed"
+		_debug_enabled_result = true
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+		assert.truthy(find_debug_log("grenade deferred while unarmed"))
+	end)
+
+	it("retries item grenade activation after leaving unarmed", function()
+		_wielded_slot = "slot_unarmed"
+		_component_state_by_name.weapon_action.template_name = "unarmed"
+
+		GrenadeFallback.try_queue(unit, blackboard)
+		assert.equals(0, #_recorded_inputs)
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+
+		_wielded_slot = "slot_secondary"
+		_component_state_by_name.weapon_action.template_name = "autogun_p1_m1"
+		_mock_time = _mock_time + 0.1
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(1, #_recorded_inputs)
+		assert.equals("weapon_action", _recorded_inputs[1].component)
+		assert.equals("grenade_ability", _recorded_inputs[1].input)
+		assert.equals("wield", _grenade_state_by_unit[unit].stage)
 	end)
 
 	it("emits grenade decision events when heuristic passes", function()
@@ -718,6 +781,53 @@ describe("grenade_fallback", function()
 		assert.is_false(_aim_calls[#_aim_calls].aiming)
 	end)
 
+	it("aborts when target despawns mid-sequence (position disappears)", function()
+		_debug_enabled_result = true
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		-- Target's position disappears (enemy died/despawned)
+		_G.POSITION_LOOKUP = {}
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+		assert.truthy(find_debug_log("grenade aim unavailable"))
+	end)
+
+	it("retains stale aim target when context loses target_enemy", function()
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		-- Context stops providing target_enemy but POSITION_LOOKUP still valid
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_generic"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+		})
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		-- Sequence continues using sticky aim from original target
+		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+		assert.equals("set_aim_position", _aim_calls[#_aim_calls].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[#_aim_calls].position)
+	end)
+
 	it("resets when wield lost during wait_throw", function()
 		advance_to_stage("wait_throw")
 		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
@@ -758,7 +868,7 @@ describe("grenade_fallback", function()
 		-- Wire with a blitz template that uses a different input chain
 		GrenadeFallback.wire({
 			build_context = function()
-				return { num_nearby = 3 }
+				return { target_enemy = "enemy_1", num_nearby = 3 }
 			end,
 			evaluate_grenade_heuristic = function()
 				return true, "grenade_generic"
@@ -786,7 +896,7 @@ describe("grenade_fallback", function()
 			-- Wire with shock_mine (number entry = same as standard grenades)
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -804,7 +914,7 @@ describe("grenade_fallback", function()
 		it("ability-based blitz queues inputs on grenade_ability_action without wield", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -840,7 +950,7 @@ describe("grenade_fallback", function()
 
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -867,7 +977,7 @@ describe("grenade_fallback", function()
 
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -895,7 +1005,7 @@ describe("grenade_fallback", function()
 		it("skips aim/throw stages for auto-fire templates", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -921,7 +1031,7 @@ describe("grenade_fallback", function()
 		it("completes auto-fire item templates on charge confirm without stable grenade slot", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -949,7 +1059,7 @@ describe("grenade_fallback", function()
 		it("skips wait_throw when release_input is nil", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"
@@ -981,7 +1091,7 @@ describe("grenade_fallback", function()
 		it("supports Assail as an aimed homing blitz", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3, target_enemy_distance = 12, ranged_count = 2 }
+					return { target_enemy = "enemy_1", num_nearby = 3, target_enemy_distance = 12, ranged_count = 2 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_assail_ranged_pressure"
@@ -1017,7 +1127,7 @@ describe("grenade_fallback", function()
 		it("supports Assail as a fast close-range blitz under crowd pressure", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 5, challenge_rating_sum = 2.5, target_enemy_distance = 4 }
+					return { target_enemy = "enemy_1", num_nearby = 5, challenge_rating_sum = 2.5, target_enemy_distance = 4 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_assail_crowd_soften"
@@ -1046,7 +1156,7 @@ describe("grenade_fallback", function()
 		it("does not queue invalid unwield_to_previous cleanup for Assail", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_assail_ranged_pressure"
@@ -1085,10 +1195,142 @@ describe("grenade_fallback", function()
 			assert.is_nil(_grenade_state_by_unit[unit].stage)
 		end)
 
+		it("does not reset Assail state on action_rapid_zoomed confirmation alone", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_assail_ranged_pressure"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			-- Advance aimed Assail to wait_unwield: wield → wait_aim → zoom → zoom_shoot
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.6
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			-- Simulate the engine entering action_rapid_zoomed (knife throw animation)
+			-- but NO charge consumption yet
+			_component_state_by_name.weapon_action = {
+				current_action_name = "action_rapid_zoomed",
+			}
+
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Bug: previously this would reset state, letting the BT switch to staff
+			-- before the knife charge was consumed.
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+		end)
+
+		it("holds Assail wield lock until charge consumption even with action confirmation", function()
+			_debug_enabled_result = true
+			GrenadeFallback.wire({
+				build_context = function()
+					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_assail_ranged_pressure"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			-- Advance aimed Assail to wait_unwield
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.6
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			-- action_rapid_zoomed fires but no charge yet — lock must hold
+			_component_state_by_name.weapon_action = {
+				current_action_name = "action_rapid_zoomed",
+			}
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit))
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			-- Now charge is consumed — state should reset
+			GrenadeFallback.record_charge_event(unit, "psyker_throwing_knives", _mock_time + 0.15)
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+		end)
+
+		it("releases Assail wield lock on timeout when charge event never arrives", function()
+			GrenadeFallback.wire({
+				build_context = function()
+					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_assail_ranged_pressure"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			-- Advance aimed Assail to wait_unwield
+			GrenadeFallback.try_queue(unit, blackboard)
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+			_mock_time = _mock_time + 0.6
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
+
+			-- No charge event — wield lock must hold
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit))
+
+			-- Advance past UNWIELD_TIMEOUT_S (3.0s) — timeout must release everything
+			_mock_time = _mock_time + 3.1
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.is_false(GrenadeFallback.should_block_wield_input(unit))
+		end)
+
 		it("supports Chain Lightning charged crowd-control sequence", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 5 }
+					return { target_enemy = "enemy_1", num_nearby = 5 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -1131,7 +1373,7 @@ describe("grenade_fallback", function()
 		it("does not queue invalid unwield_to_previous cleanup for Chain Lightning", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 4, peril_pct = 0.2 }
+					return { target_enemy = "enemy_1", num_nearby = 4, peril_pct = 0.2 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -1172,7 +1414,7 @@ describe("grenade_fallback", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 4, peril_pct = 0.2 }
+					return { target_enemy = "enemy_1", num_nearby = 4, peril_pct = 0.2 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -1212,7 +1454,7 @@ describe("grenade_fallback", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 4, peril_pct = 0.2 }
+					return { target_enemy = "enemy_1", num_nearby = 4, peril_pct = 0.2 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_chain_lightning_crowd"
@@ -1247,7 +1489,7 @@ describe("grenade_fallback", function()
 		it("supports Smite sticky-charge startup", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 1 }
+					return { target_enemy = "enemy_1", num_nearby = 1 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_smite_priority"
@@ -1276,7 +1518,7 @@ describe("grenade_fallback", function()
 		it("queues explicit Smite use_power after sticky charge", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 1, peril_pct = 0.1 }
+					return { target_enemy = "enemy_1", num_nearby = 1, peril_pct = 0.1 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_smite_priority_target"
@@ -1311,7 +1553,7 @@ describe("grenade_fallback", function()
 		it("ability-based blitz completes on charge confirm without unwield", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { num_nearby = 3 }
+					return { target_enemy = "enemy_1", num_nearby = 3 }
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_generic"

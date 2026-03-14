@@ -116,6 +116,7 @@ local ASSAIL_FAST_PROFILE = {
 	aim_input = "shoot",
 	auto_unwield = true,
 	allow_external_wield_cleanup = true,
+	require_charge_confirmation = true,
 }
 
 local ASSAIL_AIMED_PROFILE = {
@@ -125,6 +126,7 @@ local ASSAIL_AIMED_PROFILE = {
 	auto_unwield = true,
 	allow_external_wield_cleanup = true,
 	confirmation_action = "action_rapid_zoomed",
+	require_charge_confirmation = true,
 }
 
 local function _resolve_template_entry(grenade_name, context, rule)
@@ -209,7 +211,14 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 	state.aim_distance = context and context.target_enemy_distance or nil
 
 	if not state.aim_unit then
-		return true
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_aim_no_target:" .. tostring(unit),
+				fixed_t,
+				"grenade aim unavailable (no target unit resolved)"
+			)
+		end
+		return false
 	end
 
 	local aim_ok, aim_reason = _set_bot_aim(unit, state.aim_unit)
@@ -253,6 +262,7 @@ local function _reset_state(unit, state, next_try_t)
 	state.allow_external_wield_cleanup = nil
 	state.confirmation_action = nil
 	state.confirmation_logged = nil
+	state.require_charge_confirmation = nil
 	state.last_blocked_foreign_input = nil
 	state.aim_unit = nil
 	state.aim_distance = nil
@@ -297,6 +307,16 @@ local function should_block_wield_input(unit)
 		return false
 	end
 	if state.stage == "wait_unwield" and state.allow_external_wield_cleanup then
+		-- Assail: keep blocking until charge is consumed; the wield chain
+		-- on action_rapid_zoomed has no chain_time gate, so the BT can
+		-- switch away before the projectile fires at fire_time=0.25.
+		if
+			state.require_charge_confirmation
+			and not _has_confirmed_charge(state, unit)
+			and (not state.deadline_t or _fixed_time() < state.deadline_t)
+		then
+			return true, state.grenade_name or "grenade_ability"
+		end
 		return false
 	end
 	return true, state.grenade_name or "grenade_ability"
@@ -713,7 +733,7 @@ local function try_queue(unit, blackboard)
 				)
 			end
 
-			if action_confirmed then
+			if action_confirmed and not state.require_charge_confirmation then
 				if _debug_enabled() then
 					state.confirmation_logged = true
 					_debug_log(
@@ -919,6 +939,16 @@ local function try_queue(unit, blackboard)
 		confirmation_action = template_entry.confirmation_action
 	end
 
+	-- Pre-flight: don't enter the state machine without a target for aimed throws.
+	-- Wielding auto-fire templates (zealot knives) triggers the throw immediately,
+	-- so aborting after wield is too late — the charge is already consumed.
+	if aim_input then
+		local aim_unit = _resolve_aim_unit(context)
+		if not aim_unit then
+			return
+		end
+	end
+
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
 		return
@@ -937,6 +967,8 @@ local function try_queue(unit, blackboard)
 		and template_entry.allow_external_wield_cleanup == true
 	state.confirmation_action = confirmation_action
 	state.confirmation_logged = nil
+	state.require_charge_confirmation = type(template_entry) == "table"
+		and template_entry.require_charge_confirmation == true
 
 	if component then
 		-- Ability-based blitz: queue aim input directly on the ability component.
@@ -973,6 +1005,24 @@ local function try_queue(unit, blackboard)
 			)
 		end
 	else
+		local weapon_action = unit_data_extension and unit_data_extension:read_component("weapon_action")
+		local weapon_template_name = weapon_action and weapon_action.template_name or "none"
+
+		if wielded_slot == "slot_unarmed" or weapon_template_name == "unarmed" then
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_unarmed:" .. grenade_name,
+					fixed_t,
+					"grenade deferred while unarmed (slot="
+						.. tostring(wielded_slot)
+						.. ", template="
+						.. tostring(weapon_template_name)
+						.. ")"
+				)
+			end
+			return
+		end
+
 		-- Item-based grenade: wield the grenade slot first.
 		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
 		state.stage = "wield"

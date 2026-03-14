@@ -906,5 +906,9 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 	end
 end
 
-mod:echo("BetterBots loaded")
+-- All modules are assert-guarded above; if any failed to load we'd have
+-- crashed already.  The count serves as a deployment sanity check in logs.
+-- Bump when adding/removing modules.
+local _MODULE_COUNT = 25
+mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
