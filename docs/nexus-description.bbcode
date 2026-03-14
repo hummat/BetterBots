@@ -20,13 +20,17 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
-[size=3][b]New in v0.7.0[/b][/size]
+[size=3][b]New in v0.7.1[/b][/size]
 
 [list]
-[*]Grenade / blitz heuristics are now live, including Psyker Assail, Smite, and Chain Lightning
-[*]Bots respond to player-tagged enemies, hazards, and bosses targeting them
-[*]New in-game settings: `standard/testing` profile, tier toggles, grenade/blitz toggle, healing deferral controls
-[*]Tiered logging plus optional JSONL event log and runtime timing diagnostics
+[*]Fixed: Arbites drone animation crash with 3 Arbites bots
+[*]Fixed: Bots stop shooting at 50% reserve ammo — threshold lowered to 20%
+[*]Fixed: Heavy attack overuse in hordes — armor-aware light/heavy selection
+[*]Fixed: Assail knives fire into void — charge-lock prevents premature weapon switch
+[*]Fixed: Grenade throw misaim — bot aim is now driven for all throws
+[*]Fixed: Grenade activation while bot is unarmed (stagger/revive)
+[*]New: Smart targeting for precision blitz (Assail, knives)
+[*]New: ADS fire fix for Tertium 5/6 ranged weapons
 [/list]
 
 [size=3][b]What works[/b][/size]
@@ -109,11 +113,11 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
 [*][color=green]✓[/color] Bot warp charge venting
 [*][color=green]✓[/color] Suppress bot VFX/SFX bleed to human player
-[*][color=green]✓[/color] Smart melee attack selection (armor-aware) — light/heavy balance being improved ([url=https://github.com/hummat/BetterBots/issues/52]#52[/url])
+[*][color=green]✓[/color] Smart melee attack selection (armor-aware light/heavy balance)
 [*][color=green]✓[/color] Force staff charged fire (all 4 staves)
 [*]Weapon/enemy-aware ADS vs hip-fire
 [*]Poxburster push ([url=https://github.com/hummat/BetterBots/issues/54]#54[/url])
-[*]Ammo management and conservation settings ([url=https://github.com/hummat/BetterBots/issues/51]#51[/url])
+[*][color=green]✓[/color] Ammo conservation — lowered shoot threshold from 50% to 20%
 [/list]
 
 [b]Long-term[/b]
@@ -146,11 +150,8 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 
 [size=3][b]Known issues[/b][/size]
 
-[b]Bugs being fixed:[/b]
+[b]Known bugs:[/b]
 [list]
-[*][b]Bots stop shooting at ~50% ammo[/b] — a vanilla threshold makes bots go melee-only once reserve ammo drops below 50%, even though ammo pickups are nearby. They still shoot specials and elites. Fix and configurable slider coming. ([url=https://github.com/hummat/BetterBots/issues/51]#51[/url])
-[*][b]Bots overuse heavy attacks[/b] — bots prefer heavy attacks in hordes when spamming lights would be better for toughness regen and cleave. Caused by the melee improvements in v0.5.0. Smarter light/heavy/push attack selection coming. ([url=https://github.com/hummat/BetterBots/issues/52]#52[/url])
-[*][b]Grenade and Assail aim still need broader field testing[/b] — the stabilization branch includes fixes for bot aim direction and smart-target seeding, but mixed-lineup in-game verification is still pending. ([url=https://github.com/hummat/BetterBots/issues/61]#61[/url], [url=https://github.com/hummat/BetterBots/issues/62]#62[/url])
 [*][b]Rumbler projectile arc visible[/b] — the Ogryn Rumbler's aim trajectory can be visible to the player when a bot aims it. ([url=https://github.com/hummat/BetterBots/issues/53]#53[/url])
 [/list]
 
