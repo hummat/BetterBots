@@ -41,6 +41,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		},
 		talents = {},
 	},
+	-- Cosmetics sourced from Darktide Seven (misc_bot_profiles.lua) and tutorial bots.
+	-- Each non-veteran class gets full body/gear overrides so the bot looks correct.
 	zealot = {
 		archetype = "zealot",
 		current_level = 1,
@@ -49,6 +51,22 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/powersword_2h_p1_m2",
 			slot_secondary = "content/items/weapons/player/ranged/flamer_p1_m1",
+		},
+		cosmetic_overrides = {
+			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",
+			slot_body_eye_color = "content/items/characters/player/eye_colors/eye_color_brown_02",
+			slot_body_face = "content/items/characters/player/human/faces/female_asian_face_02",
+			slot_body_face_hair = "content/items/characters/player/human/face_hair/female_facial_hair_base",
+			slot_body_face_scar = "content/items/characters/player/human/face_scars/empty_face_scar",
+			slot_body_face_tattoo = "content/items/characters/player/human/face_tattoo/empty_face_tattoo",
+			slot_body_hair = "content/items/characters/player/human/hair/hair_short_bobcut_a",
+			slot_body_hair_color = "content/items/characters/player/hair_colors/hair_color_black_02",
+			slot_body_skin_color = "content/items/characters/player/skin_colors/skin_color_asian_01",
+			slot_body_tattoo = "content/items/characters/player/human/body_tattoo/empty_body_tattoo",
+			slot_body_torso = "content/items/characters/player/human/attachment_base/female_torso",
+			slot_gear_head = "content/items/characters/player/human/gear_head/empty_headgear",
+			slot_gear_lowerbody = "content/items/characters/player/human/gear_lowerbody/d7_zealot_f_lowerbody",
+			slot_gear_upperbody = "content/items/characters/player/human/gear_upperbody/d7_zealot_f_upperbody",
 		},
 		bot_gestalts = {
 			melee = "linesman",
@@ -65,6 +83,22 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
 			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p4_m1",
 		},
+		cosmetic_overrides = {
+			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
+			slot_body_eye_color = "content/items/characters/player/eye_colors/eye_color_psyker_02",
+			slot_body_face = "content/items/characters/player/human/faces/male_african_face_01",
+			slot_body_face_hair = "content/items/characters/player/human/face_hair/empty_face_hair",
+			slot_body_face_scar = "content/items/characters/player/human/face_scars/empty_face_scar",
+			slot_body_face_tattoo = "content/items/characters/player/human/face_tattoo/face_tattoo_psyker_05",
+			slot_body_hair = "content/items/characters/player/human/hair/empty_hair",
+			slot_body_hair_color = "content/items/characters/player/hair_colors/hair_color_black_01",
+			slot_body_skin_color = "content/items/characters/player/skin_colors/skin_color_african_02",
+			slot_body_tattoo = "content/items/characters/player/human/body_tattoo/empty_body_tattoo",
+			slot_body_torso = "content/items/characters/player/human/gear_torso/empty_torso",
+			slot_gear_head = "content/items/characters/player/human/gear_head/d7_psyker_m_headgear",
+			slot_gear_lowerbody = "content/items/characters/player/human/gear_lowerbody/d7_psyker_m_lowerbody",
+			slot_gear_upperbody = "content/items/characters/player/human/gear_upperbody/d7_psyker_m_upperbody",
+		},
 		bot_gestalts = {
 			melee = "linesman",
 			ranged = "killshot",
@@ -79,6 +113,22 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/ogryn_powermaul_p1_m1",
 			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m2",
+		},
+		cosmetic_overrides = {
+			slot_body_arms = "content/items/characters/player/ogryn/attachment_base/male_arms",
+			slot_body_eye_color = "content/items/characters/player/eye_colors/eye_color_green_02",
+			slot_body_face = "content/items/characters/player/ogryn/attachment_base/male_face_caucasian_02",
+			slot_body_face_hair = "content/items/characters/player/ogryn/face_hair/ogryn_facial_hair_b_eyebrows",
+			slot_body_face_scar = "content/items/characters/player/human/face_scars/empty_face_scar",
+			slot_body_face_tattoo = "content/items/characters/player/ogryn/face_tattoo/face_tattoo_ogryn_01",
+			slot_body_hair = "content/items/characters/player/human/hair/empty_hair",
+			slot_body_hair_color = "content/items/characters/player/hair_colors/hair_color_brown_01",
+			slot_body_skin_color = "content/items/characters/player/skin_colors/skin_color_caucasian_02",
+			slot_body_tattoo = "content/items/characters/player/ogryn/body_tattoo/body_tattoo_ogryn_03",
+			slot_body_torso = "content/items/characters/player/ogryn/attachment_base/male_torso",
+			slot_gear_head = "content/items/characters/player/human/gear_head/empty_headgear",
+			slot_gear_lowerbody = "content/items/characters/player/ogryn/gear_lowerbody/d7_ogryn_lowerbody",
+			slot_gear_upperbody = "content/items/characters/player/ogryn/gear_upperbody/d7_ogryn_upperbody",
 		},
 		bot_gestalts = {
 			melee = "linesman",
@@ -166,7 +216,14 @@ local function _resolve_profile_template(class_name)
 	end
 	profile.archetype = archetype_table
 
-	-- Resolve weapon template strings to item objects (same as bot_character_profiles.lua)
+	-- Add cosmetic overrides (e.g. ogryn body meshes) to loadout for resolution
+	if template.cosmetic_overrides then
+		for slot_name, item_id in pairs(template.cosmetic_overrides) do
+			profile.loadout[slot_name] = item_id
+		end
+	end
+
+	-- Resolve all template strings to item objects (same as bot_character_profiles.lua)
 	for slot_name, item_id in pairs(profile.loadout) do
 		local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
 		profile.loadout[slot_name] = item
@@ -257,10 +314,33 @@ local function resolve_profile(profile)
 		profile.loadout_item_data.slot_primary = resolved.loadout_item_data.slot_primary
 		profile.loadout_item_data.slot_secondary = resolved.loadout_item_data.slot_secondary
 	end
+	-- Apply cosmetic slot overrides (e.g. ogryn body meshes)
+	local template = DEFAULT_PROFILE_TEMPLATES[choice]
+	if template and template.cosmetic_overrides then
+		for slot_name in pairs(template.cosmetic_overrides) do
+			if resolved.loadout[slot_name] then
+				profile.loadout[slot_name] = resolved.loadout[slot_name]
+				if resolved.loadout_item_ids and resolved.loadout_item_ids[slot_name] then
+					profile.loadout_item_ids[slot_name] = resolved.loadout_item_ids[slot_name]
+				end
+				if resolved.loadout_item_data and resolved.loadout_item_data[slot_name] then
+					profile.loadout_item_data[slot_name] = resolved.loadout_item_data[slot_name]
+				end
+			end
+		end
+	end
+
 	-- visual_loadout mirrors loadout for package resolution
 	if profile.visual_loadout then
 		profile.visual_loadout.slot_primary = resolved.loadout.slot_primary
 		profile.visual_loadout.slot_secondary = resolved.loadout.slot_secondary
+		if template and template.cosmetic_overrides then
+			for slot_name in pairs(template.cosmetic_overrides) do
+				if resolved.loadout[slot_name] then
+					profile.visual_loadout[slot_name] = resolved.loadout[slot_name]
+				end
+			end
+		end
 	end
 
 	if _debug_enabled() then
