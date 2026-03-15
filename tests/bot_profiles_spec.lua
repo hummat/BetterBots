@@ -4,7 +4,11 @@
 -- Returns nil for game-only modules so resolve_profile gracefully fails without crashing.
 local _original_require = require
 rawset(_G, "require", function(modname)
-	if modname == "scripts/backend/master_items" or modname == "scripts/utilities/local_profile_backend_parser" then
+	if
+		modname == "scripts/backend/master_items"
+		or modname == "scripts/utilities/local_profile_backend_parser"
+		or modname == "scripts/settings/archetype/archetypes"
+	then
 		return nil
 	end
 	return _original_require(modname)

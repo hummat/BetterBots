@@ -129,8 +129,9 @@ local function _resolve_profile_template(class_name)
 
 	local MasterItems = require("scripts/backend/master_items")
 	local LocalProfileBackendParser = require("scripts/utilities/local_profile_backend_parser")
+	local Archetypes = require("scripts/settings/archetype/archetypes")
 
-	if not MasterItems or not LocalProfileBackendParser then
+	if not MasterItems or not LocalProfileBackendParser or not Archetypes then
 		return nil
 	end
 
@@ -149,14 +150,35 @@ local function _resolve_profile_template(class_name)
 
 	local profile = _deep_copy_profile(template)
 
+	-- Resolve archetype string to the Archetypes table entry.
+	-- The spawning pipeline (package_synchronizer_client) reads archetype.name,
+	-- so it must be the resolved table, not the raw string.
+	local archetype_table = Archetypes[template.archetype]
+	if not archetype_table then
+		if _debug_enabled() then
+			_debug_log(
+				"bot_profiles:bad_archetype",
+				0,
+				"unknown archetype '" .. tostring(template.archetype) .. "' for " .. class_name
+			)
+		end
+		return nil
+	end
+	profile.archetype = archetype_table
+
 	-- Resolve weapon template strings to item objects (same as bot_character_profiles.lua)
 	for slot_name, item_id in pairs(profile.loadout) do
 		local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
 		profile.loadout[slot_name] = item
 	end
 
-	-- Run parse_profile to inject base talents and build loadout metadata
+	-- Run parse_profile to inject base talents and build loadout metadata.
+	-- Note: parse_profile reads profile.archetype as a string for the archetype name,
+	-- but we've already resolved it to a table. Save and restore.
+	local saved_archetype = profile.archetype
+	profile.archetype = template.archetype -- string for parse_profile
 	LocalProfileBackendParser.parse_profile(profile, "betterbots_" .. class_name)
+	profile.archetype = saved_archetype -- restore table for spawning pipeline
 
 	_resolved_profiles[class_name] = profile
 
