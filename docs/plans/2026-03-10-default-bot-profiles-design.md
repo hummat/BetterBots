@@ -1,8 +1,8 @@
 # Default Bot Profiles Design
 
 > Date: 2026-03-10
-> Status: Approved
-> Issue: #44 (pending creation)
+> Status: Shipped (v0.8.0, 2026-03-15)
+> Issue: #45
 > Related: #28 (Tertium consolidation — shares hook point, complementary feature)
 
 ## Problem
@@ -60,15 +60,20 @@ Bot Slot 3: [None | Default Veteran | Default Zealot | Default Psyker | Default 
 
 Estimated ~150-200 LOC new code. No changes to existing ability/metadata/heuristics code.
 
-### Compatibility
+### Compatibility (resolved)
 
-- **With Tertium4Or5/Tertium6**: Both mods hook the same `add_bot` path. When both are active, hook execution order determines which profile wins. Document that users should use one or the other for a given slot, not both.
+- **With Tertium4Or5/Tertium6**: Complementary, not conflicting. BetterBots yields when `profile.archetype` is non-veteran (Tertium already assigned a real player character). BetterBots fills gaps for slots Tertium doesn't cover. Hook order doesn't matter.
 - **With #28**: When #28 lands, it extends the dropdown options with `Player Character 1..N` and adds a backend fetch path. Same hook, same settings UI, different profile source.
 
-### Risks
+### Implementation notes (discovered during development)
 
-- **Item data format**: `MasterItems.get_item_or_fallback()` may expect more than a template name string. Tertium proves this path works with player weapon templates, but the exact format needs verification during implementation.
-- **Cosmetic slots**: Minimal cosmetics may look odd. Can be refined later or combined with fancy_bots.
+- **Item resolution required**: loadout slots in `add_bot` contain resolved item objects, not template ID strings. `bot_character_profiles.lua` resolves items at require-time before profiles reach `add_bot`. Our templates must go through the same `MasterItems.get_item_or_fallback()` + `LocalProfileBackendParser.parse_profile()` pipeline.
+- **Archetype must be a resolved table**: `package_synchronizer_client` reads `profile.archetype.name` (table field). Resolve via `Archetypes[archetype_string]`. `parse_profile` reads archetype as a string — save/restore around the call.
+- **In-place mutation, not replacement**: the vanilla profile carries cosmetic slots, body data, and visual_loadout. Deep-copying breaks item objects (they're MasterItems cache references). Mutate gameplay fields only.
+- **visual_loadout must be updated**: `package_synchronizer_client` iterates it for package resolution. Mirror weapon/cosmetic changes.
+- **Ogryn needs different body meshes**: uses `content/items/characters/player/ogryn/...`. All non-veteran classes get full cosmetic overrides from Darktide Seven / tutorial bot profiles.
+- **Talents are NOT a hard constraint**: `talents = {}` is a vanilla design choice, not an engine limitation. Tertium's backend profiles include talents and the engine processes them. Future: populate from hadrons-blessing builds.
+- **Curios are a no-op**: `slot_trinket_1` has `ignore_character_spawning = true` — not processed during bot spawn.
 
 ### Downstream support already in place
 

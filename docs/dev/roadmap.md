@@ -57,7 +57,8 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|-------|-------|
 | 57 | Toggle safety audit | **Done.** `is_togglable = false` — singleton mutations can't be reverted by DMF. |
 | 6 | Settings control surface | **Done.** Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature gates (sprint/pinging/special_penalty/poxburster), veteran dual-category gate. |
-| 45 | Default class profiles | **Done.** 4-class profiles (Veteran/Zealot/Psyker/Ogryn) with hadrons-blessing weapon picks. `BotSynchronizerHost.add_bot` hook + 3 per-slot dropdowns. |
+| 45 | Default class profiles | **Done.** 4-class profiles (Veteran/Zealot/Psyker/Ogryn) with hadrons-blessing weapon picks, per-class cosmetics, Tertium compat. `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns. |
+| 63 | Enrich profiles with talents & blessings | Populate `profile.talents` from hadrons-blessing builds (Phase 1). Construct gear tables with weapon blessings/perks (Phase 2). Blocks v0.8.0 release. |
 | 60 | Simplify heuristic dispatch | Refactor `fn(context)` signature — pays down tech debt before settings adds more call sites. |
 | 59 | Grenade fallback logging | Per-stage lifecycle events (queued/stage/complete/failed) matching item_fallback pattern. |
 
