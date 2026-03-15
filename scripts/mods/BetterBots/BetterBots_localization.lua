@@ -168,19 +168,19 @@ return {
 		en = "Bot slot 1",
 	},
 	bot_slot_1_profile_description = {
-		en = "Class for the first bot that spawns. None = vanilla veteran.",
+		en = "Class for the first bot. Tertium4Or5 characters take priority when installed. None = vanilla veteran.",
 	},
 	bot_slot_2_profile = {
 		en = "Bot slot 2",
 	},
 	bot_slot_2_profile_description = {
-		en = "Class for the second bot that spawns. None = vanilla veteran.",
+		en = "Class for the second bot. Tertium4Or5 characters take priority when installed. None = vanilla veteran.",
 	},
 	bot_slot_3_profile = {
 		en = "Bot slot 3",
 	},
 	bot_slot_3_profile_description = {
-		en = "Class for the third bot that spawns. None = vanilla veteran.",
+		en = "Class for the third bot. Tertium4Or5 characters take priority when installed. None = vanilla veteran.",
 	},
 	bot_profile_none = {
 		en = "None (vanilla veteran)",

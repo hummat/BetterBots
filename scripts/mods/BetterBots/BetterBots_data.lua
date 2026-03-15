@@ -93,7 +93,7 @@ return {
 					{
 						setting_id = "bot_slot_1_profile",
 						type = "dropdown",
-						default_value = "none",
+						default_value = "zealot",
 						options = {
 							{ text = "bot_profile_none", value = "none" },
 							{ text = "bot_profile_veteran", value = "veteran" },
@@ -105,7 +105,7 @@ return {
 					{
 						setting_id = "bot_slot_2_profile",
 						type = "dropdown",
-						default_value = "none",
+						default_value = "psyker",
 						options = {
 							{ text = "bot_profile_none", value = "none" },
 							{ text = "bot_profile_veteran", value = "veteran" },
@@ -117,7 +117,7 @@ return {
 					{
 						setting_id = "bot_slot_3_profile",
 						type = "dropdown",
-						default_value = "none",
+						default_value = "ogryn",
 						options = {
 							{ text = "bot_profile_none", value = "none" },
 							{ text = "bot_profile_veteran", value = "veteran" },
