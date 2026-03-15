@@ -352,19 +352,7 @@ end
 
 local function register_hooks()
 	_mod:hook("BotSynchronizerHost", "add_bot", function(func, self, local_player_id, profile)
-		local resolved, swapped = resolve_profile(profile)
-		local archetype_raw = profile.archetype
-		local archetype_display = type(archetype_raw) == "table"
-				and (archetype_raw.name or archetype_raw.archetype_name or "table")
-			or tostring(archetype_raw)
-		_mod:echo(
-			"BetterBots: add_bot slot "
-				.. tostring(_spawn_counter)
-				.. " archetype="
-				.. archetype_display
-				.. " swapped="
-				.. tostring(swapped)
-		)
+		local resolved = resolve_profile(profile)
 		return func(self, local_player_id, resolved)
 	end)
 end
