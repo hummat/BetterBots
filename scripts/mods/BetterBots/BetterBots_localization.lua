@@ -20,7 +20,7 @@ return {
 		en = "Stance abilities",
 	},
 	enable_stances_description = {
-		en = "Self-buff abilities (Veteran Focus, Psyker Overcharge, Ogryn Gunlugger, Arbites Stance)",
+		en = "Self-buff abilities: Veteran Focus, Psyker Overcharge, Ogryn Gunlugger, Arbites/Hive Scum Stances",
 	},
 	enable_charges = {
 		en = "Charge & dash abilities",
@@ -32,13 +32,13 @@ return {
 		en = "Shout abilities",
 	},
 	enable_shouts_description = {
-		en = "Area-of-effect abilities (Psyker Shriek, Ogryn Taunt, Arbites Shout)",
+		en = "Crowd control and team buff shouts: Psyker Shriek, Ogryn Taunt, Veteran Voice of Command, Arbites Shout",
 	},
 	enable_stealth = {
 		en = "Stealth abilities",
 	},
 	enable_stealth_description = {
-		en = "Invisibility and stealth abilities (Veteran Stealth, Zealot Invisibility)",
+		en = "Bots can go invisible to reposition or rescue downed allies: Veteran Stealth, Zealot Invisibility",
 	},
 	enable_deployables = {
 		en = "Deployable abilities",
@@ -50,7 +50,7 @@ return {
 		en = "Grenades & blitz",
 	},
 	enable_grenades_description = {
-		en = "All throwable and blitz abilities",
+		en = "All grenade types (frag, krak, smoke, shock, fire) and Psyker blitz (Assail, Smite, Chain Lightning)",
 	},
 	-- Behavior preset
 	behavior_profile = {
@@ -85,7 +85,7 @@ return {
 		en = "Bots ping elites and specials they detect",
 	},
 	enable_special_penalty = {
-		en = "Prioritize shooting distant specials",
+		en = "Distant special targeting",
 	},
 	enable_special_penalty_description = {
 		en = "Bots prefer ranged attacks against distant specials instead of charging into melee",
@@ -100,6 +100,9 @@ return {
 	healing_deferral_mode = {
 		en = "Healing deferral mode",
 	},
+	healing_deferral_mode_description = {
+		en = "Bots defer healing pickups to human players. Off = bots heal freely.",
+	},
 	healing_deferral_mode_off = {
 		en = "Off",
 	},
@@ -110,10 +113,16 @@ return {
 		en = "Health stations and med-crates",
 	},
 	healing_deferral_human_threshold = {
-		en = "Defer when any player is below",
+		en = "Deferral threshold",
+	},
+	healing_deferral_human_threshold_description = {
+		en = "Bots step aside and let humans heal first when any human player's health is below this threshold.",
 	},
 	healing_deferral_emergency_threshold = {
-		en = "Bot emergency override below",
+		en = "Emergency override",
+	},
+	healing_deferral_emergency_threshold_description = {
+		en = "Bots ignore deferral and heal themselves when their own health drops below this threshold.",
 	},
 	healing_deferral_threshold_10 = {
 		en = "10%% health",
@@ -143,6 +152,9 @@ return {
 	enable_debug_logs = {
 		en = "Debug log level",
 	},
+	enable_debug_logs_description = {
+		en = "Controls how much BetterBots logs to the console. Higher levels produce more output.",
+	},
 	debug_log_level_off = {
 		en = "Off",
 	},
@@ -156,9 +168,15 @@ return {
 		en = "Trace - everything including per-frame diagnostics",
 	},
 	enable_event_log = {
-		en = "Enable event log (JSONL)",
+		en = "Event log",
+	},
+	enable_event_log_description = {
+		en = "Write structured ability events (JSONL) to binaries/dump/. Analyze with bb-log commands.",
 	},
 	enable_perf_timing = {
-		en = "Enable runtime timing (/bb_perf to read/reset)",
+		en = "Performance timing",
+	},
+	enable_perf_timing_description = {
+		en = "Track per-module execution times. Use /bb_perf in chat to view and reset.",
 	},
 }
