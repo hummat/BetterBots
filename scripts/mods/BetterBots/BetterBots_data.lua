@@ -85,6 +85,49 @@ return {
 					},
 				},
 			},
+			-- Group: Bot Profiles
+			{
+				setting_id = "bot_profiles_group",
+				type = "group",
+				sub_widgets = {
+					{
+						setting_id = "bot_slot_1_profile",
+						type = "dropdown",
+						default_value = "none",
+						options = {
+							{ text = "bot_profile_none", value = "none" },
+							{ text = "bot_profile_veteran", value = "veteran" },
+							{ text = "bot_profile_zealot", value = "zealot" },
+							{ text = "bot_profile_psyker", value = "psyker" },
+							{ text = "bot_profile_ogryn", value = "ogryn" },
+						},
+					},
+					{
+						setting_id = "bot_slot_2_profile",
+						type = "dropdown",
+						default_value = "none",
+						options = {
+							{ text = "bot_profile_none", value = "none" },
+							{ text = "bot_profile_veteran", value = "veteran" },
+							{ text = "bot_profile_zealot", value = "zealot" },
+							{ text = "bot_profile_psyker", value = "psyker" },
+							{ text = "bot_profile_ogryn", value = "ogryn" },
+						},
+					},
+					{
+						setting_id = "bot_slot_3_profile",
+						type = "dropdown",
+						default_value = "none",
+						options = {
+							{ text = "bot_profile_none", value = "none" },
+							{ text = "bot_profile_veteran", value = "veteran" },
+							{ text = "bot_profile_zealot", value = "zealot" },
+							{ text = "bot_profile_psyker", value = "psyker" },
+							{ text = "bot_profile_ogryn", value = "ogryn" },
+						},
+					},
+				},
+			},
 			-- Group: Diagnostics
 			{
 				setting_id = "diagnostics_group",

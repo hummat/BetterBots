@@ -12,6 +12,9 @@ return {
 	bot_behavior_group = {
 		en = "Bot Behavior",
 	},
+	bot_profiles_group = {
+		en = "Bot Profiles",
+	},
 	diagnostics_group = {
 		en = "Diagnostics",
 	},
@@ -159,6 +162,40 @@ return {
 	},
 	healing_deferral_emergency_never = {
 		en = "Never override (bots may die)",
+	},
+	-- Bot profiles
+	bot_slot_1_profile = {
+		en = "Bot slot 1",
+	},
+	bot_slot_1_profile_description = {
+		en = "Class for the first bot that spawns. None = vanilla veteran.",
+	},
+	bot_slot_2_profile = {
+		en = "Bot slot 2",
+	},
+	bot_slot_2_profile_description = {
+		en = "Class for the second bot that spawns. None = vanilla veteran.",
+	},
+	bot_slot_3_profile = {
+		en = "Bot slot 3",
+	},
+	bot_slot_3_profile_description = {
+		en = "Class for the third bot that spawns. None = vanilla veteran.",
+	},
+	bot_profile_none = {
+		en = "None (vanilla veteran)",
+	},
+	bot_profile_veteran = {
+		en = "Veteran - Plasma Gun + Devil's Claw Sword",
+	},
+	bot_profile_zealot = {
+		en = "Zealot - Purgation Flamer + Relic Blade",
+	},
+	bot_profile_psyker = {
+		en = "Psyker - Voidblast Staff + Force Greatsword",
+	},
+	bot_profile_ogryn = {
+		en = "Ogryn - Rumbler + Power Maul",
 	},
 	-- Diagnostics
 	enable_debug_logs = {

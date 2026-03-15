@@ -57,7 +57,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|-------|-------|
 | 57 | Toggle safety audit | **Done.** `is_togglable = false` — singleton mutations can't be reverted by DMF. |
 | 6 | Settings control surface | **Done.** Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature gates (sprint/pinging/special_penalty/poxburster), veteran dual-category gate. |
-| 45 | Default class profiles | Hardcoded Zealot/Psyker/Ogryn/Veteran profiles for players without leveled characters. ~150-200 LOC, design doc ready. |
+| 45 | Default class profiles | **Done.** 4-class profiles (Veteran/Zealot/Psyker/Ogryn) with hadrons-blessing weapon picks. `BotSynchronizerHost.add_bot` hook + 3 per-slot dropdowns. |
 | 60 | Simplify heuristic dispatch | Refactor `fn(context)` signature — pays down tech debt before settings adds more call sites. |
 | 59 | Grenade fallback logging | Per-stage lifecycle events (queued/stage/complete/failed) matching item_fallback pattern. |
 

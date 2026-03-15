@@ -209,9 +209,18 @@ assert(PingSystem, "BetterBots: failed to load ping_system module")
 local HealingDeferral = mod:io_dofile("BetterBots/scripts/mods/BetterBots/healing_deferral")
 assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 
+local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
+assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
+
 -- Init each module with its dependencies
 Settings.init({
 	mod = mod,
+})
+
+BotProfiles.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 })
 
 MetaData.init({
@@ -503,6 +512,7 @@ WeaponAction.register_hooks({
 })
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
+BotProfiles.register_hooks()
 
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
@@ -924,6 +934,7 @@ function mod.on_game_state_changed(status, state)
 	if status == "enter" and state == "GameplayStateRun" then
 		_refresh_debug_log_level()
 		Perf.enter_run()
+		BotProfiles.reset()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil
 		end
@@ -963,6 +974,6 @@ end
 -- All modules are assert-guarded above; if any failed to load we'd have
 -- crashed already.  The count serves as a deployment sanity check in logs.
 -- Bump when adding/removing modules.
-local _MODULE_COUNT = 25
+local _MODULE_COUNT = 26
 mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
