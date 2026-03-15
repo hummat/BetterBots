@@ -291,6 +291,15 @@ local function _resolve_veteran_class_tag(ability_extension)
 	return nil, "unknown"
 end
 
+-- Per-preset threshold tables: aggressive fires abilities at first sign of pressure
+-- (accepts resource waste), balanced is the default, conservative holds for genuine
+-- emergencies (risks missed opportunities). The "testing" preset has no threshold
+-- entries — it intentionally falls back to "balanced" thresholds via the
+-- `or table.balanced` pattern, then the testing profile override in
+-- _apply_behavior_profile loosens decisions post-heuristic.
+-- Templates without preset-varying thresholds (broker_focus, broker_punk_rage,
+-- broker_ability_stimm_field) take only (context) — the extra thresholds arg is
+-- silently ignored by Lua.
 local VETERAN_VOC_THRESHOLDS = {
 	aggressive = {
 		surrounded = 2,
@@ -1163,58 +1172,27 @@ local function _can_activate_stimm_field(context)
 	return false, "stimm_hold"
 end
 
+-- Template heuristic dispatch: fn(context, thresholds) -> can_activate, rule
+-- veteran_combat_ability is dispatched separately in _evaluate_template_heuristic
+-- because it needs the full condition_patch args.
 local TEMPLATE_HEURISTICS = {
-	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_veteran_stealth(context, thresholds)
-	end,
-	zealot_dash = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_zealot_dash(context, thresholds)
-	end,
-	zealot_targeted_dash = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_zealot_dash(context, thresholds)
-	end,
-	zealot_targeted_dash_improved = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_zealot_dash(context, thresholds)
-	end,
-	zealot_targeted_dash_improved_double = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_zealot_dash(context, thresholds)
-	end,
-	zealot_invisibility = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_zealot_invisibility(context, thresholds)
-	end,
-	psyker_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_psyker_shout(context, thresholds)
-	end,
-	psyker_overcharge_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_psyker_stance(context, thresholds)
-	end,
-	ogryn_charge = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_ogryn_charge(context, thresholds)
-	end,
-	ogryn_charge_increased_distance = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_ogryn_charge(context, thresholds)
-	end,
-	ogryn_taunt_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_ogryn_taunt(context, thresholds)
-	end,
-	ogryn_gunlugger_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_ogryn_gunlugger(context, thresholds)
-	end,
-	adamant_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_adamant_stance(context, thresholds)
-	end,
-	adamant_charge = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_adamant_charge(context, thresholds)
-	end,
-	adamant_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
-		return _can_activate_adamant_shout(context, thresholds)
-	end,
-	broker_focus = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_broker_focus(context)
-	end,
-	broker_punk_rage = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_broker_rage(context)
-	end,
+	veteran_stealth_combat_ability = _can_activate_veteran_stealth,
+	zealot_dash = _can_activate_zealot_dash,
+	zealot_targeted_dash = _can_activate_zealot_dash,
+	zealot_targeted_dash_improved = _can_activate_zealot_dash,
+	zealot_targeted_dash_improved_double = _can_activate_zealot_dash,
+	zealot_invisibility = _can_activate_zealot_invisibility,
+	psyker_shout = _can_activate_psyker_shout,
+	psyker_overcharge_stance = _can_activate_psyker_stance,
+	ogryn_charge = _can_activate_ogryn_charge,
+	ogryn_charge_increased_distance = _can_activate_ogryn_charge,
+	ogryn_taunt_shout = _can_activate_ogryn_taunt,
+	ogryn_gunlugger_stance = _can_activate_ogryn_gunlugger,
+	adamant_stance = _can_activate_adamant_stance,
+	adamant_charge = _can_activate_adamant_charge,
+	adamant_shout = _can_activate_adamant_shout,
+	broker_focus = _can_activate_broker_focus,
+	broker_punk_rage = _can_activate_broker_rage,
 }
 
 local HEURISTIC_THRESHOLDS = {
@@ -1525,18 +1503,7 @@ local function _evaluate_template_heuristic(
 	local threshold_table = HEURISTIC_THRESHOLDS[ability_template_name]
 	local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
 
-	return fn(
-		conditions,
-		unit,
-		blackboard,
-		scratchpad,
-		condition_args,
-		action_data,
-		is_running,
-		ability_extension,
-		context,
-		thresholds
-	)
+	return fn(context, thresholds)
 end
 
 local function _testing_profile_active(opts)
@@ -1622,8 +1589,8 @@ local function _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
 -- Centralized decision evaluation with nil→fallback resolution.
--- Replaces the pattern previously duplicated in _can_activate_ability,
--- _fallback_try_queue_combat_ability, and _resolve_current_heuristic_decision.
+-- Replaces the pattern previously duplicated in condition_patch._can_activate_ability
+-- and ability_queue._fallback_try_queue_combat_ability.
 local function resolve_decision(
 	ability_template_name,
 	conditions,
@@ -1710,7 +1677,7 @@ local function evaluate_heuristic(template_name, context, opts)
 
 	local threshold_table = HEURISTIC_THRESHOLDS[template_name]
 	local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
-	local can_activate, rule = fn(nil, nil, nil, nil, nil, nil, nil, nil, context, thresholds)
+	local can_activate, rule = fn(context, thresholds)
 	context.preset = saved_preset
 	return _apply_behavior_profile(can_activate, rule, context, opts)
 end

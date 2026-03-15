@@ -244,6 +244,8 @@ describe("settings", function()
 			assert.is_true(Settings.is_feature_enabled("pinging"))
 			assert.is_true(Settings.is_feature_enabled("special_penalty"))
 			assert.is_true(Settings.is_feature_enabled("poxburster"))
+			assert.is_true(Settings.is_feature_enabled("melee_improvements"))
+			assert.is_true(Settings.is_feature_enabled("ranged_improvements"))
 		end)
 
 		it("returns true for unknown feature names", function()
@@ -264,6 +266,16 @@ describe("settings", function()
 		it("gates poxburster feature correctly", function()
 			Settings.init(mock_mod({ enable_poxburster = false }))
 			assert.is_false(Settings.is_feature_enabled("poxburster"))
+		end)
+
+		it("gates melee_improvements feature correctly", function()
+			Settings.init(mock_mod({ enable_melee_improvements = false }))
+			assert.is_false(Settings.is_feature_enabled("melee_improvements"))
+		end)
+
+		it("gates ranged_improvements feature correctly", function()
+			Settings.init(mock_mod({ enable_ranged_improvements = false }))
+			assert.is_false(Settings.is_feature_enabled("ranged_improvements"))
 		end)
 	end)
 
@@ -287,8 +299,10 @@ describe("settings", function()
 			-- veteran_combat_ability is handled via dual-category gate, NOT in CATEGORY_ tables.
 			-- The test above would never find it in a CATEGORY_ block, but assert it's absent
 			-- to catch regressions.
-			assert.is_nil(template_names["veteran_combat_ability"],
-				"veteran_combat_ability must NOT appear in any CATEGORY_ table (uses dual-category gate)")
+			assert.is_nil(
+				template_names["veteran_combat_ability"],
+				"veteran_combat_ability must NOT appear in any CATEGORY_ table (uses dual-category gate)"
+			)
 
 			Heuristics.init({
 				fixed_time = function()
@@ -306,12 +320,16 @@ describe("settings", function()
 			})
 
 			for template_name in pairs(template_names) do
-				local result, rule = Heuristics.evaluate_heuristic(template_name, helper.make_context({
-					num_nearby = 1,
-				}), {
-					conditions = helper.make_conditions(false),
-					ability_extension = helper.make_veteran_ability_extension("ranger", template_name),
-				})
+				local result, rule = Heuristics.evaluate_heuristic(
+					template_name,
+					helper.make_context({
+						num_nearby = 1,
+					}),
+					{
+						conditions = helper.make_conditions(false),
+						ability_extension = helper.make_veteran_ability_extension("ranger", template_name),
+					}
+				)
 
 				assert.are_not.equal(
 					"fallback_unhandled_template",

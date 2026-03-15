@@ -92,7 +92,9 @@ local function _setting_enabled(setting_id)
 end
 
 -- Minimal veteran class_tag resolution for the dual-category gate.
--- Avoids circular dependency with heuristics.lua.
+-- Duplicates _resolve_veteran_class_tag from heuristics.lua because settings.lua
+-- is loaded before heuristics.lua and cannot import from it (heuristics.lua
+-- receives resolve_preset from settings.lua via init(), creating a mutual dependency).
 local function _veteran_class_tag(ability_extension)
 	local equipped = ability_extension and ability_extension._equipped_abilities
 	local combat = equipped and equipped.combat_ability
@@ -172,6 +174,9 @@ function M.is_grenade_enabled(_grenade_name)
 	return _setting_enabled("enable_grenades")
 end
 
+-- Feature gates are mod-internal constants (unlike template names, which come from
+-- game data). An unknown feature_name is always a bug — but we fail open to avoid
+-- crashing in production. The test suite validates all wired feature names.
 function M.is_feature_enabled(feature_name)
 	local setting_id = FEATURE_GATES[feature_name]
 	if not setting_id then

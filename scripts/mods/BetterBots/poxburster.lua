@@ -146,72 +146,36 @@ function M.register_hooks()
 				end
 
 				local perf_t0 = _perf and _perf.begin()
-				local suppress, reason =
-					_suppress_reason_for_target(perception_component.target_enemy, self_position, side)
-				if suppress then
-					perception_component.target_enemy = nil
-					perception_component.target_enemy_distance = math.huge
-					perception_component.target_enemy_type = "none"
+
+				local function try_suppress(field_name, log_suffix)
+					local suppress, reason =
+						_suppress_reason_for_target(perception_component[field_name], self_position, side)
+					if not suppress then
+						return
+					end
+
+					perception_component[field_name] = nil
+					if field_name == "target_enemy" then
+						perception_component.target_enemy_distance = math.huge
+						perception_component.target_enemy_type = "none"
+					end
 
 					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
 						_pox_suppress_logged[self_unit] = true
 						_debug_log(
-							"poxburster_suppress:" .. tostring(self_unit),
+							"poxburster_suppress" .. log_suffix .. ":" .. tostring(self_unit),
 							_fixed_time(),
-							"suppressed poxburster target (" .. tostring(reason) .. ")",
+							"suppressed poxburster " .. field_name .. " (" .. tostring(reason) .. ")",
 							nil,
 							"debug"
 						)
 					end
 				end
 
-				suppress, reason =
-					_suppress_reason_for_target(perception_component.opportunity_target_enemy, self_position, side)
-				if suppress then
-					perception_component.opportunity_target_enemy = nil
-					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
-						_pox_suppress_logged[self_unit] = true
-						_debug_log(
-							"poxburster_suppress_opp:" .. tostring(self_unit),
-							_fixed_time(),
-							"suppressed poxburster opportunity target (" .. tostring(reason) .. ")",
-							nil,
-							"debug"
-						)
-					end
-				end
-
-				suppress, reason =
-					_suppress_reason_for_target(perception_component.urgent_target_enemy, self_position, side)
-				if suppress then
-					perception_component.urgent_target_enemy = nil
-					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
-						_pox_suppress_logged[self_unit] = true
-						_debug_log(
-							"poxburster_suppress_urg:" .. tostring(self_unit),
-							_fixed_time(),
-							"suppressed poxburster urgent target (" .. tostring(reason) .. ")",
-							nil,
-							"debug"
-						)
-					end
-				end
-
-				suppress, reason =
-					_suppress_reason_for_target(perception_component.priority_target_enemy, self_position, side)
-				if suppress then
-					perception_component.priority_target_enemy = nil
-					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
-						_pox_suppress_logged[self_unit] = true
-						_debug_log(
-							"poxburster_suppress_pri:" .. tostring(self_unit),
-							_fixed_time(),
-							"suppressed poxburster priority target (" .. tostring(reason) .. ")",
-							nil,
-							"debug"
-						)
-					end
-				end
+				try_suppress("target_enemy", "")
+				try_suppress("opportunity_target_enemy", "_opp")
+				try_suppress("urgent_target_enemy", "_urg")
+				try_suppress("priority_target_enemy", "_pri")
 
 				if perf_t0 then
 					_perf.finish("poxburster.update_target_enemy", perf_t0)

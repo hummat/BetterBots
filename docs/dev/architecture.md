@@ -42,7 +42,7 @@ This mod targets bot ability activation in three paths:
 10. Per-template heuristics (via `heuristics.lua`):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
-    - `standard/testing` behavior profile: testing mode applies a narrow leniency override after heuristic evaluation across template, item, and grenade/blitz heuristics so bots produce validation events faster without bypassing hard safety/resource guards
+    - `testing/aggressive/balanced/conservative` behavior presets: per-template threshold tables control when abilities fire (aggressive = early, conservative = emergency-only). Testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing hard safety/resource guards
     - `enemy_breed` export for breed classification
 11. Settings surface (`settings.lua`):
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
@@ -51,7 +51,7 @@ This mod targets bot ability activation in three paths:
     - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
-    - `on_setting_changed` in `BetterBots.lua` calls `settings.lua` functions on every DMF setting change — no restart required
+    - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
 12. Structured JSONL event logging (`event_log.lua`):
     - opt-in via mod setting (`enable_event_log`)
     - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`

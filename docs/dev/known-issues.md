@@ -29,10 +29,9 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics: 15/18 validated (12 combat + 3 item), 1 N/A, 2 DLC-blocked. Thresholds loosened for testing.
-   - Thresholds are intentionally lenient (`de776f5`) to generate activation data during testing phase.
+5. Per-career heuristics: 15/18 validated (12 combat + 3 item), 1 N/A, 2 DLC-blocked.
+   - Production presets shipped in v0.8.0 (#6): per-template threshold tables for aggressive/balanced/conservative, with testing profile for validation. The "testing" preset uses intentionally lenient thresholds; production presets are calibrated per-heuristic.
    - Item heuristics added (#3): zealot_relic, psyker_force_field (3 variants), adamant_area_buff_drone, broker_ability_stimm_field. Replace coarse `enemies_in_proximity > 0` gate with per-ability rules using coherency, toughness, corruption, and ally state.
-   - Production presets (Balanced/Conservative) will be calibrated from this data (#6).
    - Meta builds research (`docs/classes/meta-builds-research.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
    - Use `/bb_decide` to inspect live decisions during play.
 

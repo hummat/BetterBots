@@ -549,9 +549,15 @@ mod:hook_require(
 				end
 
 				-- Category gate: block abilities disabled by settings (#6).
-				-- The generated BT selector (bt_bot_selector_node.lua) inlines
-				-- condition logic, bypassing our condition_patch gate. This enter
+				-- The generated BT selector (bt_bot_selector_node.lua, vanilla engine file)
+				-- inlines condition logic, bypassing our condition_patch gate. This enter
 				-- hook is the last check before the ability action starts.
+				-- NOTE: skipping func() means the BT node's enter() never initializes
+				-- scratchpad. If the BT framework still calls run() after a no-op enter(),
+				-- uninitialised scratchpad fields could cause nil-access errors. Verified
+				-- safe in v0.8.0 testing — the BT selector re-evaluates conditions each
+				-- frame, so a blocked node is not re-entered. If future Fatshark BT
+				-- changes break this assumption, add a scratchpad sentinel here.
 				local gate_comp_name = action_data and action_data.ability_component_name
 				if gate_comp_name then
 					local gate_unit_data = ScriptUnit.has_extension(unit, "unit_data_system")
@@ -566,13 +572,13 @@ mod:hook_require(
 									ScriptUnit.has_extension(unit, "ability_system")
 								)
 						if not enabled then
-							if _debug_enabled() then
-								_debug_log(
-									"bt_enter_blocked:" .. gate_template,
-									_fixed_time(),
-									"BT enter blocked " .. gate_template .. " (disabled by mod setting)"
-								)
-							end
+							_debug_log(
+								"bt_enter_blocked:" .. gate_template,
+								_fixed_time(),
+								"BT enter blocked " .. gate_template .. " (disabled by mod setting)",
+								nil,
+								"info"
+							)
 							return
 						end
 					end

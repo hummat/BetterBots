@@ -137,9 +137,7 @@ describe("poxburster", function()
 
 		local function run_hook_with_target(slot_name)
 			Poxburster.register_hooks()
-			assert.is_not_nil(
-				captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"]
-			)
+			assert.is_not_nil(captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"])
 
 			captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"]({})
 			assert.is_not_nil(captured_hook_safe)
@@ -171,7 +169,7 @@ describe("poxburster", function()
 			assert.equals("none", perception_component.target_enemy_type)
 			assert.equals(1, #debug_logs)
 			assert.equals("debug", debug_logs[1].level)
-			assert.matches("suppressed poxburster target %(near_human_player%)", debug_logs[1].message)
+			assert.matches("suppressed poxburster target_enemy %(near_human_player%)", debug_logs[1].message)
 		end)
 
 		it("suppresses poxbursters from all secondary perception slots", function()

@@ -65,72 +65,53 @@ function M.register_hooks()
 				local perf_t0 = _perf and _perf.begin()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
 
-				if _is_enabled and not _is_enabled() then
-					if perf_t0 then
-						_perf.finish("target_selection.slot_weight", perf_t0)
+				if not _is_enabled or _is_enabled() then
+					-- Issue #48: Boost score for player-tagged enemies
+					if score > 0 and target_unit and _has_human_player_tag(target_unit) then
+						score = score + PLAYER_TAG_BONUS
+						if _debug_enabled() then
+							_debug_log(
+								"target_sel_tag_boost:" .. tostring(target_unit),
+								_fixed_time(),
+								"boosting score for player-tagged "
+									.. tostring(target_breed.name)
+									.. " +"
+									.. PLAYER_TAG_BONUS
+							)
+						end
 					end
-					return score
+
+					-- Issue #19: Stop chasing distant specials for melee
+					-- If target is a special at >18m and bot has sufficient ammo (>50%),
+					-- massively penalize melee score. This forces the bot to either shoot it
+					-- or pick a closer target for melee.
+					local tags = target_breed.tags
+					local ammo_percent = nil
+					if target_distance_sq > CHASE_RANGE_SQ and tags and tags.special then
+						ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
+					end
+
+					if ammo_percent and ammo_percent > 0.5 then
+						if _debug_enabled() then
+							_debug_log(
+								"target_sel_penalty",
+								_fixed_time(),
+								"penalizing melee score for distant special "
+									.. tostring(target_breed.name)
+									.. " dist_sq="
+									.. target_distance_sq
+									.. " ammo="
+									.. ammo_percent
+							)
+						end
+						score = score - 100
+					end
 				end
 
-				-- Issue #48: Boost score for player-tagged enemies
-				if score > 0 and target_unit and _has_human_player_tag(target_unit) then
-					score = score + PLAYER_TAG_BONUS
-					if _debug_enabled() then
-						_debug_log(
-							"target_sel_tag_boost:" .. tostring(target_unit),
-							_fixed_time(),
-							"boosting score for player-tagged "
-								.. tostring(target_breed.name)
-								.. " +"
-								.. PLAYER_TAG_BONUS
-						)
-					end
-				end
-
-				-- Issue #19: Stop chasing distant specials for melee
-				-- If target is a special at >18m and bot has sufficient ammo (>50%),
-				-- massively penalize melee score. This forces the bot to either shoot it
-				-- or pick a closer target for melee.
-				if target_distance_sq <= CHASE_RANGE_SQ then
-					if perf_t0 then
-						_perf.finish("target_selection.slot_weight", perf_t0)
-					end
-					return score
-				end
-
-				local tags = target_breed.tags
-				if not (tags and tags.special) then
-					if perf_t0 then
-						_perf.finish("target_selection.slot_weight", perf_t0)
-					end
-					return score
-				end
-
-				local ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
-				if not (ammo_percent and ammo_percent > 0.5) then
-					if perf_t0 then
-						_perf.finish("target_selection.slot_weight", perf_t0)
-					end
-					return score
-				end
-
-				if _debug_enabled() then
-					_debug_log(
-						"target_sel_penalty",
-						_fixed_time(),
-						"penalizing melee score for distant special "
-							.. tostring(target_breed.name)
-							.. " dist_sq="
-							.. target_distance_sq
-							.. " ammo="
-							.. ammo_percent
-					)
-				end
-				-- Massive penalty to ensure melee_score loses to ranged_score
 				if perf_t0 then
 					_perf.finish("target_selection.slot_weight", perf_t0)
 				end
-				return score - 100
+				return score
 			end
 		)
 
@@ -138,41 +119,31 @@ function M.register_hooks()
 			local perf_t0 = _perf and _perf.begin()
 			local weight, override = func(unit, target_unit, target_breed, t)
 
-			if _is_enabled and not _is_enabled() then
-				if perf_t0 then
-					_perf.finish("target_selection.monster_weight", perf_t0)
+			if not _is_enabled or _is_enabled() then
+				local tags = target_breed and target_breed.tags or nil
+
+				if
+					tags
+					and tags.monster
+					and (not weight or weight <= 0)
+					and _is_monster_targeting_unit(target_unit, unit)
+				then
+					if _debug_enabled() then
+						_debug_log(
+							"boss_targeting_bot",
+							_fixed_time(),
+							"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
+						)
+					end
+					weight = DEFAULT_MONSTER_WEIGHT
+					override = false
 				end
-				return weight, override
-			end
-
-			local tags = target_breed and target_breed.tags or nil
-
-			if not (tags and tags.monster) or (weight and weight > 0) then
-				if perf_t0 then
-					_perf.finish("target_selection.monster_weight", perf_t0)
-				end
-				return weight, override
-			end
-
-			if not _is_monster_targeting_unit(target_unit, unit) then
-				if perf_t0 then
-					_perf.finish("target_selection.monster_weight", perf_t0)
-				end
-				return weight, override
-			end
-
-			if _debug_enabled() then
-				_debug_log(
-					"boss_targeting_bot",
-					_fixed_time(),
-					"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
-				)
 			end
 
 			if perf_t0 then
 				_perf.finish("target_selection.monster_weight", perf_t0)
 			end
-			return DEFAULT_MONSTER_WEIGHT, false
+			return weight, override
 		end)
 	end)
 end
