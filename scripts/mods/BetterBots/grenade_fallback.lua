@@ -10,8 +10,8 @@ local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled
 local _fixed_time
-local _event_log -- luacheck: ignore 231 — TODO: emit grenade_queued/grenade_complete events
-local _bot_slot_for_unit -- luacheck: ignore 231 — TODO: include in EventLog emissions
+local _event_log
+local _bot_slot_for_unit
 local _is_suppressed
 
 -- Late-bound cross-module refs (set via wire)
@@ -266,6 +266,7 @@ local function _reset_state(unit, state, next_try_t)
 	state.last_blocked_foreign_input = nil
 	state.aim_unit = nil
 	state.aim_distance = nil
+	state.attempt_id = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
 	end
@@ -443,6 +444,30 @@ local function _emit_grenade_decision(unit, grenade_name, should_throw, rule, co
 	)
 end
 
+local function _emit_grenade_event(event_type, unit, grenade_name, state, fixed_t, extra)
+	if not _event_log or not _event_log.is_enabled() then
+		return
+	end
+
+	local ev = {
+		t = fixed_t,
+		event = event_type,
+		bot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or nil,
+		ability = grenade_name,
+		stage = state.stage,
+		attempt_id = state.attempt_id,
+		source = "grenade",
+	}
+
+	if extra then
+		for k, v in pairs(extra) do
+			ev[k] = v
+		end
+	end
+
+	_event_log.emit(ev)
+end
+
 local function try_queue(unit, blackboard)
 	local fixed_t = _fixed_time()
 
@@ -467,6 +492,7 @@ local function try_queue(unit, blackboard)
 				"grenade aborted stage=" .. tostring(state.stage) .. ": unit_data_system missing"
 			)
 		end
+		_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "unit_data_missing" })
 		_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
@@ -477,6 +503,7 @@ local function try_queue(unit, blackboard)
 	if state.stage and state.stage ~= "wait_unwield" then
 		active_context = _build_context(unit, blackboard)
 		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "aim_lost" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -488,6 +515,7 @@ local function try_queue(unit, blackboard)
 				state.stage = "wait_unwield"
 				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 				state.unwield_requested_t = nil
+				_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t)
 				if _debug_enabled() then
 					_debug_log(
 						"grenade_auto_fire:" .. tostring(unit),
@@ -503,6 +531,7 @@ local function try_queue(unit, blackboard)
 						"grenade auto-fire complete without stable grenade slot (slot=" .. tostring(wielded_slot) .. ")"
 					)
 				end
+				_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "auto_fire" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
@@ -515,6 +544,7 @@ local function try_queue(unit, blackboard)
 				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 				state.release_t = fixed_t
 				state.unwield_requested_t = nil
+				_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t)
 				if _debug_enabled() then
 					_debug_log(
 						"grenade_auto_fire:" .. tostring(unit),
@@ -525,6 +555,7 @@ local function try_queue(unit, blackboard)
 			else
 				state.stage = "wait_aim"
 				state.wait_t = fixed_t + AIM_DELAY_S
+				_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t)
 				if _debug_enabled() then
 					_debug_log(
 						"grenade_wield_ok:" .. tostring(unit),
@@ -544,6 +575,7 @@ local function try_queue(unit, blackboard)
 					"grenade wield timeout, resetting with retry"
 				)
 			end
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "wield_timeout" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
@@ -559,6 +591,7 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during aim (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "lost_wield" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -574,6 +607,14 @@ local function try_queue(unit, blackboard)
 						"grenade aim aborted after revalidation (rule=" .. tostring(rule) .. ")"
 					)
 				end
+				_emit_grenade_event(
+					"blocked",
+					unit,
+					state.grenade_name,
+					state,
+					fixed_t,
+					{ reason = "revalidation", rule = rule }
+				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
@@ -593,6 +634,7 @@ local function try_queue(unit, blackboard)
 				state.release_t = fixed_t
 				state.unwield_requested_t = nil
 			end
+			_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t, { input = aim })
 			if _debug_enabled() then
 				_debug_log("grenade_aim:" .. tostring(unit), fixed_t, "grenade queued " .. aim)
 			end
@@ -610,6 +652,7 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during followup (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "lost_wield" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -626,6 +669,14 @@ local function try_queue(unit, blackboard)
 				state.release_t = fixed_t
 				state.unwield_requested_t = nil
 			end
+			_emit_grenade_event(
+				"grenade_stage",
+				unit,
+				state.grenade_name,
+				state,
+				fixed_t,
+				{ input = tostring(followup) }
+			)
 			if _debug_enabled() then
 				_debug_log("grenade_followup:" .. tostring(unit), fixed_t, "grenade queued " .. tostring(followup))
 			end
@@ -643,6 +694,7 @@ local function try_queue(unit, blackboard)
 					"grenade lost wield during throw (slot=" .. tostring(wielded_slot) .. ")"
 				)
 			end
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "lost_wield" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -654,6 +706,7 @@ local function try_queue(unit, blackboard)
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 			state.release_t = fixed_t
 			state.unwield_requested_t = nil
+			_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t, { input = release })
 			if _debug_enabled() then
 				local component_state = state.component and _describe_action_component_state(unit, state.component)
 					or ""
@@ -680,8 +733,9 @@ local function try_queue(unit, blackboard)
 		-- Just wait for charge confirmation or timeout, then reset.
 		if state.component then
 			if _has_confirmed_charge(state, unit) or fixed_t >= (state.deadline_t or 0) then
+				local charge_ok = _has_confirmed_charge(state, unit)
 				if _debug_enabled() then
-					local reason = _has_confirmed_charge(state, unit) and "charge confirmed" or "timeout"
+					local reason = charge_ok and "charge confirmed" or "timeout"
 					local component_state = _describe_action_component_state(unit, state.component)
 					_debug_log(
 						"grenade_ability_complete:" .. tostring(unit),
@@ -689,6 +743,14 @@ local function try_queue(unit, blackboard)
 						"ability blitz complete (" .. reason .. ")" .. component_state
 					)
 				end
+				_emit_grenade_event(
+					charge_ok and "complete" or "blocked",
+					unit,
+					state.grenade_name,
+					state,
+					fixed_t,
+					{ reason = charge_ok and "charge_confirmed" or "timeout" }
+				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
@@ -706,6 +768,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (slot changed)"
 					)
 				end
+				_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "slot_changed" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
@@ -742,6 +805,14 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (action confirmed)"
 					)
 				end
+				_emit_grenade_event(
+					"complete",
+					unit,
+					state.grenade_name,
+					state,
+					fixed_t,
+					{ reason = "action_confirmed" }
+				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
@@ -754,6 +825,14 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (charge confirmed)"
 					)
 				end
+				_emit_grenade_event(
+					"complete",
+					unit,
+					state.grenade_name,
+					state,
+					fixed_t,
+					{ reason = "charge_confirmed" }
+				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
 			end
@@ -766,6 +845,7 @@ local function try_queue(unit, blackboard)
 						"grenade released cleanup lock without explicit unwield (timeout)"
 					)
 				end
+				_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "timeout" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
 			return
@@ -779,6 +859,7 @@ local function try_queue(unit, blackboard)
 					"grenade throw complete, slot returned to " .. tostring(wielded_slot)
 				)
 			end
+			_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "slot_returned" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
 		end
@@ -820,6 +901,7 @@ local function try_queue(unit, blackboard)
 					"grenade forced unwield_to_previous on timeout"
 				)
 			end
+			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "unwield_timeout" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
@@ -835,6 +917,7 @@ local function try_queue(unit, blackboard)
 				"grenade unknown stage=" .. tostring(state.stage) .. ", resetting"
 			)
 		end
+		_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "unknown_stage" })
 		_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		return
 	end
@@ -970,6 +1053,10 @@ local function try_queue(unit, blackboard)
 	state.require_charge_confirmation = type(template_entry) == "table"
 		and template_entry.require_charge_confirmation == true
 
+	if _event_log and _event_log.is_enabled() then
+		state.attempt_id = _event_log.next_attempt_id()
+	end
+
 	if component then
 		-- Ability-based blitz: queue aim input directly on the ability component.
 		-- No slot wield needed — the ability fires from any weapon slot.
@@ -989,6 +1076,11 @@ local function try_queue(unit, blackboard)
 			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 			state.release_t = fixed_t
 		end
+		_emit_grenade_event("queued", unit, grenade_name, state, fixed_t, {
+			rule = rule,
+			input = aim_input,
+			component = component,
+		})
 		if _debug_enabled() then
 			local component_state = _describe_action_component_state(unit, component)
 			_debug_log(
@@ -1030,6 +1122,10 @@ local function try_queue(unit, blackboard)
 		if not aim_input then
 			state.release_t = fixed_t
 		end
+		_emit_grenade_event("queued", unit, grenade_name, state, fixed_t, {
+			rule = rule,
+			input = "grenade_ability",
+		})
 		if _debug_enabled() then
 			_debug_log(
 				"grenade_wield:" .. tostring(unit),

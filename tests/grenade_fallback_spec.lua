@@ -10,6 +10,7 @@ local _extensions = {}
 local _recorded_inputs = {}
 local _debug_logs = {}
 local _event_decisions = {}
+local _event_emissions = {}
 local _aim_calls = {}
 
 -- Mock ability_extension
@@ -126,6 +127,7 @@ local function reset()
 	_recorded_inputs = {}
 	_debug_logs = {}
 	_event_decisions = {}
+	_event_emissions = {}
 	_aim_calls = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
@@ -165,6 +167,12 @@ local function reset()
 		event_log = {
 			is_enabled = function()
 				return true
+			end,
+			next_attempt_id = function()
+				return 7
+			end,
+			emit = function(event)
+				_event_emissions[#_event_emissions + 1] = event
 			end,
 			emit_decision = function(_fixed_t, bot_slot, ability_name, template_name, result, rule, source, context)
 				_event_decisions[#_event_decisions + 1] = {
@@ -1127,7 +1135,12 @@ describe("grenade_fallback", function()
 		it("supports Assail as a fast close-range blitz under crowd pressure", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { target_enemy = "enemy_1", num_nearby = 5, challenge_rating_sum = 2.5, target_enemy_distance = 4 }
+					return {
+						target_enemy = "enemy_1",
+						num_nearby = 5,
+						challenge_rating_sum = 2.5,
+						target_enemy_distance = 4,
+					}
 				end,
 				evaluate_grenade_heuristic = function()
 					return true, "grenade_assail_crowd_soften"
@@ -1583,6 +1596,182 @@ describe("grenade_fallback", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(0, #_recorded_inputs) -- no unwield queued
 			assert.is_nil(_grenade_state_by_unit[unit].stage) -- state reset
+		end)
+	end)
+
+	describe("event log emissions (#59)", function()
+		local function find_events(event_type)
+			local found = {}
+			for i = 1, #_event_emissions do
+				if _event_emissions[i].event == event_type then
+					found[#found + 1] = _event_emissions[i]
+				end
+			end
+			return found
+		end
+
+		it("emits queued event with attempt_id and rule on item-based grenade start", function()
+			_heuristic_result = true
+			_heuristic_rule = "frag_horde"
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local queued = find_events("queued")
+			assert.equals(1, #queued)
+			assert.equals("veteran_frag_grenade", queued[1].ability)
+			assert.equals("frag_horde", queued[1].rule)
+			assert.equals("grenade", queued[1].source)
+			assert.equals("slot1", queued[1].bot)
+			assert.equals(7, queued[1].attempt_id)
+			assert.equals("grenade_ability", queued[1].input)
+			assert.equals("wield", queued[1].stage)
+		end)
+
+		it("emits grenade_stage events through standard throw lifecycle", function()
+			_heuristic_result = true
+			_heuristic_rule = "frag_horde"
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield succeeds
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Aim delay passes
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Throw delay passes
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local stages = find_events("grenade_stage")
+			assert.is_true(#stages >= 3) -- wait_aim, wait_throw (from aim), wait_unwield (from release)
+		end)
+
+		it("emits complete event when slot returns after throw", function()
+			_heuristic_result = true
+			_heuristic_rule = "frag_horde"
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Aim
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Throw
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Slot returns
+			_wielded_slot = "slot_secondary"
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local complete = find_events("complete")
+			assert.equals(1, #complete)
+			assert.equals("slot_returned", complete[1].reason)
+			assert.equals("grenade", complete[1].source)
+			assert.equals(7, complete[1].attempt_id)
+		end)
+
+		it("emits blocked event on wield timeout", function()
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield never succeeds, time out
+			_mock_time = _mock_time + 3.0
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("wield_timeout", blocked[1].reason)
+			assert.equals("wield", blocked[1].stage)
+		end)
+
+		it("emits blocked event on lost wield during aim", function()
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield succeeds
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield lost during aim
+			_wielded_slot = "slot_secondary"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("lost_wield", blocked[1].reason)
+			assert.equals("wait_aim", blocked[1].stage)
+		end)
+
+		it("emits blocked event on revalidation failure", function()
+			_heuristic_result = true
+			_heuristic_rule = "frag_horde"
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield succeeds
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Heuristic changes mind before aim fires
+			_heuristic_result = false
+			_heuristic_rule = "frag_horde_too_few"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("revalidation", blocked[1].reason)
+			assert.equals("frag_horde_too_few", blocked[1].rule)
+		end)
+
+		it("emits complete event for auto-fire template (zealot knives)", function()
+			-- Override to zealot_throwing_knives
+			GrenadeFallback.wire({
+				build_context = function()
+					return { num_nearby = 3, target_enemy = "enemy_1" }
+				end,
+				evaluate_grenade_heuristic = function()
+					return _heuristic_result, _heuristic_rule
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "zealot_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Wield triggers auto-fire → wait_unwield
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			-- Slot returns
+			_wielded_slot = "slot_secondary"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local queued = find_events("queued")
+			assert.equals(1, #queued)
+			local complete = find_events("complete")
+			assert.equals(1, #complete)
+			assert.equals("slot_returned", complete[1].reason)
 		end)
 	end)
 end)
