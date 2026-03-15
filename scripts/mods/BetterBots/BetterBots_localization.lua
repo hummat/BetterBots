@@ -182,6 +182,18 @@ return {
 	bot_slot_3_profile_description = {
 		en = "Class for the third bot. Tertium4Or5 characters take priority when installed. None = vanilla veteran.",
 	},
+	bot_slot_4_profile = {
+		en = "Bot slot 4 (Tertium)",
+	},
+	bot_slot_4_profile_description = {
+		en = "Only used when Tertium4Or5/6 adds a 4th bot. Tertium characters take priority. None = vanilla veteran.",
+	},
+	bot_slot_5_profile = {
+		en = "Bot slot 5 (Tertium)",
+	},
+	bot_slot_5_profile_description = {
+		en = "Only used when Tertium 6 adds a 5th bot. Tertium characters take priority. None = vanilla veteran.",
+	},
 	bot_profile_none = {
 		en = "None (vanilla veteran)",
 	},

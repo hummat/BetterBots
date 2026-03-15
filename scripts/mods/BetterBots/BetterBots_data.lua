@@ -126,6 +126,30 @@ return {
 							{ text = "bot_profile_ogryn", value = "ogryn" },
 						},
 					},
+					{
+						setting_id = "bot_slot_4_profile",
+						type = "dropdown",
+						default_value = "none",
+						options = {
+							{ text = "bot_profile_none", value = "none" },
+							{ text = "bot_profile_veteran", value = "veteran" },
+							{ text = "bot_profile_zealot", value = "zealot" },
+							{ text = "bot_profile_psyker", value = "psyker" },
+							{ text = "bot_profile_ogryn", value = "ogryn" },
+						},
+					},
+					{
+						setting_id = "bot_slot_5_profile",
+						type = "dropdown",
+						default_value = "none",
+						options = {
+							{ text = "bot_profile_none", value = "none" },
+							{ text = "bot_profile_veteran", value = "veteran" },
+							{ text = "bot_profile_zealot", value = "zealot" },
+							{ text = "bot_profile_psyker", value = "psyker" },
+							{ text = "bot_profile_ogryn", value = "ogryn" },
+						},
+					},
 				},
 			},
 			-- Group: Diagnostics

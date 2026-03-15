@@ -15,6 +15,8 @@ local SLOT_SETTING_IDS = {
 	"bot_slot_1_profile",
 	"bot_slot_2_profile",
 	"bot_slot_3_profile",
+	"bot_slot_4_profile",
+	"bot_slot_5_profile",
 }
 
 local DEFAULT_PROFILES = {
