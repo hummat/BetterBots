@@ -235,15 +235,39 @@ local function resolve_profile(profile)
 		return profile, false
 	end
 
-	-- Pass resolved profile directly — do NOT deep-copy the vanilla profile.
-	-- Vanilla item objects are references into the MasterItems cache; deep-copying
-	-- them creates broken standalone tables missing engine internals.
-	-- Tertium uses the same approach: pass the full profile object directly.
+	-- Mutate the vanilla profile in-place rather than replacing it entirely.
+	-- The vanilla profile has cosmetic slots, body data, and visual_loadout already
+	-- set up correctly. We only swap gameplay-relevant fields: archetype, weapons,
+	-- talents, gestalts, and voice. Item objects are direct MasterItems cache references
+	-- — no copying needed.
+	profile.archetype = resolved.archetype
+	profile.gender = resolved.gender
+	profile.selected_voice = resolved.selected_voice
+	profile.talents = resolved.talents or {}
+	profile.bot_gestalts = resolved.bot_gestalts
+	profile.loadout.slot_primary = resolved.loadout.slot_primary
+	profile.loadout.slot_secondary = resolved.loadout.slot_secondary
+	if resolved.loadout_item_ids then
+		profile.loadout_item_ids = profile.loadout_item_ids or {}
+		profile.loadout_item_ids.slot_primary = resolved.loadout_item_ids.slot_primary
+		profile.loadout_item_ids.slot_secondary = resolved.loadout_item_ids.slot_secondary
+	end
+	if resolved.loadout_item_data then
+		profile.loadout_item_data = profile.loadout_item_data or {}
+		profile.loadout_item_data.slot_primary = resolved.loadout_item_data.slot_primary
+		profile.loadout_item_data.slot_secondary = resolved.loadout_item_data.slot_secondary
+	end
+	-- visual_loadout mirrors loadout for package resolution
+	if profile.visual_loadout then
+		profile.visual_loadout.slot_primary = resolved.loadout.slot_primary
+		profile.visual_loadout.slot_secondary = resolved.loadout.slot_secondary
+	end
+
 	if _debug_enabled() then
 		_debug_log("bot_profiles:swap", 0, "bot slot " .. tostring(slot_index) .. " → " .. tostring(choice))
 	end
 
-	return resolved, true
+	return profile, true
 end
 
 local function register_hooks()
