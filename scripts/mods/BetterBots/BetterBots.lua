@@ -228,6 +228,7 @@ Heuristics.init({
 	super_armor_breed_cache = _super_armor_breed_flag_by_name,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_testing_profile = Settings.is_testing_profile,
+	resolve_preset = Settings.resolve_preset,
 })
 
 ItemFallback.init({
@@ -275,6 +276,9 @@ Sprint.init({
 	fixed_time = _fixed_time,
 	perf = Perf,
 	shared_rules = SharedRules,
+	is_enabled = function()
+		return Settings.is_feature_enabled("sprint")
+	end,
 })
 
 MeleeMetaData.init({
@@ -306,6 +310,9 @@ TargetSelection.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	is_enabled = function()
+		return Settings.is_feature_enabled("special_penalty")
+	end,
 })
 
 Poxburster.init({
@@ -314,6 +321,9 @@ Poxburster.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	is_enabled = function()
+		return Settings.is_feature_enabled("poxburster")
+	end,
 })
 
 AnimationGuard.init({
@@ -782,9 +792,11 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		perf_t0 = Perf.begin()
 		GrenadeFallback.try_queue(unit, blackboard)
 		Perf.finish("grenade_fallback", perf_t0)
-		perf_t0 = Perf.begin()
-		PingSystem.update(unit, blackboard)
-		Perf.finish("ping_system", perf_t0)
+		if Settings.is_feature_enabled("pinging") then
+			perf_t0 = Perf.begin()
+			PingSystem.update(unit, blackboard)
+			Perf.finish("ping_system", perf_t0)
+		end
 		perf_t0 = Perf.begin()
 		EventLog.try_flush(_fixed_time())
 		Perf.finish("event_log_flush", perf_t0)
