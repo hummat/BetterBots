@@ -39,6 +39,8 @@ return {
 					{ setting_id = "enable_pinging", type = "checkbox", default_value = true },
 					{ setting_id = "enable_special_penalty", type = "checkbox", default_value = true },
 					{ setting_id = "enable_poxburster", type = "checkbox", default_value = true },
+					{ setting_id = "enable_melee_improvements", type = "checkbox", default_value = true },
+					{ setting_id = "enable_ranged_improvements", type = "checkbox", default_value = true },
 					{
 						setting_id = "healing_deferral_mode",
 						type = "dropdown",

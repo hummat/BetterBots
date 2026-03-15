@@ -39,6 +39,8 @@ end
 
 local M = {}
 
+local _is_enabled
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -47,6 +49,7 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_perf = deps.perf
 	_ammo = deps.ammo
+	_is_enabled = deps.is_enabled
 end
 
 local function _ammo_api()
@@ -190,6 +193,9 @@ function M.register_hooks(deps)
 			-- they will actually queue.
 			local _may_fire_logged = setmetatable({}, { __mode = "k" })
 			_mod:hook(BtBotShootAction, "_may_fire", function(func, self, unit, scratchpad, range_squared, t)
+				if _is_enabled and not _is_enabled() then
+					return func(self, unit, scratchpad, range_squared, t)
+				end
 				local perf_t0 = _perf and _perf.begin()
 				if
 					not scratchpad
@@ -243,6 +249,9 @@ function M.register_hooks(deps)
 				PlayerUnitActionInputExtension,
 				"bot_queue_action_input",
 				function(func, self, id, action_input, raw_input)
+					if _is_enabled and not _is_enabled() then
+						return func(self, id, action_input, raw_input)
+					end
 					local perf_t0 = _perf and _perf.begin()
 					local unit = self._betterbots_player_unit
 					if unit and id == "weapon_action" and action_input == "wield" then

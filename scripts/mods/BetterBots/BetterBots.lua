@@ -295,6 +295,9 @@ MeleeAttackChoice.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	is_enabled = function()
+		return Settings.is_feature_enabled("melee_improvements")
+	end,
 })
 
 RangedMetaData.init({
@@ -354,6 +357,9 @@ WeaponAction.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	perf = Perf,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
 })
 
 ConditionPatch.init({

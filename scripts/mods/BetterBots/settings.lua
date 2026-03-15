@@ -66,6 +66,8 @@ local FEATURE_GATES = {
 	pinging = "enable_pinging",
 	special_penalty = "enable_special_penalty",
 	poxburster = "enable_poxburster",
+	melee_improvements = "enable_melee_improvements",
+	ranged_improvements = "enable_ranged_improvements",
 }
 
 -- Preset system

@@ -96,6 +96,18 @@ return {
 	enable_poxburster_description = {
 		en = "Bots hold fire on poxbursters within detonation range of bots or humans. Disabling removes this safety check.",
 	},
+	enable_melee_improvements = {
+		en = "Melee improvements",
+	},
+	enable_melee_improvements_description = {
+		en = "Bots use heavy attacks vs armor, lights vs hordes. Disabling reverts to vanilla light-only.",
+	},
+	enable_ranged_improvements = {
+		en = "Ranged improvements",
+	},
+	enable_ranged_improvements_description = {
+		en = "Bots aim down sights, use charged staff fire, and vent warp heat. Disabling reverts to vanilla.",
+	},
 	-- Healing deferral
 	healing_deferral_mode = {
 		en = "Healing deferral mode",

@@ -125,19 +125,25 @@ local function _armor_api()
 	return _armor
 end
 
+local _is_enabled
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_armored_type = deps.ARMOR_TYPE_ARMORED
+	_is_enabled = deps.is_enabled
 end
 
 function M.register_hooks()
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
 		function(BtBotMeleeAction)
-			_mod:hook(BtBotMeleeAction, "_choose_attack", function(_func, _self, target_unit, target_breed, scratchpad)
+			_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, target_unit, target_breed, scratchpad)
+				end
 				local num_enemies = scratchpad.num_enemies_in_proximity or 0
 				local armor = _armor_api()
 				local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
