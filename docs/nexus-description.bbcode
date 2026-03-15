@@ -74,8 +74,9 @@ Bots use per-ability heuristics to decide [i]when[/i] to activate — based on e
 
 [b]In-game settings and diagnostics:[/b]
 [list]
-[*]`Standard` / `Testing` behavior profile
-[*]Tier 1 / Tier 2 / Tier 3 / grenade-blitz enable toggles
+[*][b]Ability categories:[/b] enable/disable stances, charges, shouts, stealth, deployables, grenades independently
+[*][b]Behavior presets:[/b] Testing / Aggressive / Balanced / Conservative — controls how eagerly bots use abilities
+[*][b]Feature toggles:[/b] bot sprinting, elite/special pinging, distant-special penalty, poxburster suppression
 [*]Healing deferral mode and thresholds
 [*]`Info / Debug / Trace` log levels
 [*]Optional JSONL event log and `/bb_perf` runtime timing
@@ -92,7 +93,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Smart per-ability trigger heuristics
 [*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
 [*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz)
-[*]Ability settings surface (partial: profile + tier/grenade toggles shipped; full per-ability toggles still open)
+[*][color=green]✓[/color] Ability settings surface (category toggles + 4 behavior presets + feature gates)
 [*]Hive Scum validation (DLC-blocked)
 [/list]
 
