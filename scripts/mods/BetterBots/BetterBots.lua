@@ -542,6 +542,36 @@ mod:hook_require(
 					end
 				end
 
+				-- Category gate: block abilities disabled by settings (#6).
+				-- The generated BT selector (bt_bot_selector_node.lua) inlines
+				-- condition logic, bypassing our condition_patch gate. This enter
+				-- hook is the last check before the ability action starts.
+				local gate_comp_name = action_data and action_data.ability_component_name
+				if gate_comp_name then
+					local gate_unit_data = ScriptUnit.has_extension(unit, "unit_data_system")
+					local gate_comp = gate_unit_data and gate_unit_data:read_component(gate_comp_name)
+					local gate_template = gate_comp and gate_comp.template_name
+					if gate_template and gate_template ~= "none" then
+						local is_grenade = string.find(gate_comp_name, "grenade", 1, true) ~= nil
+						local enabled = is_grenade and Settings.is_grenade_enabled(gate_template)
+							or not is_grenade
+								and Settings.is_combat_template_enabled(
+									gate_template,
+									ScriptUnit.has_extension(unit, "ability_system")
+								)
+						if not enabled then
+							if _debug_enabled() then
+								_debug_log(
+									"bt_enter_blocked:" .. gate_template,
+									_fixed_time(),
+									"BT enter blocked " .. gate_template .. " (disabled by mod setting)"
+								)
+							end
+							return
+						end
+					end
+				end
+
 				func(self, unit, breed, blackboard, scratchpad, action_data, t)
 
 				local ability_component_name = action_data and action_data.ability_component_name or "?"
