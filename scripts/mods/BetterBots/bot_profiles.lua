@@ -230,33 +230,15 @@ local function resolve_profile(profile)
 		return profile, false
 	end
 
-	-- Overlay resolved profile onto the vanilla profile to preserve engine-expected fields
-	-- (cosmetic slots, personal data, etc.)
-	local new_profile = _deep_copy_profile(profile)
-	new_profile.archetype = resolved.archetype
-	new_profile.gender = resolved.gender
-	new_profile.selected_voice = resolved.selected_voice
-	new_profile.current_level = resolved.current_level
-	new_profile.talents = resolved.talents or {}
-	new_profile.bot_gestalts = _deep_copy_profile(resolved.bot_gestalts)
-	new_profile.loadout.slot_primary = resolved.loadout.slot_primary
-	new_profile.loadout.slot_secondary = resolved.loadout.slot_secondary
-	if resolved.loadout_item_ids then
-		new_profile.loadout_item_ids = new_profile.loadout_item_ids or {}
-		new_profile.loadout_item_ids.slot_primary = resolved.loadout_item_ids.slot_primary
-		new_profile.loadout_item_ids.slot_secondary = resolved.loadout_item_ids.slot_secondary
-	end
-	if resolved.loadout_item_data then
-		new_profile.loadout_item_data = new_profile.loadout_item_data or {}
-		new_profile.loadout_item_data.slot_primary = resolved.loadout_item_data.slot_primary
-		new_profile.loadout_item_data.slot_secondary = resolved.loadout_item_data.slot_secondary
-	end
-
+	-- Pass resolved profile directly — do NOT deep-copy the vanilla profile.
+	-- Vanilla item objects are references into the MasterItems cache; deep-copying
+	-- them creates broken standalone tables missing engine internals.
+	-- Tertium uses the same approach: pass the full profile object directly.
 	if _debug_enabled() then
 		_debug_log("bot_profiles:swap", 0, "bot slot " .. tostring(slot_index) .. " → " .. tostring(choice))
 	end
 
-	return new_profile, true
+	return resolved, true
 end
 
 local function register_hooks()
