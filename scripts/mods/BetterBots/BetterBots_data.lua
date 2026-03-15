@@ -44,7 +44,7 @@ return {
 						type = "dropdown",
 						default_value = "stations_and_deployables",
 						options = {
-							{ text = "healing_deferral_mode_off", value = "off" },
+							{ text = "healing_deferral_mode_off", value = "off", show_widgets = {} },
 							{
 								text = "healing_deferral_mode_stations_only",
 								value = "stations_only",
