@@ -2,21 +2,9 @@ local M = {}
 
 local _mod
 
-local BEHAVIOR_PROFILE_SETTING_ID = "behavior_profile"
-local ENABLE_TIER_1_ABILITIES_SETTING_ID = "enable_tier_1_abilities"
-local ENABLE_TIER_2_ABILITIES_SETTING_ID = "enable_tier_2_abilities"
-local ENABLE_TIER_3_ABILITIES_SETTING_ID = "enable_tier_3_abilities"
-local ENABLE_GRENADE_BLITZ_ABILITIES_SETTING_ID = "enable_grenade_blitz_abilities"
-
-local DEFAULT_BEHAVIOR_PROFILE = "standard"
-local VALID_BEHAVIOR_PROFILES = {
-	standard = true,
-	testing = true,
-}
-
-local TIER_1_COMBAT_TEMPLATES = {
-	veteran_combat_ability = true,
-	veteran_stealth_combat_ability = true,
+-- Category → setting ID mapping
+local CATEGORY_STANCES = {
+	-- veteran_combat_ability is NOT here — uses dual-category gate
 	psyker_overcharge_stance = true,
 	ogryn_gunlugger_stance = true,
 	adamant_stance = true,
@@ -24,27 +12,68 @@ local TIER_1_COMBAT_TEMPLATES = {
 	broker_punk_rage = true,
 }
 
-local TIER_2_COMBAT_TEMPLATES = {
+local CATEGORY_CHARGES = {
 	zealot_dash = true,
 	zealot_targeted_dash = true,
 	zealot_targeted_dash_improved = true,
 	zealot_targeted_dash_improved_double = true,
-	zealot_invisibility = true,
-	psyker_shout = true,
 	ogryn_charge = true,
 	ogryn_charge_increased_distance = true,
-	ogryn_taunt_shout = true,
 	adamant_charge = true,
+}
+
+local CATEGORY_SHOUTS = {
+	psyker_shout = true,
+	ogryn_taunt_shout = true,
 	adamant_shout = true,
 }
 
-local TIER_3_ITEM_ABILITIES = {
+local CATEGORY_STEALTH = {
+	veteran_stealth_combat_ability = true,
+	zealot_invisibility = true,
+}
+
+-- Reverse lookup: template_name → setting_id
+-- Built once at load time. veteran_combat_ability excluded (dual-category).
+local TEMPLATE_TO_CATEGORY_SETTING = {}
+
+local CATEGORY_TO_SETTING = {
+	{ table = CATEGORY_STANCES, setting = "enable_stances" },
+	{ table = CATEGORY_CHARGES, setting = "enable_charges" },
+	{ table = CATEGORY_SHOUTS, setting = "enable_shouts" },
+	{ table = CATEGORY_STEALTH, setting = "enable_stealth" },
+}
+
+for _, entry in ipairs(CATEGORY_TO_SETTING) do
+	for template_name in pairs(entry.table) do
+		TEMPLATE_TO_CATEGORY_SETTING[template_name] = entry.setting
+	end
+end
+
+-- Deployable item abilities (all map to enable_deployables)
+local DEPLOYABLE_ITEMS = {
 	zealot_relic = true,
 	psyker_force_field = true,
 	psyker_force_field_improved = true,
 	psyker_force_field_dome = true,
 	adamant_area_buff_drone = true,
 	broker_ability_stimm_field = true,
+}
+
+-- Feature gates: feature_name → setting_id
+local FEATURE_GATES = {
+	sprint = "enable_sprint",
+	pinging = "enable_pinging",
+	special_penalty = "enable_special_penalty",
+	poxburster = "enable_poxburster",
+}
+
+-- Preset system
+local VALID_PRESETS = {
+	testing = true,
+	aggressive = true,
+	balanced = true,
+	conservative = true,
 }
 
 local function _setting_enabled(setting_id)
@@ -60,49 +89,94 @@ local function _setting_enabled(setting_id)
 	return value == true
 end
 
+-- Minimal veteran class_tag resolution for the dual-category gate.
+-- Avoids circular dependency with heuristics.lua.
+local function _veteran_class_tag(ability_extension)
+	local equipped = ability_extension and ability_extension._equipped_abilities
+	local combat = equipped and equipped.combat_ability
+	local tweak = combat and combat.ability_template_tweak_data
+	local class_tag = tweak and tweak.class_tag
+
+	if class_tag then
+		return class_tag
+	end
+
+	local name = combat and combat.name or ""
+	if string.find(name, "shout", 1, true) then
+		return "squad_leader"
+	end
+	if string.find(name, "stance", 1, true) then
+		return "ranger"
+	end
+
+	return nil
+end
+
 function M.init(deps)
 	_mod = deps.mod
 end
 
-function M.resolve_behavior_profile()
+function M.resolve_preset()
 	if not _mod then
-		return DEFAULT_BEHAVIOR_PROFILE
+		return "balanced"
 	end
 
-	local value = _mod:get(BEHAVIOR_PROFILE_SETTING_ID)
-	if VALID_BEHAVIOR_PROFILES[value] then
+	local value = _mod:get("behavior_profile")
+
+	-- Silent migration: "standard" → "balanced"
+	if value == "standard" then
+		return "balanced"
+	end
+
+	if VALID_PRESETS[value] then
 		return value
 	end
 
-	return DEFAULT_BEHAVIOR_PROFILE
+	return "balanced"
 end
 
 function M.is_testing_profile()
-	return M.resolve_behavior_profile() == "testing"
+	return M.resolve_preset() == "testing"
 end
 
-function M.is_combat_template_enabled(template_name)
-	if TIER_1_COMBAT_TEMPLATES[template_name] then
-		return _setting_enabled(ENABLE_TIER_1_ABILITIES_SETTING_ID)
+function M.is_combat_template_enabled(template_name, ability_extension)
+	-- Dual-category gate for veteran_combat_ability
+	if template_name == "veteran_combat_ability" then
+		local tag = _veteran_class_tag(ability_extension)
+		if tag == "squad_leader" then
+			return _setting_enabled("enable_shouts")
+		end
+		-- ranger, base, or unknown → stances
+		return _setting_enabled("enable_stances")
 	end
 
-	if TIER_2_COMBAT_TEMPLATES[template_name] then
-		return _setting_enabled(ENABLE_TIER_2_ABILITIES_SETTING_ID)
+	local setting_id = TEMPLATE_TO_CATEGORY_SETTING[template_name]
+	if not setting_id then
+		return true
 	end
 
-	return true
+	return _setting_enabled(setting_id)
 end
 
 function M.is_item_ability_enabled(ability_name)
-	if TIER_3_ITEM_ABILITIES[ability_name] then
-		return _setting_enabled(ENABLE_TIER_3_ABILITIES_SETTING_ID)
+	if DEPLOYABLE_ITEMS[ability_name] then
+		return _setting_enabled("enable_deployables")
 	end
 
 	return true
 end
 
 function M.is_grenade_enabled(_grenade_name)
-	return _setting_enabled(ENABLE_GRENADE_BLITZ_ABILITIES_SETTING_ID)
+	return _setting_enabled("enable_grenades")
+end
+
+function M.is_feature_enabled(feature_name)
+	local setting_id = FEATURE_GATES[feature_name]
+	if not setting_id then
+		return true
+	end
+
+	return _setting_enabled(setting_id)
 end
 
 return M

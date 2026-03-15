@@ -68,7 +68,11 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
-	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name) then
+	local ability_extension_for_gate = ScriptUnit.has_extension(unit, "ability_system")
+	if
+		_is_combat_template_enabled
+		and not _is_combat_template_enabled(ability_template_name, ability_extension_for_gate)
+	then
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_disabled_template:" .. ability_template_name,

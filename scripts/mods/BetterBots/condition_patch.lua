@@ -138,7 +138,9 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return _return_with_perf(perf_t0, false)
 	end
 
-	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name) then
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+
+	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name, ability_extension) then
 		if _debug_enabled() then
 			_debug_log(
 				"disabled_template:" .. ability_template_name,
@@ -201,7 +203,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local used_input = activation_data.used_input
-	local ability_extension = ScriptUnit.extension(unit, "ability_system")
 	local action_input_is_valid =
 		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
 

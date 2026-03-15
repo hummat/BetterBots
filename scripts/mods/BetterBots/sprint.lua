@@ -3,6 +3,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _perf
+local _is_enabled
 
 local SPRINT_FOLLOW_DISTANCE = 12
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
@@ -173,6 +174,13 @@ local function on_update_movement(func, self, unit, input, dt, t)
 	local perf_t0 = _perf and _perf.begin()
 	func(self, unit, input, dt, t)
 
+	if _is_enabled and not _is_enabled() then
+		if perf_t0 then
+			_perf.finish("sprint.update_movement", perf_t0)
+		end
+		return
+	end
+
 	local should, reason = _should_sprint(self, unit, input)
 
 	-- Always set hold_to_sprint so Sprint.sprint_input uses the hold path.
@@ -219,6 +227,7 @@ Sprint.init = function(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
+	_is_enabled = deps.is_enabled
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 end

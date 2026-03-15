@@ -57,7 +57,7 @@ See `docs/dev/logging.md` for the full logging architecture, output channels, lo
 
 Use project-local tooling configs before handing off changes:
 
-- `make deps` → install git hooks (conventional commits)
+- `make deps` → install git hooks (conventional commits + StyLua pre-commit)
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
@@ -334,7 +334,7 @@ scripts/mods/BetterBots/
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
-  settings.lua                              # DMF settings resolution (behavior profile, tier/grenade feature gates)
+  settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
   log_levels.lua                            # Tiered debug log level constants and resolution (#40)
   perf.lua                                  # Per-hook runtime recorder + /bb_perf command
   shared_rules.lua                          # Shared rule tables (daemonhost breeds, rescue charge rules)

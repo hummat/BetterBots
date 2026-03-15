@@ -7,6 +7,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _perf
+local _is_enabled
 local CHASE_RANGE_SQ = 324
 local DEFAULT_MONSTER_WEIGHT = 2
 local PLAYER_TAG_BONUS = 3.0
@@ -46,6 +47,7 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
+	_is_enabled = deps.is_enabled
 end
 
 function M.register_hooks()
@@ -62,6 +64,13 @@ function M.register_hooks()
 			function(func, unit, target_unit, target_distance_sq, target_breed, target_ally)
 				local perf_t0 = _perf and _perf.begin()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
+
+				if _is_enabled and not _is_enabled() then
+					if perf_t0 then
+						_perf.finish("target_selection.slot_weight", perf_t0)
+					end
+					return score
+				end
 
 				-- Issue #48: Boost score for player-tagged enemies
 				if score > 0 and target_unit and _has_human_player_tag(target_unit) then
@@ -128,6 +137,14 @@ function M.register_hooks()
 		_mod:hook(BotTargetSelection, "monster_weight", function(func, unit, target_unit, target_breed, t)
 			local perf_t0 = _perf and _perf.begin()
 			local weight, override = func(unit, target_unit, target_breed, t)
+
+			if _is_enabled and not _is_enabled() then
+				if perf_t0 then
+					_perf.finish("target_selection.monster_weight", perf_t0)
+				end
+				return weight, override
+			end
+
 			local tags = target_breed and target_breed.tags or nil
 
 			if not (tags and tags.monster) or (weight and weight > 0) then

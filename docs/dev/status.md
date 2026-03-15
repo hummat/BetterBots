@@ -121,8 +121,8 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 | # | Feature | Status |
 |---|---------|--------|
-| 57 | Toggle safety audit | Not started — prerequisite for #6 |
-| 6 | Settings control surface | Spec + plan committed, ready to execute (8 tasks) |
+| 57 | Toggle safety audit | **Done** — `is_togglable = false`, singleton mutations not revertible |
+| 6 | Settings control surface | **Done** — category gates, 4 presets (testing/aggressive/balanced/conservative), feature toggles, veteran dual-category gate |
 | 45 | Default class profiles | Design doc ready, ~150-200 LOC |
 | 60 | Simplify heuristic dispatch | Not started — internal refactor |
 | 59 | Grenade fallback logging | Not started — observability |

@@ -1601,6 +1601,28 @@ describe("heuristics", function()
 			assert.is_false(result)
 			assert.matches("hold", rule)
 		end)
+
+		describe("grenade preset offsets", function()
+			local evaluate_grenade = Heuristics.evaluate_grenade_heuristic
+
+			it("aggressive frag triggers at lower density than balanced", function()
+				-- frag base: min_nearby=6. aggressive offset=-1 → 5. balanced offset=0 → 6.
+				local c = helper.make_context({ num_nearby = 5, challenge_rating_sum = 2.0 })
+				local ok_agg = evaluate_grenade("veteran_frag_grenade", c, { preset = "aggressive" })
+				local ok_bal = evaluate_grenade("veteran_frag_grenade", c, { preset = "balanced" })
+				assert.is_true(ok_agg)
+				assert.is_false(ok_bal)
+			end)
+
+			it("conservative chain_lightning requires more enemies than balanced", function()
+				-- balanced crowd=4, conservative crowd=5
+				local c = helper.make_context({ num_nearby = 4, peril_pct = 0.30 })
+				local ok_bal = evaluate_grenade("psyker_chain_lightning", c, { preset = "balanced" })
+				local ok_con = evaluate_grenade("psyker_chain_lightning", c, { preset = "conservative" })
+				assert.is_true(ok_bal)
+				assert.is_false(ok_con)
+			end)
+		end)
 	end)
 
 	describe("build_context", function()
@@ -1787,6 +1809,79 @@ describe("heuristics", function()
 
 			assert.is_false(ok)
 			assert.matches("super_armor", rule)
+		end)
+	end)
+
+	describe("preset thresholds", function()
+		it("aggressive triggers veteran_stealth at higher toughness than balanced", function()
+			-- balanced critical_toughness = 0.25, aggressive = 0.35
+			-- toughness 0.30 is < 0.35 (aggressive fires) but not < 0.25 (balanced doesn't)
+			local borderline = ctx({ num_nearby = 3, toughness_pct = 0.30 })
+			local ok_agg = evaluate("veteran_stealth_combat_ability", borderline, { preset = "aggressive" })
+			local ok_bal = evaluate("veteran_stealth_combat_ability", borderline, { preset = "balanced" })
+			assert.is_true(ok_agg)
+			assert.is_false(ok_bal)
+		end)
+
+		it("balanced triggers zealot_dash elite gap at wider range than conservative", function()
+			-- balanced elite_max_dist = 20, conservative = 15
+			-- distance 17 is < 20 (balanced fires) but not < 15 (conservative doesn't)
+			local borderline = ctx({
+				target_enemy = "unit",
+				target_enemy_distance = 17,
+				target_is_elite_special = true,
+			})
+			local ok_bal = evaluate("zealot_dash", borderline, { preset = "balanced" })
+			local ok_con = evaluate("zealot_dash", borderline, { preset = "conservative" })
+			assert.is_true(ok_bal)
+			assert.is_false(ok_con)
+		end)
+
+		it("aggressive triggers ogryn_taunt horde control with fewer enemies than balanced", function()
+			-- aggressive horde_nearby = 2, balanced = 3
+			-- num_nearby 2 is >= 2 (aggressive fires) but not >= 3 (balanced doesn't)
+			local borderline = ctx({ num_nearby = 2, toughness_pct = 0.40, health_pct = 0.30 })
+			local ok_agg = evaluate("ogryn_taunt_shout", borderline, { preset = "aggressive" })
+			local ok_bal = evaluate("ogryn_taunt_shout", borderline, { preset = "balanced" })
+			assert.is_true(ok_agg)
+			assert.is_false(ok_bal)
+		end)
+
+		it("aggressive triggers psyker_shout surrounded with fewer enemies than balanced", function()
+			-- aggressive surrounded = 2, balanced = 3
+			-- num_nearby 2 is >= 2 (aggressive fires) but not >= 3 (balanced doesn't)
+			local borderline = ctx({ num_nearby = 2 })
+			local ok_agg = evaluate("psyker_shout", borderline, { preset = "aggressive" })
+			local ok_bal = evaluate("psyker_shout", borderline, { preset = "balanced" })
+			assert.is_true(ok_agg)
+			assert.is_false(ok_bal)
+		end)
+
+		it("balanced triggers force_field pressure while conservative does not", function()
+			-- balanced: pressure_nearby = 3, pressure_toughness = 0.40
+			-- conservative: pressure_nearby = 4, pressure_toughness = 0.25
+			-- num_nearby 3 meets balanced threshold but not conservative
+			local borderline = ctx({ num_nearby = 3, toughness_pct = 0.35, target_enemy = "unit" })
+			local ok_bal = Heuristics.evaluate_item_heuristic("psyker_force_field", borderline, { preset = "balanced" })
+			local ok_con = Heuristics.evaluate_item_heuristic("psyker_force_field", borderline, { preset = "conservative" })
+			assert.is_true(ok_bal)
+			assert.is_false(ok_con)
+		end)
+
+		it("balanced preset matches hardcoded defaults exactly", function()
+			-- Verify that balanced produces identical results to no-preset calls
+			local scenarios = {
+				{ "psyker_shout", ctx({ num_nearby = 3, peril_pct = 0.50 }) },
+				{ "ogryn_charge", ctx({ target_enemy = "unit", target_enemy_distance = 10, opportunity_target_enemy = "opp" }) },
+				{ "adamant_stance", ctx({ toughness_pct = 0.25 }) },
+			}
+			for _, scenario in ipairs(scenarios) do
+				local template, context_val = scenario[1], scenario[2]
+				local ok_default, rule_default = evaluate(template, context_val)
+				local ok_balanced, rule_balanced = evaluate(template, context_val, { preset = "balanced" })
+				assert.are.equal(ok_default, ok_balanced)
+				assert.are.equal(rule_default, rule_balanced)
+			end
 		end)
 	end)
 end)
