@@ -105,66 +105,80 @@ local function _deep_copy_profile(source)
 	return copy
 end
 
-local function register_hooks()
-	_mod:hook("BotSynchronizerHost", "add_bot", function(func, self, local_player_id, profile)
-		_spawn_counter = _spawn_counter + 1
-		local slot_index = _spawn_counter
+-- Resolve the profile for a given bot spawn. Returns (resolved_profile, was_swapped).
+-- Extracted from the hook for testability.
+local function resolve_profile(profile)
+	_spawn_counter = _spawn_counter + 1
+	local slot_index = _spawn_counter
 
-		if slot_index > #SLOT_SETTING_IDS then
-			return func(self, local_player_id, profile)
-		end
+	if slot_index > #SLOT_SETTING_IDS then
+		return profile, false
+	end
 
-		local choice = _get_slot_profile_choice(slot_index)
-		if choice == "none" then
-			return func(self, local_player_id, profile)
-		end
+	-- If another mod (Tertium4Or5/6) already swapped the profile to a non-veteran
+	-- class, yield — vanilla only spawns veterans, so a non-veteran archetype means
+	-- another mod provided a real player character for this slot.
+	if profile.archetype and profile.archetype ~= "veteran" then
+		return profile, false
+	end
 
-		local template = DEFAULT_PROFILES[choice]
-		if not template then
-			if _debug_enabled() then
-				_debug_log(
-					"bot_profiles:unknown_choice",
-					0,
-					"bot slot "
-						.. tostring(slot_index)
-						.. " has unknown profile choice: "
-						.. tostring(choice)
-						.. ", using vanilla"
-				)
-			end
-			return func(self, local_player_id, profile)
-		end
+	local choice = _get_slot_profile_choice(slot_index)
+	if choice == "none" then
+		return profile, false
+	end
 
-		-- Build replacement profile by overlaying our defaults onto the vanilla profile.
-		-- This preserves any fields the engine expects that we don't set (cosmetic slots, etc).
-		local new_profile = _deep_copy_profile(profile)
-		new_profile.archetype = template.archetype
-		new_profile.gender = template.gender
-		new_profile.selected_voice = template.selected_voice
-		new_profile.current_level = template.current_level
-		new_profile.talents = {}
-		new_profile.bot_gestalts = _deep_copy_profile(template.bot_gestalts)
-		new_profile.loadout = new_profile.loadout or {}
-		new_profile.loadout.slot_primary = template.loadout.slot_primary
-		new_profile.loadout.slot_secondary = template.loadout.slot_secondary
-
+	local template = DEFAULT_PROFILES[choice]
+	if not template then
 		if _debug_enabled() then
 			_debug_log(
-				"bot_profiles:swap",
+				"bot_profiles:unknown_choice",
 				0,
 				"bot slot "
 					.. tostring(slot_index)
-					.. " → "
-					.. template.archetype
-					.. " (melee="
-					.. template.loadout.slot_primary
-					.. ", ranged="
-					.. template.loadout.slot_secondary
-					.. ")"
+					.. " has unknown profile choice: "
+					.. tostring(choice)
+					.. ", using vanilla"
 			)
 		end
+		return profile, false
+	end
 
-		return func(self, local_player_id, new_profile)
+	-- Build replacement profile by overlaying our defaults onto the vanilla profile.
+	-- This preserves any fields the engine expects that we don't set (cosmetic slots, etc).
+	local new_profile = _deep_copy_profile(profile)
+	new_profile.archetype = template.archetype
+	new_profile.gender = template.gender
+	new_profile.selected_voice = template.selected_voice
+	new_profile.current_level = template.current_level
+	new_profile.talents = {}
+	new_profile.bot_gestalts = _deep_copy_profile(template.bot_gestalts)
+	new_profile.loadout = new_profile.loadout or {}
+	new_profile.loadout.slot_primary = template.loadout.slot_primary
+	new_profile.loadout.slot_secondary = template.loadout.slot_secondary
+
+	if _debug_enabled() then
+		_debug_log(
+			"bot_profiles:swap",
+			0,
+			"bot slot "
+				.. tostring(slot_index)
+				.. " → "
+				.. template.archetype
+				.. " (melee="
+				.. template.loadout.slot_primary
+				.. ", ranged="
+				.. template.loadout.slot_secondary
+				.. ")"
+		)
+	end
+
+	return new_profile, true
+end
+
+local function register_hooks()
+	_mod:hook("BotSynchronizerHost", "add_bot", function(func, self, local_player_id, profile)
+		local resolved = resolve_profile(profile)
+		return func(self, local_player_id, resolved)
 	end)
 end
 
@@ -180,7 +194,7 @@ return {
 	end,
 	register_hooks = register_hooks,
 	reset = reset,
-	-- Test-only accessors
+	resolve_profile = resolve_profile,
 	_get_profiles = function()
 		return DEFAULT_PROFILES
 	end,

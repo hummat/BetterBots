@@ -27,6 +27,23 @@ BotProfiles.init({
 	end,
 })
 
+local VANILLA_PROFILE = {
+	archetype = "veteran",
+	current_level = 1,
+	gender = "male",
+	selected_voice = "veteran_male_a",
+	loadout = {
+		slot_primary = "bot_combatsword_linesman_p1",
+		slot_secondary = "bot_lasgun_killshot",
+		slot_gear_head = "some_helmet",
+	},
+	bot_gestalts = {
+		melee = "linesman",
+		ranged = "killshot",
+	},
+	talents = {},
+}
+
 describe("bot_profiles", function()
 	before_each(function()
 		_mock_settings = {}
@@ -73,12 +90,126 @@ describe("bot_profiles", function()
 		end)
 	end)
 
-	describe("reset", function()
-		it("resets spawn counter so slot assignment starts fresh", function()
-			-- Simulate that the counter has been used
+	describe("resolve_profile", function()
+		it("passes through vanilla profile when slot setting is none", function()
+			_mock_settings.bot_slot_1_profile = "none"
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_false(swapped)
+			assert.equals("veteran", resolved.archetype)
+			assert.equals("bot_combatsword_linesman_p1", resolved.loadout.slot_primary)
+		end)
+
+		it("passes through vanilla profile when slot setting is nil", function()
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_false(swapped)
+			assert.equals("veteran", resolved.archetype)
+		end)
+
+		it("swaps to zealot when slot 1 is set to zealot", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_true(swapped)
+			assert.equals("zealot", resolved.archetype)
+			assert.equals("powersword_2h_p1_m2", resolved.loadout.slot_primary)
+			assert.equals("flamer_p1_m1", resolved.loadout.slot_secondary)
+			assert.equals("female", resolved.gender)
+			assert.same({}, resolved.talents)
+		end)
+
+		it("preserves vanilla cosmetic slots in swapped profile", function()
+			_mock_settings.bot_slot_1_profile = "psyker"
+			local resolved = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.equals("psyker", resolved.archetype)
+			assert.equals("some_helmet", resolved.loadout.slot_gear_head)
+		end)
+
+		it("does not mutate the original profile", function()
+			_mock_settings.bot_slot_1_profile = "ogryn"
+			BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.equals("veteran", VANILLA_PROFILE.archetype)
+			assert.equals("bot_combatsword_linesman_p1", VANILLA_PROFILE.loadout.slot_primary)
+		end)
+
+		it("assigns sequential slots across multiple spawns", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			_mock_settings.bot_slot_2_profile = "psyker"
+			_mock_settings.bot_slot_3_profile = "ogryn"
+
+			local r1 = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			local r2 = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			local r3 = BotProfiles.resolve_profile(VANILLA_PROFILE)
+
+			assert.equals("zealot", r1.archetype)
+			assert.equals("psyker", r2.archetype)
+			assert.equals("ogryn", r3.archetype)
+		end)
+
+		it("passes through when spawn counter exceeds 3 slots", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			_mock_settings.bot_slot_2_profile = "psyker"
+			_mock_settings.bot_slot_3_profile = "ogryn"
+
+			BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 1
+			BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 2
+			BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 3
+			local r4, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 4: overflow
+
+			assert.is_false(swapped)
+			assert.equals("veteran", r4.archetype)
+		end)
+
+		it("resets spawn counter correctly", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 1 → zealot
 			BotProfiles.reset()
-			-- After reset, the next add_bot should map to slot 1
-			-- (tested indirectly via the hook tests below)
+
+			local resolved = BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 1 again
+			assert.equals("zealot", resolved.archetype)
+		end)
+	end)
+
+	describe("Tertium compatibility", function()
+		it("yields when profile is already non-veteran (Tertium assigned)", function()
+			_mock_settings.bot_slot_1_profile = "ogryn"
+
+			local tertium_profile = {
+				archetype = "zealot",
+				current_level = 30,
+				gender = "female",
+				selected_voice = "zealot_female_b",
+				loadout = {
+					slot_primary = "thunderhammer_2h_p1_m1",
+					slot_secondary = "autogun_p1_m1",
+				},
+				talents = {},
+			}
+
+			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			assert.is_false(swapped)
+			assert.equals("zealot", resolved.archetype)
+			assert.equals("thunderhammer_2h_p1_m1", resolved.loadout.slot_primary)
+			assert.equals(30, resolved.current_level)
+		end)
+
+		it("applies BetterBots profile when Tertium slot is none (veteran passes through)", function()
+			_mock_settings.bot_slot_1_profile = "psyker"
+
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_true(swapped)
+			assert.equals("psyker", resolved.archetype)
+		end)
+
+		it("yields for all non-veteran archetypes including DLC classes", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			_mock_settings.bot_slot_2_profile = "zealot"
+			_mock_settings.bot_slot_3_profile = "zealot"
+
+			for _, archetype in ipairs({ "zealot", "psyker", "ogryn", "adamant", "broker" }) do
+				BotProfiles.reset()
+				local profile = { archetype = archetype, loadout = {}, talents = {} }
+				local _, swapped = BotProfiles.resolve_profile(profile)
+				assert.is_false(swapped, "should yield for " .. archetype)
+			end
 		end)
 	end)
 end)
