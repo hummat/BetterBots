@@ -3,7 +3,7 @@ local mod = get_mod("BetterBots")
 return {
 	name = "Better Bots",
 	description = mod:localize("mod_description"),
-	is_togglable = true,
+	is_togglable = false,
 	options = {
 		widgets = {
 			{

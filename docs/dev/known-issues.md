@@ -2,10 +2,7 @@
 
 ## High severity
 
-1. DMF toggle safety is incomplete.
-   - The mod mutates global tables (`AbilityTemplates`, `bt_bot_conditions`).
-   - No disable/unload restore path is implemented.
-   - Toggling off in-session may require reload/restart to fully restore vanilla behavior.
+1. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 
 2. ~~Bots stop shooting at 50% reserve ammo (#51).~~ **Fixed in v0.7.1**: threshold lowered to 20%. Validated: 270 permitted shots with lowered gate in standard-profile mission.
 
@@ -76,7 +73,7 @@
 
 ## Current fix direction
 
-1. Add explicit restore-on-disable behavior.
+1. ~~Add explicit restore-on-disable behavior.~~ Done (#57) — set `is_togglable = false` instead.
 2. ~~Align `ITEM_SEQUENCE_PROFILES` timing with decompiled action durations (#3).~~ Done — validated 100% consume rate.
 3. Replace heuristic item matching with explicit per-template mapping table.
 4. Reduce debug-log noise for expected transient `invalid action_input` states.
