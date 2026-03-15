@@ -118,7 +118,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 1. **Don't break what works.** Vanilla bot combat (melee, shoot, revive, rescue, follow) must remain functional. Every change is additive.
 2. **Per-ability, not per-class.** Trigger heuristics are per ability template, not per archetype. A Zealot with Dash needs different rules than a Zealot with Stealth.
-3. **Conservative by default.** Bots should under-use abilities rather than waste them. A missed opportunity costs nothing; a wasted 80s cooldown costs the next fight.
+3. **Precise triggers, eager usage.** Bots should use abilities frequently but only when the trigger conditions genuinely apply. Community consensus (VT2 and Darktide) strongly favors maximizing ability uptime — conservation frustrates players more than occasional misfires. Heuristics should be confident, not rare.
 4. **Observable.** Debug logging traces every activation decision. If a bot does something wrong, the log should explain why.
 
 ## Research basis
