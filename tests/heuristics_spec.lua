@@ -1601,6 +1601,28 @@ describe("heuristics", function()
 			assert.is_false(result)
 			assert.matches("hold", rule)
 		end)
+
+		describe("grenade preset offsets", function()
+			local evaluate_grenade = Heuristics.evaluate_grenade_heuristic
+
+			it("aggressive frag triggers at lower density than balanced", function()
+				-- frag base: min_nearby=6. aggressive offset=-1 → 5. balanced offset=0 → 6.
+				local c = helper.make_context({ num_nearby = 5, challenge_rating_sum = 2.0 })
+				local ok_agg = evaluate_grenade("veteran_frag_grenade", c, { preset = "aggressive" })
+				local ok_bal = evaluate_grenade("veteran_frag_grenade", c, { preset = "balanced" })
+				assert.is_true(ok_agg)
+				assert.is_false(ok_bal)
+			end)
+
+			it("conservative chain_lightning requires more enemies than balanced", function()
+				-- balanced crowd=4, conservative crowd=5
+				local c = helper.make_context({ num_nearby = 4, peril_pct = 0.30 })
+				local ok_bal = evaluate_grenade("psyker_chain_lightning", c, { preset = "balanced" })
+				local ok_con = evaluate_grenade("psyker_chain_lightning", c, { preset = "conservative" })
+				assert.is_true(ok_bal)
+				assert.is_false(ok_con)
+			end)
+		end)
 	end)
 
 	describe("build_context", function()

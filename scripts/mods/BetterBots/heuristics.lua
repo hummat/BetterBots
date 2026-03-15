@@ -1252,15 +1252,48 @@ local ITEM_HEURISTICS = {
 	broker_ability_stimm_field = _can_activate_stimm_field,
 }
 
-local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix)
-	if context.num_nearby >= min_nearby and context.challenge_rating_sum >= min_challenge then
+local GRENADE_HORDE_PRESETS = {
+	aggressive = { nearby_offset = -1, challenge_offset = -0.5 },
+	balanced = { nearby_offset = 0, challenge_offset = 0 },
+	conservative = { nearby_offset = 1, challenge_offset = 0.5 },
+}
+
+local GRENADE_PRIORITY_PRESETS = {
+	aggressive = { distance_offset = -1 },
+	balanced = { distance_offset = 0 },
+	conservative = { distance_offset = 1 },
+}
+
+local GRENADE_DEFENSIVE_PRESETS = {
+	aggressive = { toughness_offset = 0.10, count_offset = -1 },
+	balanced = { toughness_offset = 0, count_offset = 0 },
+	conservative = { toughness_offset = -0.10, count_offset = 1 },
+}
+
+local GRENADE_MINE_PRESETS = {
+	aggressive = { elite_offset = -1, density_offset = -1 },
+	balanced = { elite_offset = 0, density_offset = 0 },
+	conservative = { elite_offset = 1, density_offset = 1 },
+}
+
+local CHAIN_LIGHTNING_THRESHOLDS = {
+	aggressive = { crowd = 3, mixed_nearby = 2 },
+	balanced = { crowd = 4, mixed_nearby = 3 },
+	conservative = { crowd = 5, mixed_nearby = 4 },
+}
+
+local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, preset)
+	local t = GRENADE_HORDE_PRESETS[preset] or GRENADE_HORDE_PRESETS.balanced
+	local adj_nearby = min_nearby + t.nearby_offset
+	local adj_challenge = min_challenge + t.challenge_offset
+	if context.num_nearby >= adj_nearby and context.challenge_rating_sum >= adj_challenge then
 		return true, rule_prefix .. "_horde"
 	end
 
 	return false, rule_prefix .. "_hold"
 end
 
-local function _grenade_priority_target(context, rule_prefix, opts)
+local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	opts = opts or {}
 
 	if opts.max_peril and context.peril_pct and context.peril_pct >= opts.max_peril then
@@ -1272,7 +1305,8 @@ local function _grenade_priority_target(context, rule_prefix, opts)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
-	local min_distance = opts.min_distance or 0
+	local t = GRENADE_PRIORITY_PRESETS[preset] or GRENADE_PRIORITY_PRESETS.balanced
+	local min_distance = (opts.min_distance or 0) + t.distance_offset
 	local has_priority_target = context.target_is_monster
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
@@ -1290,28 +1324,30 @@ local function _grenade_priority_target(context, rule_prefix, opts)
 	return false, rule_prefix .. "_hold"
 end
 
-local function _grenade_defensive(context, rule_prefix)
+local function _grenade_defensive(context, rule_prefix, preset)
+	local t = GRENADE_DEFENSIVE_PRESETS[preset] or GRENADE_DEFENSIVE_PRESETS.balanced
 	if context.target_ally_needs_aid and context.num_nearby >= 2 then
 		return true, rule_prefix .. "_ally_aid"
 	end
 
-	if context.ranged_count >= 2 and context.toughness_pct < 0.50 then
+	if context.ranged_count >= (2 + t.count_offset) and context.toughness_pct < (0.50 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
-	if context.num_nearby >= 4 and context.toughness_pct < 0.35 then
+	if context.num_nearby >= (4 + t.count_offset) and context.toughness_pct < (0.35 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
 	return false, rule_prefix .. "_hold"
 end
 
-local function _grenade_mine(context, rule_prefix)
-	if context.elite_count >= 3 then
+local function _grenade_mine(context, rule_prefix, preset)
+	local t = GRENADE_MINE_PRESETS[preset] or GRENADE_MINE_PRESETS.balanced
+	if context.elite_count >= (3 + t.elite_offset) then
 		return true, rule_prefix .. "_elite_pack"
 	end
 
-	if context.num_nearby >= 5 and context.challenge_rating_sum >= 3.0 then
+	if context.num_nearby >= (5 + t.density_offset) and context.challenge_rating_sum >= 3.0 then
 		return true, rule_prefix .. "_hold_point"
 	end
 
@@ -1334,7 +1370,7 @@ local function _grenade_smite(context)
 	return _grenade_priority_target(context, "grenade_smite", {
 		max_peril = 0.85,
 		min_distance = 5,
-	})
+	}, context.preset)
 end
 
 local function _grenade_assail(context)
@@ -1381,11 +1417,12 @@ local function _grenade_chain_lightning(context)
 		return false, "grenade_chain_lightning_block_peril"
 	end
 
-	if context.num_nearby >= 4 then
+	local t = CHAIN_LIGHTNING_THRESHOLDS[context.preset] or CHAIN_LIGHTNING_THRESHOLDS.balanced
+	if context.num_nearby >= t.crowd then
 		return true, "grenade_chain_lightning_crowd"
 	end
 
-	if context.num_nearby >= 3 and (context.elite_count + context.special_count) >= 1 then
+	if context.num_nearby >= t.mixed_nearby and (context.elite_count + context.special_count) >= 1 then
 		return true, "grenade_chain_lightning_crowd"
 	end
 
@@ -1394,56 +1431,56 @@ end
 
 local GRENADE_HEURISTICS = {
 	veteran_frag_grenade = function(context)
-		return _grenade_horde(context, 6, 2.5, "grenade_frag")
+		return _grenade_horde(context, 6, 2.5, "grenade_frag", context.preset)
 	end,
 	veteran_krak_grenade = function(context)
-		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 })
+		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 }, context.preset)
 	end,
 	veteran_smoke_grenade = function(context)
-		return _grenade_defensive(context, "grenade_smoke")
+		return _grenade_defensive(context, "grenade_smoke", context.preset)
 	end,
 	zealot_fire_grenade = function(context)
-		return _grenade_horde(context, 5, 2.5, "grenade_fire")
+		return _grenade_horde(context, 5, 2.5, "grenade_fire", context.preset)
 	end,
 	zealot_shock_grenade = function(context)
-		return _grenade_defensive(context, "grenade_shock")
+		return _grenade_defensive(context, "grenade_shock", context.preset)
 	end,
 	zealot_throwing_knives = function(context)
-		return _grenade_priority_target(context, "grenade_knives", { min_distance = 5 })
+		return _grenade_priority_target(context, "grenade_knives", { min_distance = 5 }, context.preset)
 	end,
 	ogryn_grenade_box = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_box")
+		return _grenade_horde(context, 5, 3.0, "grenade_box", context.preset)
 	end,
 	ogryn_grenade_box_cluster = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_box_cluster")
+		return _grenade_horde(context, 5, 3.0, "grenade_box_cluster", context.preset)
 	end,
 	ogryn_grenade_frag = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_ogryn_frag")
+		return _grenade_horde(context, 5, 3.0, "grenade_ogryn_frag", context.preset)
 	end,
 	ogryn_grenade_friend_rock = function(context)
-		return _grenade_priority_target(context, "grenade_rock", { min_distance = 6 })
+		return _grenade_priority_target(context, "grenade_rock", { min_distance = 6 }, context.preset)
 	end,
 	adamant_grenade = function(context)
-		return _grenade_horde(context, 4, 2.0, "grenade_adamant")
+		return _grenade_horde(context, 4, 2.0, "grenade_adamant", context.preset)
 	end,
 	adamant_grenade_improved = function(context)
-		return _grenade_horde(context, 4, 2.0, "grenade_adamant")
+		return _grenade_horde(context, 4, 2.0, "grenade_adamant", context.preset)
 	end,
 	adamant_shock_mine = function(context)
-		return _grenade_mine(context, "grenade_shock_mine")
+		return _grenade_mine(context, "grenade_shock_mine", context.preset)
 	end,
 	adamant_whistle = _grenade_whistle,
 	broker_flash_grenade = function(context)
-		return _grenade_defensive(context, "grenade_flash")
+		return _grenade_defensive(context, "grenade_flash", context.preset)
 	end,
 	broker_flash_grenade_improved = function(context)
-		return _grenade_defensive(context, "grenade_flash")
+		return _grenade_defensive(context, "grenade_flash", context.preset)
 	end,
 	broker_tox_grenade = function(context)
-		return _grenade_horde(context, 6, 3.0, "grenade_tox")
+		return _grenade_horde(context, 6, 3.0, "grenade_tox", context.preset)
 	end,
 	broker_missile_launcher = function(context)
-		return _grenade_priority_target(context, "grenade_missile", { min_distance = 8 })
+		return _grenade_priority_target(context, "grenade_missile", { min_distance = 8 }, context.preset)
 	end,
 	psyker_throwing_knives = _grenade_assail,
 	psyker_smite = _grenade_smite,
@@ -1696,17 +1733,22 @@ local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 		return false, "grenade_no_context"
 	end
 
+	local preset = (opts and opts.preset) or context.preset or "balanced"
+	local saved_preset = context.preset
+	context.preset = preset
+
 	local fn = GRENADE_HEURISTICS[grenade_template_name]
+	local can_activate, rule
 	if fn then
-		local can_activate, rule = fn(context)
-		return _apply_behavior_profile(can_activate, rule, context, opts)
+		can_activate, rule = fn(context)
+	elseif context.num_nearby > 0 then
+		can_activate, rule = true, "grenade_generic"
+	else
+		can_activate, rule = false, "grenade_no_enemies"
 	end
 
-	if context.num_nearby > 0 then
-		return _apply_behavior_profile(true, "grenade_generic", context, opts)
-	end
-
-	return _apply_behavior_profile(false, "grenade_no_enemies", context, opts)
+	context.preset = saved_preset
+	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
 return {
