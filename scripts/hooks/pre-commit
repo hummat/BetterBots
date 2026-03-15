@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Pre-commit hook: verify StyLua formatting on staged Lua files.
+# Install: git config core.hooksPath .githooks
+
+staged_lua=$(git diff --cached --name-only --diff-filter=ACM -- '*.lua')
+if [ -z "$staged_lua" ]; then
+	exit 0
+fi
+
+if ! command -v stylua &>/dev/null; then
+	echo "pre-commit: stylua not found, skipping format check"
+	exit 0
+fi
+
+if ! stylua --check $staged_lua; then
+	echo ""
+	echo "pre-commit: StyLua formatting violations in staged files."
+	echo "Run 'make format' and re-stage."
+	exit 1
+fi
