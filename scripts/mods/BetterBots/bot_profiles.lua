@@ -180,6 +180,11 @@ local function _resolve_profile_template(class_name)
 	LocalProfileBackendParser.parse_profile(profile, "betterbots_" .. class_name)
 	profile.archetype = saved_archetype -- restore table for spawning pipeline
 
+	-- The package synchronizer client iterates visual_loadout to resolve item packages.
+	-- Bot profiles don't have visual_loadout natively — vanilla bots get it set elsewhere.
+	-- Set it to loadout so the package system finds our weapons.
+	profile.visual_loadout = profile.visual_loadout or profile.loadout
+
 	_resolved_profiles[class_name] = profile
 
 	if _debug_enabled() then
