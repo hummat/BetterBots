@@ -48,7 +48,8 @@ This mod targets bot ability activation in three paths:
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
     - **Veteran dual-category gate**: `veteran_combat_ability` resolves its actual class tag at runtime (`ability_extension._equipped_abilities`) to route to `enable_stances` or `enable_shouts` — it is excluded from the static `TEMPLATE_TO_CATEGORY_SETTING` lookup table
-    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`
+    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
+    - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - `on_setting_changed` in `BetterBots.lua` calls `settings.lua` functions on every DMF setting change — no restart required
 12. Structured JSONL event logging (`event_log.lua`):
