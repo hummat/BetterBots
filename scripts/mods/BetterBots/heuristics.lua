@@ -3,6 +3,7 @@ local _decision_context_cache
 local _super_armor_breed_cache
 local _armor_type_super_armor
 local _is_testing_profile
+local _resolve_preset
 local _overlapping_liquids = {}
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
@@ -150,6 +151,8 @@ local function build_context(unit, blackboard)
 		in_hazard = false,
 	}
 
+	context.preset = _resolve_preset and _resolve_preset() or "balanced"
+
 	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit]
 	if unit_position then
 		context.in_hazard = _position_in_hostile_hazard(unit_position)
@@ -288,6 +291,42 @@ local function _resolve_veteran_class_tag(ability_extension)
 	return nil, "unknown"
 end
 
+local VETERAN_VOC_THRESHOLDS = {
+	aggressive = {
+		surrounded = 2,
+		low_toughness = 0.65,
+		low_toughness_nearby = 1,
+		critical_toughness = 0.40,
+		ally_aid_dist = 14,
+		block_safe_toughness = 0.70,
+		block_safe_max_enemies = 2,
+	},
+	balanced = {
+		surrounded = 3,
+		low_toughness = 0.50,
+		low_toughness_nearby = 2,
+		critical_toughness = 0.25,
+		ally_aid_dist = 9,
+		block_safe_toughness = 0.85,
+		block_safe_max_enemies = 1,
+	},
+	conservative = {
+		surrounded = 4,
+		low_toughness = 0.35,
+		low_toughness_nearby = 3,
+		critical_toughness = 0.15,
+		ally_aid_dist = 6,
+		block_safe_toughness = 0.95,
+		block_safe_max_enemies = 0,
+	},
+}
+
+local VETERAN_STANCE_THRESHOLDS = {
+	aggressive = { block_surrounded = 7, urgent_max_enemies = 3 },
+	balanced = { block_surrounded = 5, urgent_max_enemies = 2 },
+	conservative = { block_surrounded = 4, urgent_max_enemies = 1 },
+}
+
 local function _can_activate_veteran_combat_ability(
 	conditions,
 	unit,
@@ -297,26 +336,38 @@ local function _can_activate_veteran_combat_ability(
 	action_data,
 	is_running,
 	ability_extension,
-	context
+	context,
+	thresholds
 )
 	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
 	if class_tag == "squad_leader" then
+		local preset = context.preset or "balanced"
+		local thresholds_voc = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
 		if context.in_hazard and context.num_nearby >= 1 then
 			return true, "veteran_voc_hazard"
 		end
-		if context.num_nearby >= 3 then
+		if context.num_nearby >= thresholds_voc.surrounded then
 			return true, "veteran_voc_surrounded"
 		end
-		if context.toughness_pct < 0.50 and context.num_nearby >= 2 then
+		if
+			context.toughness_pct < thresholds_voc.low_toughness
+			and context.num_nearby >= thresholds_voc.low_toughness_nearby
+		then
 			return true, "veteran_voc_low_toughness"
 		end
-		if context.toughness_pct < 0.25 and context.num_nearby >= 1 then
+		if context.toughness_pct < thresholds_voc.critical_toughness and context.num_nearby >= 1 then
 			return true, "veteran_voc_critical_toughness"
 		end
-		if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) <= 9 then
+		if
+			context.target_ally_needs_aid
+			and (context.target_ally_distance or math.huge) <= thresholds_voc.ally_aid_dist
+		then
 			return true, "veteran_voc_ally_aid"
 		end
-		if context.toughness_pct > 0.85 and context.num_nearby <= 1 then
+		if
+			context.toughness_pct > thresholds_voc.block_safe_toughness
+			and context.num_nearby <= thresholds_voc.block_safe_max_enemies
+		then
 			return false, "veteran_voc_block_safe_state"
 		end
 
@@ -324,7 +375,7 @@ local function _can_activate_veteran_combat_ability(
 	end
 
 	if class_tag == "base" or class_tag == "ranger" then
-		if context.num_nearby > 5 and context.target_enemy_type == "melee" then
+		if context.num_nearby > thresholds.block_surrounded and context.target_enemy_type == "melee" then
 			return false, "veteran_stance_block_surrounded"
 		end
 
@@ -340,7 +391,7 @@ local function _can_activate_veteran_combat_ability(
 			return true, "veteran_stance_target_elite_special"
 		end
 
-		if context.urgent_target_enemy and context.num_nearby <= 2 then
+		if context.urgent_target_enemy and context.num_nearby <= thresholds.urgent_max_enemies then
 			return true, "veteran_stance_urgent_target"
 		end
 
@@ -350,14 +401,35 @@ local function _can_activate_veteran_combat_ability(
 	return nil, "veteran_variant_" .. source
 end
 
-local function _can_activate_veteran_stealth(context)
+local VETERAN_STEALTH_THRESHOLDS = {
+	aggressive = {
+		critical_toughness = 0.35,
+		low_health = 0.55,
+		overwhelmed_nearby = 4,
+		overwhelmed_toughness = 0.65,
+	},
+	balanced = {
+		critical_toughness = 0.25,
+		low_health = 0.40,
+		overwhelmed_nearby = 5,
+		overwhelmed_toughness = 0.50,
+	},
+	conservative = {
+		critical_toughness = 0.15,
+		low_health = 0.25,
+		overwhelmed_nearby = 6,
+		overwhelmed_toughness = 0.35,
+	},
+}
+
+local function _can_activate_veteran_stealth(context, thresholds)
 	if context.num_nearby == 0 then
 		return false, "veteran_stealth_block_no_enemies"
 	end
-	if context.toughness_pct < 0.25 and context.num_nearby >= 2 then
+	if context.toughness_pct < thresholds.critical_toughness and context.num_nearby >= 2 then
 		return true, "veteran_stealth_critical_toughness"
 	end
-	if context.health_pct < 0.40 and context.num_nearby >= 1 then
+	if context.health_pct < thresholds.low_health and context.num_nearby >= 1 then
 		return true, "veteran_stealth_low_health"
 	end
 	if
@@ -367,14 +439,44 @@ local function _can_activate_veteran_stealth(context)
 	then
 		return true, "veteran_stealth_ally_aid"
 	end
-	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+	if
+		context.num_nearby >= thresholds.overwhelmed_nearby
+		and context.toughness_pct < thresholds.overwhelmed_toughness
+	then
 		return true, "veteran_stealth_overwhelmed"
 	end
 
 	return false, "veteran_stealth_hold"
 end
 
-local function _can_activate_zealot_dash(context)
+local ZEALOT_DASH_THRESHOLDS = {
+	aggressive = {
+		low_toughness = 0.45,
+		elite_min_dist = 3,
+		elite_max_dist = 28,
+		combat_gap_nearby = 1,
+		combat_gap_min_dist = 3,
+		combat_gap_max_dist = 22,
+	},
+	balanced = {
+		low_toughness = 0.30,
+		elite_min_dist = 5,
+		elite_max_dist = 20,
+		combat_gap_nearby = 2,
+		combat_gap_min_dist = 4,
+		combat_gap_max_dist = 15,
+	},
+	conservative = {
+		low_toughness = 0.20,
+		elite_min_dist = 6,
+		elite_max_dist = 15,
+		combat_gap_nearby = 3,
+		combat_gap_min_dist = 5,
+		combat_gap_max_dist = 10,
+	},
+}
+
+local function _can_activate_zealot_dash(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if not context.target_enemy then
 		return false, "zealot_dash_block_no_target"
@@ -392,7 +494,7 @@ local function _can_activate_zealot_dash(context)
 		return true, "zealot_dash_priority_target"
 	end
 	if
-		context.toughness_pct < 0.30
+		context.toughness_pct < thresholds.low_toughness
 		and context.num_nearby > 0
 		and target_distance
 		and target_distance > 3
@@ -400,30 +502,73 @@ local function _can_activate_zealot_dash(context)
 	then
 		return true, "zealot_dash_low_toughness"
 	end
-	if context.target_is_elite_special and target_distance and target_distance > 5 and target_distance < 20 then
+	if
+		context.target_is_elite_special
+		and target_distance
+		and target_distance > thresholds.elite_min_dist
+		and target_distance < thresholds.elite_max_dist
+	then
 		return true, "zealot_dash_elite_special_gap"
 	end
-	if context.num_nearby >= 2 and target_distance and target_distance > 4 and target_distance < 15 then
+	if
+		context.num_nearby >= thresholds.combat_gap_nearby
+		and target_distance
+		and target_distance > thresholds.combat_gap_min_dist
+		and target_distance < thresholds.combat_gap_max_dist
+	then
 		return true, "zealot_dash_combat_gap_close"
 	end
 
 	return false, "zealot_dash_hold"
 end
 
-local function _can_activate_zealot_invisibility(context)
+local ZEALOT_INVISIBILITY_THRESHOLDS = {
+	aggressive = {
+		emergency_toughness = 0.45,
+		emergency_health = 0.45,
+		overwhelmed_nearby = 3,
+		overwhelmed_toughness = 0.75,
+		ally_dist = 18,
+		ally_nearby = 1,
+	},
+	balanced = {
+		emergency_toughness = 0.30,
+		emergency_health = 0.30,
+		overwhelmed_nearby = 4,
+		overwhelmed_toughness = 0.60,
+		ally_dist = 12,
+		ally_nearby = 2,
+	},
+	conservative = {
+		emergency_toughness = 0.20,
+		emergency_health = 0.20,
+		overwhelmed_nearby = 5,
+		overwhelmed_toughness = 0.45,
+		ally_dist = 8,
+		ally_nearby = 3,
+	},
+}
+
+local function _can_activate_zealot_invisibility(context, thresholds)
 	if context.num_nearby == 0 then
 		return false, "zealot_stealth_block_no_enemies"
 	end
-	if (context.toughness_pct < 0.30 and context.num_nearby >= 2) or context.health_pct < 0.30 then
+	if
+		(context.toughness_pct < thresholds.emergency_toughness and context.num_nearby >= 2)
+		or context.health_pct < thresholds.emergency_health
+	then
 		return true, "zealot_stealth_emergency"
 	end
-	if context.num_nearby >= 4 and context.toughness_pct < 0.60 then
+	if
+		context.num_nearby >= thresholds.overwhelmed_nearby
+		and context.toughness_pct < thresholds.overwhelmed_toughness
+	then
 		return true, "zealot_stealth_overwhelmed"
 	end
 	if
 		context.target_ally_needs_aid
-		and (context.target_ally_distance or math.huge) <= 12
-		and context.num_nearby >= 2
+		and (context.target_ally_distance or math.huge) <= thresholds.ally_dist
+		and context.num_nearby >= thresholds.ally_nearby
 	then
 		return true, "zealot_stealth_ally_reposition"
 	end
@@ -431,30 +576,69 @@ local function _can_activate_zealot_invisibility(context)
 	return false, "zealot_stealth_hold"
 end
 
-local function _can_activate_psyker_shout(context)
+local PSYKER_SHOUT_THRESHOLDS = {
+	aggressive = {
+		high_peril = 0.60,
+		surrounded = 2,
+		low_toughness = 0.30,
+		priority_dist = 30,
+		block_low_value_toughness = 0.35,
+	},
+	balanced = {
+		high_peril = 0.75,
+		surrounded = 3,
+		low_toughness = 0.20,
+		priority_dist = 20,
+		block_low_value_toughness = 0.50,
+	},
+	conservative = {
+		high_peril = 0.85,
+		surrounded = 4,
+		low_toughness = 0.12,
+		priority_dist = 15,
+		block_low_value_toughness = 0.65,
+	},
+}
+
+local function _can_activate_psyker_shout(context, thresholds)
 	if context.num_nearby == 0 then
 		return false, "psyker_shout_block_no_enemies"
 	end
-	if context.peril_pct and context.peril_pct >= 0.75 then
+	if context.peril_pct and context.peril_pct >= thresholds.high_peril then
 		return true, "psyker_shout_high_peril"
 	end
-	if context.num_nearby >= 3 then
+	if context.num_nearby >= thresholds.surrounded then
 		return true, "psyker_shout_surrounded"
 	end
-	if context.toughness_pct < 0.20 and context.num_nearby >= 1 then
+	if context.toughness_pct < thresholds.low_toughness and context.num_nearby >= 1 then
 		return true, "psyker_shout_low_toughness"
 	end
-	if context.priority_target_enemy and context.target_enemy_distance and context.target_enemy_distance <= 20 then
+	if
+		context.priority_target_enemy
+		and context.target_enemy_distance
+		and context.target_enemy_distance <= thresholds.priority_dist
+	then
 		return true, "psyker_shout_priority_target"
 	end
-	if context.peril_pct and context.peril_pct < 0.30 and context.num_nearby < 3 and context.toughness_pct > 0.50 then
+	if
+		context.peril_pct
+		and context.peril_pct < 0.30
+		and context.num_nearby < thresholds.surrounded
+		and context.toughness_pct > thresholds.block_low_value_toughness
+	then
 		return false, "psyker_shout_block_low_value"
 	end
 
 	return false, "psyker_shout_hold"
 end
 
-local function _can_activate_psyker_stance(context)
+local PSYKER_STANCE_THRESHOLDS = {
+	aggressive = { threat_cr = 3.0, combat_density = 2 },
+	balanced = { threat_cr = 4.0, combat_density = 3 },
+	conservative = { threat_cr = 5.0, combat_density = 4 },
+}
+
+local function _can_activate_psyker_stance(context, thresholds)
 	if context.peril_pct == nil then
 		return nil, "psyker_stance_missing_peril"
 	end
@@ -479,19 +663,40 @@ local function _can_activate_psyker_stance(context)
 		return true, "psyker_stance_target_window"
 	end
 	if
-		context.challenge_rating_sum >= 4.0
+		context.challenge_rating_sum >= thresholds.threat_cr
 		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
 	then
 		return true, "psyker_stance_threat_window"
 	end
-	if bot_no_peril and context.num_nearby >= 3 then
+	if bot_no_peril and context.num_nearby >= thresholds.combat_density then
 		return true, "psyker_stance_combat_density"
 	end
 
 	return false, "psyker_stance_hold"
 end
 
-local function _can_activate_ogryn_charge(context)
+local OGRYN_CHARGE_THRESHOLDS = {
+	aggressive = {
+		opportunity_min_dist = 4,
+		opportunity_max_dist = 28,
+		escape_nearby = 2,
+		escape_toughness = 0.45,
+	},
+	balanced = {
+		opportunity_min_dist = 6,
+		opportunity_max_dist = 20,
+		escape_nearby = 3,
+		escape_toughness = 0.30,
+	},
+	conservative = {
+		opportunity_min_dist = 8,
+		opportunity_max_dist = 15,
+		escape_nearby = 4,
+		escape_toughness = 0.20,
+	},
+}
+
+local function _can_activate_ogryn_charge(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if target_distance and target_distance < 4 then
 		return false, "ogryn_charge_block_target_too_close"
@@ -502,10 +707,15 @@ local function _can_activate_ogryn_charge(context)
 	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 6 then
 		return true, "ogryn_charge_ally_aid"
 	end
-	if context.opportunity_target_enemy and target_distance and target_distance >= 6 and target_distance <= 20 then
+	if
+		context.opportunity_target_enemy
+		and target_distance
+		and target_distance >= thresholds.opportunity_min_dist
+		and target_distance <= thresholds.opportunity_max_dist
+	then
 		return true, "ogryn_charge_opportunity_target"
 	end
-	if context.num_nearby >= 3 and context.toughness_pct < 0.30 then
+	if context.num_nearby >= thresholds.escape_nearby and context.toughness_pct < thresholds.escape_toughness then
 		return true, "ogryn_charge_escape"
 	end
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_ally_needs_aid then
@@ -518,35 +728,94 @@ local function _can_activate_ogryn_charge(context)
 	return false, "ogryn_charge_hold"
 end
 
-local function _can_activate_ogryn_taunt(context)
+local OGRYN_TAUNT_THRESHOLDS = {
+	aggressive = {
+		horde_nearby = 2,
+		horde_toughness = 0.20,
+		horde_health = 0.15,
+		high_threat_cr = 3.0,
+		block_low_value_enemies = 3,
+		block_low_value_cr = 2.5,
+	},
+	balanced = {
+		horde_nearby = 3,
+		horde_toughness = 0.35,
+		horde_health = 0.25,
+		high_threat_cr = 4.0,
+		block_low_value_enemies = 2,
+		block_low_value_cr = 1.5,
+	},
+	conservative = {
+		horde_nearby = 4,
+		horde_toughness = 0.50,
+		horde_health = 0.35,
+		high_threat_cr = 5.0,
+		block_low_value_enemies = 1,
+		block_low_value_cr = 1.0,
+	},
+}
+
+local function _can_activate_ogryn_taunt(context, thresholds)
 	if context.toughness_pct < 0.20 and context.health_pct < 0.30 then
 		return false, "ogryn_taunt_block_too_fragile"
 	end
 	if context.target_ally_needs_aid and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
 		return true, "ogryn_taunt_ally_aid"
 	end
-	if context.num_nearby >= 3 and context.toughness_pct > 0.35 and context.health_pct > 0.25 then
+	if
+		context.num_nearby >= thresholds.horde_nearby
+		and context.toughness_pct > thresholds.horde_toughness
+		and context.health_pct > thresholds.horde_health
+	then
 		return true, "ogryn_taunt_horde_control"
 	end
-	if context.challenge_rating_sum >= 4.0 and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
+	if
+		context.challenge_rating_sum >= thresholds.high_threat_cr
+		and context.num_nearby >= 2
+		and context.toughness_pct > 0.30
+	then
 		return true, "ogryn_taunt_high_threat"
 	end
-	if context.num_nearby <= 2 and context.challenge_rating_sum < 1.5 then
+	if
+		context.num_nearby <= thresholds.block_low_value_enemies
+		and context.challenge_rating_sum < thresholds.block_low_value_cr
+	then
 		return false, "ogryn_taunt_block_low_value"
 	end
 
 	return false, "ogryn_taunt_hold"
 end
 
-local function _can_activate_ogryn_gunlugger(context)
+local OGRYN_GUNLUGGER_THRESHOLDS = {
+	aggressive = {
+		block_melee_nearby = 5,
+		block_low_threat_cr = 1.0,
+		high_threat_cr = 3.0,
+		high_threat_max_enemies = 3,
+	},
+	balanced = {
+		block_melee_nearby = 4,
+		block_low_threat_cr = 1.5,
+		high_threat_cr = 4.0,
+		high_threat_max_enemies = 2,
+	},
+	conservative = {
+		block_melee_nearby = 3,
+		block_low_threat_cr = 2.0,
+		high_threat_cr = 5.5,
+		high_threat_max_enemies = 1,
+	},
+}
+
+local function _can_activate_ogryn_gunlugger(context, thresholds)
 	local target_distance = context.target_enemy_distance
-	if context.num_nearby >= 4 then
+	if context.num_nearby >= thresholds.block_melee_nearby then
 		return false, "ogryn_gunlugger_block_melee_pressure"
 	end
 	if target_distance and target_distance < 4 then
 		return false, "ogryn_gunlugger_block_target_too_close"
 	end
-	if context.challenge_rating_sum < 1.5 then
+	if context.challenge_rating_sum < thresholds.block_low_threat_cr then
 		return false, "ogryn_gunlugger_block_low_threat"
 	end
 	if context.urgent_target_enemy and context.num_nearby <= 1 and target_distance and target_distance > 5 then
@@ -560,35 +829,82 @@ local function _can_activate_ogryn_gunlugger(context)
 	then
 		return true, "ogryn_gunlugger_ranged_pack"
 	end
-	if context.challenge_rating_sum >= 4.0 and target_distance and target_distance > 5 and context.num_nearby <= 2 then
+	if
+		context.challenge_rating_sum >= thresholds.high_threat_cr
+		and target_distance
+		and target_distance > 5
+		and context.num_nearby <= thresholds.high_threat_max_enemies
+	then
 		return true, "ogryn_gunlugger_high_threat"
 	end
 
 	return false, "ogryn_gunlugger_hold"
 end
 
-local function _can_activate_adamant_stance(context)
+local ADAMANT_STANCE_THRESHOLDS = {
+	aggressive = {
+		low_toughness = 0.45,
+		surrounded_nearby = 1,
+		surrounded_toughness = 0.85,
+		elite_count = 1,
+		elite_toughness = 0.65,
+		block_safe_toughness = 0.55,
+		block_safe_max_enemies = 2,
+	},
+	balanced = {
+		low_toughness = 0.30,
+		surrounded_nearby = 2,
+		surrounded_toughness = 0.70,
+		elite_count = 2,
+		elite_toughness = 0.50,
+		block_safe_toughness = 0.70,
+		block_safe_max_enemies = 1,
+	},
+	conservative = {
+		low_toughness = 0.20,
+		surrounded_nearby = 3,
+		surrounded_toughness = 0.55,
+		elite_count = 3,
+		elite_toughness = 0.35,
+		block_safe_toughness = 0.80,
+		block_safe_max_enemies = 0,
+	},
+}
+
+local function _can_activate_adamant_stance(context, thresholds)
 	local target_distance = context.target_enemy_distance
-	if context.toughness_pct < 0.30 then
+	if context.toughness_pct < thresholds.low_toughness then
 		return true, "adamant_stance_low_toughness"
 	end
-	if context.num_nearby >= 2 and context.toughness_pct < 0.70 then
+	if
+		context.num_nearby >= thresholds.surrounded_nearby
+		and context.toughness_pct < thresholds.surrounded_toughness
+	then
 		return true, "adamant_stance_surrounded"
 	end
 	if context.target_is_monster and target_distance and target_distance < 8 then
 		return true, "adamant_stance_monster_pressure"
 	end
-	if context.elite_count >= 2 and context.toughness_pct < 0.50 then
+	if context.elite_count >= thresholds.elite_count and context.toughness_pct < thresholds.elite_toughness then
 		return true, "adamant_stance_elite_pressure"
 	end
-	if context.toughness_pct > 0.70 and context.num_nearby <= 1 then
+	if
+		context.toughness_pct > thresholds.block_safe_toughness
+		and context.num_nearby <= thresholds.block_safe_max_enemies
+	then
 		return false, "adamant_stance_block_safe_state"
 	end
 
 	return false, "adamant_stance_hold"
 end
 
-local function _can_activate_adamant_charge(context)
+local ADAMANT_CHARGE_THRESHOLDS = {
+	aggressive = { density_nearby = 1, density_max_dist = 14 },
+	balanced = { density_nearby = 2, density_max_dist = 10 },
+	conservative = { density_nearby = 3, density_max_dist = 7 },
+}
+
+local function _can_activate_adamant_charge(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if target_distance and target_distance < 3 then
 		return false, "adamant_charge_block_target_too_close"
@@ -599,10 +915,20 @@ local function _can_activate_adamant_charge(context)
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_is_elite_special then
 		return false, "adamant_charge_block_no_pressure"
 	end
-	if context.num_nearby >= 2 and target_distance and target_distance > 3 and target_distance < 10 then
+	if
+		context.num_nearby >= thresholds.density_nearby
+		and target_distance
+		and target_distance > 3
+		and target_distance < thresholds.density_max_dist
+	then
 		return true, "adamant_charge_density"
 	end
-	if context.target_is_elite_special and target_distance and target_distance > 3 and target_distance < 10 then
+	if
+		context.target_is_elite_special
+		and target_distance
+		and target_distance > 3
+		and target_distance < thresholds.density_max_dist
+	then
 		return true, "adamant_charge_elite_special"
 	end
 	if context.priority_target_enemy and target_distance and target_distance > 3 then
@@ -612,17 +938,41 @@ local function _can_activate_adamant_charge(context)
 	return false, "adamant_charge_hold"
 end
 
-local function _can_activate_adamant_shout(context)
-	if context.toughness_pct < 0.25 and context.num_nearby >= 2 then
+local ADAMANT_SHOUT_THRESHOLDS = {
+	aggressive = {
+		low_toughness = 0.40,
+		low_toughness_nearby = 1,
+		density_nearby = 3,
+		density_toughness = 0.75,
+		elite_toughness = 0.65,
+	},
+	balanced = {
+		low_toughness = 0.25,
+		low_toughness_nearby = 2,
+		density_nearby = 4,
+		density_toughness = 0.60,
+		elite_toughness = 0.50,
+	},
+	conservative = {
+		low_toughness = 0.15,
+		low_toughness_nearby = 3,
+		density_nearby = 5,
+		density_toughness = 0.45,
+		elite_toughness = 0.35,
+	},
+}
+
+local function _can_activate_adamant_shout(context, thresholds)
+	if context.toughness_pct < thresholds.low_toughness and context.num_nearby >= thresholds.low_toughness_nearby then
 		return true, "adamant_shout_low_toughness"
 	end
-	if context.num_nearby >= 4 and context.toughness_pct < 0.60 then
+	if context.num_nearby >= thresholds.density_nearby and context.toughness_pct < thresholds.density_toughness then
 		return true, "adamant_shout_density"
 	end
 	if
 		(context.elite_count + context.special_count) >= 1
 		and context.num_nearby >= 2
-		and context.toughness_pct < 0.50
+		and context.toughness_pct < thresholds.elite_toughness
 	then
 		return true, "adamant_shout_elite_pressure"
 	end
@@ -670,17 +1020,45 @@ local function _can_activate_broker_rage(context)
 	return false, "broker_rage_hold"
 end
 
-local function _can_activate_zealot_relic(context)
+local ZEALOT_RELIC_THRESHOLDS = {
+	aggressive = {
+		team_toughness = 0.55,
+		team_max_enemies = 3,
+		self_critical_toughness = 0.35,
+		self_max_enemies = 4,
+	},
+	balanced = {
+		team_toughness = 0.40,
+		team_max_enemies = 2,
+		self_critical_toughness = 0.25,
+		self_max_enemies = 3,
+	},
+	conservative = {
+		team_toughness = 0.30,
+		team_max_enemies = 1,
+		self_critical_toughness = 0.15,
+		self_max_enemies = 2,
+	},
+}
+
+local function _can_activate_zealot_relic(context, thresholds)
 	if context.in_hazard and context.num_nearby >= 1 then
 		return true, "zealot_relic_hazard"
 	end
 	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
 		return false, "zealot_relic_block_overwhelmed"
 	end
-	if context.avg_ally_toughness_pct < 0.40 and context.allies_in_coherency >= 2 and context.num_nearby < 2 then
+	if
+		context.avg_ally_toughness_pct < thresholds.team_toughness
+		and context.allies_in_coherency >= 2
+		and context.num_nearby < thresholds.team_max_enemies
+	then
 		return true, "zealot_relic_team_low_toughness"
 	end
-	if context.toughness_pct < 0.25 and context.num_nearby < 3 then
+	if
+		context.toughness_pct < thresholds.self_critical_toughness
+		and context.num_nearby < thresholds.self_max_enemies
+	then
 		return true, "zealot_relic_self_critical"
 	end
 	if context.allies_in_coherency == 0 then
@@ -689,39 +1067,84 @@ local function _can_activate_zealot_relic(context)
 	return false, "zealot_relic_hold"
 end
 
-local function _can_activate_force_field(context)
+local FORCE_FIELD_THRESHOLDS = {
+	aggressive = {
+		block_safe_toughness = 0.65,
+		pressure_nearby = 2,
+		pressure_toughness = 0.55,
+		ranged_toughness = 0.75,
+	},
+	balanced = {
+		block_safe_toughness = 0.80,
+		pressure_nearby = 3,
+		pressure_toughness = 0.40,
+		ranged_toughness = 0.60,
+	},
+	conservative = {
+		block_safe_toughness = 0.90,
+		pressure_nearby = 4,
+		pressure_toughness = 0.25,
+		ranged_toughness = 0.45,
+	},
+}
+
+local function _can_activate_force_field(context, thresholds)
 	if context.num_nearby == 0 and not context.target_enemy then
 		return false, "force_field_block_no_threats"
 	end
 	if context.target_ally_needs_aid then
 		return true, "force_field_ally_aid"
 	end
-	if context.toughness_pct > 0.80 then
+	if context.toughness_pct > thresholds.block_safe_toughness then
 		return false, "force_field_block_safe"
 	end
-	if context.num_nearby >= 3 and context.toughness_pct < 0.40 then
+	if context.num_nearby >= thresholds.pressure_nearby and context.toughness_pct < thresholds.pressure_toughness then
 		return true, "force_field_pressure"
 	end
-	if context.target_enemy_type == "ranged" and context.toughness_pct < 0.60 then
+	if context.target_enemy_type == "ranged" and context.toughness_pct < thresholds.ranged_toughness then
 		return true, "force_field_ranged_pressure"
 	end
 	return false, "force_field_hold"
 end
 
-local function _can_activate_drone(context)
+local DRONE_THRESHOLDS = {
+	aggressive = {
+		block_low_value_enemies = 1,
+		team_horde_nearby = 3,
+		overwhelmed_nearby = 4,
+		overwhelmed_toughness = 0.65,
+	},
+	balanced = {
+		block_low_value_enemies = 2,
+		team_horde_nearby = 4,
+		overwhelmed_nearby = 5,
+		overwhelmed_toughness = 0.50,
+	},
+	conservative = {
+		block_low_value_enemies = 3,
+		team_horde_nearby = 5,
+		overwhelmed_nearby = 6,
+		overwhelmed_toughness = 0.35,
+	},
+}
+
+local function _can_activate_drone(context, thresholds)
 	if context.allies_in_coherency == 0 then
 		return false, "drone_block_no_allies"
 	end
 	if context.target_is_monster and context.allies_in_coherency >= 1 then
 		return true, "drone_monster_fight"
 	end
-	if context.num_nearby <= 2 then
+	if context.num_nearby <= thresholds.block_low_value_enemies then
 		return false, "drone_block_low_value"
 	end
-	if context.allies_in_coherency >= 2 and context.num_nearby >= 4 then
+	if context.allies_in_coherency >= 2 and context.num_nearby >= thresholds.team_horde_nearby then
 		return true, "drone_team_horde"
 	end
-	if context.num_nearby >= 5 and context.toughness_pct < 0.50 then
+	if
+		context.num_nearby >= thresholds.overwhelmed_nearby
+		and context.toughness_pct < thresholds.overwhelmed_toughness
+	then
 		return true, "drone_overwhelmed"
 	end
 	return false, "drone_hold"
@@ -741,50 +1164,50 @@ local function _can_activate_stimm_field(context)
 end
 
 local TEMPLATE_HEURISTICS = {
-	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_veteran_stealth(context)
+	veteran_stealth_combat_ability = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_veteran_stealth(context, thresholds)
 	end,
-	zealot_dash = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_zealot_dash(context)
+	zealot_dash = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_zealot_dash(context, thresholds)
 	end,
-	zealot_targeted_dash = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_zealot_dash(context)
+	zealot_targeted_dash = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_zealot_dash(context, thresholds)
 	end,
-	zealot_targeted_dash_improved = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_zealot_dash(context)
+	zealot_targeted_dash_improved = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_zealot_dash(context, thresholds)
 	end,
-	zealot_targeted_dash_improved_double = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_zealot_dash(context)
+	zealot_targeted_dash_improved_double = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_zealot_dash(context, thresholds)
 	end,
-	zealot_invisibility = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_zealot_invisibility(context)
+	zealot_invisibility = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_zealot_invisibility(context, thresholds)
 	end,
-	psyker_shout = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_psyker_shout(context)
+	psyker_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_psyker_shout(context, thresholds)
 	end,
-	psyker_overcharge_stance = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_psyker_stance(context)
+	psyker_overcharge_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_psyker_stance(context, thresholds)
 	end,
-	ogryn_charge = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_ogryn_charge(context)
+	ogryn_charge = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_ogryn_charge(context, thresholds)
 	end,
-	ogryn_charge_increased_distance = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_ogryn_charge(context)
+	ogryn_charge_increased_distance = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_ogryn_charge(context, thresholds)
 	end,
-	ogryn_taunt_shout = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_ogryn_taunt(context)
+	ogryn_taunt_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_ogryn_taunt(context, thresholds)
 	end,
-	ogryn_gunlugger_stance = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_ogryn_gunlugger(context)
+	ogryn_gunlugger_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_ogryn_gunlugger(context, thresholds)
 	end,
-	adamant_stance = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_adamant_stance(context)
+	adamant_stance = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_adamant_stance(context, thresholds)
 	end,
-	adamant_charge = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_adamant_charge(context)
+	adamant_charge = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_adamant_charge(context, thresholds)
 	end,
-	adamant_shout = function(_, _, _, _, _, _, _, _, context)
-		return _can_activate_adamant_shout(context)
+	adamant_shout = function(_, _, _, _, _, _, _, _, context, thresholds)
+		return _can_activate_adamant_shout(context, thresholds)
 	end,
 	broker_focus = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_broker_focus(context)
@@ -792,6 +1215,32 @@ local TEMPLATE_HEURISTICS = {
 	broker_punk_rage = function(_, _, _, _, _, _, _, _, context)
 		return _can_activate_broker_rage(context)
 	end,
+}
+
+local HEURISTIC_THRESHOLDS = {
+	veteran_stealth_combat_ability = VETERAN_STEALTH_THRESHOLDS,
+	zealot_dash = ZEALOT_DASH_THRESHOLDS,
+	zealot_targeted_dash = ZEALOT_DASH_THRESHOLDS,
+	zealot_targeted_dash_improved = ZEALOT_DASH_THRESHOLDS,
+	zealot_targeted_dash_improved_double = ZEALOT_DASH_THRESHOLDS,
+	zealot_invisibility = ZEALOT_INVISIBILITY_THRESHOLDS,
+	psyker_shout = PSYKER_SHOUT_THRESHOLDS,
+	psyker_overcharge_stance = PSYKER_STANCE_THRESHOLDS,
+	ogryn_charge = OGRYN_CHARGE_THRESHOLDS,
+	ogryn_charge_increased_distance = OGRYN_CHARGE_THRESHOLDS,
+	ogryn_taunt_shout = OGRYN_TAUNT_THRESHOLDS,
+	ogryn_gunlugger_stance = OGRYN_GUNLUGGER_THRESHOLDS,
+	adamant_stance = ADAMANT_STANCE_THRESHOLDS,
+	adamant_charge = ADAMANT_CHARGE_THRESHOLDS,
+	adamant_shout = ADAMANT_SHOUT_THRESHOLDS,
+}
+
+local ITEM_THRESHOLDS = {
+	zealot_relic = ZEALOT_RELIC_THRESHOLDS,
+	psyker_force_field = FORCE_FIELD_THRESHOLDS,
+	psyker_force_field_improved = FORCE_FIELD_THRESHOLDS,
+	psyker_force_field_dome = FORCE_FIELD_THRESHOLDS,
+	adamant_area_buff_drone = DRONE_THRESHOLDS,
 }
 
 local ITEM_HEURISTICS = {
@@ -1013,7 +1462,10 @@ local function _evaluate_template_heuristic(
 	ability_extension,
 	context
 )
+	local preset = context.preset or "balanced"
+
 	if ability_template_name == "veteran_combat_ability" then
+		local vet_thresholds = VETERAN_STANCE_THRESHOLDS[preset] or VETERAN_STANCE_THRESHOLDS.balanced
 		return _can_activate_veteran_combat_ability(
 			conditions,
 			unit,
@@ -1023,7 +1475,8 @@ local function _evaluate_template_heuristic(
 			action_data,
 			is_running,
 			ability_extension,
-			context
+			context,
+			vet_thresholds
 		)
 	end
 
@@ -1031,6 +1484,9 @@ local function _evaluate_template_heuristic(
 	if not fn then
 		return nil, "fallback_unhandled_template"
 	end
+
+	local threshold_table = HEURISTIC_THRESHOLDS[ability_template_name]
+	local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
 
 	return fn(
 		conditions,
@@ -1041,11 +1497,15 @@ local function _evaluate_template_heuristic(
 		action_data,
 		is_running,
 		ability_extension,
-		context
+		context,
+		thresholds
 	)
 end
 
 local function _testing_profile_active(opts)
+	if opts and opts.preset then
+		return opts.preset == "testing"
+	end
 	if opts and opts.behavior_profile then
 		return opts.behavior_profile == "testing"
 	end
@@ -1178,8 +1638,16 @@ end
 -- context table without touching engine state. For veteran_combat_ability, pass
 -- opts.conditions and opts.ability_extension.
 local function evaluate_heuristic(template_name, context, opts)
+	opts = opts or {}
+	local preset = opts.preset or context.preset or "balanced"
+	local saved_preset = context.preset
+	context.preset = preset
+
 	if template_name == "veteran_combat_ability" then
-		opts = opts or {}
+		local tag = _resolve_veteran_class_tag(opts.ability_extension)
+		local threshold_table = (tag == "squad_leader") and VETERAN_VOC_THRESHOLDS or VETERAN_STANCE_THRESHOLDS
+		local thresholds = threshold_table[preset] or threshold_table.balanced
+
 		local can_activate, rule = _can_activate_veteran_combat_ability(
 			opts.conditions or {},
 			opts.unit,
@@ -1189,18 +1657,24 @@ local function evaluate_heuristic(template_name, context, opts)
 			nil,
 			false,
 			opts.ability_extension,
-			context
+			context,
+			thresholds
 		)
 
+		context.preset = saved_preset
 		return _apply_behavior_profile(can_activate, rule, context, opts)
 	end
 
 	local fn = TEMPLATE_HEURISTICS[template_name]
 	if not fn then
+		context.preset = saved_preset
 		return nil, "fallback_unhandled_template"
 	end
 
-	local can_activate, rule = fn(nil, nil, nil, nil, nil, nil, nil, nil, context)
+	local threshold_table = HEURISTIC_THRESHOLDS[template_name]
+	local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
+	local can_activate, rule = fn(nil, nil, nil, nil, nil, nil, nil, nil, context, thresholds)
+	context.preset = saved_preset
 	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
@@ -1210,7 +1684,10 @@ local function evaluate_item_heuristic(ability_name, context, opts)
 		return false, "unknown_item_ability"
 	end
 
-	local can_activate, rule = fn(context)
+	local preset = (opts and opts.preset) or context.preset or "balanced"
+	local threshold_table = ITEM_THRESHOLDS[ability_name]
+	local thresholds = threshold_table and (threshold_table[preset] or threshold_table.balanced) or nil
+	local can_activate, rule = fn(context, thresholds)
 	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
@@ -1239,6 +1716,7 @@ return {
 		_super_armor_breed_cache = deps.super_armor_breed_cache
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
 		_is_testing_profile = deps.is_testing_profile
+		_resolve_preset = deps.resolve_preset
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

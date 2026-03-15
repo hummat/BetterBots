@@ -40,7 +40,7 @@ local TEMPLATE_TO_CATEGORY_SETTING = {}
 local CATEGORY_TO_SETTING = {
 	{ table = CATEGORY_STANCES, setting = "enable_stances" },
 	{ table = CATEGORY_CHARGES, setting = "enable_charges" },
-	{ table = CATEGORY_SHOUTS,  setting = "enable_shouts" },
+	{ table = CATEGORY_SHOUTS, setting = "enable_shouts" },
 	{ table = CATEGORY_STEALTH, setting = "enable_stealth" },
 }
 
@@ -62,10 +62,10 @@ local DEPLOYABLE_ITEMS = {
 
 -- Feature gates: feature_name → setting_id
 local FEATURE_GATES = {
-	sprint          = "enable_sprint",
-	pinging         = "enable_pinging",
+	sprint = "enable_sprint",
+	pinging = "enable_pinging",
 	special_penalty = "enable_special_penalty",
-	poxburster      = "enable_poxburster",
+	poxburster = "enable_poxburster",
 }
 
 -- Preset system
