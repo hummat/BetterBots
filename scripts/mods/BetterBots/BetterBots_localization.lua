@@ -213,7 +213,7 @@ return {
 		en = "Bot Weapon Quality",
 	},
 	bot_weapon_quality_description = {
-		en = "Controls how strong bot weapons are. Auto scales with mission difficulty. Affects damage, stagger, and other weapon stats.",
+		en = "Controls bot weapon power level. Auto scales with difficulty. Affects damage, stagger, and other stats.",
 	},
 	bot_weapon_quality_auto = {
 		en = "Auto (scales with difficulty)",
