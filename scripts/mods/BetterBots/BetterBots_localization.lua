@@ -204,10 +204,31 @@ return {
 		en = "Zealot - Purgation Flamer + Relic Blade",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Voidblast Staff + Force Greatsword",
+		en = "Psyker - Surge Staff + Force Greatsword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Rumbler + Power Maul",
+		en = "Ogryn - Heavy Stubber + Power Maul",
+	},
+	bot_weapon_quality = {
+		en = "Bot Weapon Quality",
+	},
+	bot_weapon_quality_description = {
+		en = "Controls how strong bot weapons are. Auto scales with mission difficulty. Affects damage, stagger, and other weapon stats.",
+	},
+	bot_weapon_quality_auto = {
+		en = "Auto (scales with difficulty)",
+	},
+	bot_weapon_quality_low = {
+		en = "Low (Sedition/Uprising)",
+	},
+	bot_weapon_quality_medium = {
+		en = "Medium (Malice/Heresy)",
+	},
+	bot_weapon_quality_high = {
+		en = "High (Damnation)",
+	},
+	bot_weapon_quality_max = {
+		en = "Max (fully empowered god-roll, expertise 500)",
 	},
 	-- Diagnostics
 	enable_debug_logs = {

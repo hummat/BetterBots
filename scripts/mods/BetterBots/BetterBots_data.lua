@@ -150,6 +150,18 @@ return {
 							{ text = "bot_profile_ogryn", value = "ogryn" },
 						},
 					},
+					{
+						setting_id = "bot_weapon_quality",
+						type = "dropdown",
+						default_value = "auto",
+						options = {
+							{ text = "bot_weapon_quality_auto", value = "auto" },
+							{ text = "bot_weapon_quality_low", value = "low" },
+							{ text = "bot_weapon_quality_medium", value = "medium" },
+							{ text = "bot_weapon_quality_high", value = "high" },
+							{ text = "bot_weapon_quality_max", value = "max" },
+						},
+					},
 				},
 			},
 			-- Group: Diagnostics

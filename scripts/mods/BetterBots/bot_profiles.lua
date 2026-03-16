@@ -536,15 +536,72 @@ local function _resolve_profile_template(class_name)
 	-- For weapon slots with overrides (blessings/perks), use get_item_instance with a
 	-- synthetic gear table so overrides are merged onto the base item via the proxy metatable.
 	-- For everything else (cosmetics, trinkets), use get_item_or_fallback (bare definition).
+	--
+	-- Weapon stat quality: configurable via "Bot Weapon Quality" setting.
+	-- In-game, players empower weapons at the Omnissiah in steps of 10, up to power 500.
+	-- Power level drives how far each stat bar fills toward its per-stat maximum (60-80%).
+	-- At power 500, all stats are at their individual maximums.
+	--
+	-- Under the hood: base_stats[].value (0.0-1.0) lerps between each stat template's
+	-- "basic" and "perfect" values. The expertise formula is:
+	--   expertise = floor((sum(values)*100 - 80) / 6) * 10
+	-- Reversing: stat_value_per_stat = (power/10 * 6 + 80) / num_stats / 100
+	-- For a 5-stat weapon at power 500: (50*6+80)/5/100 = 380/500 = 0.76
+	--
+	-- "Auto" scales with difficulty to match what a player at that tier would have.
+	local QUALITY_POWER_LEVELS = { low = 200, medium = 350, high = 450, max = 500 }
+	local AUTO_POWER_BY_CHALLENGE = {
+		[1] = 200, -- sedition
+		[2] = 300, -- uprising
+		[3] = 380, -- malice
+		[4] = 450, -- heresy
+		[5] = 500, -- damnation/havoc
+	}
+
+	local quality_setting = _mod and _mod:get("bot_weapon_quality") or "auto"
+	local target_power = QUALITY_POWER_LEVELS[quality_setting]
+	if not target_power then
+		-- Auto: read difficulty
+		local difficulty_manager = Managers and Managers.state and Managers.state.difficulty
+		local challenge = difficulty_manager and difficulty_manager:get_challenge() or 3
+		target_power = AUTO_POWER_BY_CHALLENGE[challenge] or 380
+	end
+
 	local weapon_overrides = template.weapon_overrides
 	for slot_name, item_id in pairs(profile.loadout) do
 		local overrides = weapon_overrides and weapon_overrides[slot_name]
 		if overrides then
+			-- Read the master item definition to discover its stat names,
+			-- then construct a base_stats array with uniform quality value.
+			-- Discover stat names from the weapon template (NOT the MasterItems catalog —
+			-- the catalog doesn't carry base_stats). Extract template name from the content
+			-- path and look it up in WeaponTemplates.
+			local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
+			local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
+			local weapon_template = template_name and WeaponTemplates[template_name]
+			local base_stats_override = {}
+			if weapon_template and weapon_template.base_stats then
+				for stat_name, _ in pairs(weapon_template.base_stats) do
+					base_stats_override[#base_stats_override + 1] = { name = stat_name }
+				end
+			end
+			local num_stats = math.max(1, #base_stats_override)
+			local total_stat_points = target_power / 10 * 6 + 80
+			local stat_value = math.min(1.0, total_stat_points / num_stats / 100)
+			for _, stat in ipairs(base_stats_override) do
+				stat.value = stat_value
+			end
+
+			-- baseItemLevel for display: use total_stat_points (matches total_stats_value)
+			local base_item_level = math.floor(total_stat_points + 0.5)
+
 			local gear_id = "betterbots_" .. class_name .. "_" .. slot_name
 			local gear = {
 				masterDataInstance = {
 					id = item_id,
 					overrides = {
+						baseItemLevel = base_item_level,
+						base_stats = base_stats_override,
 						traits = overrides.traits or {},
 						perks = overrides.perks or {},
 					},
@@ -553,6 +610,35 @@ local function _resolve_profile_template(class_name)
 			}
 			local item = MasterItems.get_item_instance(gear, gear_id)
 			profile.loadout[slot_name] = item
+
+			if _debug_enabled() then
+				local stat_names = {}
+				for _, s in ipairs(base_stats_override) do
+					stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
+				end
+				_debug_log(
+					"bot_profiles:weapon:" .. class_name .. ":" .. slot_name,
+					0,
+					slot_name
+						.. " quality="
+						.. tostring(quality_setting)
+						.. " power="
+						.. tostring(target_power)
+						.. " stat_value="
+						.. string.format("%.2f", stat_value)
+						.. " baseItemLevel="
+						.. tostring(base_item_level)
+						.. " stats="
+						.. tostring(#base_stats_override)
+						.. " ("
+						.. table.concat(stat_names, ",")
+						.. ")"
+						.. " traits="
+						.. tostring(#(overrides.traits or {}))
+						.. " perks="
+						.. tostring(#(overrides.perks or {}))
+				)
+			end
 		else
 			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
 			profile.loadout[slot_name] = item
