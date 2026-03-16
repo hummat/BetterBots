@@ -715,6 +715,7 @@ local function resolve_profile(profile)
 	-- talents, gestalts, and voice. Item objects are direct MasterItems cache references
 	-- — no copying needed.
 	profile.archetype = resolved.archetype
+	profile.current_level = resolved.current_level or 30
 	profile.gender = resolved.gender
 	profile.selected_voice = resolved.selected_voice
 	profile.talents = resolved.talents or {}
