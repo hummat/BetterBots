@@ -27,7 +27,7 @@ local SLOT_SETTING_IDS = {
 -- These get resolved to full item objects at hook time via MasterItems.
 --
 -- Talent tables sourced from hadrons-blessing builds (2026-03-16):
---   veteran: 03-slinking-veteran, zealot: 04-spicy-meta-zealot,
+--   veteran: 01-veteran-squad-leader, zealot: 04-spicy-meta-zealot,
 --   psyker: 08-gandalf-melee-wizard, ogryn: 11-explodegryn.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
 local DEFAULT_PROFILE_TEMPLATES = {
@@ -44,21 +44,27 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 03-slinking-veteran (Executioner's Stance + Sniper's Focus)
+		-- Source: 01-veteran-squad-leader (Voice of Command + Focus Target)
+		-- Chosen over 03-slinking-veteran because bots can't headshot, making
+		-- Sniper's Focus and lasweapon_crit talents ineffective with plasma.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			veteran_combat_ability_elite_and_special_outlines = 1,
+			veteran_combat_ability_stagger_nearby_enemies = 1,
 			veteran_grenade_apply_bleed = 1,
 			veteran_aura_gain_ammo_on_elite_kill_improved = 1,
-			veteran_snipers_focus = 1,
+			veteran_improved_tag = 1,
 			-- Class talents
-			veteran_aura_elite_kills_restore_grenade = 1,
+			veteran_crits_apply_rending = 1,
+			veteran_increase_damage_after_sprinting = 1,
+			veteran_increased_melee_crit_chance_and_melee_finesse = 1,
+			veteran_dodging_grants_crit = 1,
+			veteran_hits_cause_bleed = 1,
+			veteran_attack_speed = 1,
 			veteran_replenish_toughness_outside_melee = 1,
-			veteran_ranged_power_out_of_melee = 1,
-			veteran_no_ammo_consumption_on_lasweapon_crit = 1,
 			veteran_replenish_toughness_on_weakspot_kill = 1,
+			veteran_improved_grenades = 1,
+			veteran_allies_in_coherency_share_toughness_gain = 1,
 			veteran_replenish_grenades = 1,
-			veteran_better_deployables = 1,
 			veteran_increase_damage_vs_elites = 1,
 			veteran_elite_kills_reduce_cooldown = 1,
 			veteran_elite_kills_replenish_toughness = 1,
@@ -66,19 +72,15 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			veteran_increased_damage_based_on_range = 1,
 			veteran_increased_weakspot_damage = 1,
 			veteran_big_game_hunter = 1,
-			veteran_ammo_increase = 1,
 			veteran_tdr_on_high_toughness = 1,
-			veteran_reduce_swap_time = 1,
 			-- Keystone/ability modifiers
-			veteran_increased_weakspot_power_after_combat_ability = 1,
-			veteran_combat_ability_ogryn_outlines = 1,
-			veteran_snipers_focus_toughness_bonus = 1,
-			veteran_snipers_focus_increased_stacks = 1,
+			veteran_combat_ability_increase_and_restore_toughness_to_coherency = 1,
+			veteran_improved_tag_dead_coherency_bonus = 1,
 			-- Stat nodes
 			base_toughness_node_buff_medium_1 = 1,
 			base_toughness_node_buff_medium_2 = 1,
-			base_stamina_regen_delay_1 = 1,
 			base_stamina_node_buff_low_1 = 1,
+			base_melee_damage_node_buff_high_1 = 1,
 			base_ranged_damage_node_buff_medium_1 = 1,
 		},
 	},
