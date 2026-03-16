@@ -28,7 +28,7 @@ local SLOT_SETTING_IDS = {
 --
 -- Talent tables sourced from hadrons-blessing builds (2026-03-16):
 --   veteran: 01-veteran-squad-leader, zealot: 04-spicy-meta-zealot,
---   psyker: 08-gandalf-melee-wizard, ogryn: 11-explodegryn.
+--   psyker: 10-electro-shriek-psyker, ogryn: 22-ogryn-heavy-gunlugger.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
 local DEFAULT_PROFILE_TEMPLATES = {
 	veteran = {
@@ -159,8 +159,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p4_m1",
+			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m2",
+			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p3_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
@@ -182,41 +182,42 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 08-gandalf-melee-wizard (Scrier's Gaze + Disrupt Destiny)
+		-- Source: 10-electro-shriek-psyker (Venting Shriek + Warp Siphon)
+		-- Zero bot-unfriendly talents. Warpfire chain + soul stacking are passive.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			psyker_combat_ability_stance = 1,
+			psyker_shout_vent_warp_charge = 1,
 			psyker_brain_burst_improved = 1,
-			psyker_aura_crit_chance_aura = 1,
-			psyker_new_mark_passive = 1,
+			psyker_cooldown_aura_improved = 1,
+			psyker_passive_souls_from_elite_kills = 1,
 			-- Class talents
+			psyker_toughness_on_vent = 1,
 			psyker_crits_regen_toughness_movement_speed = 1,
 			psyker_elite_kills_add_warpfire = 1,
-			psyker_chance_to_vent_on_kill = 1,
 			psyker_crits_empower_next_attack = 1,
+			psyker_spread_warpfire_on_kill = 1,
 			psyker_2_tier_3_name_2 = 1,
-			psyker_kills_stack_other_weapon_damage = 1,
 			psyker_warp_charge_reduces_toughness_damage_taken = 1,
-			psyker_dodge_after_crits = 1,
+			psyker_increased_vent_speed = 1,
 			psyker_damage_based_on_warp_charge = 1,
-			psyker_block_costs_warp_charge = 1,
-			psyker_melee_attack_speed = 1,
-			psyker_cleave_from_peril = 1,
 			psyker_killing_enemy_with_warpfire_boosts = 1,
-			psyker_toughness_on_melee = 1,
-			psyker_stat_mix = 1,
+			psyker_warp_glass_cannon = 1,
+			psyker_warp_attacks_rending = 1,
+			psyker_damage_vs_ogryns_and_monsters = 1,
 			-- Keystone/ability modifiers
 			psyker_smite_on_hit = 1,
-			psyker_overcharge_weakspot_kill_bonuses = 1,
-			psyker_mark_increased_duration = 1,
-			psyker_overcharge_stance_infinite_casting = 1,
+			psyker_shout_reduces_warp_charge_generation = 1,
+			psyker_warpfire_on_shout = 1,
+			psyker_toughness_on_soul = 1,
+			psyker_aura_souls_on_kill = 1,
+			psyker_increased_max_souls = 1,
 			-- Stat nodes
-			base_movement_speed_node_buff_low_1 = 1,
+			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_toughness_damage_reduction_node_buff_medium_2 = 1,
 			base_toughness_node_buff_medium_1 = 1,
 			base_toughness_node_buff_medium_2 = 1,
-			base_melee_damage_node_buff_high_1 = 1,
+			base_ranged_damage_node_buff_medium_1 = 1,
 			base_stamina_node_buff_low_1 = 1,
-			base_toughness_damage_reduction_node_buff_medium_1 = 1,
 			base_crit_chance_node_buff_low_1 = 1,
 		},
 	},
@@ -227,7 +228,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		selected_voice = "ogryn_a",
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/ogryn_powermaul_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m2",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_heavystubber_p2_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/ogryn/attachment_base/male_arms",
@@ -249,35 +250,36 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 11-explodegryn (Loyal Protector + Burst Limiter Override)
+		-- Source: 22-ogryn-heavy-gunlugger (Point Blank Barrage + Burst Limiter Override)
+		-- Zero bot-unfriendly talents. Pure ranged/toughness synergy with Heavy Stubber.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			ogryn_taunt_shout = 1,
-			ogryn_box_explodes = 1,
+			ogryn_special_ammo = 1,
+			ogryn_grenade_frag = 1,
 			ogryn_damage_vs_suppressed_coherency = 1,
 			ogryn_leadbelcher_no_ammo_chance = 1,
 			-- Class talents
+			ogryn_multi_heavy_toughness = 1,
 			ogryn_single_heavy_toughness = 1,
 			ogryn_toughness_while_bracing = 1,
 			ogryn_ogryn_killer = 1,
-			ogryn_reloading_grants_damage = 1,
 			ogryn_targets_recieve_damage_taken_increase_debuff = 1,
-			ogryn_multi_hits_grant_reload_speed = 1,
 			ogryn_increased_ammo_reserve = 1,
+			ogryn_bracing_reduces_damage_taken = 1,
 			ogryn_ally_elite_kills_grant_cooldown = 1,
-			ogryn_ally_movement_boost_on_ability = 1,
+			ogryn_kills_grant_crit_chance = 1,
 			ogryn_revenge_damage = 1,
-			ogryn_increase_explosion_radius = 1,
-			ogryn_movement_speed_after_ranged_kills = 1,
 			ogryn_damage_taken_by_all_increases_strength_tdr = 1,
-			ogryn_explosions_burn = 1,
+			ogryn_ranged_damage_immunity = 1,
 			ogryn_damage_reduction_on_high_stamina = 1,
-			ogryn_reload_speed_on_empty = 1,
+			ogryn_crit_damage_increase = 1,
+			ogryn_wield_speed_increase = 1,
 			-- Keystone/ability modifiers
 			ogryn_leadbelcher_cooldown_reduction = 1,
-			ogryn_taunt_damage_taken_increase = 1,
-			ogryn_taunt_restore_toughness = 1,
-			ogryn_blo_melee = 1,
+			ogryn_leadbelcher_crits = 1,
+			ogryn_special_ammo_armor_pen = 1,
+			ogryn_ranged_stance_toughness_regen = 1,
+			ogryn_blo_ally_ranged_buffs = 1,
 			-- Stat nodes
 			base_toughness_node_buff_medium_1 = 1,
 			base_toughness_node_buff_medium_2 = 1,
