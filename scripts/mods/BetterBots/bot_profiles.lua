@@ -40,6 +40,46 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			slot_primary = "content/items/weapons/player/melee/combatsword_p2_m1",
 			slot_secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
 		},
+		-- Weapon overrides: blessings (traits) and perks from build 01-veteran-squad-leader.
+		-- Content paths verified via MasterItems cache dump 2026-03-16.
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_combatsword_p2/increased_melee_damage_on_multiple_hits",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_combatsword_p2/increased_attack_cleave_on_multiple_hits",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_berserker_damage", rarity = 4 },
+				},
+			},
+			slot_secondary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_plasmagun_p1/power_bonus_scaled_on_heat",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_plasmagun_p1/reduced_overheat_on_critical_strike",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/ranged_common/wield_increase_berserker_damage", rarity = 4 },
+					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
+				},
+			},
+		},
 		bot_gestalts = {
 			melee = "linesman",
 			ranged = "killshot",
@@ -94,6 +134,44 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/powersword_2h_p1_m2",
 			slot_secondary = "content/items/weapons/player/ranged/flamer_p1_m1",
+		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_powersword_2h_p1/reduce_fixed_overheat_amount",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_powersword_2h_p1/chained_weakspot_hits_increase_finesse_and_reduce_overheat",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_elite_enemy_damage", rarity = 4 },
+				},
+			},
+			slot_secondary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_flamer_p1/power_bonus_on_continuous_fire",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_flamer_p1/armor_rending_from_dot_burning",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
+					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
+				},
+			},
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",
@@ -162,6 +240,47 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m2",
 			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p3_m1",
 		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_forcesword_2h_p1/chained_hits_increases_cleave",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_forcesword_2h_p1/warp_charge_power_bonus",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{
+						id = "content/items/perks/melee_common/wield_increase_disgustingly_resilient_damage",
+						rarity = 4,
+					},
+					{ id = "content/items/perks/melee_common/wield_increase_unarmored_damage", rarity = 4 },
+				},
+			},
+			slot_secondary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_forcestaff_p3/increased_crit_chance_scaled_on_peril",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_forcestaff_p3/faster_charge_on_chained_secondary_attacks",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
+					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
+				},
+			},
+		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
 			slot_body_eye_color = "content/items/characters/player/eye_colors/eye_color_psyker_02",
@@ -229,6 +348,43 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/ogryn_powermaul_p1_m1",
 			slot_secondary = "content/items/weapons/player/ranged/ogryn_heavystubber_p2_m1",
+		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_ogryn_powermaul_p1/explosion_on_activated_attacks_on_armor",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_ogryn_powermaul_p1/staggered_targets_receive_increased_damage_debuff",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
+				},
+			},
+			slot_secondary = {
+				traits = {
+					{
+						id = "content/items/traits/bespoke_ogryn_heavystubber_p2/power_bonus_on_continuous_fire",
+						rarity = 4,
+						value = 1,
+					},
+					{
+						id = "content/items/traits/bespoke_ogryn_heavystubber_p2/stagger_count_bonus_damage",
+						rarity = 4,
+						value = 1,
+					},
+				},
+				perks = {
+					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
+				},
+			},
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/ogryn/attachment_base/male_arms",
@@ -376,10 +532,31 @@ local function _resolve_profile_template(class_name)
 		end
 	end
 
-	-- Resolve all template strings to item objects (same as bot_character_profiles.lua)
+	-- Resolve all template strings to item objects.
+	-- For weapon slots with overrides (blessings/perks), use get_item_instance with a
+	-- synthetic gear table so overrides are merged onto the base item via the proxy metatable.
+	-- For everything else (cosmetics, trinkets), use get_item_or_fallback (bare definition).
+	local weapon_overrides = template.weapon_overrides
 	for slot_name, item_id in pairs(profile.loadout) do
-		local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
-		profile.loadout[slot_name] = item
+		local overrides = weapon_overrides and weapon_overrides[slot_name]
+		if overrides then
+			local gear_id = "betterbots_" .. class_name .. "_" .. slot_name
+			local gear = {
+				masterDataInstance = {
+					id = item_id,
+					overrides = {
+						traits = overrides.traits or {},
+						perks = overrides.perks or {},
+					},
+				},
+				slots = { slot_name },
+			}
+			local item = MasterItems.get_item_instance(gear, gear_id)
+			profile.loadout[slot_name] = item
+		else
+			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
+			profile.loadout[slot_name] = item
+		end
 	end
 
 	-- Run parse_profile to inject base talents and build loadout metadata.
