@@ -33,7 +33,7 @@ local SLOT_SETTING_IDS = {
 local DEFAULT_PROFILE_TEMPLATES = {
 	veteran = {
 		archetype = "veteran",
-		current_level = 1,
+		current_level = 30,
 		gender = "male",
 		selected_voice = "veteran_male_a",
 		loadout = {
@@ -128,7 +128,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 	-- Each non-veteran class gets full body/gear overrides so the bot looks correct.
 	zealot = {
 		archetype = "zealot",
-		current_level = 1,
+		current_level = 30,
 		gender = "female",
 		selected_voice = "zealot_female_a",
 		loadout = {
@@ -233,7 +233,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 	},
 	psyker = {
 		archetype = "psyker",
-		current_level = 1,
+		current_level = 30,
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
@@ -342,7 +342,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 	},
 	ogryn = {
 		archetype = "ogryn",
-		current_level = 1,
+		current_level = 30,
 		gender = "male",
 		selected_voice = "ogryn_a",
 		loadout = {
