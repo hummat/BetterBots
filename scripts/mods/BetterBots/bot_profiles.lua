@@ -383,7 +383,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 				},
 				perks = {
 					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
+					{ id = "content/items/perks/ranged_common/wield_increase_crit_chance", rarity = 4 },
 				},
 			},
 		},
