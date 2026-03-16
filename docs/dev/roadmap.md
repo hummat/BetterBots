@@ -45,6 +45,15 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 ### v0.7.1 (2026-03-14)
 - P0/P1 stabilization: animation crash guard (#50), ammo threshold (#51), melee horde bias (#52), Assail void throws (#61), grenade misaim (#62), unarmed defer, smart blitz targeting, ADS fire fix. Repo cleanup (scrapers migrated to hadrons-blessing). 461 tests.
 
+### v0.8.0 (2026-03-16)
+- Default class-diverse bot profiles (#45): 4-class loadouts with per-slot settings, Tertium compat, cosmetic overrides.
+- Full talent enrichment (#63): ~30 talents per class from hadrons-blessing builds, including abilities, keystones, and stat nodes. Bot-optimized build selection (Voice of Command veteran, Electro Shriek psyker, Gun-Lugger ogryn).
+- Weapon blessings and perks (#63 phase 2): 2 T4 blessings + 1-2 T4 perks per weapon via synthetic `get_item_instance` overrides. First mod to construct blessed weapons without player backend profiles.
+- Settings control surface (#6): category checkboxes, 4 behavior presets, feature gates, veteran dual-category gate.
+- Heuristic dispatch refactor (#60), grenade fallback logging (#59), toggle safety audit (#57).
+- Log throttle collision fix: 19 per-bot debug log keys were silently dropping multi-bot messages. Convention updated in AGENTS.md + logging.md.
+- 518 unit tests.
+
 ## Planned batches
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
@@ -58,7 +67,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 57 | Toggle safety audit | **Done.** `is_togglable = false` — singleton mutations can't be reverted by DMF. |
 | 6 | Settings control surface | **Done.** Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature gates (sprint/pinging/special_penalty/poxburster), veteran dual-category gate. |
 | 45 | Default class profiles | **Done.** 4-class profiles (Veteran/Zealot/Psyker/Ogryn) with hadrons-blessing weapon picks, per-class cosmetics, Tertium compat. `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns. |
-| 63 | Enrich profiles with talents & blessings | Populate `profile.talents` from hadrons-blessing builds (Phase 1). Construct gear tables with weapon blessings/perks (Phase 2). Blocks v0.8.0 release. |
+| 63 | Enrich profiles with talents & blessings | **Done.** Full talent trees (~30 per class) + weapon blessings (2 T4 per weapon) + perks from hadrons-blessing builds. Bot-optimized build selection (zero bot-unfriendly talents for psyker/ogryn). Also fixed 19 log throttle collision bugs. |
 | 60 | Simplify heuristic dispatch | Refactor `fn(context)` signature — pays down tech debt before settings adds more call sites. |
 | 59 | Grenade fallback logging | Per-stage lifecycle events (queued/stage/complete/failed) matching item_fallback pattern. |
 
