@@ -20,17 +20,14 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
-[size=3][b]New in v0.7.1[/b][/size]
+[size=3][b]New in v0.8.0[/b][/size]
 
 [list]
-[*]Fixed: Arbites drone animation crash with 3 Arbites bots
-[*]Fixed: Bots stop shooting at 50% reserve ammo — threshold lowered to 20%
-[*]Fixed: Heavy attack overuse in hordes — armor-aware light/heavy selection
-[*]Fixed: Assail knives fire into void — charge-lock prevents premature weapon switch
-[*]Fixed: Grenade throw misaim — bot aim is now driven for all throws
-[*]Fixed: Grenade activation while bot is unarmed (stagger/revive)
-[*]New: Smart targeting for precision blitz (Assail, knives)
-[*]New: ADS fire fix for Tertium 5/6 ranged weapons
+[*][b]Default bot profiles:[/b] Class-diverse bots out of the box — Veteran, Zealot, Psyker, Ogryn with per-slot dropdown settings. No longer requires Tertium 5/6 for non-veteran bots (still recommended for your own characters).
+[*][b]Full talent trees:[/b] Each bot gets ~30 talents from optimized builds — combat abilities, keystones, passive buffs, and stat nodes. Bot-specific build selection avoids headshot-dependent and dodge-dependent talents.
+[*][b]Weapon blessings & perks:[/b] Bot weapons now have T4 blessings and perks (e.g. Rampage + Wrath on Veteran's Devil's Claw, Blaze Away + Penetrating Flame on Zealot's Flamer). First mod to construct blessed weapons without player backend profiles.
+[*][b]Settings surface:[/b] Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets (Testing/Aggressive/Balanced/Conservative), feature toggles for sprint/pinging/special penalty/poxburster.
+[*][b]Bot builds:[/b] Veteran (Voice of Command + Focus Target, Devil's Claw + Plasma Gun), Zealot (Chorus + Blazing Piety, Relic Blade + Flamer), Psyker (Venting Shriek + Warp Siphon, Force Greatsword + Surge Staff), Ogryn (Point Blank Barrage + Burst Limiter Override, Power Maul + Heavy Stubber).
 [/list]
 
 [size=3][b]What works[/b][/size]
@@ -94,6 +91,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
 [*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz)
 [*][color=green]✓[/color] Ability settings surface (category toggles + 4 behavior presets + feature gates)
+[*][color=green]✓[/color] Default class profiles with full talent trees + weapon blessings/perks
 [*]Hive Scum validation (DLC-blocked)
 [/list]
 
@@ -133,7 +131,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/19]Darktide Mod Loader[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/8]Darktide Mod Framework (DMF)[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]
-[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] — recommended for non-veteran bot classes
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] — optional. BetterBots v0.8.0+ has built-in class profiles with talents and blessed weapons. Tertium is still useful if you want bots to use your own player characters.
 [/list]
 
 [b]Note:[/b] Tertium 5 can crash on startup with newer classes (Arbites, Hive Scum). If this happens, use [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] instead — it supports all 6 classes.
