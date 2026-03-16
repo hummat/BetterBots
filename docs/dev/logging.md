@@ -142,6 +142,8 @@ Poxburster suppression confirmations are logged at `Debug`, not `Trace`, so norm
 
 3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg, interval, level)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
 
+   **Per-bot keys are mandatory in per-bot code paths.** `_debug_log` throttles by key — if multiple bots fire the same key in the same frame (same `fixed_t`), only the first bot's message appears. All others are silently dropped. Any `_debug_log` call inside a hook or function that runs per-bot (condition evaluation, ability queue, grenade fallback, etc.) **must** include `.. ":" .. tostring(unit)` in the key. Logs that fire once globally (init patches, startup messages) don't need this.
+
 4. **Log the confirmation signal**. Each feature should log the event that proves it fired correctly:
    - State machine transition → log the new state and trigger
    - Input swap/translation → log what was swapped and why

@@ -25,6 +25,11 @@ local SLOT_SETTING_IDS = {
 
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
+--
+-- Talent tables sourced from hadrons-blessing builds (2026-03-16):
+--   veteran: 03-slinking-veteran, zealot: 04-spicy-meta-zealot,
+--   psyker: 08-gandalf-melee-wizard, ogryn: 11-explodegryn.
+-- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
 local DEFAULT_PROFILE_TEMPLATES = {
 	veteran = {
 		archetype = "veteran",
@@ -39,7 +44,43 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		talents = {},
+		-- Source: 03-slinking-veteran (Executioner's Stance + Sniper's Focus)
+		talents = {
+			-- Combat ability, blitz, aura, keystone
+			veteran_combat_ability_elite_and_special_outlines = 1,
+			veteran_grenade_apply_bleed = 1,
+			veteran_aura_gain_ammo_on_elite_kill_improved = 1,
+			veteran_snipers_focus = 1,
+			-- Class talents
+			veteran_aura_elite_kills_restore_grenade = 1,
+			veteran_replenish_toughness_outside_melee = 1,
+			veteran_ranged_power_out_of_melee = 1,
+			veteran_no_ammo_consumption_on_lasweapon_crit = 1,
+			veteran_replenish_toughness_on_weakspot_kill = 1,
+			veteran_replenish_grenades = 1,
+			veteran_better_deployables = 1,
+			veteran_increase_damage_vs_elites = 1,
+			veteran_elite_kills_reduce_cooldown = 1,
+			veteran_elite_kills_replenish_toughness = 1,
+			veteran_reduced_toughness_damage_in_coherency = 1,
+			veteran_increased_damage_based_on_range = 1,
+			veteran_increased_weakspot_damage = 1,
+			veteran_big_game_hunter = 1,
+			veteran_ammo_increase = 1,
+			veteran_tdr_on_high_toughness = 1,
+			veteran_reduce_swap_time = 1,
+			-- Keystone/ability modifiers
+			veteran_increased_weakspot_power_after_combat_ability = 1,
+			veteran_combat_ability_ogryn_outlines = 1,
+			veteran_snipers_focus_toughness_bonus = 1,
+			veteran_snipers_focus_increased_stacks = 1,
+			-- Stat nodes
+			base_toughness_node_buff_medium_1 = 1,
+			base_toughness_node_buff_medium_2 = 1,
+			base_stamina_regen_delay_1 = 1,
+			base_stamina_node_buff_low_1 = 1,
+			base_ranged_damage_node_buff_medium_1 = 1,
+		},
 	},
 	-- Cosmetics sourced from Darktide Seven (misc_bot_profiles.lua) and tutorial bots.
 	-- Each non-veteran class gets full body/gear overrides so the bot looks correct.
@@ -72,7 +113,43 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		talents = {},
+		-- Source: 04-spicy-meta-zealot (Chorus + Blazing Piety)
+		talents = {
+			-- Combat ability, blitz, aura, keystone
+			zealot_bolstering_prayer = 1,
+			zealot_throwing_knives = 1,
+			zealot_corruption_healing_coherency_improved = 1,
+			zealot_fanatic_rage = 1,
+			-- Class talents
+			zealot_crits_apply_bleed = 1,
+			zealot_backstab_damage = 1,
+			zealot_increased_damage_vs_resilient = 1,
+			zealot_increase_ranged_close_damage = 1,
+			zealot_crits_reduce_toughness_damage = 1,
+			zealot_toughness_on_dodge = 1,
+			zealot_increased_crit_and_weakspot_damage_after_dodge = 1,
+			zealot_resist_death = 1,
+			zealot_resist_death_healing = 1,
+			zealot_damage_boosts_movement = 1,
+			zealot_reduced_damage_after_dodge = 1,
+			zealot_attack_speed = 1,
+			zealot_hits_grant_stacking_damage = 1,
+			zealot_revive_speed = 1,
+			zealot_damage_vs_elites = 1,
+			zealot_elite_kills_empowers = 1,
+			zealot_offensive_vs_many = 1,
+			-- Keystone/ability modifiers
+			zealot_channel_grants_damage = 1,
+			zealot_crits_grant_cd = 1,
+			zealot_fanatic_rage_toughness_on_max = 1,
+			zealot_fanatic_rage_improved = 1,
+			zealot_shared_fanatic_rage = 1,
+			-- Stat nodes
+			base_melee_damage_node_buff_high_1 = 1,
+			base_melee_damage_node_buff_high_2 = 1,
+			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_toughness_node_buff_medium_1 = 1,
+		},
 	},
 	psyker = {
 		archetype = "psyker",
@@ -103,7 +180,43 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		talents = {},
+		-- Source: 08-gandalf-melee-wizard (Scrier's Gaze + Disrupt Destiny)
+		talents = {
+			-- Combat ability, blitz, aura, keystone
+			psyker_combat_ability_stance = 1,
+			psyker_brain_burst_improved = 1,
+			psyker_aura_crit_chance_aura = 1,
+			psyker_new_mark_passive = 1,
+			-- Class talents
+			psyker_crits_regen_toughness_movement_speed = 1,
+			psyker_elite_kills_add_warpfire = 1,
+			psyker_chance_to_vent_on_kill = 1,
+			psyker_crits_empower_next_attack = 1,
+			psyker_2_tier_3_name_2 = 1,
+			psyker_kills_stack_other_weapon_damage = 1,
+			psyker_warp_charge_reduces_toughness_damage_taken = 1,
+			psyker_dodge_after_crits = 1,
+			psyker_damage_based_on_warp_charge = 1,
+			psyker_block_costs_warp_charge = 1,
+			psyker_melee_attack_speed = 1,
+			psyker_cleave_from_peril = 1,
+			psyker_killing_enemy_with_warpfire_boosts = 1,
+			psyker_toughness_on_melee = 1,
+			psyker_stat_mix = 1,
+			-- Keystone/ability modifiers
+			psyker_smite_on_hit = 1,
+			psyker_overcharge_weakspot_kill_bonuses = 1,
+			psyker_mark_increased_duration = 1,
+			psyker_overcharge_stance_infinite_casting = 1,
+			-- Stat nodes
+			base_movement_speed_node_buff_low_1 = 1,
+			base_toughness_node_buff_medium_1 = 1,
+			base_toughness_node_buff_medium_2 = 1,
+			base_melee_damage_node_buff_high_1 = 1,
+			base_stamina_node_buff_low_1 = 1,
+			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_crit_chance_node_buff_low_1 = 1,
+		},
 	},
 	ogryn = {
 		archetype = "ogryn",
@@ -134,7 +247,43 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		talents = {},
+		-- Source: 11-explodegryn (Loyal Protector + Burst Limiter Override)
+		talents = {
+			-- Combat ability, blitz, aura, keystone
+			ogryn_taunt_shout = 1,
+			ogryn_box_explodes = 1,
+			ogryn_damage_vs_suppressed_coherency = 1,
+			ogryn_leadbelcher_no_ammo_chance = 1,
+			-- Class talents
+			ogryn_single_heavy_toughness = 1,
+			ogryn_toughness_while_bracing = 1,
+			ogryn_ogryn_killer = 1,
+			ogryn_reloading_grants_damage = 1,
+			ogryn_targets_recieve_damage_taken_increase_debuff = 1,
+			ogryn_multi_hits_grant_reload_speed = 1,
+			ogryn_increased_ammo_reserve = 1,
+			ogryn_ally_elite_kills_grant_cooldown = 1,
+			ogryn_ally_movement_boost_on_ability = 1,
+			ogryn_revenge_damage = 1,
+			ogryn_increase_explosion_radius = 1,
+			ogryn_movement_speed_after_ranged_kills = 1,
+			ogryn_damage_taken_by_all_increases_strength_tdr = 1,
+			ogryn_explosions_burn = 1,
+			ogryn_damage_reduction_on_high_stamina = 1,
+			ogryn_reload_speed_on_empty = 1,
+			-- Keystone/ability modifiers
+			ogryn_leadbelcher_cooldown_reduction = 1,
+			ogryn_taunt_damage_taken_increase = 1,
+			ogryn_taunt_restore_toughness = 1,
+			ogryn_blo_melee = 1,
+			-- Stat nodes
+			base_toughness_node_buff_medium_1 = 1,
+			base_toughness_node_buff_medium_2 = 1,
+			base_toughness_node_buff_medium_3 = 1,
+			base_reload_speed_node_buff_medium_1 = 1,
+			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_ranged_damage_node_buff_medium_1 = 1,
+		},
 	},
 }
 
@@ -246,7 +395,7 @@ local function _resolve_profile_template(class_name)
 
 	if _debug_enabled() then
 		_debug_log(
-			"bot_profiles:resolved",
+			"bot_profiles:resolved:" .. class_name,
 			0,
 			"resolved profile for " .. class_name .. " (archetype=" .. tostring(profile.archetype) .. ")"
 		)
@@ -284,7 +433,7 @@ local function resolve_profile(profile)
 	if not resolved then
 		if _debug_enabled() then
 			_debug_log(
-				"bot_profiles:resolve_failed",
+				"bot_profiles:resolve_failed:" .. tostring(slot_index),
 				0,
 				"bot slot " .. tostring(slot_index) .. " failed to resolve profile for " .. tostring(choice)
 			)
@@ -344,7 +493,11 @@ local function resolve_profile(profile)
 	end
 
 	if _debug_enabled() then
-		_debug_log("bot_profiles:swap", 0, "bot slot " .. tostring(slot_index) .. " → " .. tostring(choice))
+		_debug_log(
+			"bot_profiles:swap:" .. tostring(slot_index),
+			0,
+			"bot slot " .. tostring(slot_index) .. " → " .. tostring(choice)
+		)
 	end
 
 	return profile, true

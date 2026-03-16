@@ -75,7 +75,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_disabled_template:" .. ability_template_name,
+				"fallback_disabled_template:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback blocked " .. ability_template_name .. " (disabled by mod setting)"
 			)
@@ -94,7 +94,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if not ability_template then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_missing_template:" .. ability_template_name,
+				"fallback_missing_template:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback blocked missing template " .. ability_template_name
 			)
@@ -106,7 +106,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if not ability_meta_data then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_missing_meta:" .. ability_template_name,
+				"fallback_missing_meta:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback blocked " .. ability_template_name .. " (no ability_meta_data)"
 			)
@@ -118,7 +118,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if not activation_data then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_missing_activation:" .. ability_template_name,
+				"fallback_missing_activation:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback blocked " .. ability_template_name .. " (no activation data)"
 			)
@@ -130,7 +130,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if not action_input then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_missing_action_input:" .. ability_template_name,
+				"fallback_missing_action_input:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback blocked " .. ability_template_name .. " (activation.action_input missing)"
 			)
@@ -171,7 +171,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if suppressed then
 		if _debug_enabled() then
 			_debug_log(
-				"fallback_suppress:" .. tostring(suppress_reason),
+				"fallback_suppress:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
 			)
@@ -229,7 +229,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if not can_activate then
 		if context.num_nearby > 0 and _debug_enabled() then
 			_debug_log(
-				"fallback_decision_block:" .. ability_template_name,
+				"fallback_decision_block:" .. ability_template_name .. ":" .. tostring(unit),
 				fixed_t,
 				"fallback held "
 					.. ability_template_name

@@ -583,7 +583,7 @@ mod:hook_require(
 								)
 						if not enabled then
 							_debug_log(
-								"bt_enter_blocked:" .. gate_template,
+								"bt_enter_blocked:" .. gate_template .. ":" .. tostring(unit),
 								_fixed_time(),
 								"BT enter blocked " .. gate_template .. " (disabled by mod setting)",
 								nil,
@@ -603,7 +603,12 @@ mod:hook_require(
 
 				if _debug_enabled() then
 					_debug_log(
-						"enter:" .. tostring(ability_component_name) .. ":" .. tostring(action_input),
+						"enter:"
+							.. tostring(ability_component_name)
+							.. ":"
+							.. tostring(action_input)
+							.. ":"
+							.. tostring(unit),
 						fixed_t,
 						"enter ability node component="
 							.. tostring(ability_component_name)
@@ -666,7 +671,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 
 			if _debug_enabled() then
 				_debug_log(
-					"grenade_charge:" .. grenade_name,
+					"grenade_charge:" .. grenade_name .. ":" .. tostring(unit),
 					_fixed_time(),
 					"grenade charge consumed for "
 						.. grenade_name

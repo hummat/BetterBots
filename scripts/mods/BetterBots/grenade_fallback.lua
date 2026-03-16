@@ -397,7 +397,7 @@ local function _queue_weapon_input(unit, input_name, component)
 	if not ext then
 		if _debug_enabled() then
 			_debug_log(
-				"grenade_no_ext:" .. input_name,
+				"grenade_no_ext:" .. input_name .. ":" .. tostring(unit),
 				_fixed_time(),
 				"grenade _queue_weapon_input skipped: no action_input_extension for " .. input_name
 			)
@@ -933,7 +933,7 @@ local function try_queue(unit, blackboard)
 	if suppressed then
 		if _debug_enabled() then
 			_debug_log(
-				"grenade_suppress:" .. tostring(suppress_reason),
+				"grenade_suppress:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
 				fixed_t,
 				"grenade blocked: suppressed (" .. tostring(suppress_reason) .. ")"
 			)
@@ -976,7 +976,7 @@ local function try_queue(unit, blackboard)
 			)
 		then
 			_debug_log(
-				"grenade_decision_block:" .. grenade_name,
+				"grenade_decision_block:" .. grenade_name .. ":" .. tostring(unit),
 				fixed_t,
 				"grenade held "
 					.. grenade_name
@@ -996,7 +996,7 @@ local function try_queue(unit, blackboard)
 	if not template_entry then
 		if _debug_enabled() then
 			_debug_log(
-				"grenade_unsupported:" .. grenade_name,
+				"grenade_unsupported:" .. grenade_name .. ":" .. tostring(unit),
 				fixed_t,
 				"unsupported grenade template " .. grenade_name .. " (rule=" .. tostring(rule) .. ")"
 			)
@@ -1103,7 +1103,7 @@ local function try_queue(unit, blackboard)
 		if wielded_slot == "slot_unarmed" or weapon_template_name == "unarmed" then
 			if _debug_enabled() then
 				_debug_log(
-					"grenade_unarmed:" .. grenade_name,
+					"grenade_unarmed:" .. grenade_name .. ":" .. tostring(unit),
 					fixed_t,
 					"grenade deferred while unarmed (slot="
 						.. tostring(wielded_slot)

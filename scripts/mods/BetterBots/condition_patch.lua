@@ -113,7 +113,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	if suppressed then
 		if _debug_enabled() then
 			_debug_log(
-				"suppress:" .. tostring(suppress_reason),
+				"suppress:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
 				_fixed_time(),
 				"ability suppressed (" .. tostring(suppress_reason) .. ")"
 			)

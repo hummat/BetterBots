@@ -84,10 +84,51 @@ describe("bot_profiles", function()
 				assert.is_not_nil(profile.loadout, class_name .. " missing loadout")
 				assert.is_not_nil(profile.loadout.slot_primary, class_name .. " missing melee")
 				assert.is_not_nil(profile.loadout.slot_secondary, class_name .. " missing ranged")
-				assert.same({}, profile.talents, class_name .. " talents must be empty")
+				assert.is_table(profile.talents, class_name .. " missing talents")
+				assert.is_true(next(profile.talents) ~= nil, class_name .. " talents must not be empty")
 				assert.is_not_nil(profile.bot_gestalts, class_name .. " missing gestalts")
 				assert.equals("linesman", profile.bot_gestalts.melee, class_name .. " melee gestalt")
 				assert.equals("killshot", profile.bot_gestalts.ranged, class_name .. " ranged gestalt")
+			end
+		end)
+
+		it("talent keys are valid for their class (no cross-class contamination)", function()
+			local profiles = BotProfiles._get_profiles()
+			-- Class-specific talent keys must start with the class name or "base_" (stat nodes)
+			local CLASS_PREFIXES = {
+				veteran = { "veteran_", "base_" },
+				zealot = { "zealot_", "base_" },
+				psyker = { "psyker_", "base_" },
+				ogryn = { "ogryn_", "base_" },
+			}
+			-- Other classes whose prefixes should NEVER appear in a profile
+			local WRONG_PREFIXES = {
+				veteran = { "zealot_", "psyker_", "ogryn_", "adamant_", "broker_" },
+				zealot = { "veteran_", "psyker_", "ogryn_", "adamant_", "broker_" },
+				psyker = { "veteran_", "zealot_", "ogryn_", "adamant_", "broker_" },
+				ogryn = { "veteran_", "zealot_", "psyker_", "adamant_", "broker_" },
+			}
+			for class_name, profile in pairs(profiles) do
+				local valid_prefixes = CLASS_PREFIXES[class_name]
+				local wrong_prefixes = WRONG_PREFIXES[class_name]
+				for talent_name, _ in pairs(profile.talents) do
+					-- Must match at least one valid prefix
+					local has_valid = false
+					for _, prefix in ipairs(valid_prefixes) do
+						if string.sub(talent_name, 1, #prefix) == prefix then
+							has_valid = true
+							break
+						end
+					end
+					assert.is_true(has_valid, class_name .. " talent '" .. talent_name .. "' has no valid prefix")
+					-- Must NOT match any wrong-class prefix
+					for _, prefix in ipairs(wrong_prefixes) do
+						assert.is_false(
+							string.sub(talent_name, 1, #prefix) == prefix,
+							class_name .. " talent '" .. talent_name .. "' belongs to another class"
+						)
+					end
+				end
 			end
 		end)
 

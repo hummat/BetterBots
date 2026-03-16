@@ -37,7 +37,7 @@ Every new feature must include enough `_debug_log` calls to verify correctness f
 **Writing `_debug_log` calls — mandatory rules:**
 - **Gate expensive reads**: never call `read_component()`, `has_extension()`, or build context strings unless `_debug_enabled()` is true. These run on the hot path every frame.
 - **One-shot dedup for repeated events**: use a weak-keyed set (`setmetatable({}, { __mode = "k" })`) keyed on scratchpad/unit, or a string-keyed set for `combo_key` patterns. Log each unique occurrence once per load, not per frame.
-- **Throttle key convention**: first arg to `_debug_log` is `"feature_tag:" .. discriminator` (e.g. `"may_fire_swap:" .. input_name`). This enables grep-based filtering.
+- **Throttle key convention**: first arg to `_debug_log` is `"feature_tag:" .. discriminator` (e.g. `"may_fire_swap:" .. input_name`). This enables grep-based filtering. **Per-bot code paths must include `.. ":" .. tostring(unit)` in the key** — otherwise `_debug_log`'s time-based throttle silently drops all but the first bot's message when multiple bots fire the same key in the same frame.
 - **Log the confirmation signal**: the event that proves the feature fired correctly (e.g. "input was swapped", "grenade state transitioned", "target was penalized"), not intermediate state.
 - **Don't log no-ops**: idle paths, false conditions, and expected skips produce no output. Only log when something interesting happened.
 
@@ -295,6 +295,7 @@ Every factual claim about Darktide mechanics — talent effects, ability interac
 
 **Game knowledge base** (`docs/knowledge/`):
 - `class-talents.md` — all 6 classes: abilities, keystones, key passives, coherency (from decompiled source)
+- `talent-system.md` — engine internals: profile.talents format, stat node naming, add_archetype_base_talents behavior, ability template dispatch, hadrons-blessing entity ID mapping
 - `perks-curios.md` — weapon perk + curio perk T1→T4 tables (from decompiled source)
 - `buff-templates.md` — exhaustive buff template stat values for all 6 classes (from decompiled source)
 - `damage-system.md` — 13-stage damage pipeline, ADM, rending, finesse, toughness absorption
