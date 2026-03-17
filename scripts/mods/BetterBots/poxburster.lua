@@ -20,7 +20,6 @@ local _is_enabled
 -- One-shot dedup: log poxburster suppression once per bot per targeting evaluation.
 -- Weak-keyed so entries are GC'd when bots despawn.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
-local _pox_push_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_near_any_position(origin_position, positions, threshold, distance_fn)
 	if not origin_position or not positions then
@@ -204,14 +203,12 @@ function M.register_hooks()
 				local in_push_range = _is_poxburster_in_push_range(perception_component.target_enemy, self_position)
 				if not in_push_range then
 					_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
-				elseif _debug_enabled() and not _pox_push_logged[self_unit] then
-					_pox_push_logged[self_unit] = true
+				elseif _debug_enabled() then
 					_debug_log(
 						"poxburster_push_range:" .. tostring(self_unit),
 						_fixed_time(),
 						"poxburster in push range, keeping target for melee push",
-						nil,
-						"debug"
+						2
 					)
 				end
 				_try_suppress_target(
@@ -269,6 +266,14 @@ function M.register_hooks()
 				local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
 				local target_breed = data_ext and data_ext:breed()
 				if target_breed and target_breed.name == POXBURSTER_BREED_NAME then
+					if _debug_enabled() then
+						_debug_log(
+							"poxburster_defend:" .. tostring(unit),
+							_fixed_time(),
+							"defend gate bypassed for poxburster target",
+							2
+						)
+					end
 					return true
 				end
 
@@ -308,10 +313,20 @@ function M.register_hooks()
 								_debug_log(
 									"poxburster_push:" .. tostring(target_unit),
 									fixed_t,
-									"pushing poxburster (bypassed outnumbered gate)"
+									"pushing poxburster (bypassed outnumbered gate)",
+									1
 								)
 							end
 							return true, push_action_input
+						else
+							if _debug_enabled() then
+								_debug_log(
+									"poxburster_push_blocked:" .. tostring(target_unit),
+									fixed_t,
+									"poxburster push unavailable (action not valid)",
+									2
+								)
+							end
 						end
 					end
 
