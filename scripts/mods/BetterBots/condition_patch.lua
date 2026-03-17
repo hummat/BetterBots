@@ -139,6 +139,9 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	if not ability_extension then
+		return _return_with_perf(perf_t0, false)
+	end
 
 	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name, ability_extension) then
 		if _debug_enabled() then

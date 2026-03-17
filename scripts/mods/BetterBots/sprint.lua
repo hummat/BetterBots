@@ -21,6 +21,7 @@ local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 -- (sprint, _is_suppressed, BT condition wrappers) query in the same tick.
 local _dh_nearest_dist_sq_by_unit = setmetatable({}, { __mode = "k" })
 local _dh_cache_t_by_unit = setmetatable({}, { __mode = "k" })
+local _side_system_warned = false
 
 -- Returns the squared distance to the nearest non-aggroed daemonhost,
 -- or math.huge if none exist. Cached per unit per frame.
@@ -53,6 +54,10 @@ local function _nearest_dh_dist_sq(unit)
 
 	local ok, ss = pcall(side_system.system, side_system, "side_system")
 	if not ok or not ss then
+		if not _side_system_warned then
+			_side_system_warned = true
+			_debug_log("dh_side_system_fail", 0, "daemonhost scan unavailable, sprint safety disabled", nil, "info")
+		end
 		_dh_cache_t_by_unit[unit] = fixed_t
 		_dh_nearest_dist_sq_by_unit[unit] = nearest
 		return nearest

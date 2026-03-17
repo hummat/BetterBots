@@ -11,7 +11,7 @@ local _mod
 local _debug_log
 local _debug_enabled
 
--- Spawn counter: incremented per add_bot call within a mission, maps to slot 1-3.
+-- Spawn counter: incremented per add_bot call within a mission, maps to slot 1-5.
 -- Reset on GameplayStateRun enter.
 local _spawn_counter = 0
 
@@ -487,11 +487,14 @@ local function _resolve_profile_template(class_name)
 		return nil
 	end
 
-	local MasterItems = require("scripts/backend/master_items")
-	local LocalProfileBackendParser = require("scripts/utilities/local_profile_backend_parser")
-	local Archetypes = require("scripts/settings/archetype/archetypes")
+	local ok_mi, MasterItems = pcall(require, "scripts/backend/master_items")
+	local ok_lp, LocalProfileBackendParser = pcall(require, "scripts/utilities/local_profile_backend_parser")
+	local ok_ar, Archetypes = pcall(require, "scripts/settings/archetype/archetypes")
 
-	if not MasterItems or not LocalProfileBackendParser or not Archetypes then
+	if not (ok_mi and MasterItems and ok_lp and LocalProfileBackendParser and ok_ar and Archetypes) then
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: profile resolution unavailable (missing engine module)")
+		end
 		return nil
 	end
 
@@ -540,8 +543,12 @@ local function _resolve_profile_template(class_name)
 	--
 	-- Weapon stat quality: configurable via "Bot Weapon Quality" setting.
 	-- In-game, players empower weapons at the Omnissiah in steps of 10, up to power 500.
-	-- Power level drives how far each stat bar fills toward its per-stat maximum (60-80%).
-	-- At power 500, all stats are at their individual maximums.
+	-- Power level drives how far each stat bar fills. In-game, bars range ~60% (basic)
+	-- to ~80% (perfect/max). A real perfect weapon has one dump stat (~60%) and the
+	-- rest at ~80%, NOT all five at 80%. Modelling per-stat distribution was deferred —
+	-- we use a uniform stat_value for all stats instead. At power 500 with 5 stats,
+	-- stat_value ≈ 0.76 (~75% bar each). This is a simplification: real weapons have
+	-- uneven distributions, but uniform values are good enough for bot gameplay.
 	--
 	-- Under the hood: base_stats[].value (0.0-1.0) lerps between each stat template's
 	-- "basic" and "perfect" values. The expertise formula is:
@@ -610,6 +617,16 @@ local function _resolve_profile_template(class_name)
 				slots = { slot_name },
 			}
 			local item = MasterItems.get_item_instance(gear, gear_id)
+			if not item then
+				if _debug_enabled() then
+					_debug_log(
+						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
+						0,
+						"failed to resolve weapon " .. tostring(item_id) .. " for " .. slot_name
+					)
+				end
+				return nil
+			end
 			profile.loadout[slot_name] = item
 
 			if _debug_enabled() then
@@ -642,6 +659,16 @@ local function _resolve_profile_template(class_name)
 			end
 		else
 			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
+			if not item then
+				if _debug_enabled() then
+					_debug_log(
+						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
+						0,
+						"failed to resolve item " .. tostring(item_id) .. " for " .. slot_name
+					)
+				end
+				return nil
+			end
 			profile.loadout[slot_name] = item
 		end
 	end
@@ -651,8 +678,14 @@ local function _resolve_profile_template(class_name)
 	-- but we've already resolved it to a table. Save and restore.
 	local saved_archetype = profile.archetype
 	profile.archetype = template.archetype -- string for parse_profile
-	LocalProfileBackendParser.parse_profile(profile, "betterbots_" .. class_name)
+	local parse_ok, parse_err = pcall(LocalProfileBackendParser.parse_profile, profile, "betterbots_" .. class_name)
 	profile.archetype = saved_archetype -- restore table for spawning pipeline
+	if not parse_ok then
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: profile parse failed for " .. class_name .. ": " .. tostring(parse_err))
+		end
+		return nil
+	end
 
 	-- The package synchronizer client iterates visual_loadout to resolve item packages.
 	-- Bot profiles don't have visual_loadout natively — vanilla bots get it set elsewhere.
@@ -711,15 +744,22 @@ local function resolve_profile(profile)
 
 	-- Mutate the vanilla profile in-place rather than replacing it entirely.
 	-- The vanilla profile has cosmetic slots, body data, and visual_loadout already
-	-- set up correctly. We only swap gameplay-relevant fields: archetype, weapons,
-	-- talents, gestalts, and voice. Item objects are direct MasterItems cache references
-	-- — no copying needed.
+	-- set up correctly. We swap class identity fields (archetype, level, gender, voice,
+	-- weapons, talents, gestalts) and cosmetics. Other vanilla fields (trinkets, etc.)
+	-- are preserved. Weapon item objects are MasterItems cache references — no copying.
 	profile.archetype = resolved.archetype
 	profile.current_level = resolved.current_level or 30
 	profile.gender = resolved.gender
 	profile.selected_voice = resolved.selected_voice
-	profile.talents = resolved.talents or {}
-	profile.bot_gestalts = resolved.bot_gestalts
+	-- Shallow-copy: same-class bots must not share mutable table references
+	profile.talents = {}
+	for k, v in pairs(resolved.talents or {}) do
+		profile.talents[k] = v
+	end
+	profile.bot_gestalts = {}
+	for k, v in pairs(resolved.bot_gestalts or {}) do
+		profile.bot_gestalts[k] = v
+	end
 	profile.loadout.slot_primary = resolved.loadout.slot_primary
 	profile.loadout.slot_secondary = resolved.loadout.slot_secondary
 	if resolved.loadout_item_ids then

@@ -60,6 +60,8 @@ local function _ammo_api()
 	local ok, ammo = pcall(require, "scripts/utilities/ammo")
 	if ok then
 		_ammo = ammo
+	elseif _mod and _mod.warning then
+		_mod:warning("BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled")
 	end
 
 	return _ammo

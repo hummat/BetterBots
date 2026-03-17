@@ -13,8 +13,8 @@ local _fixed_time
 local _perf
 local _is_enabled
 
--- One-shot dedup: log poxburster suppression once per bot per encounter
--- instead of every 2s frame. Weak-keyed so entries are GC'd when bots despawn.
+-- One-shot dedup: log poxburster suppression once per bot per targeting evaluation.
+-- Weak-keyed so entries are GC'd when bots despawn.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_near_any_position(origin_position, positions, threshold, distance_fn)
@@ -96,6 +96,30 @@ local function _suppress_reason_for_target(unit, self_position, side)
 	)
 end
 
+local function _try_suppress_target(perception_component, field_name, log_suffix, self_position, side, self_unit)
+	local suppress, reason = _suppress_reason_for_target(perception_component[field_name], self_position, side)
+	if not suppress then
+		return
+	end
+
+	perception_component[field_name] = nil
+	if field_name == "target_enemy" then
+		perception_component.target_enemy_distance = math.huge
+		perception_component.target_enemy_type = "none"
+	end
+
+	if _debug_enabled() and not _pox_suppress_logged[self_unit] then
+		_pox_suppress_logged[self_unit] = true
+		_debug_log(
+			"poxburster_suppress" .. log_suffix .. ":" .. tostring(self_unit),
+			_fixed_time(),
+			"suppressed poxburster " .. field_name .. " (" .. tostring(reason) .. ")",
+			nil,
+			"debug"
+		)
+	end
+end
+
 local M = {}
 
 function M.init(deps)
@@ -147,35 +171,31 @@ function M.register_hooks()
 
 				local perf_t0 = _perf and _perf.begin()
 
-				local function try_suppress(field_name, log_suffix)
-					local suppress, reason =
-						_suppress_reason_for_target(perception_component[field_name], self_position, side)
-					if not suppress then
-						return
-					end
-
-					perception_component[field_name] = nil
-					if field_name == "target_enemy" then
-						perception_component.target_enemy_distance = math.huge
-						perception_component.target_enemy_type = "none"
-					end
-
-					if _debug_enabled() and not _pox_suppress_logged[self_unit] then
-						_pox_suppress_logged[self_unit] = true
-						_debug_log(
-							"poxburster_suppress" .. log_suffix .. ":" .. tostring(self_unit),
-							_fixed_time(),
-							"suppressed poxburster " .. field_name .. " (" .. tostring(reason) .. ")",
-							nil,
-							"debug"
-						)
-					end
-				end
-
-				try_suppress("target_enemy", "")
-				try_suppress("opportunity_target_enemy", "_opp")
-				try_suppress("urgent_target_enemy", "_urg")
-				try_suppress("priority_target_enemy", "_pri")
+				_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
+				_try_suppress_target(
+					perception_component,
+					"opportunity_target_enemy",
+					"_opp",
+					self_position,
+					side,
+					self_unit
+				)
+				_try_suppress_target(
+					perception_component,
+					"urgent_target_enemy",
+					"_urg",
+					self_position,
+					side,
+					self_unit
+				)
+				_try_suppress_target(
+					perception_component,
+					"priority_target_enemy",
+					"_pri",
+					self_position,
+					side,
+					self_unit
+				)
 
 				if perf_t0 then
 					_perf.finish("poxburster.update_target_enemy", perf_t0)

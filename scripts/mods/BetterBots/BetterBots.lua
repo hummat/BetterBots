@@ -528,7 +528,7 @@ end)
 
 Sprint.register_hook()
 
--- BT activate ability enter hook: rescue aim (#10) + event logging
+-- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)

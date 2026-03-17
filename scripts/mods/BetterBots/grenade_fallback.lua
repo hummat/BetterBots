@@ -36,6 +36,8 @@ local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
+-- Boolean true: supported but defers to _resolve_template_entry for dynamic profile
+--   selection (used by psyker_throwing_knives for aimed vs fast dispatch).
 -- Table value: {
 --   aim_input, followup_input, followup_delay, release_input, throw_delay,
 --   auto_unwield, component
