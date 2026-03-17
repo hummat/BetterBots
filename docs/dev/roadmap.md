@@ -119,10 +119,10 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Blocker |
 |---|-------|---------|
-| 8 | Hive Scum ability support | DLC-blocked (Arbites/Hive Scum requires `adamant` DLC) |
+| 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
 | 17 | Daemonhost avoidance | Code + tests shipped v0.6.0. Needs in-game daemonhost encounter to verify. |
 | 39 | Healing deferral | Implemented v0.7.0. Needs in-game trigger to validate deferral path. |
-| 49 | Arbites companion-command smart tag | DLC-blocked. Direct mastiff via `enemy_companion_target` tag. |
+| 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target` tag. Arbites DLC available. |
 
 ## Design principles
 

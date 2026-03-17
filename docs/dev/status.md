@@ -47,9 +47,9 @@
 
 | Tier | Status | Notes |
 |------|--------|-------|
-| 1 | PASS (5/5 testable) | Broker variants DLC-blocked |
+| 1 | PASS (5/5 testable) | Broker (Hive Scum) variants DLC-blocked; adamant (Arbites) testable |
 | 2 | PASS (6/6 testable) | `adamant_shout` N/A (cut content) |
-| 3 | PASS (3/3 testable) | `zealot_relic`, `force_field`, `drone` all 100%. `broker_stimm_field` DLC-blocked. |
+| 3 | PASS (3/3 testable) | `zealot_relic`, `force_field`, `drone` all 100%. `broker_stimm_field` Hive Scum DLC-blocked. |
 
 ## Evidence Source
 
@@ -77,7 +77,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 
 ## Known Blockers
 
-1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
+1. **Hive Scum DLC (broker_ archetype)**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation. Arbites (adamant_ archetype) is available and testable.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 

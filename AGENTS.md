@@ -137,10 +137,10 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 | Tier | Status | Examples | What's needed |
 |------|--------|----------|---------------|
 | 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance | Whitelist removal only |
-| 1 | Untested (DLC) | Broker Focus/Rage | Whitelist removal only — DLC-blocked for validation |
+| 1 | Untested (Hive Scum DLC) | Broker Focus/Rage | Whitelist removal only — Hive Scum DLC not owned |
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
 | 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence). Drone crash guard for #50 validated in a 2026-03-13 Arbites stress run. |
-| 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
+| 3 | Blocked (Hive Scum DLC) | Hive Scum Stimm Field | Item-based, Hive Scum DLC not owned |
 | 3 | Validated | Standard grenades, Psyker Smite/Assail/Chain Lightning, knives, whistle, mines | Grenade/blitz fallback + per-grenade heuristics |
 
 ### Decompiled source repo (Aussiemon/Darktide-Source-Code)
