@@ -46,40 +46,33 @@ function M.register_hooks()
 		end
 	)
 
-	-- #53: use pre-call hook to set is_local_unit=false BEFORE the original init
-	-- constructs wieldable slot scripts. AimProjectileEffects.init caches
-	-- context.is_local_unit on its own field — a hook_safe (post-call) is too late.
-	-- Save/restore extension_init_data.is_local_unit so other extensions aren't affected.
+	-- Patch wieldable slot scripts context after init. This suppresses most
+	-- first-person VFX for bots, but AimProjectileEffects.init caches
+	-- is_local_unit before we can patch it (#53 — rumbler trajectory arc).
+	-- A pre-call hook that sets extension_init_data.is_local_unit=false crashes
+	-- in 1.11.0 (Warband) — the engine's init path now requires is_local_unit=true
+	-- for code that runs before slot script construction. Reverted to hook_safe.
 	_mod:hook_require(
 		"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
 		function(PlayerUnitVisualLoadoutExtension)
-			_mod:hook(
-				PlayerUnitVisualLoadoutExtension,
-				"init",
-				function(func, self, extension_init_context, unit, extension_init_data, ...)
-					local player = extension_init_data and extension_init_data.player
-					local is_bot = player and not player:is_human_controlled()
-
-					if is_bot then
-						extension_init_data.is_local_unit = false
-					end
-
-					func(self, extension_init_context, unit, extension_init_data, ...)
-
-					if is_bot then
-						extension_init_data.is_local_unit = true
+			_mod:hook_safe(PlayerUnitVisualLoadoutExtension, "init", function(self, _context, unit, extension_init_data)
+				local player = extension_init_data.player
+				if player and not player:is_human_controlled() then
+					local ctx = self._wieldable_slot_scripts_context
+					if ctx then
+						ctx.is_local_unit = false
 						if _debug_enabled() then
 							_debug_log(
 								"vfx_fix_loadout:" .. tostring(unit),
 								0,
-								"patched visual loadout is_local_unit=false for bot (pre-init)",
+								"patched wieldable slot scripts context is_local_unit=false for bot",
 								nil,
 								"info"
 							)
 						end
 					end
 				end
-			)
+			end)
 		end
 	)
 
