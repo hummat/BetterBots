@@ -24,6 +24,7 @@ describe("TargetSelection", function()
 
 	before_each(function()
 		TargetSelection = require("scripts.mods.BetterBots.target_selection")
+		_G.BLACKBOARDS = {}
 
 		-- Default: no smart tags
 		_G.Managers = {
@@ -90,6 +91,7 @@ describe("TargetSelection", function()
 	after_each(function()
 		package.loaded["scripts/utilities/ammo"] = nil
 		_G.Managers = nil
+		_G.BLACKBOARDS = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -260,5 +262,105 @@ describe("TargetSelection", function()
 		local breed = { tags = {}, name = "cultist" }
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 100, breed, nil)
 		assert.are.equal(5, score)
+	end)
+
+	-- #55: pounced target boost
+	describe("pounced target boost (#55)", function()
+		it("boosts score for enemy pounced by companion mastiff", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(10, score) -- 5 base + 5 pounced bonus
+		end)
+
+		it("does not boost for non-pounced disabled enemies", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "consumed", attacker_unit = {} },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("does not boost when disable component is absent", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = {}, name = "cultist" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("does not boost when enemy is not disabled", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = false, type = "pounced" },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = {}, name = "cultist" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("stacks with player tag boost", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			_G.Managers = {
+				state = {
+					extension = {
+						system = function()
+							return make_smart_tag_system(target_unit, true)
+						end,
+					},
+				},
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(13, score) -- 5 base + 3 tag + 5 pounced
+		end)
+	end)
+
+	-- #55: pure function unit test
+	describe("is_pounced_by_companion", function()
+		it("returns true for pounced enemy", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "pounced" },
+			}
+			assert.is_true(TargetSelection.is_pounced_by_companion(enemy))
+		end)
+
+		it("returns false for non-pounced disabled enemy", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "consumed" },
+			}
+			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+		end)
+
+		it("returns false when no blackboard", function()
+			assert.is_false(TargetSelection.is_pounced_by_companion({}))
+		end)
+
+		it("returns false when disable not set", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {}
+			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+		end)
 	end)
 end)
