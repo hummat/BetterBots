@@ -1,8 +1,12 @@
--- Poxburster targeting (#34): bots ignore poxbursters entirely due to
--- not_bot_target on breed data. We patch the breed to re-enable targeting
--- and suppress only at close range to avoid detonation.
+-- Poxburster targeting (#34) and push counterplay (#54).
+-- #34: bots ignore poxbursters due to not_bot_target on breed data. We patch the
+-- breed to re-enable targeting and suppress at close range to avoid detonation.
+-- #54: within push range, bots enter melee and push instead of ignoring. The
+-- poxburster's approach action has explicit push counter-kill logic (power=2000
+-- counter-hit when a player pushes during lunge within 5m).
 local POXBURSTER_SUPPRESS_DIST = 5
 local POXBURSTER_HUMAN_SUPPRESS_DIST = 8
+local POXBURSTER_PUSH_DIST = 3
 local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
 local _poxburster_breed_patched = false
 
@@ -16,6 +20,7 @@ local _is_enabled
 -- One-shot dedup: log poxburster suppression once per bot per targeting evaluation.
 -- Weak-keyed so entries are GC'd when bots despawn.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
+local _pox_push_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_near_any_position(origin_position, positions, threshold, distance_fn)
 	if not origin_position or not positions then
@@ -96,6 +101,29 @@ local function _suppress_reason_for_target(unit, self_position, side)
 	)
 end
 
+local function _is_poxburster_in_push_range(unit, self_position)
+	if not unit then
+		return false
+	end
+
+	local data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not data_ext then
+		return false
+	end
+
+	local breed = data_ext:breed()
+	if not breed or breed.name ~= POXBURSTER_BREED_NAME then
+		return false
+	end
+
+	local pos = POSITION_LOOKUP[unit]
+	if not pos then
+		return false
+	end
+
+	return Vector3.distance(self_position, pos) < POXBURSTER_PUSH_DIST
+end
+
 local function _try_suppress_target(perception_component, field_name, log_suffix, self_position, side, self_unit)
 	local suppress, reason = _suppress_reason_for_target(perception_component[field_name], self_position, side)
 	if not suppress then
@@ -171,7 +199,21 @@ function M.register_hooks()
 
 				local perf_t0 = _perf and _perf.begin()
 
-				_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
+				-- #54: skip target_enemy suppression when poxburster is in push range
+				-- so the bot enters melee and pushes instead of ignoring
+				local in_push_range = _is_poxburster_in_push_range(perception_component.target_enemy, self_position)
+				if not in_push_range then
+					_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
+				elseif _debug_enabled() and not _pox_push_logged[self_unit] then
+					_pox_push_logged[self_unit] = true
+					_debug_log(
+						"poxburster_push_range:" .. tostring(self_unit),
+						_fixed_time(),
+						"poxburster in push range, keeping target for melee push",
+						nil,
+						"debug"
+					)
+				end
 				_try_suppress_target(
 					perception_component,
 					"opportunity_target_enemy",
@@ -203,8 +245,85 @@ function M.register_hooks()
 			end
 		)
 	end)
+
+	-- #54: hook melee action to make bots push poxbursters.
+	-- The approach action has explicit push counter-kill logic: when a player
+	-- pushes during lunge within 5m, a power=2000 counter-hit triggers
+	-- staggered_during_lunge → instakill → attributed explosion.
+	_mod:hook_require(
+		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
+		function(BtBotMeleeAction)
+			-- Defend gate: vanilla requires num_melee_attackers > 0, but an
+			-- approaching poxburster hasn't attacked yet. Override so the bot
+			-- enters the block → push flow.
+			_mod:hook(BtBotMeleeAction, "_should_defend", function(func, self, unit, target_unit, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, unit, target_unit, scratchpad)
+				end
+
+				local result = func(self, unit, target_unit, scratchpad)
+				if result then
+					return result
+				end
+
+				local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
+				local target_breed = data_ext and data_ext:breed()
+				if target_breed and target_breed.name == POXBURSTER_BREED_NAME then
+					return true
+				end
+
+				return false
+			end)
+
+			-- Push gate: vanilla requires outnumbered (num_enemies > 1). A lone
+			-- poxburster fails this. Bypass — pushing is life-or-death here.
+			_mod:hook(
+				BtBotMeleeAction,
+				"_should_push",
+				function(func, self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
+					if _is_enabled and not _is_enabled() then
+						return func(
+							self,
+							defense_meta_data,
+							scratchpad,
+							in_melee_range,
+							target_unit,
+							target_breed,
+							fixed_t
+						)
+					end
+
+					if target_breed and target_breed.name == POXBURSTER_BREED_NAME and in_melee_range then
+						local push_action_input = defense_meta_data.push_action_input
+						local weapon_extension = scratchpad.weapon_extension
+						local push_available = weapon_extension:action_input_is_currently_valid(
+							"weapon_action",
+							push_action_input,
+							nil,
+							fixed_t
+						)
+
+						if push_available then
+							if _debug_enabled() then
+								_debug_log(
+									"poxburster_push:" .. tostring(target_unit),
+									fixed_t,
+									"pushing poxburster (bypassed outnumbered gate)"
+								)
+							end
+							return true, push_action_input
+						end
+					end
+
+					return func(self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
+				end
+			)
+		end
+	)
 end
 
 M.should_suppress_poxburster_positions = _should_suppress_poxburster_positions
+M.is_poxburster_in_push_range = _is_poxburster_in_push_range
+M.POXBURSTER_PUSH_DIST = POXBURSTER_PUSH_DIST
 
 return M
