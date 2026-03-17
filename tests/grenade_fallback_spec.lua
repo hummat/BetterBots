@@ -1586,7 +1586,6 @@ describe("grenade_fallback", function()
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 
 			-- Simulate charge consumed
-			local release_t = _mock_time
 			_mock_time = _mock_time + 0.1
 			GrenadeFallback.record_charge_event(unit, "adamant_whistle", _mock_time)
 

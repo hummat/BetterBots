@@ -289,7 +289,9 @@ describe("item_fallback", function()
 		)
 
 		assert.is_not_nil(
-			find_log("fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)")
+			find_log(
+				"fallback item confirmed charge consume for zealot_relic (profile=channel, rule=zealot_relic_hazard)"
+			)
 		)
 	end)
 

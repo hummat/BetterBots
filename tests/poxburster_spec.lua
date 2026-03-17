@@ -107,7 +107,7 @@ describe("poxburster", function()
 					hook_require = function(_self, path, callback)
 						captured_hook_require[path] = callback
 					end,
-					hook_safe = function(_self, target, method_name, callback)
+					hook_safe = function(_self, _target, method_name, callback)
 						assert.equals("_update_target_enemy", method_name)
 						captured_hook_safe = callback
 					end,
@@ -272,7 +272,7 @@ describe("poxburster", function()
 						end,
 						hook = function() end,
 					},
-					debug_log = function(key, fixed_t, message, _interval, level)
+					debug_log = function(key, _fixed_t, message, _interval, level)
 						debug_logs[#debug_logs + 1] = { key = key, message = message, level = level }
 					end,
 					debug_enabled = function()

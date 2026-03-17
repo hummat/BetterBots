@@ -156,7 +156,7 @@ describe("bot_profiles", function()
 		end)
 
 		it("passes through when setting is nil (uninitialized)", function()
-			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			local _, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
 			assert.is_false(swapped)
 		end)
 
@@ -204,7 +204,7 @@ describe("bot_profiles", function()
 				loadout = {},
 				talents = {},
 			}
-			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			local _, swapped = BotProfiles.resolve_profile(tertium_profile)
 			assert.is_false(swapped)
 		end)
 

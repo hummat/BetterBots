@@ -1,10 +1,11 @@
 -- Stub cjson for test environment
-_G.cjson = _G.cjson or {
-	encode = function(t)
-		-- Minimal JSON-like serialization for test assertions
-		return tostring(t)
-	end,
-}
+_G.cjson = _G.cjson
+	or {
+		encode = function(t)
+			-- Minimal JSON-like serialization for test assertions
+			return tostring(t)
+		end,
+	}
 
 local EventLog = dofile("scripts/mods/BetterBots/event_log.lua")
 

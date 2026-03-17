@@ -17,7 +17,9 @@ describe("ranged_meta_data", function()
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
 			debug_log = noop_debug_log,
-			debug_enabled = function() return false end,
+			debug_enabled = function()
+				return false
+			end,
 		})
 	end)
 

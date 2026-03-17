@@ -5,11 +5,15 @@ describe("TargetSelection", function()
 
 	local function make_smart_tag_system(target_unit, is_human)
 		return {
-			unit_tag = function(self, unit)
+			unit_tag = function(_self, unit)
 				if unit == target_unit then
 					return {
 						tagger_player = function()
-							return { is_human_controlled = function() return is_human end }
+							return {
+								is_human_controlled = function()
+									return is_human
+								end,
+							}
 						end,
 					}
 				end
@@ -25,9 +29,13 @@ describe("TargetSelection", function()
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
-							return { unit_tag = function() return nil end }
+							return {
+								unit_tag = function()
+									return nil
+								end,
+							}
 						end
 					end,
 				},
@@ -36,13 +44,13 @@ describe("TargetSelection", function()
 
 		-- Mock the mod object
 		_mod = {
-			hook_require = function(self, path, callback)
+			hook_require = function(_self, path, callback)
 				if path == "scripts/utilities/bot_target_selection" then
 					local mock_module = {}
 					callback(mock_module)
 				end
 			end,
-			hook = function(self, module, name, handler)
+			hook = function(_self, _module, name, handler)
 				_mod.handlers = _mod.handlers or {}
 				_mod.handlers[name] = handler
 			end,
@@ -59,13 +67,13 @@ describe("TargetSelection", function()
 			end,
 		})
 
-		original_slot_weight = function(unit, target_unit, target_distance_sq, target_breed, target_ally)
+		original_slot_weight = function(_unit, _target_unit, _target_distance_sq, _target_breed, _target_ally)
 			return 5 -- arbitrary base score
 		end
 
 		-- Mock Ammo
 		package.loaded["scripts/utilities/ammo"] = {
-			current_slot_percentage = function(unit, slot)
+			current_slot_percentage = function(unit, _slot)
 				if unit.has_ammo then
 					return 1.0
 				end
@@ -167,7 +175,7 @@ describe("TargetSelection", function()
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
 							return make_smart_tag_system(target_unit, true)
 						end
@@ -183,7 +191,7 @@ describe("TargetSelection", function()
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
 							return make_smart_tag_system(target_unit, true)
 						end
@@ -200,7 +208,7 @@ describe("TargetSelection", function()
 
 	it("does not boost score when vanilla slot_weight is zero", function()
 		local target_unit = {}
-		_G.Managers.state.extension.system = function(self, name)
+		_G.Managers.state.extension.system = function(_self, name)
 			if name == "smart_tag_system" then
 				return make_smart_tag_system(target_unit, true)
 			end
@@ -216,7 +224,7 @@ describe("TargetSelection", function()
 
 	it("does not boost score when target is tagged by a bot (not human)", function()
 		local target_unit = {}
-		_G.Managers.state.extension.system = function(self, name)
+		_G.Managers.state.extension.system = function(_self, name)
 			if name == "smart_tag_system" then
 				return make_smart_tag_system(target_unit, false)
 			end
@@ -237,7 +245,9 @@ describe("TargetSelection", function()
 	end)
 
 	it("does not boost score when smart_tag_system is unavailable", function()
-		_G.Managers.state.extension.system = function() return nil end
+		_G.Managers.state.extension.system = function()
+			return nil
+		end
 		local target_unit = {}
 		local unit = { has_ammo = true }
 		local breed = { tags = { elite = true }, name = "chaos_hound" }

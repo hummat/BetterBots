@@ -1,4 +1,4 @@
-LUA_FILES := $(shell find scripts -name '*.lua')
+LUA_FILES := $(shell find scripts tests -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
 
 .PHONY: deps lint format format-check lsp-check check test doc-check release package
