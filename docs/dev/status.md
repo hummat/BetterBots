@@ -1,4 +1,4 @@
-# Status Snapshot (March 14, 2026)
+# Status Snapshot (March 18, 2026)
 
 ## What's shipped
 
@@ -115,21 +115,34 @@ In-game validation: 2026-03-13, latest analyzed log `console-2026-03-13-13.21.23
 
 All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
+## v0.8.0 (2026-03-16)
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #57 | Toggle safety audit | **Closed** | `is_togglable = false`, singleton mutations not revertible |
+| #6 | Settings control surface | **Closed** | Category gates (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature toggles, veteran dual-category gate |
+| #45 | Default class profiles | **Closed** | 4-class profiles (Veteran/Zealot/Psyker/Ogryn), hadrons-blessing weapon picks, per-class cosmetics, Tertium compat, `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns |
+| #63 | Talent enrichment + weapon blessings | **Closed** | ~30 talents per class, 2 T4 blessings + 1-2 T4 perks per weapon, bot-optimized build selection |
+| #60 | Heuristic dispatch refactor | **Closed** | `fn(context)` signature simplification |
+| #59 | Grenade fallback logging | **Closed** | Per-stage lifecycle events (queued/stage/complete/failed) |
+
+**Unit tests**: 518 tests via busted.
+
+## v0.9.0 — "Combat Awareness" (in progress on `dev/v0.9.0`)
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Open** | Native crash on Zealot/Psyker/Ogryn profiles. Workaround: Veteran or None. Blocked on 1.11.0 decompiled source. |
+| #54 | Push poxbursters | **Done** | `_should_push` outnumbered gate bypassed for poxburster breed + push logging |
+| #55 | Prioritize mastiff-pounced enemies | **Done** | Score boost for immobilized targets in `target_selection.lua` |
+| #53 | Rumbler VFX timing gap | **Done** | Pre-call hook on loadout init (crash was from profiles, not VFX — restored after #65 investigation) |
+| #47 | Combat-aware engagement leash | Not started | Root cause analyzed, 4-layer fix proposed |
+| #37 | Objective-aware ability activation | Not started | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
+
 ## Next Steps
-
-### v0.8.0 — "Player Control" (next release)
-
-| # | Feature | Status |
-|---|---------|--------|
-| 57 | Toggle safety audit | **Done** — `is_togglable = false`, singleton mutations not revertible |
-| 6 | Settings control surface | **Done** — category gates, 4 presets (testing/aggressive/balanced/conservative), feature toggles, veteran dual-category gate |
-| 45 | Default class profiles | Design doc ready, ~150-200 LOC |
-| 60 | Simplify heuristic dispatch | Not started — internal refactor |
-| 59 | Grenade fallback logging | Not started — observability |
 
 ### Later batches
 
-- **v0.9.0 "Combat Awareness"**: #54 (push poxbursters, P1), #47 (engagement leash), #37 (objective-aware), #55 (mastiff-pounced priority), #53 (rumbler VFX)
 - **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS), #58 (ScriptUnit guard)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)

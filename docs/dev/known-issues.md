@@ -2,7 +2,9 @@
 
 ## High severity
 
-1. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
+1. **Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)** (#65). Spawning Zealot/Psyker/Ogryn bot profiles causes a native CTD (empty Lua callstack) after the `add_bot` hook returns. Veteran and "None" profiles work. **Workaround:** set all bot slots to "Veteran" or "None" in settings. **Root cause:** unknown — crash is in engine code processing non-veteran archetype data. Eliminated: cosmetic overrides (crash persists without them), VFX pre-call hook (red herring — crash was from profiles). Investigation blocked on Aussiemon's 1.11.0 decompiled source (still 1.10.7 as of 2026-03-18). Next step: binary bisect zealot profile OR diff Archetypes table once 1.11.0 source available.
+
+2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 
 2. ~~Bots stop shooting at 50% reserve ammo (#51).~~ **Fixed in v0.7.1**: threshold lowered to 20%. Validated: 270 permitted shots with lowered gate in standard-profile mission.
 

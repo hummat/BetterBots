@@ -58,30 +58,18 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
-### v0.8.0 — "Player Control"
-
-*Theme: give users knobs + make the mod work out-of-the-box for more players.*
-
-| # | Issue | Notes |
-|---|-------|-------|
-| 57 | Toggle safety audit | **Done.** `is_togglable = false` — singleton mutations can't be reverted by DMF. |
-| 6 | Settings control surface | **Done.** Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature gates (sprint/pinging/special_penalty/poxburster), veteran dual-category gate. |
-| 45 | Default class profiles | **Done.** 4-class profiles (Veteran/Zealot/Psyker/Ogryn) with hadrons-blessing weapon picks, per-class cosmetics, Tertium compat. `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns. |
-| 63 | Enrich profiles with talents & blessings | **Done.** Full talent trees (~30 per class) + weapon blessings (2 T4 per weapon) + perks from hadrons-blessing builds. Bot-optimized build selection (zero bot-unfriendly talents for psyker/ogryn). Also fixed 19 log throttle collision bugs. |
-| 60 | Simplify heuristic dispatch | Refactor `fn(context)` signature — pays down tech debt before settings adds more call sites. |
-| 59 | Grenade fallback logging | Per-stage lifecycle events (queued/stage/complete/failed) matching item_fallback pattern. |
-
 ### v0.9.0 — "Combat Awareness"
 
 *Theme: bots perceive and react to combat situations better.*
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 54 | Push poxbursters | **P1.** Bypass `_should_push` outnumbered gate for poxburster breed. Standard human counterplay. |
+| 65 | **P0: non-veteran profiles CTD on 1.11.0** | Native crash on Zealot/Psyker/Ogryn bot profiles in Darktide 1.11.0 (Warband). Workaround: Veteran or None. Blocked on 1.11.0 decompiled source. |
+| 54 | Push poxbursters | **Done.** Bypass `_should_push` outnumbered gate for poxburster breed + push logging. |
+| 55 | Prioritize mastiff-pounced enemies | **Done.** Score boost for immobilized targets in target_selection.lua. |
+| 53 | Rumbler VFX timing gap | **Done.** Pre-call hook on loadout init restored (crash was from profiles, not VFX). |
 | 47 | Combat-aware engagement leash | Hook `_allow_engage()` for context-aware range extension: stickiness, post-charge grace, under-attack override. Root cause analyzed, 4-layer fix proposed. |
 | 37 | Objective-aware ability activation | Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
-| 55 | Prioritize mastiff-pounced enemies | Score boost for immobilized targets in target_selection.lua. |
-| 53 | Rumbler VFX timing gap | `hook_safe` on loadout init fires too late for `AimProjectileEffects.init` cache. Fix: pre-call hook or separate `AimProjectileEffects.init` hook. |
 
 ### v0.10.0 — "Team Coordination"
 
