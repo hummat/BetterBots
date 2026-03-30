@@ -72,6 +72,12 @@
 2. DMF Dev Console/Dev Mode interactions can produce crashes outside this mod's code path.
    - Treat as external until a BetterBots-specific traceback is captured.
 
+3. Vanilla airlock teleport crash when bot count exceeds 4 teleport nodes.
+   - Symptom: `door_extension.lua: bad argument #2 to 'has_node' (string expected, got nil)` when entering airlocks.
+   - Root cause: Fatshark's `teleport_bots()` indexes a 4-entry node name table without a nil guard. SoloPlay mods that spawn extra bots push the index past the table bounds.
+   - BetterBots does not modify bot counts or door/teleport logic. This is a vanilla/SoloPlay issue.
+   - Mitigation: `airlock_guard.lua` wraps `teleport_bots` with pcall — un-teleported bots catch up via normal follow behavior.
+
 ## Current fix direction
 
 1. ~~Add explicit restore-on-disable behavior.~~ Done (#57) — set `is_togglable = false` instead.

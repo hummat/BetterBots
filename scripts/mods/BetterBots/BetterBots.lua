@@ -188,6 +188,9 @@ assert(SmartTargeting, "BetterBots: failed to load smart_targeting module")
 local AnimationGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/animation_guard")
 assert(AnimationGuard, "BetterBots: failed to load animation_guard module")
 
+local AirlockGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/airlock_guard")
+assert(AirlockGuard, "BetterBots: failed to load airlock_guard module")
+
 local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
 assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 
@@ -339,6 +342,13 @@ Poxburster.init({
 })
 
 AnimationGuard.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+})
+
+AirlockGuard.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
@@ -503,6 +513,7 @@ TargetSelection.register_hooks()
 Poxburster.register_hooks()
 MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()
+AirlockGuard.register_hooks()
 SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({

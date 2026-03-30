@@ -6,8 +6,10 @@ BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/
 deps:
 	git config core.hooksPath scripts/hooks
 
+LUACHECK_BIN := $(shell command -v bin/luacheck 2>/dev/null || command -v luacheck 2>/dev/null)
+
 lint:
-	luacheck $(LUA_FILES)
+	$(LUACHECK_BIN) $(LUA_FILES)
 
 format:
 	stylua $(LUA_FILES)
