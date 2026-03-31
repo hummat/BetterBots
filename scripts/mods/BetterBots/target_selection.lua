@@ -85,7 +85,7 @@ function M.register_hooks()
 						score = score + PLAYER_TAG_BONUS
 						if _debug_enabled() then
 							_debug_log(
-								"target_sel_tag_boost:" .. tostring(target_unit),
+								"target_sel_tag_boost:" .. tostring(target_unit) .. ":" .. tostring(unit),
 								_fixed_time(),
 								"boosting score for player-tagged "
 									.. tostring(target_breed.name)
@@ -100,7 +100,7 @@ function M.register_hooks()
 						score = score + POUNCED_TARGET_BONUS
 						if _debug_enabled() then
 							_debug_log(
-								"target_sel_pounced:" .. tostring(target_unit),
+								"target_sel_pounced:" .. tostring(target_unit) .. ":" .. tostring(unit),
 								_fixed_time(),
 								"boosting score for pounced "
 									.. tostring(target_breed.name)
@@ -123,7 +123,7 @@ function M.register_hooks()
 					if ammo_percent and ammo_percent > 0.5 then
 						if _debug_enabled() then
 							_debug_log(
-								"target_sel_penalty",
+								"target_sel_penalty:" .. tostring(unit),
 								_fixed_time(),
 								"penalizing melee score for distant special "
 									.. tostring(target_breed.name)
@@ -159,7 +159,7 @@ function M.register_hooks()
 				then
 					if _debug_enabled() then
 						_debug_log(
-							"boss_targeting_bot",
+							"boss_targeting_bot:" .. tostring(unit),
 							_fixed_time(),
 							"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
 						)

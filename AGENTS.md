@@ -332,7 +332,7 @@ scripts/mods/BetterBots/
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
   animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
-  airlock_guard.lua                          # Airlock teleport crash guard: pcall wrap for vanilla has_node nil index bug
+  airlock_guard.lua                          # Airlock teleport crash guard: narrow nil-node guard for vanilla has_node bug
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
@@ -364,7 +364,7 @@ tests/
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
   animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
-  airlock_guard_spec.lua                    # airlock teleport pcall guard + warn-once behavior
+  airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle

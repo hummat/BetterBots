@@ -173,6 +173,65 @@ describe("poxburster", function()
 			assert.matches("suppressed poxburster target_enemy %(near_human_player%)", debug_logs[1].message)
 		end)
 
+		it("includes the acting bot in the poxburster push log key", function()
+			local captured_hook
+			local logged = {}
+
+			Poxburster.init({
+				mod = {
+					hook_require = function(_self, path, callback)
+						if path == "scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action" then
+							callback({})
+						end
+					end,
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_push" then
+							captured_hook = handler
+						end
+					end,
+				},
+				debug_log = function(key, fixed_t, message, _interval, level)
+					logged[#logged + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						level = level,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+			Poxburster.register_hooks()
+
+			local scratchpad = {
+				weapon_extension = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				},
+			}
+			local defense_meta_data = {
+				push_action_input = "push",
+			}
+			local target_breed = {
+				name = "chaos_poxwalker_bomber",
+			}
+
+			local pushed, action_input = captured_hook(function()
+				return false, nil, false
+			end, nil, defense_meta_data, scratchpad, true, "poxburster", target_breed, 12.5)
+
+			assert.is_true(pushed)
+			assert.equals("push", action_input)
+			assert.equals(1, #logged)
+			assert.equals("poxburster_push:poxburster:" .. tostring(scratchpad), logged[1].key)
+		end)
+
 		it("suppresses poxbursters from all secondary perception slots", function()
 			local opportunity = run_hook_with_target("opportunity_target_enemy")
 			local urgent = run_hook_with_target("urgent_target_enemy")

@@ -333,6 +333,40 @@ describe("TargetSelection", function()
 			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
 			assert.are.equal(13, score) -- 5 base + 3 tag + 5 pounced
 		end)
+
+		it("includes the acting bot in the pounced-target debug key", function()
+			local logs = {}
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function(key, fixed_t, message)
+					logs[#logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local target_unit = {}
+			local unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+
+			assert.are.equal(10, score)
+			assert.equals(1, #logs)
+			assert.equals("target_sel_pounced:" .. tostring(target_unit) .. ":" .. tostring(unit), logs[1].key)
+		end)
 	end)
 
 	-- #55: pure function unit test

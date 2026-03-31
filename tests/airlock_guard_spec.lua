@@ -111,12 +111,51 @@ describe("airlock_guard", function()
 		AirlockGuard.register_hooks()
 
 		hook_handler(function()
-			error("has_node boom")
+			error("bad argument #2 to 'has_node' (string expected, got nil)")
 		end, { _unit = "door_unit" })
 
 		assert.equals(1, #logged)
 		assert.equals("airlock_guard:teleport", logged[1].key)
 		assert.truthy(logged[1].message:find("vanilla crash prevented"))
+	end)
+
+	it("rethrows unrelated crashes instead of swallowing them", function()
+		local AirlockGuard = load_airlock_guard()
+		local hook_handler
+		local warnings = {}
+		local stub_mod = {
+			hook_require = function(_, _, callback)
+				callback({})
+			end,
+			hook = function(_, _, _, handler)
+				hook_handler = handler
+			end,
+			warning = function(_, message)
+				warnings[#warnings + 1] = message
+			end,
+		}
+
+		AirlockGuard.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+		})
+		AirlockGuard.register_hooks()
+
+		local ok, err = pcall(function()
+			hook_handler(function()
+				error("some other door failure")
+			end, { _unit = "door_unit" })
+		end)
+
+		assert.is_false(ok)
+		assert.matches("some other door failure", err)
+		assert.equals(0, #warnings)
 	end)
 
 	it("hooks the correct module path", function()

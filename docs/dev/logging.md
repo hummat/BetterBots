@@ -90,6 +90,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
+- `boosting score for pounced <breed> +5.0` (target selection boost for mastiff-pounced enemies; direct validation signal for `#55`)
+- `pushing poxburster (bypassed outnumbered gate)` (poxburster melee hook forced a push; direct validation signal for `#54`)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)

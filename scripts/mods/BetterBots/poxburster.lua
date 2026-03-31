@@ -311,7 +311,7 @@ function M.register_hooks()
 						if push_available then
 							if _debug_enabled() then
 								_debug_log(
-									"poxburster_push:" .. tostring(target_unit),
+									"poxburster_push:" .. tostring(target_unit) .. ":" .. tostring(scratchpad),
 									fixed_t,
 									"pushing poxburster (bypassed outnumbered gate)",
 									1
@@ -321,7 +321,7 @@ function M.register_hooks()
 						else
 							if _debug_enabled() then
 								_debug_log(
-									"poxburster_push_blocked:" .. tostring(target_unit),
+									"poxburster_push_blocked:" .. tostring(target_unit) .. ":" .. tostring(scratchpad),
 									fixed_t,
 									"poxburster push unavailable (action not valid)",
 									2

@@ -12,11 +12,22 @@ local _debug_enabled
 local _fixed_time
 local _warned = false
 
+local function _is_known_nil_node_crash(err)
+	local message = tostring(err)
+
+	return message:find("bad argument #2 to 'has_node'", 1, true) ~= nil
+		and message:find("string expected, got nil", 1, true) ~= nil
+end
+
 local function register_hooks()
 	_mod:hook_require("scripts/extension_systems/door/door_extension", function(DoorExtension)
 		_mod:hook(DoorExtension, "teleport_bots", function(func, self)
 			local ok, err = pcall(func, self)
 			if not ok then
+				if not _is_known_nil_node_crash(err) then
+					error(err, 0)
+				end
+
 				if not _warned then
 					_warned = true
 					if _mod.warning then

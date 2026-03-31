@@ -1,3 +1,12 @@
 #!/bin/sh
 # Wrapper: run luacheck under Lua 5.4 (luacheck 1.2.0 is broken on Lua 5.5)
-exec /usr/bin/lua5.4 -e 'package.path="/usr/share/lua/5.5/?.lua;/usr/share/lua/5.5/?/init.lua;"..package.path; package.cpath="/usr/lib/lua/5.4/?.so;/usr/lib/lua/5.5/?.so;"..package.cpath; require("luacheck.main")()' -- "$@"
+if [ -x /usr/bin/lua5.4 ] && [ -r /usr/share/lua/5.5/luacheck/main.lua ]; then
+	exec /usr/bin/lua5.4 -e 'package.path="/usr/share/lua/5.5/?.lua;/usr/share/lua/5.5/?/init.lua;"..package.path; package.cpath="/usr/lib/lua/5.4/?.so;/usr/lib/lua/5.5/?.so;"..package.cpath; require("luacheck.main")()' -- "$@"
+fi
+
+if command -v luacheck >/dev/null 2>&1; then
+	exec "$(command -v luacheck)" "$@"
+fi
+
+echo "luacheck not found" >&2
+exit 127
