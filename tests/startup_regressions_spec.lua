@@ -135,4 +135,19 @@ describe("startup regressions", function()
 		assert.is_nil(source:find('mod:echo%("BetterBots DEBUG: logging enabled %(level=', 1))
 		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
 	end)
+
+	it("heuristics.lua uses breed.ranged for ranged_count (not tags.ranged)", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/heuristics.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_nil(
+			source:find('_is_tagged%(tags, "ranged"%)' ),
+			"ranged_count must use enemy_breed.ranged, not _is_tagged(tags, 'ranged')"
+		)
+		assert.is_not_nil(
+			source:find("enemy_breed%.ranged"),
+			"ranged_count classification must check enemy_breed.ranged"
+		)
+	end)
 end)

@@ -243,7 +243,7 @@ local function build_context(unit, blackboard)
 				if _is_tagged(tags, "monster") then
 					context.monster_count = context.monster_count + 1
 				end
-				if _is_tagged(tags, "ranged") then
+				if enemy_breed.ranged then
 					context.ranged_count = context.ranged_count + 1
 				else
 					context.melee_count = context.melee_count + 1
