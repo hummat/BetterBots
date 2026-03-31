@@ -2,7 +2,7 @@
 
 ## High severity
 
-1. **Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)** (#65). Spawning Zealot/Psyker/Ogryn bot profiles causes a native CTD (empty Lua callstack) after the `add_bot` hook returns. Veteran and "None" profiles work. **Workaround:** set all bot slots to "Veteran" or "None" in settings. **Root cause:** unknown — crash is in engine code processing non-veteran archetype data. Eliminated: cosmetic overrides (crash persists without them), VFX pre-call hook (red herring — crash was from profiles). Investigation blocked on Aussiemon's 1.11.0 decompiled source (still 1.10.7 as of 2026-03-18). Next step: binary bisect zealot profile OR diff Archetypes table once 1.11.0 source available.
+1. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
 
 2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 

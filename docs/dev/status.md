@@ -132,7 +132,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
-| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Open** | Native crash on Zealot/Psyker/Ogryn profiles. Workaround: Veteran or None. Blocked on 1.11.0 decompiled source. |
+| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Fixed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Awaiting in-game validation. |
 | #54 | Push poxbursters | **Done** | `_should_push` outnumbered gate bypassed for poxburster breed + push logging |
 | #55 | Prioritize mastiff-pounced enemies | **Done** | Score boost for immobilized targets in `target_selection.lua` |
 | #53 | Rumbler VFX timing gap | **Done** | Pre-call hook on loadout init (crash was from profiles, not VFX — restored after #65 investigation) |
