@@ -264,5 +264,145 @@ describe("bot_profiles", function()
 			assert.is_nil(resolved.is_local_profile)
 			assert.is_nil(resolved._bb_resolved)
 		end)
+
+		describe("set_profile hook", function()
+			it("register_hooks registers BotPlayer.set_profile hook", function()
+				local hooked_targets = {}
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, _handler)
+						hooked_targets[#hooked_targets + 1] = { target = target, method = method }
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+
+				local found_add_bot = false
+				local found_set_profile = false
+				for _, h in ipairs(hooked_targets) do
+					if h.target == "BotSynchronizerHost" and h.method == "add_bot" then
+						found_add_bot = true
+					end
+					if h.target == "BotPlayer" and h.method == "set_profile" then
+						found_set_profile = true
+					end
+				end
+				assert.is_true(found_add_bot, "must hook BotSynchronizerHost.add_bot")
+				assert.is_true(found_set_profile, "must hook BotPlayer.set_profile")
+			end)
+
+			it("blocks set_profile when existing profile has _bb_resolved", function()
+				local set_profile_handler
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+				assert.is_not_nil(set_profile_handler, "handler must be captured")
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = {
+					_profile = { _bb_resolved = true, archetype = "zealot" },
+				}
+				local new_profile = { archetype = "zealot", _from_network = true }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_false(original_called, "should block overwrite for _bb_resolved profile")
+			end)
+
+			it("allows set_profile when existing profile is NOT _bb_resolved", function()
+				local set_profile_handler
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = {
+					_profile = { archetype = "veteran" },
+				}
+				local new_profile = { archetype = "veteran" }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow overwrite for vanilla profile")
+			end)
+
+			it("allows set_profile when no existing profile (first assignment)", function()
+				local set_profile_handler
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = { _profile = nil }
+				local new_profile = { archetype = "zealot" }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow first profile assignment")
+			end)
+		end)
 	end)
 end)

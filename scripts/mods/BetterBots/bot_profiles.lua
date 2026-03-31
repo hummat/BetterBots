@@ -825,6 +825,17 @@ local function register_hooks()
 		local resolved = resolve_profile(profile)
 		return func(self, local_player_id, resolved)
 	end)
+
+	-- Guard against 1.11+ network-sync profile overwrite (#65).
+	-- ProfileSynchronizerClient reconstructs the profile from JSON (losing weapon
+	-- overrides, running validate_talent_layouts) then calls set_profile, replacing
+	-- our fully-resolved profile. Block the overwrite for BetterBots-managed profiles.
+	_mod:hook("BotPlayer", "set_profile", function(func, self, profile)
+		if self._profile and self._profile._bb_resolved then
+			return
+		end
+		return func(self, profile)
+	end)
 end
 
 local function reset()
