@@ -229,4 +229,40 @@ describe("bot_profiles", function()
 			-- Either way, swapped=false, but we can check logs to confirm it got past the guard
 		end)
 	end)
+
+	describe("profile overwrite guard (#65)", function()
+		it("does NOT set flags on pass-through (setting=none)", function()
+			_mock_settings.bot_slot_1_profile = "none"
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+
+		it("does NOT set flags on pass-through (Tertium yield)", function()
+			_mock_settings.bot_slot_1_profile = "ogryn"
+			local tertium_profile = {
+				archetype = "zealot",
+				loadout = {},
+				talents = {},
+			}
+			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+
+		it("does NOT set flags on pass-through (slot overflow)", function()
+			for i = 1, 5 do
+				_mock_settings["bot_slot_" .. i .. "_profile"] = "zealot"
+			end
+			for _ = 1, 5 do
+				BotProfiles.resolve_profile(VANILLA_PROFILE)
+			end
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 6
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+	end)
 end)

@@ -801,6 +801,14 @@ local function resolve_profile(profile)
 		end
 	end
 
+	-- Guard against 1.11+ profile overwrite (#65): the network-sync pipeline
+	-- JSON-serializes and reconstructs the profile, losing weapon overrides and
+	-- running validate_talent_layouts (new in 1.11). Tag the profile so that:
+	-- (1) unit_templates.lua skips talent re-validation (is_local_profile)
+	-- (2) our BotPlayer.set_profile hook blocks the lossy overwrite (_bb_resolved)
+	profile.is_local_profile = true
+	profile._bb_resolved = true
+
 	if _debug_enabled() then
 		_debug_log(
 			"bot_profiles:swap:" .. tostring(slot_index),
