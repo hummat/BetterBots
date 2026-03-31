@@ -334,6 +334,12 @@ describe("bot_profiles", function()
 
 				set_profile_handler(original_func, bot_self, new_profile)
 				assert.is_false(original_called, "should block overwrite for _bb_resolved profile")
+				assert.is_nil(bot_self._profile._bb_resolved, "sentinel consumed after one-shot block")
+
+				-- Second call should pass through (sentinel consumed)
+				original_called = false
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow subsequent updates after one-shot block")
 			end)
 
 			it("allows set_profile when existing profile is NOT _bb_resolved", function()
