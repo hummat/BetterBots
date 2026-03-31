@@ -68,6 +68,7 @@ local FEATURE_GATES = {
 	poxburster = "enable_poxburster",
 	melee_improvements = "enable_melee_improvements",
 	ranged_improvements = "enable_ranged_improvements",
+	engagement_leash = "enable_engagement_leash",
 }
 
 -- Preset system

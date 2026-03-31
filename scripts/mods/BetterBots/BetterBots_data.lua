@@ -41,6 +41,7 @@ return {
 					{ setting_id = "enable_poxburster", type = "checkbox", default_value = true },
 					{ setting_id = "enable_melee_improvements", type = "checkbox", default_value = true },
 					{ setting_id = "enable_ranged_improvements", type = "checkbox", default_value = true },
+					{ setting_id = "enable_engagement_leash", type = "checkbox", default_value = true },
 					{
 						setting_id = "healing_deferral_mode",
 						type = "dropdown",

@@ -111,6 +111,12 @@ return {
 	enable_ranged_improvements_description = {
 		en = "Bots aim down sights, use charged staff fire, and vent warp heat. Disabling reverts to vanilla.",
 	},
+	enable_engagement_leash = {
+		en = "Combat engagement leash",
+	},
+	enable_engagement_leash_description = {
+		en = "Bots stay in combat longer instead of breaking off to follow. Uses coherency-based ranges.",
+	},
 	-- Healing deferral
 	healing_deferral_mode = {
 		en = "Healing deferral mode",
