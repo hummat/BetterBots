@@ -68,7 +68,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 54 | Push poxbursters | **Done.** Bypass `_should_push` outnumbered gate for poxburster breed + push logging. |
 | 55 | Prioritize mastiff-pounced enemies | **Done.** Score boost for immobilized targets in target_selection.lua. |
 | 53 | Rumbler VFX timing gap | **Done.** Pre-call hook on loadout init restored (crash was from profiles, not VFX). |
-| 47 | Combat-aware engagement leash | Hook `_allow_engage()` for context-aware range extension: stickiness, post-charge grace, under-attack override. Root cause analyzed, 4-layer fix proposed. |
+| 47 | Combat-aware engagement leash | **Done.** Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. |
 | 37 | Objective-aware ability activation | Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
 
 ### v0.10.0 — "Team Coordination"

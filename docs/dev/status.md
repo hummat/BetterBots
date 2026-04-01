@@ -136,7 +136,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 | #54 | Push poxbursters | **Done** | `_should_push` outnumbered gate bypassed for poxburster breed + push logging |
 | #55 | Prioritize mastiff-pounced enemies | **Done** | Score boost for immobilized targets in `target_selection.lua` |
 | #53 | Rumbler VFX timing gap | **Done** | Pre-call hook on loadout init (crash was from profiles, not VFX — restored after #65 investigation) |
-| #47 | Combat-aware engagement leash | Not started | Root cause analyzed, 4-layer fix proposed |
+| #47 | Combat-aware engagement leash | **Done** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides |
 | #37 | Objective-aware ability activation | Not started | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
 
 ## Next Steps
