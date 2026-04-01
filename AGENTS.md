@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -337,6 +337,7 @@ scripts/mods/BetterBots/
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   bot_profiles.lua                          # Default class-diverse bot profiles: archetype/weapon/talent/cosmetic per slot (#45/#63)
+  engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
   log_levels.lua                            # Tiered debug log level constants and resolution (#40)
   perf.lua                                  # Per-hook runtime recorder + /bb_perf command
@@ -367,6 +368,7 @@ tests/
   airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
+  engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder
