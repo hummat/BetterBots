@@ -1,5 +1,3 @@
-local helper = require("tests.test_helper")
-
 -- Stub globals that engagement_leash.lua needs
 local BLACKBOARDS_STUB = {}
 local POSITION_LOOKUP_STUB = {}
@@ -12,7 +10,11 @@ local function setup_globals()
 			return nil
 		end,
 	}
-	_G.Managers = { time = { time = function() return 0 end } }
+	_G.Managers = { time = {
+		time = function()
+			return 0
+		end,
+	} }
 	_G.Vector3 = {
 		distance_squared = function(a, b)
 			local dx = (a.x or 0) - (b.x or 0)
@@ -49,31 +51,6 @@ local function make_breed(overrides)
 	return b
 end
 
-local function make_action_data(overrides)
-	local ad = {
-		engage_range = 6,
-		engage_range_near_follow_position = 10,
-		override_engage_range_to_follow_position = 12,
-		override_engage_range_to_follow_position_challenge = 6,
-	}
-	if overrides then
-		for k, v in pairs(overrides) do
-			ad[k] = v
-		end
-	end
-	return ad
-end
-
--- Priority target action_data (all math.huge)
-local function make_priority_action_data()
-	return {
-		engage_range = math.huge,
-		engage_range_near_follow_position = math.huge,
-		override_engage_range_to_follow_position = math.huge,
-		override_engage_range_to_follow_position_challenge = math.huge,
-	}
-end
-
 local EngagementLeash
 
 describe("engagement_leash", function()
@@ -84,10 +61,16 @@ describe("engagement_leash", function()
 		EngagementLeash = dofile("scripts/mods/BetterBots/engagement_leash.lua")
 		EngagementLeash.init({
 			debug_log = function() end,
-			debug_enabled = function() return false end,
-			fixed_time = function() return 0 end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
 			perf = nil,
-			is_enabled = function() return true end,
+			is_enabled = function()
+				return true
+			end,
 		})
 	end)
 
@@ -96,12 +79,11 @@ describe("engagement_leash", function()
 	end)
 
 	describe("compute_effective_leash", function()
-		local unit, target, follow_pos
+		local unit, target
 
 		before_each(function()
 			unit = make_unit("bot1")
 			target = make_unit("enemy1")
-			follow_pos = make_pos(0, 0, 0)
 			POSITION_LOOKUP_STUB[unit] = make_pos(0, 0, 0)
 			POSITION_LOOKUP_STUB[target] = make_pos(10, 0, 0)
 		end)
@@ -123,7 +105,11 @@ describe("engagement_leash", function()
 			_G.ScriptUnit = {
 				has_extension = function(_, ext_name)
 					if ext_name == "coherency_system" then
-						return { current_radius = function() return 14 end }
+						return {
+							current_radius = function()
+								return 14
+							end,
+						}
 					end
 					return nil
 				end,

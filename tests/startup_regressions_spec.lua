@@ -142,12 +142,23 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_nil(
-			source:find('_is_tagged%(tags, "ranged"%)' ),
+			source:find('_is_tagged%(tags, "ranged"%)'),
 			"ranged_count must use enemy_breed.ranged, not _is_tagged(tags, 'ranged')"
 		)
 		assert.is_not_nil(
 			source:find("enemy_breed%.ranged"),
 			"ranged_count classification must check enemy_breed.ranged"
 		)
+	end)
+
+	it("engagement_leash module loads without error", function()
+		local ok, result = pcall(dofile, "scripts/mods/BetterBots/engagement_leash.lua")
+		assert.is_true(ok, "engagement_leash.lua failed to load: " .. tostring(result))
+		assert.is_not_nil(result)
+		assert.is_not_nil(result.init)
+		assert.is_not_nil(result.register_hooks)
+		assert.is_not_nil(result.compute_effective_leash)
+		assert.is_not_nil(result.record_charge)
+		assert.is_not_nil(result.is_movement_ability)
 	end)
 end)
