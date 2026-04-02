@@ -20,15 +20,15 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
-[size=3][b]New in v0.8.0[/b][/size]
+[size=3][b]New in v0.9.0[/b][/size]
 
 [list]
-[*][b]Default bot profiles:[/b] Class-diverse bots out of the box — Veteran, Zealot, Psyker, Ogryn with per-slot dropdown settings. No longer requires Tertium 5/6 for non-veteran bots (still recommended for your own characters).
-[*][b]Full talent trees:[/b] Each bot gets ~30 talents from optimized builds — combat abilities, keystones, passive buffs, and stat nodes. Bot-specific build selection avoids headshot-dependent and dodge-dependent talents.
-[*][b]Weapon blessings & perks:[/b] Bot weapons now have T4 blessings and perks (e.g. Rampage + Wrath on Veteran's Devil's Claw, Blaze Away + Penetrating Flame on Zealot's Flamer). First mod to construct blessed weapons without player backend profiles.
-[*][b]Settings surface:[/b] Category checkboxes (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets (Testing/Aggressive/Balanced/Conservative), feature toggles for sprint/pinging/special penalty/poxburster.
-[*][b]Weapon stats & quality:[/b] Bot weapons have difficulty-scaled base stats (power level). Auto mode: Sedition→200, Damnation→500. Configurable via "Bot Weapon Quality" setting.
-[*][b]Bot builds:[/b] Veteran (Voice of Command + Focus Target, Devil's Claw + Plasma Gun), Zealot (Chorus + Blazing Piety, Relic Blade + Flamer), Psyker (Venting Shriek + Warp Siphon, Force Greatsword + Surge Staff), Ogryn (Point Blank Barrage + Burst Limiter Override, Power Maul + Heavy Stubber).
+[*][b]Combat engagement leash:[/b] Bots no longer rubber-band back to the player mid-fight. Coherency-anchored melee leash extends engagement range when already fighting, under attack, pursuing ranged enemies, or after a dash/charge ability. Bots fight at their charge destination instead of turning around.
+[*][b]Poxburster push:[/b] Bots now push approaching poxbursters at melee range — the standard human counterplay for instant kills.
+[*][b]Mastiff-pounce priority:[/b] Bots prioritize enemies pinned by the Arbites cyber mastiff, helping finish off immobilized targets.
+[*][b]Healing deferral:[/b] Bots defer health stations and med-crates to the human player when you need healing. Configurable threshold in mod settings.
+[*][b]1.11.x compatibility:[/b] Fixed non-veteran bot profiles crashing on Darktide 1.11.0+ (Warband). Parser-level ability input validation fixes ability rejection on 1.11.x.
+[*][b]Airlock crash guard:[/b] Prevents a vanilla crash at airlock doors when bot count exceeds teleport nodes (common with SoloPlay mods).
 [/list]
 
 [size=3][b]What works[/b][/size]
@@ -103,8 +103,11 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Daemonhost avoidance
 [*][color=green]✓[/color] Bot pinging of elites/specials
 [*][color=green]✓[/color] Boss engagement discipline
-[*][color=green]✓[/color] Poxburster targeting
+[*][color=green]✓[/color] Poxburster targeting + push
 [*][color=green]✓[/color] Stop chasing distant specials
+[*][color=green]✓[/color] Combat engagement leash (coherency-anchored, post-charge grace)
+[*][color=green]✓[/color] Mastiff-pounce priority
+[*][color=green]✓[/color] Healing deferral (health stations + med-crates)
 [/list]
 
 [b]Bot weapon/equipment fixes[/b]
@@ -116,7 +119,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Smart melee attack selection (armor-aware light/heavy balance)
 [*][color=green]✓[/color] Force staff charged fire (all 4 staves)
 [*]Weapon/enemy-aware ADS vs hip-fire
-[*]Poxburster push ([url=https://github.com/hummat/BetterBots/issues/54]#54[/url])
+[*][color=green]✓[/color] Poxburster push
 [*][color=green]✓[/color] Ammo conservation — lowered shoot threshold from 50% to 20%
 [/list]
 
@@ -157,8 +160,7 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 
 [b]Vanilla bot limitations being addressed:[/b]
 [list]
-[*][b]Bots don't push poxbursters[/b] — vanilla bots never push approaching poxbursters, which is the standard human counterplay. Bots now shoot them at range (v0.7.0), but melee push support is coming. ([url=https://github.com/hummat/BetterBots/issues/54]#54[/url])
-[*][b]Bots ignore mastiff-pounced enemies[/b] — when the cyber mastiff pins an enemy, bots stand around instead of attacking the immobilized target. ([url=https://github.com/hummat/BetterBots/issues/55]#55[/url])
+[*][b]Objective-aware abilities[/b] — bots don't yet adjust ability usage to protect allies interacting with objectives. ([url=https://github.com/hummat/BetterBots/issues/37]#37[/url])
 [/list]
 
 [b]Other limitations:[/b]
