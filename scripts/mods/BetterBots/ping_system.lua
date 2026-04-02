@@ -15,6 +15,7 @@ local _last_tagged_by_bot = setmetatable({}, { __mode = "k" })
 local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
 local _missing_los_method_warned = false
 local _smart_tag_system_warned = false
+local _ping_call_failed_warned = false
 
 function M.init(deps)
 	_mod = deps.mod
@@ -234,6 +235,10 @@ function M.update(unit, blackboard)
 		_last_skip_log_key_by_bot[unit] = nil
 	else
 		_last_ping_failure_t_by_bot[unit] = fixed_t
+		if not _ping_call_failed_warned and _mod and _mod.warning then
+			_ping_call_failed_warned = true
+			_mod:warning("BetterBots: bot ping call failed (" .. tostring(err) .. "). Pinging may be impaired.")
+		end
 	end
 
 	if _debug_enabled() then

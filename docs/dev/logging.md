@@ -59,6 +59,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
+- `blocked lossy network-sync profile overwrite` (issue `#65` guard fired; the first lossy `BotPlayer.set_profile` sync was dropped on purpose)
+- `allowed profile update (no _bb_resolved sentinel)` (the `BotPlayer.set_profile` hook passed through because the one-shot sentinel was absent or already consumed)
 - `decision ... -> true` (BT condition path activation — includes `hazard=<true|false>` in the debug line)
 - `enter ability node ...`
 - `fallback queued ...` (template fallback queued)
@@ -82,6 +84,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade released cleanup lock without explicit unwield (slot changed)` (external cleanup templates left grenade slot through the engine's normal unwind; BetterBots treats that as success)
 - `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
 - `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
+- `post-charge grace started (4s)` (engagement leash recorded a movement-ability charge and started the temporary 20m grace window for that bot)
 - `ranged dead-zone override kept normal shot (ammo=<0.xx>, target=<breed>, weapon=<template>, action=<input>)` (bot fired a normal ranged shot while reserve ammo was in the old 20%-50% dead zone; direct validation signal for `#51`)
 - `melee choice <attack> vs <armored|unarmored> target (crowd=<N>, bucket=<solo|pack|horde>, weapon=<template>)` (interesting `_choose_attack` decision; use to validate `#52` without per-swing spam)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
@@ -90,6 +93,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
+- `boosting score for pounced <breed> +5.0` (target selection boost for mastiff-pounced enemies; direct validation signal for `#55`)
+- `pushing poxburster (bypassed outnumbered gate)` (poxburster melee hook forced a push; direct validation signal for `#54`)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)

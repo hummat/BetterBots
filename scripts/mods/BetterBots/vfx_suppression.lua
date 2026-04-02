@@ -46,27 +46,40 @@ function M.register_hooks()
 		end
 	)
 
+	-- #53: use pre-call hook to set is_local_unit=false BEFORE the original init
+	-- constructs wieldable slot scripts. AimProjectileEffects.init caches
+	-- context.is_local_unit on its own field — a hook_safe (post-call) is too late.
+	-- Save/restore extension_init_data.is_local_unit so other extensions aren't affected.
 	_mod:hook_require(
 		"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
 		function(PlayerUnitVisualLoadoutExtension)
-			_mod:hook_safe(PlayerUnitVisualLoadoutExtension, "init", function(self, _context, unit, extension_init_data)
-				local player = extension_init_data.player
-				if player and not player:is_human_controlled() then
-					local ctx = self._wieldable_slot_scripts_context
-					if ctx then
-						ctx.is_local_unit = false
+			_mod:hook(
+				PlayerUnitVisualLoadoutExtension,
+				"init",
+				function(func, self, extension_init_context, unit, extension_init_data, ...)
+					local player = extension_init_data and extension_init_data.player
+					local is_bot = player and not player:is_human_controlled()
+
+					if is_bot then
+						extension_init_data.is_local_unit = false
+					end
+
+					func(self, extension_init_context, unit, extension_init_data, ...)
+
+					if is_bot then
+						extension_init_data.is_local_unit = true
 						if _debug_enabled() then
 							_debug_log(
 								"vfx_fix_loadout:" .. tostring(unit),
 								0,
-								"patched wieldable slot scripts context is_local_unit=false for bot",
+								"patched visual loadout is_local_unit=false for bot (pre-init)",
 								nil,
 								"info"
 							)
 						end
 					end
 				end
-			end)
+			)
 		end
 	)
 

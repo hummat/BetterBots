@@ -48,7 +48,10 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback queued` | Ability input was sent to the action queue (activation attempt) |
 | `fallback held` | Heuristic decided NOT to activate (with rule name + nearby count) |
 | `fallback blocked` | Ability on cooldown or action_input invalid (post-activation spam) |
+| `blocked lossy network-sync overwrite` | `BotPlayer.set_profile` one-shot guard blocked the lossy 1.11+ sync overwrite for a resolved bot profile (#65) |
+| `allowed profile update` | `BotPlayer.set_profile` hook passed a later legitimate profile update through after the one-shot guard |
 | `charge consumed` | Ability charge was spent (confirmed activation) |
+| `post-charge grace started` | Engagement leash recorded a movement-ability charge and started the temporary grace window (#47) |
 | `one-shot context dump` | First-time context dump for a template (debug-only) |
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
@@ -56,6 +59,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
 | `suppressed poxburster target (too_close_to_bot|near_human_player)` | Bot cleared poxburster `target_enemy` when it was unsafe to shoot (#34) |
 | `suppressed poxburster opportunity/urgent/priority target (...)` | Bot cleared unsafe poxburster targets from secondary perception slots (#34) |
+| `pushing poxburster (bypassed outnumbered gate)` | Bot forced the melee push path against a poxburster; key is per-bot via `scratchpad.unit` to avoid throttle collisions (#54) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |

@@ -1,4 +1,4 @@
-# Status Snapshot (March 14, 2026)
+# Status Snapshot (March 18, 2026)
 
 ## What's shipped
 
@@ -47,9 +47,9 @@
 
 | Tier | Status | Notes |
 |------|--------|-------|
-| 1 | PASS (5/5 testable) | Broker variants DLC-blocked |
+| 1 | PASS (5/5 testable) | Broker (Hive Scum) variants DLC-blocked; adamant (Arbites) testable |
 | 2 | PASS (6/6 testable) | `adamant_shout` N/A (cut content) |
-| 3 | PASS (3/3 testable) | `zealot_relic`, `force_field`, `drone` all 100%. `broker_stimm_field` DLC-blocked. |
+| 3 | PASS (3/3 testable) | `zealot_relic`, `force_field`, `drone` all 100%. `broker_stimm_field` Hive Scum DLC-blocked. |
 
 ## Evidence Source
 
@@ -77,7 +77,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 
 ## Known Blockers
 
-1. **Hive Scum / Broker DLC**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation.
+1. **Hive Scum DLC (broker_ archetype)**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation. Arbites (adamant_ archetype) is available and testable.
 2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
@@ -115,21 +115,34 @@ In-game validation: 2026-03-13, latest analyzed log `console-2026-03-13-13.21.23
 
 All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
+## v0.8.0 (2026-03-16)
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #57 | Toggle safety audit | **Closed** | `is_togglable = false`, singleton mutations not revertible |
+| #6 | Settings control surface | **Closed** | Category gates (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature toggles, veteran dual-category gate |
+| #45 | Default class profiles | **Closed** | 4-class profiles (Veteran/Zealot/Psyker/Ogryn), hadrons-blessing weapon picks, per-class cosmetics, Tertium compat, `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns |
+| #63 | Talent enrichment + weapon blessings | **Closed** | ~30 talents per class, 2 T4 blessings + 1-2 T4 perks per weapon, bot-optimized build selection |
+| #60 | Heuristic dispatch refactor | **Closed** | `fn(context)` signature simplification |
+| #59 | Grenade fallback logging | **Closed** | Per-stage lifecycle events (queued/stage/complete/failed) |
+
+**Unit tests**: 518 tests via busted.
+
+## v0.9.0 — "Combat Awareness" (in progress on `dev/v0.9.0`)
+
+| Issue | Feature | Status | Evidence |
+|-------|---------|--------|----------|
+| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Fixed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Awaiting in-game validation. |
+| #54 | Push poxbursters | **Done** | `_should_push` outnumbered gate bypassed for poxburster breed + push logging |
+| #55 | Prioritize mastiff-pounced enemies | **Done** | Score boost for immobilized targets in `target_selection.lua` |
+| #53 | Rumbler VFX timing gap | **Done** | Pre-call hook on loadout init (crash was from profiles, not VFX — restored after #65 investigation) |
+| #47 | Combat-aware engagement leash | **Done** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides |
+| #37 | Objective-aware ability activation | Not started | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
+
 ## Next Steps
-
-### v0.8.0 — "Player Control" (next release)
-
-| # | Feature | Status |
-|---|---------|--------|
-| 57 | Toggle safety audit | **Done** — `is_togglable = false`, singleton mutations not revertible |
-| 6 | Settings control surface | **Done** — category gates, 4 presets (testing/aggressive/balanced/conservative), feature toggles, veteran dual-category gate |
-| 45 | Default class profiles | Design doc ready, ~150-200 LOC |
-| 60 | Simplify heuristic dispatch | Not started — internal refactor |
-| 59 | Grenade fallback logging | Not started — observability |
 
 ### Later batches
 
-- **v0.9.0 "Combat Awareness"**: #54 (push poxbursters, P1), #47 (engagement leash), #37 (objective-aware), #55 (mastiff-pounced priority), #53 (rumbler VFX)
 - **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS), #58 (ScriptUnit guard)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)

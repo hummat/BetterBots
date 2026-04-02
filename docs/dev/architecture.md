@@ -123,6 +123,14 @@ This mod targets bot ability activation in three paths:
 29. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
+30. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
+    - hook `BotSynchronizerHost.add_bot`: resolve per-slot class setting → swap archetype, weapons, talents, cosmetics, blessings/perks
+    - hook `BotPlayer.set_profile` (#65): block lossy network-sync overwrite for BetterBots-resolved profiles (`_bb_resolved` sentinel). Tags profiles with `is_local_profile = true` to bypass 1.11+ `validate_talent_layouts` in `unit_templates.lua`
+31. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
+    - hook `BtBotMeleeAction._allow_engage`: dynamically inflate `override_engage_range_to_follow_position` based on combat context (already engaged → 20m stickiness, post-charge grace → 20m for 4s, under melee attack → 20m, ranged foray → 20m when ranged enemy targets bot)
+    - hook `BtBotMeleeAction._is_in_engage_range`: extend approach range from 6m to 10m when engagement extension conditions hold
+    - coherency-scaled base leash: `max(12m, coherency_radius + 4m)` via `UnitCoherencyExtension:current_radius()`, hard cap 25m (30m with always-in-coherency talent)
+    - per-bot state in weak-keyed table with 1s coherency cache refresh
 
 ## DMF module loading pattern
 

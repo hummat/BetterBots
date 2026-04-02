@@ -11,12 +11,12 @@ describe("Boss engagement", function()
 		_G.BLACKBOARDS = {}
 
 		_mod = {
-			hook_require = function(self, path, callback)
+			hook_require = function(_self, path, callback)
 				if path == "scripts/utilities/bot_target_selection" then
 					callback({})
 				end
 			end,
-			hook = function(self, module, name, handler)
+			hook = function(_self, _module, name, handler)
 				_mod.handlers = _mod.handlers or {}
 				_mod.handlers[name] = handler
 			end,

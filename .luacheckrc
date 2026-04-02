@@ -14,4 +14,9 @@ read_globals = {
 
 files["tests/**"] = {
 	std = "+busted",
+	-- Tests mock engine globals; allow writing to them
+	globals = {
+		"BLACKBOARDS",
+		"POSITION_LOOKUP",
+	},
 }

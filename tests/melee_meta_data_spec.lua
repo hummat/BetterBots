@@ -51,7 +51,9 @@ describe("melee_meta_data", function()
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
 			debug_log = noop_debug_log,
-			debug_enabled = function() return false end,
+			debug_enabled = function()
+				return false
+			end,
 			ARMOR_TYPE_ARMORED = ARMORED,
 		})
 	end)
@@ -199,11 +201,7 @@ describe("melee_meta_data", function()
 
 		it("generates correct action_inputs sequences", function()
 			local templates = {
-				sword = make_weapon_template(
-					{ "melee" },
-					make_damage_profile(6, 0.3),
-					make_damage_profile(0.001, 1.0)
-				),
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), make_damage_profile(0.001, 1.0)),
 			}
 
 			MeleeMetaData.inject(templates)
@@ -326,12 +324,7 @@ describe("melee_meta_data", function()
 
 		it("uses chain_time as timing for light_attack input", function()
 			local templates = {
-				sword = make_weapon_template(
-					{ "melee" },
-					make_damage_profile(6, 0.3),
-					nil,
-					{ light_chain_time = 0.1 }
-				),
+				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil, { light_chain_time = 0.1 }),
 			}
 
 			MeleeMetaData.inject(templates)

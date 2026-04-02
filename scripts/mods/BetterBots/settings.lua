@@ -68,9 +68,12 @@ local FEATURE_GATES = {
 	poxburster = "enable_poxburster",
 	melee_improvements = "enable_melee_improvements",
 	ranged_improvements = "enable_ranged_improvements",
+	engagement_leash = "enable_engagement_leash",
 }
 
 -- Preset system
+local _warned_unknown_features = {}
+
 local VALID_PRESETS = {
 	testing = true,
 	aggressive = true,
@@ -180,6 +183,10 @@ end
 function M.is_feature_enabled(feature_name)
 	local setting_id = FEATURE_GATES[feature_name]
 	if not setting_id then
+		if not _warned_unknown_features[feature_name] and _mod and _mod.warning then
+			_warned_unknown_features[feature_name] = true
+			_mod:warning("BetterBots: unknown feature gate '" .. tostring(feature_name) .. "' (defaulting to enabled)")
+		end
 		return true
 	end
 

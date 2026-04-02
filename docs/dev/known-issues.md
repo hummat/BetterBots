@@ -2,7 +2,9 @@
 
 ## High severity
 
-1. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
+1. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
+
+2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 
 2. ~~Bots stop shooting at 50% reserve ammo (#51).~~ **Fixed in v0.7.1**: threshold lowered to 20%. Validated: 270 permitted shots with lowered gate in standard-profile mission.
 
@@ -29,7 +31,7 @@
    - New or changed templates can fail with `fallback item blocked ... unsupported weapon template`.
    - In the latest run, psyker force-field showed mixed behavior after reload (`aim_force_field`/`place_force_field` queued, but no later `charge consumed` line).
 
-5. Per-career heuristics: 15/18 validated (12 combat + 3 item), 1 N/A, 2 DLC-blocked.
+5. Per-career heuristics: 15/18 validated (12 combat + 3 item), 1 N/A, 2 Hive Scum DLC-blocked.
    - Production presets shipped in v0.8.0 (#6): per-template threshold tables for aggressive/balanced/conservative, with testing profile for validation. The "testing" preset uses intentionally lenient thresholds; production presets are calibrated per-heuristic.
    - Item heuristics added (#3): zealot_relic, psyker_force_field (3 variants), adamant_area_buff_drone, broker_ability_stimm_field. Replace coarse `enemies_in_proximity > 0` gate with per-ability rules using coherency, toughness, corruption, and ally state.
    - Meta builds research (`docs/classes/meta-builds-research.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
@@ -69,6 +71,12 @@
 
 2. DMF Dev Console/Dev Mode interactions can produce crashes outside this mod's code path.
    - Treat as external until a BetterBots-specific traceback is captured.
+
+3. Vanilla airlock teleport crash when bot count exceeds 4 teleport nodes.
+   - Symptom: `door_extension.lua: bad argument #2 to 'has_node' (string expected, got nil)` when entering airlocks.
+   - Root cause: Fatshark's `teleport_bots()` indexes a 4-entry node name table without a nil guard. SoloPlay mods that spawn extra bots push the index past the table bounds.
+   - BetterBots does not modify bot counts or door/teleport logic. This is a vanilla/SoloPlay issue.
+   - Mitigation: `airlock_guard.lua` wraps `teleport_bots` with pcall — un-teleported bots catch up via normal follow behavior.
 
 ## Current fix direction
 

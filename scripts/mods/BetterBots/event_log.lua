@@ -47,11 +47,17 @@ local function _flush()
 			return
 		end
 
+		local dropped = 0
 		for i = 1, #_buffer do
 			local success, line = pcall(cjson.encode, _buffer[i])
 			if success then
 				f:write(line .. "\n")
+			else
+				dropped = dropped + 1
 			end
+		end
+		if dropped > 0 and _mod then
+			_mod:warning("BetterBots: event_log dropped " .. dropped .. " events (JSON encode failure)")
 		end
 
 		f:close()

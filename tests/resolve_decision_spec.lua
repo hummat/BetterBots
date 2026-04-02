@@ -67,7 +67,8 @@ describe("resolve_decision", function()
 			}
 			local ability_ext = helper.make_veteran_ability_extension(nil, "something_unknown")
 
-			local ok, rule = resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
+			local ok, rule =
+				resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
 			assert.is_true(ok)
 			assert.matches("fallback_veteran_vanilla", rule)
 		end)
@@ -80,7 +81,8 @@ describe("resolve_decision", function()
 			}
 			local ability_ext = helper.make_veteran_ability_extension(nil, "something_unknown")
 
-			local ok, rule = resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
+			local ok, rule =
+				resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
 			assert.is_false(ok)
 			assert.matches("fallback_veteran_vanilla", rule)
 		end)
@@ -95,7 +97,8 @@ describe("resolve_decision", function()
 			}
 			local ability_ext = helper.make_veteran_ability_extension(nil, "something_unknown")
 
-			local _, rule = resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
+			local _, rule =
+				resolve("veteran_combat_ability", conditions, "unit", nil, nil, nil, nil, false, ability_ext)
 			assert.matches("veteran_variant", rule)
 			assert.matches("fallback_veteran_vanilla", rule)
 			assert.is_not_nil(string.find(rule, "->", 1, true))

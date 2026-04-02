@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, settings, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -137,10 +137,10 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 | Tier | Status | Examples | What's needed |
 |------|--------|----------|---------------|
 | 1 | Validated | Veteran Stance/Stealth, Psyker Stance, Ogryn Gunlugger, Arbites Stance | Whitelist removal only |
-| 1 | Untested (DLC) | Broker Focus/Rage | Whitelist removal only — DLC-blocked for validation |
+| 1 | Untested (Hive Scum DLC) | Broker Focus/Rage | Whitelist removal only — Hive Scum DLC not owned |
 | 2 | Validated | Zealot Dash/Invisibility, Ogryn Charge/Taunt, Psyker Shout, Arbites Charge | Meta_data injection + whitelist removal |
 | 3 | Validated | Zealot Relic, Psyker Force Field, Arbites Drone | Item-based fallback (wield/use/unwield sequence). Drone crash guard for #50 validated in a 2026-03-13 Arbites stress run. |
-| 3 | Blocked (DLC) | Hive Scum Stimm Field | Item-based, DLC-blocked for validation |
+| 3 | Blocked (Hive Scum DLC) | Hive Scum Stimm Field | Item-based, Hive Scum DLC not owned |
 | 3 | Validated | Standard grenades, Psyker Smite/Assail/Chain Lightning, knives, whistle, mines | Grenade/blitz fallback + per-grenade heuristics |
 
 ### Decompiled source repo (Aussiemon/Darktide-Source-Code)
@@ -332,9 +332,12 @@ scripts/mods/BetterBots/
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
   animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
+  airlock_guard.lua                          # Airlock teleport crash guard: narrow nil-node guard for vanilla has_node bug
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
+  bot_profiles.lua                          # Default class-diverse bot profiles: archetype/weapon/talent/cosmetic per slot (#45/#63)
+  engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
   log_levels.lua                            # Tiered debug log level constants and resolution (#40)
   perf.lua                                  # Per-hook runtime recorder + /bb_perf command
@@ -362,7 +365,10 @@ tests/
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
   animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
+  airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
+  bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
+  engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder

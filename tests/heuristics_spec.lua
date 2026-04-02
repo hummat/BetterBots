@@ -1425,15 +1425,15 @@ describe("heuristics", function()
 
 	describe("evaluate_grenade_heuristic", function()
 		it("uses anti-horde rules for frag grenades", function()
-			local ctx = helper.make_context({ num_nearby = 6, challenge_rating_sum = 3.0 })
-			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", ctx)
+			local local_ctx = helper.make_context({ num_nearby = 6, challenge_rating_sum = 3.0 })
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
 			assert.is_true(result)
 			assert.matches("horde", rule)
 		end)
 
 		it("holds frag grenades for small groups", function()
-			local ctx = helper.make_context({ num_nearby = 3, challenge_rating_sum = 1.0 })
-			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", ctx)
+			local local_ctx = helper.make_context({ num_nearby = 3, challenge_rating_sum = 1.0 })
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
 			assert.is_false(result)
 			assert.matches("hold", rule)
 		end)
@@ -1645,29 +1645,29 @@ describe("heuristics", function()
 				state = {
 					extension = {
 						system = function(_, system_name)
-								assert.equals("liquid_area_system", system_name)
-									return {
-										find_liquid_areas_in_position = function(_, position, results)
-											assert.equals("hazard_pos", position)
-											captured_liquid_results[#captured_liquid_results + 1] = results
-											results[1] = {
-											source_side_name = function()
-												return "enemy"
+							assert.equals("liquid_area_system", system_name)
+							return {
+								find_liquid_areas_in_position = function(_, position, results)
+									assert.equals("hazard_pos", position)
+									captured_liquid_results[#captured_liquid_results + 1] = results
+									results[1] = {
+										source_side_name = function()
+											return "enemy"
 										end,
-											area_template_name = function()
-												return "cultist_grenadier_gas"
-											end,
-										}
+										area_template_name = function()
+											return "cultist_grenadier_gas"
+										end,
+									}
 
-										if liquid_results_return_mode == "number" then
-											return 1
-										end
+									if liquid_results_return_mode == "number" then
+										return 1
+									end
 
-										return results
-									end,
-								}
-							end,
-						},
+									return results
+								end,
+							}
+						end,
+					},
 				},
 			}
 			_G.POSITION_LOOKUP = {
@@ -1678,12 +1678,12 @@ describe("heuristics", function()
 					return nil
 				end,
 			}
-				Heuristics.init({
-					fixed_time = function()
-						return current_fixed_t
-					end,
-					decision_context_cache = {},
-					super_armor_breed_cache = {},
+			Heuristics.init({
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
 				ARMOR_TYPE_SUPER_ARMOR = 6,
 				is_testing_profile = function()
 					return false
@@ -1863,7 +1863,8 @@ describe("heuristics", function()
 			-- num_nearby 3 meets balanced threshold but not conservative
 			local borderline = ctx({ num_nearby = 3, toughness_pct = 0.35, target_enemy = "unit" })
 			local ok_bal = Heuristics.evaluate_item_heuristic("psyker_force_field", borderline, { preset = "balanced" })
-			local ok_con = Heuristics.evaluate_item_heuristic("psyker_force_field", borderline, { preset = "conservative" })
+			local ok_con =
+				Heuristics.evaluate_item_heuristic("psyker_force_field", borderline, { preset = "conservative" })
 			assert.is_true(ok_bal)
 			assert.is_false(ok_con)
 		end)
@@ -1872,7 +1873,10 @@ describe("heuristics", function()
 			-- Verify that balanced produces identical results to no-preset calls
 			local scenarios = {
 				{ "psyker_shout", ctx({ num_nearby = 3, peril_pct = 0.50 }) },
-				{ "ogryn_charge", ctx({ target_enemy = "unit", target_enemy_distance = 10, opportunity_target_enemy = "opp" }) },
+				{
+					"ogryn_charge",
+					ctx({ target_enemy = "unit", target_enemy_distance = 10, opportunity_target_enemy = "opp" }),
+				},
 				{ "adamant_stance", ctx({ toughness_pct = 0.25 }) },
 			}
 			for _, scenario in ipairs(scenarios) do

@@ -602,8 +602,8 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 | `_can_activate_adamant_stance` | `adamant_stance` | PASS | H-03 | 2 consumes; `low_toughness` (1), `block_safe_state` (20), `stance_hold` (27). |
 | `_can_activate_adamant_charge` | `adamant_charge` | PASS | H-03 | 6 consumes; `block_target_too_close` (3), `charge_hold` (1). |
 | `_can_activate_adamant_shout` | `adamant_shout` | N/A | — | not player-facing |
-| `_can_activate_broker_focus` | `broker_focus` | UNTESTED | — | DLC-blocked |
-| `_can_activate_broker_rage` | `broker_punk_rage` | UNTESTED | — | DLC-blocked |
+| `_can_activate_broker_focus` | `broker_focus` | UNTESTED | — | Hive Scum DLC not owned |
+| `_can_activate_broker_rage` | `broker_punk_rage` | UNTESTED | — | Hive Scum DLC not owned |
 
 ### Item Heuristic Validation (#3)
 
@@ -614,7 +614,7 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 | `_can_activate_zealot_relic` | `zealot_relic` | PASS | 2026-03-07-tier3-final | 2 consumes; `self_critical` observed (toughness-gated activation) |
 | `_can_activate_force_field` | `psyker_force_field*` | PASS | 2026-03-07-tier3-final | 1 consume; activated under combat pressure |
 | `_can_activate_drone` | `adamant_area_buff_drone` | PASS | 2026-03-07-tier3-final | 5 consumes; activated reliably in combat |
-| `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | DLC-blocked |
+| `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | Hive Scum DLC not owned |
 
 ### M5 Batch Validation (2026-03-11)
 
@@ -704,12 +704,12 @@ Conclusion:
 - Batch overall: ready for merge except whistle (can ship independently).
 ```
 
-**Template heuristic summary: 12/13 PASS, 1 N/A, 2 DLC-blocked.**
-**Item heuristic summary: 3/3 testable PASS, 1 DLC-blocked.**
+**Template heuristic summary: 12/13 PASS, 1 N/A, 2 Hive Scum DLC-blocked.**
+**Item heuristic summary: 3/3 testable PASS, 1 Hive Scum DLC-blocked.**
 
 **Remaining validation runs needed:**
 
-1. **Run H-04** (optional, DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
+1. **Run H-04** (optional, Hive Scum DLC-gated): Hive Scum (Focus) + Hive Scum (Rage)
    - Covers: `broker_focus`, `broker_punk_rage`
 
 ## dev/m5-batch2 Test Plan

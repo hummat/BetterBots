@@ -188,6 +188,9 @@ assert(SmartTargeting, "BetterBots: failed to load smart_targeting module")
 local AnimationGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/animation_guard")
 assert(AnimationGuard, "BetterBots: failed to load animation_guard module")
 
+local AirlockGuard = mod:io_dofile("BetterBots/scripts/mods/BetterBots/airlock_guard")
+assert(AirlockGuard, "BetterBots: failed to load airlock_guard module")
+
 local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
 assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 
@@ -212,6 +215,9 @@ assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
+local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
+assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
+
 -- Init each module with its dependencies
 Settings.init({
 	mod = mod,
@@ -221,6 +227,17 @@ BotProfiles.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+})
+
+EngagementLeash.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	perf = Perf,
+	is_enabled = function()
+		return Settings.is_feature_enabled("engagement_leash")
+	end,
 })
 
 MetaData.init({
@@ -345,6 +362,13 @@ AnimationGuard.init({
 	fixed_time = _fixed_time,
 })
 
+AirlockGuard.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+})
+
 SmartTargeting.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -459,6 +483,7 @@ AbilityQueue.wire({
 	ItemFallback = ItemFallback,
 	Debug = Debug,
 	EventLog = EventLog,
+	EngagementLeash = EngagementLeash,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
@@ -503,6 +528,7 @@ TargetSelection.register_hooks()
 Poxburster.register_hooks()
 MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()
+AirlockGuard.register_hooks()
 SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({
@@ -513,6 +539,7 @@ WeaponAction.register_hooks({
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 BotProfiles.register_hooks()
+EngagementLeash.register_hooks()
 
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
@@ -528,7 +555,7 @@ end)
 
 Sprint.register_hook()
 
--- BT activate ability enter hook: rescue aim (#10) + event logging
+-- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)
@@ -595,6 +622,19 @@ mod:hook_require(
 				end
 
 				func(self, unit, breed, blackboard, scratchpad, action_data, t)
+
+				-- Engagement leash (#47): record movement ability for post-charge grace
+				if unit then
+					local el_unit_data = ScriptUnit.has_extension(unit, "unit_data_system")
+					local el_comp = el_unit_data
+						and action_data
+						and action_data.ability_component_name
+						and el_unit_data:read_component(action_data.ability_component_name)
+					local el_template = el_comp and el_comp.template_name
+					if el_template and EngagementLeash.is_movement_ability(el_template) then
+						EngagementLeash.record_charge(unit, _fixed_time())
+					end
+				end
 
 				local ability_component_name = action_data and action_data.ability_component_name or "?"
 				local activation_data = scratchpad and scratchpad.activation_data

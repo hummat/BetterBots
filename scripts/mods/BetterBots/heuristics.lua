@@ -243,7 +243,7 @@ local function build_context(unit, blackboard)
 				if _is_tagged(tags, "monster") then
 					context.monster_count = context.monster_count + 1
 				end
-				if _is_tagged(tags, "ranged") then
+				if enemy_breed.ranged then
 					context.ranged_count = context.ranged_count + 1
 				else
 					context.melee_count = context.melee_count + 1
@@ -297,9 +297,9 @@ end
 -- entries — it intentionally falls back to "balanced" thresholds via the
 -- `or table.balanced` pattern, then the testing profile override in
 -- _apply_behavior_profile loosens decisions post-heuristic.
--- Templates without preset-varying thresholds (broker_focus, broker_punk_rage,
--- broker_ability_stimm_field) take only (context) — the extra thresholds arg is
--- silently ignored by Lua.
+-- Templates without preset-varying thresholds (broker_focus, broker_punk_rage)
+-- take only (context) — the extra thresholds arg is silently ignored by Lua.
+-- Item heuristics (broker_ability_stimm_field, etc.) are dispatched separately.
 local VETERAN_VOC_THRESHOLDS = {
 	aggressive = {
 		surrounded = 2,

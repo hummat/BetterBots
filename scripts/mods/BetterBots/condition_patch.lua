@@ -60,6 +60,8 @@ local RESCUE_CHARGE_RULES = {
 	adamant_charge_ally_aid = true,
 }
 
+local _action_input_is_bot_queueable
+
 local function _return_with_perf(perf_t0, ...)
 	if perf_t0 and _perf then
 		_perf.finish("condition_patch.can_activate_ability", perf_t0)
@@ -139,6 +141,9 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	if not ability_extension then
+		return _return_with_perf(perf_t0, false)
+	end
 
 	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name, ability_extension) then
 		if _debug_enabled() then
@@ -203,8 +208,16 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local used_input = activation_data.used_input
-	local action_input_is_valid =
-		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
+	local action_input_extension = ScriptUnit.extension(unit, "action_input_system")
+	local action_input_is_valid = _action_input_is_bot_queueable(
+		action_input_extension,
+		ability_extension,
+		ability_component_name,
+		ability_template_name,
+		action_input,
+		used_input,
+		fixed_t
+	)
 
 	if not action_input_is_valid then
 		if _debug_enabled() then
@@ -379,6 +392,7 @@ function M.init(deps)
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
+	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 end
 
 function M.wire(deps)
@@ -400,6 +414,9 @@ end
 -- Exposed for testing; not part of the public API.
 M._install_condition_patch = _install_condition_patch
 M._is_dormant_daemonhost_target = _is_dormant_daemonhost_target
+function M._action_input_is_bot_queueable(...)
+	return _action_input_is_bot_queueable(...)
+end
 
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)

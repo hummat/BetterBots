@@ -5,11 +5,15 @@ describe("TargetSelection", function()
 
 	local function make_smart_tag_system(target_unit, is_human)
 		return {
-			unit_tag = function(self, unit)
+			unit_tag = function(_self, unit)
 				if unit == target_unit then
 					return {
 						tagger_player = function()
-							return { is_human_controlled = function() return is_human end }
+							return {
+								is_human_controlled = function()
+									return is_human
+								end,
+							}
 						end,
 					}
 				end
@@ -20,14 +24,19 @@ describe("TargetSelection", function()
 
 	before_each(function()
 		TargetSelection = require("scripts.mods.BetterBots.target_selection")
+		_G.BLACKBOARDS = {}
 
 		-- Default: no smart tags
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
-							return { unit_tag = function() return nil end }
+							return {
+								unit_tag = function()
+									return nil
+								end,
+							}
 						end
 					end,
 				},
@@ -36,13 +45,13 @@ describe("TargetSelection", function()
 
 		-- Mock the mod object
 		_mod = {
-			hook_require = function(self, path, callback)
+			hook_require = function(_self, path, callback)
 				if path == "scripts/utilities/bot_target_selection" then
 					local mock_module = {}
 					callback(mock_module)
 				end
 			end,
-			hook = function(self, module, name, handler)
+			hook = function(_self, _module, name, handler)
 				_mod.handlers = _mod.handlers or {}
 				_mod.handlers[name] = handler
 			end,
@@ -59,13 +68,13 @@ describe("TargetSelection", function()
 			end,
 		})
 
-		original_slot_weight = function(unit, target_unit, target_distance_sq, target_breed, target_ally)
+		original_slot_weight = function(_unit, _target_unit, _target_distance_sq, _target_breed, _target_ally)
 			return 5 -- arbitrary base score
 		end
 
 		-- Mock Ammo
 		package.loaded["scripts/utilities/ammo"] = {
-			current_slot_percentage = function(unit, slot)
+			current_slot_percentage = function(unit, _slot)
 				if unit.has_ammo then
 					return 1.0
 				end
@@ -82,6 +91,7 @@ describe("TargetSelection", function()
 	after_each(function()
 		package.loaded["scripts/utilities/ammo"] = nil
 		_G.Managers = nil
+		_G.BLACKBOARDS = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -167,7 +177,7 @@ describe("TargetSelection", function()
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
 							return make_smart_tag_system(target_unit, true)
 						end
@@ -183,7 +193,7 @@ describe("TargetSelection", function()
 		_G.Managers = {
 			state = {
 				extension = {
-					system = function(self, name)
+					system = function(_self, name)
 						if name == "smart_tag_system" then
 							return make_smart_tag_system(target_unit, true)
 						end
@@ -200,7 +210,7 @@ describe("TargetSelection", function()
 
 	it("does not boost score when vanilla slot_weight is zero", function()
 		local target_unit = {}
-		_G.Managers.state.extension.system = function(self, name)
+		_G.Managers.state.extension.system = function(_self, name)
 			if name == "smart_tag_system" then
 				return make_smart_tag_system(target_unit, true)
 			end
@@ -216,7 +226,7 @@ describe("TargetSelection", function()
 
 	it("does not boost score when target is tagged by a bot (not human)", function()
 		local target_unit = {}
-		_G.Managers.state.extension.system = function(self, name)
+		_G.Managers.state.extension.system = function(_self, name)
 			if name == "smart_tag_system" then
 				return make_smart_tag_system(target_unit, false)
 			end
@@ -237,7 +247,9 @@ describe("TargetSelection", function()
 	end)
 
 	it("does not boost score when smart_tag_system is unavailable", function()
-		_G.Managers.state.extension.system = function() return nil end
+		_G.Managers.state.extension.system = function()
+			return nil
+		end
 		local target_unit = {}
 		local unit = { has_ammo = true }
 		local breed = { tags = { elite = true }, name = "chaos_hound" }
@@ -250,5 +262,155 @@ describe("TargetSelection", function()
 		local breed = { tags = {}, name = "cultist" }
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 100, breed, nil)
 		assert.are.equal(5, score)
+	end)
+
+	-- #55: pounced target boost
+	describe("pounced target boost (#55)", function()
+		it("boosts score for enemy pounced by companion mastiff", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(10, score) -- 5 base + 5 pounced bonus
+		end)
+
+		it("boosts score even when base slot_weight is zero (no bot slot assigned)", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local zero_slot_weight = function()
+				return 0
+			end
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(zero_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score) -- 0 base + 5 pounced bonus
+		end)
+
+		it("does not boost for non-pounced disabled enemies", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "consumed", attacker_unit = {} },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("does not boost when disable component is absent", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = {}, name = "cultist" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("does not boost when enemy is not disabled", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = false, type = "pounced" },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = {}, name = "cultist" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("stacks with player tag boost", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			_G.Managers = {
+				state = {
+					extension = {
+						system = function()
+							return make_smart_tag_system(target_unit, true)
+						end,
+					},
+				},
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(13, score) -- 5 base + 3 tag + 5 pounced
+		end)
+
+		it("includes the acting bot in the pounced-target debug key", function()
+			local logs = {}
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function(key, fixed_t, message)
+					logs[#logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local target_unit = {}
+			local unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+
+			assert.are.equal(10, score)
+			assert.equals(1, #logs)
+			assert.equals("target_sel_pounced:" .. tostring(target_unit) .. ":" .. tostring(unit), logs[1].key)
+		end)
+	end)
+
+	-- #55: pure function unit test
+	describe("is_pounced_by_companion", function()
+		it("returns true for pounced enemy", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "pounced" },
+			}
+			assert.is_true(TargetSelection.is_pounced_by_companion(enemy))
+		end)
+
+		it("returns false for non-pounced disabled enemy", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "consumed" },
+			}
+			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+		end)
+
+		it("returns false when no blackboard", function()
+			assert.is_false(TargetSelection.is_pounced_by_companion({}))
+		end)
+
+		it("returns false when disable not set", function()
+			local enemy = {}
+			_G.BLACKBOARDS[enemy] = {}
+			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+		end)
 	end)
 end)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pre-commit hook: verify StyLua formatting on staged Lua files.
-# Install: git config core.hooksPath .githooks
+# Install: git config core.hooksPath scripts/hooks
 
 staged_lua=$(git diff --cached --name-only --diff-filter=ACM -- '*.lua')
 if [ -z "$staged_lua" ]; then

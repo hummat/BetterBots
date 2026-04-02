@@ -26,7 +26,7 @@ describe("ping_system", function()
 			return current_time
 		end
 		mod_mock = {
-			warning = spy.new(function() end)
+			warning = spy.new(function() end),
 		}
 		debug_log_mock = spy.new(function() end)
 
@@ -77,7 +77,7 @@ describe("ping_system", function()
 		}
 
 		-- Setup valid elite target
-		_G.ScriptUnit.has_extension = function(unit, ext)
+		_G.ScriptUnit.has_extension = function(_unit, ext)
 			if ext == "unit_data_system" then
 				return {
 					breed = function()
@@ -117,7 +117,7 @@ describe("ping_system", function()
 		end)
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = tag_id_mock,
@@ -144,7 +144,9 @@ describe("ping_system", function()
 		PingSystem.update(bot_unit, blackboard)
 
 		assert.spy(has_los_mock).was_called_with(match.is_table(), match.is_ref(bot_unit))
-		assert.spy(set_contextual_unit_tag_mock).was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
 	end)
 
 	it("falls back to next candidate if top priority is already tagged", function()
@@ -168,9 +170,11 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "perception_system" then
-				return { has_line_of_sight = function()
-					return true
-				end }
+				return {
+					has_line_of_sight = function()
+						return true
+					end,
+				}
 			elseif extension_name == "unit_data_system" then
 				return {
 					breed = function()
@@ -190,7 +194,9 @@ describe("ping_system", function()
 
 		PingSystem.update(bot_unit, blackboard)
 
-		assert.spy(set_contextual_unit_tag_mock).was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(opportunity_target))
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(opportunity_target))
 	end)
 
 	it("holds the current tagged target instead of flipping to a new one", function()
@@ -247,11 +253,9 @@ describe("ping_system", function()
 
 		PingSystem.update(bot_unit, blackboard)
 		assert.spy(set_contextual_unit_tag_mock).was_called(1)
-		assert.spy(set_contextual_unit_tag_mock).was_called_with(
-			match.is_table(),
-			match.is_ref(bot_unit),
-			match.is_ref(priority_target)
-		)
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
 
 		current_time = 0.1
 		PingSystem.update(bot_unit, blackboard)
@@ -314,11 +318,9 @@ describe("ping_system", function()
 		tag_state[priority_target] = nil
 		PingSystem.update(bot_unit, blackboard)
 		assert.spy(set_contextual_unit_tag_mock).was_called(2)
-		assert.spy(set_contextual_unit_tag_mock).was_called_with(
-			match.is_table(),
-			match.is_ref(bot_unit),
-			match.is_ref(priority_target)
-		)
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
 	end)
 
 	it("allows immediate retag when a new target is much closer", function()
@@ -379,11 +381,9 @@ describe("ping_system", function()
 		current_time = 0.1
 		PingSystem.update(bot_unit, blackboard)
 		assert.spy(set_contextual_unit_tag_mock).was_called(2)
-		assert.spy(set_contextual_unit_tag_mock).was_called_with(
-			match.is_table(),
-			match.is_ref(bot_unit),
-			match.is_ref(opportunity_target)
-		)
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(opportunity_target))
 	end)
 
 	it("does not tag if no line of sight", function()
@@ -396,7 +396,7 @@ describe("ping_system", function()
 
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -440,7 +440,7 @@ describe("ping_system", function()
 
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -477,7 +477,7 @@ describe("ping_system", function()
 
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "unit_data_system" then
 				return {
 					breed = function()
@@ -485,7 +485,11 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "smart_tag_system" then
-				return { tag_id = function() return nil end }
+				return {
+					tag_id = function()
+						return nil
+					end,
+				}
 			end
 			return nil
 		end
@@ -506,7 +510,7 @@ describe("ping_system", function()
 
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -550,7 +554,7 @@ describe("ping_system", function()
 			},
 		}
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -588,7 +592,7 @@ describe("ping_system", function()
 			},
 		}
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -615,11 +619,8 @@ describe("ping_system", function()
 		PingSystem.update(bot_unit, blackboard)
 
 		assert.spy(debug_log_mock).was_called(1)
-		assert.spy(debug_log_mock).was_called_with(
-			"ping_system_skip:no_los:cultist_flamer",
-			0,
-			"bot 1 skipped ping for cultist_flamer (reason: no_los)"
-		)
+		local expected_msg = "bot 1 skipped ping for cultist_flamer (reason: no_los)"
+		assert.spy(debug_log_mock).was_called_with("ping_system_skip:no_los:cultist_flamer", 0, expected_msg)
 	end)
 
 	it("logs hold-last-tag suppression once at debug level", function()
@@ -657,7 +658,10 @@ describe("ping_system", function()
 			elseif extension_name == "unit_data_system" then
 				return {
 					breed = function()
-						return { name = unit == priority_target and "renegade_grenadier" or "cultist_flamer", tags = { elite = true } }
+						return {
+							name = unit == priority_target and "renegade_grenadier" or "cultist_flamer",
+							tags = { elite = true },
+						}
 					end,
 				}
 			end
@@ -697,7 +701,7 @@ describe("ping_system", function()
 			},
 		}
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -735,11 +739,9 @@ describe("ping_system", function()
 		current_time = 0.1
 		PingSystem.update(bot_unit, blackboard)
 
-		assert.spy(debug_log_mock).was_called_with(
-			"ping_system_skip:failure_backoff",
-			0.1,
-			"bot 1 skipped pinging (reason: failure_backoff)"
-		)
+		assert
+			.spy(debug_log_mock)
+			.was_called_with("ping_system_skip:failure_backoff", 0.1, "bot 1 skipped pinging (reason: failure_backoff)")
 	end)
 
 	it("warns once when smart_tag_system lookup fails", function()
@@ -750,7 +752,7 @@ describe("ping_system", function()
 			},
 		}
 
-		_G.ScriptUnit.has_extension = function(unit, extension_name)
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()

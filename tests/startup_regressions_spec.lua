@@ -77,6 +77,14 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/animation_guard"%)', 1))
 	end)
 
+	it("loads airlock_guard through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/airlock_guard"%)', 1))
+	end)
+
 	it("loads melee_attack_choice through mod io", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -92,6 +100,8 @@ describe("startup regressions", function()
 
 		assert.is_truthy(source:find("AnimationGuard%.init%(", 1))
 		assert.is_truthy(source:find("AnimationGuard%.register_hooks%(", 1))
+		assert.is_truthy(source:find("AirlockGuard%.init%(", 1))
+		assert.is_truthy(source:find("AirlockGuard%.register_hooks%(", 1))
 		assert.is_truthy(source:find("SmartTargeting%.init%(", 1))
 		assert.is_truthy(source:find("SmartTargeting%.register_hooks%(", 1))
 		assert.is_truthy(source:find("MeleeAttackChoice%.init%(", 1))
@@ -124,5 +134,31 @@ describe("startup regressions", function()
 
 		assert.is_nil(source:find('mod:echo%("BetterBots DEBUG: logging enabled %(level=', 1))
 		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
+	end)
+
+	it("heuristics.lua uses breed.ranged for ranged_count (not tags.ranged)", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/heuristics.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_nil(
+			source:find('_is_tagged%(tags, "ranged"%)'),
+			"ranged_count must use enemy_breed.ranged, not _is_tagged(tags, 'ranged')"
+		)
+		assert.is_not_nil(
+			source:find("enemy_breed%.ranged"),
+			"ranged_count classification must check enemy_breed.ranged"
+		)
+	end)
+
+	it("engagement_leash module loads without error", function()
+		local ok, result = pcall(dofile, "scripts/mods/BetterBots/engagement_leash.lua")
+		assert.is_true(ok, "engagement_leash.lua failed to load: " .. tostring(result))
+		assert.is_not_nil(result)
+		assert.is_not_nil(result.init)
+		assert.is_not_nil(result.register_hooks)
+		assert.is_not_nil(result.compute_effective_leash)
+		assert.is_not_nil(result.record_charge)
+		assert.is_not_nil(result.is_movement_ability)
 	end)
 end)

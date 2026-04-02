@@ -29,11 +29,13 @@ local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
 
 BotProfiles.init({
 	mod = mock_mod,
-	debug_log = function(key, fixed_t, message)
+	debug_log = function(key, fixed_t, message, interval, level)
 		_debug_logs[#_debug_logs + 1] = {
 			key = key,
 			fixed_t = fixed_t,
 			message = message,
+			interval = interval,
+			level = level,
 		}
 	end,
 	debug_enabled = function()
@@ -156,7 +158,7 @@ describe("bot_profiles", function()
 		end)
 
 		it("passes through when setting is nil (uninitialized)", function()
-			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			local _, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
 			assert.is_false(swapped)
 		end)
 
@@ -204,7 +206,7 @@ describe("bot_profiles", function()
 				loadout = {},
 				talents = {},
 			}
-			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			local _, swapped = BotProfiles.resolve_profile(tertium_profile)
 			assert.is_false(swapped)
 		end)
 
@@ -227,6 +229,224 @@ describe("bot_profiles", function()
 			-- If it yielded at archetype guard, there'd be no debug log about resolution
 			-- If it passed through, it would try to resolve and fail (MasterItems nil)
 			-- Either way, swapped=false, but we can check logs to confirm it got past the guard
+		end)
+	end)
+
+	describe("profile overwrite guard (#65)", function()
+		it("does NOT set flags on pass-through (setting=none)", function()
+			_mock_settings.bot_slot_1_profile = "none"
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE)
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+
+		it("does NOT set flags on pass-through (Tertium yield)", function()
+			_mock_settings.bot_slot_1_profile = "ogryn"
+			local tertium_profile = {
+				archetype = "zealot",
+				loadout = {},
+				talents = {},
+			}
+			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+
+		it("does NOT set flags on pass-through (slot overflow)", function()
+			for i = 1, 5 do
+				_mock_settings["bot_slot_" .. i .. "_profile"] = "zealot"
+			end
+			for _ = 1, 5 do
+				BotProfiles.resolve_profile(VANILLA_PROFILE)
+			end
+			local resolved, swapped = BotProfiles.resolve_profile(VANILLA_PROFILE) -- slot 6
+			assert.is_false(swapped)
+			assert.is_nil(resolved.is_local_profile)
+			assert.is_nil(resolved._bb_resolved)
+		end)
+
+		describe("set_profile hook", function()
+			it("register_hooks registers BotPlayer.set_profile hook", function()
+				local hooked_targets = {}
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, _handler)
+						hooked_targets[#hooked_targets + 1] = { target = target, method = method }
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+
+				local found_add_bot = false
+				local found_set_profile = false
+				for _, h in ipairs(hooked_targets) do
+					if h.target == "BotSynchronizerHost" and h.method == "add_bot" then
+						found_add_bot = true
+					end
+					if h.target == "BotPlayer" and h.method == "set_profile" then
+						found_set_profile = true
+					end
+				end
+				assert.is_true(found_add_bot, "must hook BotSynchronizerHost.add_bot")
+				assert.is_true(found_set_profile, "must hook BotPlayer.set_profile")
+			end)
+
+			it("blocks set_profile when existing profile has _bb_resolved", function()
+				local set_profile_handler
+				local debug_logs = {}
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function(key, fixed_t, message, interval, level)
+						debug_logs[#debug_logs + 1] = {
+							key = key,
+							fixed_t = fixed_t,
+							message = message,
+							interval = interval,
+							level = level,
+						}
+					end,
+					debug_enabled = function()
+						return true
+					end,
+				})
+				Profiles.register_hooks()
+				assert.is_not_nil(set_profile_handler, "handler must be captured")
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = {
+					_profile = { _bb_resolved = true, archetype = "zealot" },
+				}
+				local new_profile = { archetype = "zealot", _from_network = true }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_false(original_called, "should block overwrite for _bb_resolved profile")
+				assert.is_nil(bot_self._profile._bb_resolved, "sentinel consumed after one-shot block")
+				assert.equals(1, #debug_logs)
+				assert.equals("bot_profiles:set_profile_blocked", debug_logs[1].key)
+				assert.equals(0, debug_logs[1].fixed_t)
+				assert.is_nil(debug_logs[1].interval)
+				assert.equals("info", debug_logs[1].level)
+				assert.equals("blocked lossy network-sync profile overwrite", debug_logs[1].message)
+
+				-- Second call should pass through (sentinel consumed)
+				original_called = false
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow subsequent updates after one-shot block")
+				assert.equals(2, #debug_logs)
+				assert.equals("bot_profiles:set_profile_passthrough", debug_logs[2].key)
+				assert.equals(0, debug_logs[2].fixed_t)
+				assert.is_nil(debug_logs[2].interval)
+				assert.equals("debug", debug_logs[2].level)
+				assert.equals("allowed profile update (no _bb_resolved sentinel)", debug_logs[2].message)
+			end)
+
+			it("allows set_profile when existing profile is NOT _bb_resolved", function()
+				local set_profile_handler
+				local debug_logs = {}
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function(key, fixed_t, message, interval, level)
+						debug_logs[#debug_logs + 1] = {
+							key = key,
+							fixed_t = fixed_t,
+							message = message,
+							interval = interval,
+							level = level,
+						}
+					end,
+					debug_enabled = function()
+						return true
+					end,
+				})
+				Profiles.register_hooks()
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = {
+					_profile = { archetype = "veteran" },
+				}
+				local new_profile = { archetype = "veteran" }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow overwrite for vanilla profile")
+				assert.equals(1, #debug_logs)
+				assert.equals("bot_profiles:set_profile_passthrough", debug_logs[1].key)
+				assert.equals(0, debug_logs[1].fixed_t)
+				assert.is_nil(debug_logs[1].interval)
+				assert.equals("debug", debug_logs[1].level)
+				assert.equals("allowed profile update (no _bb_resolved sentinel)", debug_logs[1].message)
+			end)
+
+			it("allows set_profile when no existing profile (first assignment)", function()
+				local set_profile_handler
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = { _profile = nil }
+				local new_profile = { archetype = "zealot" }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow first profile assignment")
+			end)
 		end)
 	end)
 end)
