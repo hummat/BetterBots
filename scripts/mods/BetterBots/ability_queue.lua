@@ -16,6 +16,7 @@ local _MetaData
 local _ItemFallback
 local _Debug
 local _EventLog
+local _EngagementLeash
 local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
@@ -25,6 +26,8 @@ local RESCUE_CHARGE_RULES = {
 	zealot_dash_ally_aid = true,
 	adamant_charge_ally_aid = true,
 }
+
+local _action_input_is_bot_queueable
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
@@ -180,9 +183,17 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	local ability_extension = ScriptUnit.extension(unit, "ability_system")
+	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	local used_input = activation_data.used_input
-	local action_input_is_valid =
-		ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
+	local action_input_is_valid = _action_input_is_bot_queueable(
+		action_input_extension,
+		ability_extension,
+		ability_component_name,
+		ability_template_name,
+		action_input,
+		used_input,
+		fixed_t
+	)
 
 	if not action_input_is_valid then
 		if _debug_enabled() then
@@ -268,8 +279,11 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		end
 	end
 
-	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
+
+	if _EngagementLeash and _EngagementLeash.is_movement_ability(ability_template_name) then
+		_EngagementLeash.record_charge(unit, fixed_t)
+	end
 
 	if _EventLog.is_enabled() then
 		local attempt_id = _EventLog.next_attempt_id()
@@ -346,6 +360,7 @@ function M.init(deps)
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	local shared_rules = deps.shared_rules or {}
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
+	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 end
 
 function M.wire(deps)
@@ -354,11 +369,16 @@ function M.wire(deps)
 	_ItemFallback = deps.ItemFallback
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
+	_EngagementLeash = deps.EngagementLeash
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 
 function M.try_queue(unit, blackboard)
 	_fallback_try_queue_combat_ability(unit, blackboard)
+end
+
+function M._action_input_is_bot_queueable(...)
+	return _action_input_is_bot_queueable(...)
 end
 
 return M

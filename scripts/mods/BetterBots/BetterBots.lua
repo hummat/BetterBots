@@ -483,6 +483,7 @@ AbilityQueue.wire({
 	ItemFallback = ItemFallback,
 	Debug = Debug,
 	EventLog = EventLog,
+	EngagementLeash = EngagementLeash,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 

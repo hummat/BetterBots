@@ -29,11 +29,13 @@ local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
 
 BotProfiles.init({
 	mod = mock_mod,
-	debug_log = function(key, fixed_t, message)
+	debug_log = function(key, fixed_t, message, interval, level)
 		_debug_logs[#_debug_logs + 1] = {
 			key = key,
 			fixed_t = fixed_t,
 			message = message,
+			interval = interval,
+			level = level,
 		}
 	end,
 	debug_enabled = function()
@@ -302,6 +304,7 @@ describe("bot_profiles", function()
 
 			it("blocks set_profile when existing profile has _bb_resolved", function()
 				local set_profile_handler
+				local debug_logs = {}
 				local hook_mod = {
 					get = function(_self, setting_id)
 						return _mock_settings[setting_id]
@@ -315,9 +318,17 @@ describe("bot_profiles", function()
 				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
 				Profiles.init({
 					mod = hook_mod,
-					debug_log = function() end,
+					debug_log = function(key, fixed_t, message, interval, level)
+						debug_logs[#debug_logs + 1] = {
+							key = key,
+							fixed_t = fixed_t,
+							message = message,
+							interval = interval,
+							level = level,
+						}
+					end,
 					debug_enabled = function()
-						return false
+						return true
 					end,
 				})
 				Profiles.register_hooks()
@@ -335,15 +346,28 @@ describe("bot_profiles", function()
 				set_profile_handler(original_func, bot_self, new_profile)
 				assert.is_false(original_called, "should block overwrite for _bb_resolved profile")
 				assert.is_nil(bot_self._profile._bb_resolved, "sentinel consumed after one-shot block")
+				assert.equals(1, #debug_logs)
+				assert.equals("bot_profiles:set_profile_blocked", debug_logs[1].key)
+				assert.equals(0, debug_logs[1].fixed_t)
+				assert.is_nil(debug_logs[1].interval)
+				assert.equals("info", debug_logs[1].level)
+				assert.equals("blocked lossy network-sync profile overwrite", debug_logs[1].message)
 
 				-- Second call should pass through (sentinel consumed)
 				original_called = false
 				set_profile_handler(original_func, bot_self, new_profile)
 				assert.is_true(original_called, "should allow subsequent updates after one-shot block")
+				assert.equals(2, #debug_logs)
+				assert.equals("bot_profiles:set_profile_passthrough", debug_logs[2].key)
+				assert.equals(0, debug_logs[2].fixed_t)
+				assert.is_nil(debug_logs[2].interval)
+				assert.equals("debug", debug_logs[2].level)
+				assert.equals("allowed profile update (no _bb_resolved sentinel)", debug_logs[2].message)
 			end)
 
 			it("allows set_profile when existing profile is NOT _bb_resolved", function()
 				local set_profile_handler
+				local debug_logs = {}
 				local hook_mod = {
 					get = function(_self, setting_id)
 						return _mock_settings[setting_id]
@@ -357,9 +381,17 @@ describe("bot_profiles", function()
 				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
 				Profiles.init({
 					mod = hook_mod,
-					debug_log = function() end,
+					debug_log = function(key, fixed_t, message, interval, level)
+						debug_logs[#debug_logs + 1] = {
+							key = key,
+							fixed_t = fixed_t,
+							message = message,
+							interval = interval,
+							level = level,
+						}
+					end,
 					debug_enabled = function()
-						return false
+						return true
 					end,
 				})
 				Profiles.register_hooks()
@@ -375,6 +407,12 @@ describe("bot_profiles", function()
 
 				set_profile_handler(original_func, bot_self, new_profile)
 				assert.is_true(original_called, "should allow overwrite for vanilla profile")
+				assert.equals(1, #debug_logs)
+				assert.equals("bot_profiles:set_profile_passthrough", debug_logs[1].key)
+				assert.equals(0, debug_logs[1].fixed_t)
+				assert.is_nil(debug_logs[1].interval)
+				assert.equals("debug", debug_logs[1].level)
+				assert.equals("allowed profile update (no _bb_resolved sentinel)", debug_logs[1].message)
 			end)
 
 			it("allows set_profile when no existing profile (first assignment)", function()

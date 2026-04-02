@@ -59,6 +59,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
 - `patched bt_bot_conditions.can_activate_ability`
 - `entered GameplayStateRun`
+- `blocked lossy network-sync profile overwrite` (issue `#65` guard fired; the first lossy `BotPlayer.set_profile` sync was dropped on purpose)
+- `allowed profile update (no _bb_resolved sentinel)` (the `BotPlayer.set_profile` hook passed through because the one-shot sentinel was absent or already consumed)
 - `decision ... -> true` (BT condition path activation — includes `hazard=<true|false>` in the debug line)
 - `enter ability node ...`
 - `fallback queued ...` (template fallback queued)
@@ -82,6 +84,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade released cleanup lock without explicit unwield (slot changed)` (external cleanup templates left grenade slot through the engine's normal unwind; BetterBots treats that as success)
 - `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
 - `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
+- `post-charge grace started (4s)` (engagement leash recorded a movement-ability charge and started the temporary 20m grace window for that bot)
 - `ranged dead-zone override kept normal shot (ammo=<0.xx>, target=<breed>, weapon=<template>, action=<input>)` (bot fired a normal ranged shot while reserve ammo was in the old 20%-50% dead zone; direct validation signal for `#51`)
 - `melee choice <attack> vs <armored|unarmored> target (crowd=<N>, bucket=<solo|pack|horde>, weapon=<template>)` (interesting `_choose_attack` decision; use to validate `#52` without per-swing spam)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)

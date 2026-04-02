@@ -284,6 +284,42 @@ describe("engagement_leash", function()
 			local _, reason3 = EngagementLeash.compute_effective_leash(unit, target, make_breed(), false, 15)
 			assert.equals("base", reason3)
 		end)
+
+		it("logs post-charge grace start when debug is enabled", function()
+			local unit = make_unit("bot")
+			local debug_logs = {}
+
+			EngagementLeash.init({
+				debug_log = function(key, fixed_t, message, interval, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						interval = interval,
+						level = level,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				perf = nil,
+				is_enabled = function()
+					return true
+				end,
+			})
+
+			EngagementLeash.record_charge(unit, 7)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("leash:charge_recorded:" .. tostring(unit), debug_logs[1].key)
+			assert.equals(7, debug_logs[1].fixed_t)
+			assert.equals("debug", debug_logs[1].level)
+			assert.matches("post%-charge grace started", debug_logs[1].message)
+			assert.matches("4", debug_logs[1].message)
+		end)
 	end)
 
 	describe("action_data restoration", function()

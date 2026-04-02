@@ -278,6 +278,22 @@ describe("TargetSelection", function()
 			assert.are.equal(10, score) -- 5 base + 5 pounced bonus
 		end)
 
+		it("boosts score even when base slot_weight is zero (no bot slot assigned)", function()
+			local target_unit = {}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+			}
+
+			local zero_slot_weight = function()
+				return 0
+			end
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(zero_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score) -- 0 base + 5 pounced bonus
+		end)
+
 		it("does not boost for non-pounced disabled enemies", function()
 			local target_unit = {}
 			_G.BLACKBOARDS[target_unit] = {

@@ -32,6 +32,14 @@ local function fmt_seconds(value)
 	return string.format("%.2f", value)
 end
 
+local function _json_safe_number(value)
+	if value == nil or value == math.huge or value == -math.huge or value ~= value then
+		return nil
+	end
+
+	return value
+end
+
 local function _sanitize_dump_name_fragment(value)
 	local fragment = tostring(value or "unknown")
 	fragment = string.gsub(fragment, "[^%w_%-]", "_")
@@ -65,14 +73,14 @@ local function context_snapshot(context)
 		health_pct = context.health_pct,
 		toughness_pct = context.toughness_pct,
 		peril_pct = context.peril_pct,
-		target_enemy_distance = context.target_enemy_distance,
+		target_enemy_distance = _json_safe_number(context.target_enemy_distance),
 		target_enemy_type = context.target_enemy_type,
 		target_enemy = enemy_unit_label(context.target_enemy),
 		priority_target_enemy = enemy_unit_label(context.priority_target_enemy),
 		opportunity_target_enemy = enemy_unit_label(context.opportunity_target_enemy),
 		urgent_target_enemy = enemy_unit_label(context.urgent_target_enemy),
 		target_ally_needs_aid = context.target_ally_needs_aid,
-		target_ally_distance = context.target_ally_distance,
+		target_ally_distance = _json_safe_number(context.target_ally_distance),
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,
 		target_is_super_armor = context.target_is_super_armor,

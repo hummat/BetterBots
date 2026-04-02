@@ -57,6 +57,7 @@ local function _mock_require(path)
 end
 rawset(_G, "require", _mock_require)
 
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local ConditionPatch = dofile("scripts/mods/BetterBots/condition_patch.lua")
 
 -- Restore require
@@ -64,6 +65,7 @@ rawset(_G, "require", _orig_require)
 
 -- Initialize with minimal deps
 ConditionPatch.init({
+	shared_rules = SharedRules,
 	mod = { echo = function() end, hook_require = function() end },
 	debug_log = function(key, fixed_t, message)
 		_debug_logs[#_debug_logs + 1] = {
@@ -164,6 +166,41 @@ end
 describe("condition_patch", function()
 	before_each(function()
 		reset()
+	end)
+
+	describe("_action_input_is_bot_queueable", function()
+		it("accepts parser-level ability inputs even when action validation rejects them", function()
+			local action_input_extension = {
+				_action_input_parsers = {
+					combat_ability_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							veteran_combat_ability = {
+								stance_pressed = {
+									buffer_time = 0.5,
+								},
+							},
+						},
+					},
+				},
+			}
+			local ability_extension = {
+				action_input_is_currently_valid = function()
+					return false
+				end,
+			}
+
+			assert.is_true(
+				ConditionPatch._action_input_is_bot_queueable(
+					action_input_extension,
+					ability_extension,
+					"combat_ability_action",
+					"veteran_combat_ability",
+					"stance_pressed",
+					nil,
+					0
+				)
+			)
+		end)
 	end)
 
 	describe("_is_dormant_daemonhost_target", function()

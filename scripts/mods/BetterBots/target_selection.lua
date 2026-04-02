@@ -95,9 +95,12 @@ function M.register_hooks()
 						end
 					end
 
-					-- Issue #55: Boost score for enemies pounced by companion mastiff
-					if score > 0 and target_unit and _is_pounced_by_companion(target_unit) then
-						score = score + POUNCED_TARGET_BONUS
+					-- Issue #55: Boost score for enemies pounced by companion mastiff.
+					-- Pounced enemies may have score=0 (no bot slot assigned while
+					-- held by companion), so check unconditionally and ensure a
+					-- positive base score.
+					if target_unit and _is_pounced_by_companion(target_unit) then
+						score = math.max(score, 0) + POUNCED_TARGET_BONUS
 						if _debug_enabled() then
 							_debug_log(
 								"target_sel_pounced:" .. tostring(target_unit) .. ":" .. tostring(unit),

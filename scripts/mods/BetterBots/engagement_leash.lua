@@ -131,6 +131,16 @@ end
 function M.record_charge(unit, t)
 	local state = _get_or_create_state(unit)
 	state.charge_timestamp = t
+
+	if _debug_enabled() then
+		_debug_log(
+			"leash:charge_recorded:" .. tostring(unit),
+			t,
+			"post-charge grace started (" .. tostring(POST_CHARGE_GRACE_S) .. "s)",
+			nil,
+			"debug"
+		)
+	end
 end
 
 function M.is_movement_ability(template_name)

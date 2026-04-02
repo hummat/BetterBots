@@ -209,6 +209,7 @@ describe("poxburster", function()
 			Poxburster.register_hooks()
 
 			local scratchpad = {
+				unit = "bot_unit",
 				weapon_extension = {
 					action_input_is_currently_valid = function()
 						return true
@@ -229,7 +230,7 @@ describe("poxburster", function()
 			assert.is_true(pushed)
 			assert.equals("push", action_input)
 			assert.equals(1, #logged)
-			assert.equals("poxburster_push:poxburster:" .. tostring(scratchpad), logged[1].key)
+			assert.equals("poxburster_push:poxburster:" .. tostring(scratchpad.unit), logged[1].key)
 		end)
 
 		it("suppresses poxbursters from all secondary perception slots", function()

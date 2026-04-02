@@ -834,8 +834,27 @@ local function register_hooks()
 	-- pass through normally.
 	_mod:hook("BotPlayer", "set_profile", function(func, self, profile)
 		if self._profile and self._profile._bb_resolved then
+			if _debug_enabled() then
+				_debug_log(
+					"bot_profiles:set_profile_blocked",
+					0,
+					"blocked lossy network-sync profile overwrite",
+					nil,
+					"info"
+				)
+			end
 			self._profile._bb_resolved = nil
 			return
+		end
+
+		if _debug_enabled() then
+			_debug_log(
+				"bot_profiles:set_profile_passthrough",
+				0,
+				"allowed profile update (no _bb_resolved sentinel)",
+				nil,
+				"debug"
+			)
 		end
 		return func(self, profile)
 	end)
