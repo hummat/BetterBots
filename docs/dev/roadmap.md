@@ -54,6 +54,18 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Log throttle collision fix: 19 per-bot debug log keys were silently dropping multi-bot messages. Convention updated in AGENTS.md + logging.md.
 - 518 unit tests.
 
+### v0.9.0 (2026-04-02)
+- Combat-aware engagement leash (#47): coherency-anchored melee leash with already-engaged, under-attack, ranged-foray, and post-charge-grace overrides. 700+ override events validated.
+- Non-veteran profile crash fix (#65): `set_profile` hook blocks lossy network-sync overwrite on 1.11.x.
+- Mastiff-pounced priority (#55): score boost for pounced enemies + fix for zero-score gate when bot has no slot.
+- Poxburster push (#54): bypass `_should_push` outnumbered gate for poxbursters.
+- Rumbler VFX timing gap (#53): pre-call hook on loadout init.
+- Healing deferral validated (#39): health station deferral confirmed in-game.
+- Parser-level ability input validation: `_action_input_is_bot_queueable` in shared_rules.lua fixes 1.11.x action input rejection for combat abilities.
+- Event log JSON fix: `_json_safe_number` sanitizes infinity/NaN before cjson.encode.
+- Debug logging: set_profile guard, record_charge, per-bot poxburster keys.
+- 579 unit tests via busted.
+
 ## Planned batches
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
@@ -64,12 +76,14 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 65 | **P0: non-veteran profiles CTD on 1.11.0** | Native crash on Zealot/Psyker/Ogryn bot profiles in Darktide 1.11.0 (Warband). Workaround: Veteran or None. Blocked on 1.11.0 decompiled source. |
+| 65 | **P0: non-veteran profiles CTD on 1.11.0** | **Done.** `set_profile` hook blocks lossy network-sync overwrite. Validated on 1.11.3. |
 | 54 | Push poxbursters | **Done.** Bypass `_should_push` outnumbered gate for poxburster breed + push logging. |
-| 55 | Prioritize mastiff-pounced enemies | **Done.** Score boost for immobilized targets in target_selection.lua. |
+| 55 | Prioritize mastiff-pounced enemies | **Done.** Score boost for immobilized targets. Fixed `score=0` gate bug (pounced enemies have no bot slot). Validated with 80+ pounce events. |
 | 53 | Rumbler VFX timing gap | **Done.** Pre-call hook on loadout init restored (crash was from profiles, not VFX). |
-| 47 | Combat-aware engagement leash | **Done.** Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. |
-| 37 | Objective-aware ability activation | Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
+| 47 | Combat-aware engagement leash | **Done.** Coherency-anchored leash: stickiness-limit extension, post-charge grace (validated), under-attack/ranged-foray overrides. 700+ override events in-game. |
+| 39 | Healing deferral | **Done.** Validated: 80+ health station deferral events. Correct no-defer when human at full health. |
+| — | Parser-level input validation | **Done.** `_action_input_is_bot_queueable` in shared_rules.lua: check parser sequence_configs before action handler validation. Fixes 1.11.x action input rejection. |
+| — | Event log JSON fix | **Done.** `_json_safe_number` sanitizes `math.huge`/`NaN` before `cjson.encode`. |
 
 ### v0.10.0 — "Team Coordination"
 
@@ -89,6 +103,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
+| 37 | Objective-aware ability activation | Deferred from v0.9.0. Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
 | 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
 | 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. |
 | 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
