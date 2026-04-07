@@ -20,15 +20,14 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
-[size=3][b]New in v0.9.0[/b][/size]
+[size=3][b]New in v0.9.1[/b][/size]
 
 [list]
-[*][b]Combat engagement leash:[/b] Bots no longer rubber-band back to the player mid-fight. Coherency-anchored melee leash extends engagement range when already fighting, under attack, pursuing ranged enemies, or after a dash/charge ability. Bots fight at their charge destination instead of turning around.
-[*][b]Poxburster push:[/b] Bots now push approaching poxbursters at melee range — the standard human counterplay for instant kills.
-[*][b]Mastiff-pounce priority:[/b] Bots prioritize enemies pinned by the Arbites cyber mastiff, helping finish off immobilized targets.
-[*][b]Healing deferral:[/b] Bots defer health stations and med-crates to the human player when you need healing. Configurable threshold in mod settings.
-[*][b]1.11.x compatibility:[/b] Fixed non-veteran bot profiles crashing on Darktide 1.11.0+ (Warband). Parser-level ability input validation fixes ability rejection on 1.11.x.
-[*][b]Airlock crash guard:[/b] Prevents a vanilla crash at airlock doors when bot count exceeds teleport nodes (common with SoloPlay mods).
+[*][b]Bot-optimized builds:[/b] Overhauled bot profiles with curated builds from hadrons-blessing — Martyrdom Zealot, Indomitable Ogryn, Voidblast Psyker, plus improved Veteran. Full talent trees with blessed weapons and perks.
+[*][b]Ammo policy:[/b] Configurable bot ranged ammo threshold and human ammo reserve guard. Bots fire more freely above threshold and defer ammo pickups when you're low.
+[*][b]Grenade melee gate:[/b] Bots no longer swap to grenades while actively engaged in melee — prevents suicidal grenade throws at point-blank range.
+[*][b]Mastiff targeting fixes:[/b] Whistle gated on mastiff position (#70), friendly mastiff pins de-prioritized in targeting (#69).
+[*][b]Stability fixes:[/b] Consolidated hook_require calls (#67), Tertium None yield guard (#68), hardened VFX suppression and engagement leash edge cases.
 [/list]
 
 [size=3][b]What works[/b][/size]
