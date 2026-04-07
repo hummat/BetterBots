@@ -1,7 +1,7 @@
 -- bot_profiles.lua — hardcoded default class profiles for bots (#45)
 -- Replaces vanilla all-veteran profiles with class-diverse loadouts so players
 -- without leveled characters can still benefit from BetterBots' ability support.
--- Weapon choices sourced from hadrons-blessing bot-weapon-recommendations.json.
+-- Weapon and talent choices sourced from hadrons-blessing bot-optimized builds (2026-04-07).
 --
 -- Profile resolution: vanilla bot profiles are pre-baked by bot_character_profiles.lua
 -- (items resolved, parse_profile called) BEFORE reaching add_bot. We must resolve our
@@ -30,9 +30,13 @@ local SLOT_SETTING_IDS = {
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
--- Talent tables sourced from hadrons-blessing builds (2026-03-16):
---   veteran: 01-veteran-squad-leader, zealot: 04-spicy-meta-zealot,
---   psyker: 10-electro-shriek-psyker, ogryn: 22-ogryn-heavy-gunlugger.
+-- Bot-optimized builds sourced from hadrons-blessing (2026-04-07):
+--   veteran: bot-veteran (VoC + Focus Target, no dodge/weakspot talents)
+--   zealot:  bot-zealot  (Chorus + Martyrdom, no dodge talents)
+--   psyker:  bot-psyker  (Venting Shriek + Warp Siphon + Voidblast staff)
+--   ogryn:   bot-ogryn   (Indomitable + Heavy Hitter + Rumbler)
+-- All talent keys verified against decompiled tree layouts.
+-- Stat node names verified against class-specific tree files.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
 local DEFAULT_PROFILE_TEMPLATES = {
 	veteran = {
@@ -44,8 +48,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			slot_primary = "content/items/weapons/player/melee/combatsword_p2_m1",
 			slot_secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
 		},
-		-- Weapon overrides: blessings (traits) and perks from build 01-veteran-squad-leader.
-		-- Content paths verified via MasterItems cache dump 2026-03-16.
+		-- Weapon overrides: blessings (traits) and perks from bot-veteran build.
+		-- Rampage (increased_melee_damage_on_multiple_hits) + cleave stacking on sword.
+		-- Rising Heat + Gets Hot! on plasma: damage scales with heat, overheat management.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
@@ -88,43 +93,45 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 01-veteran-squad-leader (Voice of Command + Focus Target)
-		-- Chosen over 03-slinking-veteran because bots can't headshot, making
-		-- Sniper's Focus and lasweapon_crit talents ineffective with plasma.
+		-- Source: bot-veteran (Voice of Command + Focus Target)
+		-- Removed: veteran_dodging_grants_crit (bots can't dodge),
+		-- veteran_replenish_toughness_on_weakspot_kill (bots aim at spine),
+		-- veteran_increased_weakspot_damage (near-zero value for bots).
+		-- Replaced with: flanking damage, ranged cleave, deployable bonus, bleed-on-hit.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			veteran_combat_ability_stagger_nearby_enemies = 1,
 			veteran_grenade_apply_bleed = 1,
 			veteran_aura_gain_ammo_on_elite_kill_improved = 1,
 			veteran_improved_tag = 1,
-			-- Class talents
-			veteran_crits_apply_rending = 1,
-			veteran_increase_damage_after_sprinting = 1,
-			veteran_increased_melee_crit_chance_and_melee_finesse = 1,
-			veteran_dodging_grants_crit = 1,
-			veteran_hits_cause_bleed = 1,
-			veteran_attack_speed = 1,
-			veteran_replenish_toughness_outside_melee = 1,
-			veteran_replenish_toughness_on_weakspot_kill = 1,
-			veteran_improved_grenades = 1,
-			veteran_allies_in_coherency_share_toughness_gain = 1,
-			veteran_replenish_grenades = 1,
-			veteran_increase_damage_vs_elites = 1,
-			veteran_elite_kills_reduce_cooldown = 1,
+			-- Class talents (all passive/kill/hit-triggered — zero dodge/weakspot dependency)
+			veteran_all_kills_replenish_toughness = 1,
 			veteran_elite_kills_replenish_toughness = 1,
+			veteran_reduce_swap_time = 1,
+			veteran_replenish_toughness_and_boost_allies = 1,
 			veteran_reduced_toughness_damage_in_coherency = 1,
-			veteran_increased_damage_based_on_range = 1,
-			veteran_increased_weakspot_damage = 1,
-			veteran_big_game_hunter = 1,
 			veteran_tdr_on_high_toughness = 1,
+			veteran_attack_speed = 1,
+			veteran_increase_damage_vs_elites = 1,
+			veteran_better_deployables = 1,
+			veteran_hits_cause_bleed = 1,
+			veteran_increased_ranged_cleave = 1,
+			veteran_increased_damage_when_flanking = 1,
+			veteran_replenish_toughness_outside_melee = 1,
+			veteran_improved_grenades = 1,
+			veteran_replenish_grenades = 1,
+			veteran_allies_in_coherency_share_toughness_gain = 1,
+			veteran_elite_kills_reduce_cooldown = 1,
+			veteran_rending_bonus = 1,
+			veteran_big_game_hunter = 1,
 			-- Keystone/ability modifiers
 			veteran_combat_ability_increase_and_restore_toughness_to_coherency = 1,
 			veteran_improved_tag_dead_coherency_bonus = 1,
-			-- Stat nodes
+			-- Stat nodes (names verified against veteran_tree.lua)
+			base_toughness_node_buff_low_5 = 1,
+			base_stamina_node_buff_low_2 = 1,
 			base_toughness_node_buff_medium_1 = 1,
 			base_toughness_node_buff_medium_2 = 1,
-			base_stamina_node_buff_low_1 = 1,
-			base_melee_damage_node_buff_high_1 = 1,
 			base_ranged_damage_node_buff_medium_1 = 1,
 		},
 	},
@@ -197,42 +204,49 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 04-spicy-meta-zealot (Chorus + Blazing Piety)
+		-- Source: bot-zealot (Chorus + Martyrdom)
+		-- Switched from Blazing Piety to Martyrdom: bots take constant damage and
+		-- naturally maintain the low-health state that Martyrdom rewards with stacking
+		-- damage, attack speed, and toughness bonuses.
+		-- Removed: zealot_toughness_on_dodge, zealot_increased_crit_and_weakspot_damage_after_dodge,
+		-- zealot_reduced_damage_after_dodge (all require dodge input — bots never dodge).
+		-- Aura: Benediction (TDR in coherency) over Beacon of Purity — bots take constant
+		-- toughness damage, making DR more valuable than corruption healing.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			zealot_bolstering_prayer = 1,
 			zealot_throwing_knives = 1,
-			zealot_corruption_healing_coherency_improved = 1,
-			zealot_fanatic_rage = 1,
-			-- Class talents
-			zealot_crits_apply_bleed = 1,
-			zealot_backstab_damage = 1,
+			zealot_toughness_damage_reduction_coherency_improved = 1,
+			zealot_martyrdom = 1,
+			-- Class talents (all passive/kill/hit/crit-triggered — zero dodge dependency)
+			zealot_multi_hits_increase_damage = 1,
+			zealot_more_toughness_on_melee = 1,
 			zealot_increased_damage_vs_resilient = 1,
-			zealot_increase_ranged_close_damage = 1,
-			zealot_crits_reduce_toughness_damage = 1,
-			zealot_toughness_on_dodge = 1,
-			zealot_increased_crit_and_weakspot_damage_after_dodge = 1,
 			zealot_resist_death = 1,
 			zealot_resist_death_healing = 1,
-			zealot_damage_boosts_movement = 1,
-			zealot_reduced_damage_after_dodge = 1,
-			zealot_attack_speed = 1,
 			zealot_hits_grant_stacking_damage = 1,
-			zealot_revive_speed = 1,
-			zealot_damage_vs_elites = 1,
-			zealot_elite_kills_empowers = 1,
+			zealot_attack_speed = 1,
 			zealot_offensive_vs_many = 1,
+			zealot_revive_speed = 1,
+			zealot_crits_apply_bleed = 1,
+			zealot_crits_reduce_toughness_damage = 1,
+			zealot_reduced_damage_on_wound = 1,
+			zealot_bled_enemies_take_more_damage = 1,
+			zealot_elite_kills_empowers = 1,
+			zealot_additional_wounds = 1,
+			zealot_damage_vs_elites = 1,
 			-- Keystone/ability modifiers
 			zealot_channel_grants_damage = 1,
 			zealot_crits_grant_cd = 1,
-			zealot_fanatic_rage_toughness_on_max = 1,
-			zealot_fanatic_rage_improved = 1,
-			zealot_shared_fanatic_rage = 1,
-			-- Stat nodes
-			base_melee_damage_node_buff_high_1 = 1,
-			base_melee_damage_node_buff_high_2 = 1,
+			zealot_martyrdom_grants_toughness = 1,
+			zealot_martyrdom_grants_attack_speed = 1,
+			zealot_martyrdom_toughness_modifier = 1,
+			zealot_corruption_resistance_stacking = 1,
+			-- Stat nodes (names verified against zealot_tree.lua)
+			base_melee_damage_node_buff_medium_4 = 1,
+			base_toughness_node_buff_medium_2 = 1,
+			base_melee_damage_node_buff_medium_1 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
-			base_toughness_node_buff_medium_1 = 1,
 		},
 	},
 	psyker = {
@@ -241,47 +255,48 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m2",
-			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p3_m1",
+			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p4_m1",
 		},
+		-- Weapon overrides: Voidblast staff (p4) replaces Surge (p3) — AoE blast is more
+		-- bot-friendly than chain lightning (no single-target tracking needed).
+		-- Force Greatsword m1 per hadrons-blessing export recommendation.
+		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					{
-						id = "content/items/traits/bespoke_forcesword_2h_p1/chained_hits_increases_cleave",
-						rarity = 4,
-						value = 1,
-					},
 					{
 						id = "content/items/traits/bespoke_forcesword_2h_p1/warp_charge_power_bonus",
 						rarity = 4,
 						value = 1,
 					},
+					{
+						id = "content/items/traits/bespoke_forcesword_2h_p1/chained_hits_increases_melee_cleave",
+						rarity = 4,
+						value = 1,
+					},
 				},
 				perks = {
-					{
-						id = "content/items/perks/melee_common/wield_increase_disgustingly_resilient_damage",
-						rarity = 4,
-					},
-					{ id = "content/items/perks/melee_common/wield_increase_unarmored_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
 				},
 			},
 			slot_secondary = {
 				traits = {
 					{
-						id = "content/items/traits/bespoke_forcestaff_p3/increased_crit_chance_scaled_on_peril",
+						id = "content/items/traits/bespoke_forcestaff_p4/warp_charge_critical_strike_chance_bonus",
 						rarity = 4,
 						value = 1,
 					},
 					{
-						id = "content/items/traits/bespoke_forcestaff_p3/faster_charge_on_chained_secondary_attacks",
+						id = "content/items/traits/bespoke_forcestaff_p4/faster_charge_on_chained_secondary_attacks",
 						rarity = 4,
 						value = 1,
 					},
 				},
 				perks = {
+					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
 					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
 		},
@@ -305,25 +320,27 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 10-electro-shriek-psyker (Venting Shriek + Warp Siphon)
+		-- Source: bot-psyker (Venting Shriek + Warp Siphon + Voidblast)
 		-- Zero bot-unfriendly talents. Warpfire chain + soul stacking are passive.
+		-- Stat node names corrected (previous had 4 wrong suffixes that silently did nothing).
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			psyker_shout_vent_warp_charge = 1,
 			psyker_brain_burst_improved = 1,
 			psyker_cooldown_aura_improved = 1,
 			psyker_passive_souls_from_elite_kills = 1,
-			-- Class talents
+			-- Class talents (all passive/kill/crit-triggered)
 			psyker_toughness_on_vent = 1,
-			psyker_crits_regen_toughness_movement_speed = 1,
+			psyker_toughness_on_warp_kill = 1,
 			psyker_elite_kills_add_warpfire = 1,
+			psyker_crits_regen_toughness_movement_speed = 1,
 			psyker_crits_empower_next_attack = 1,
+			psyker_killing_enemy_with_warpfire_boosts = 1,
 			psyker_spread_warpfire_on_kill = 1,
 			psyker_2_tier_3_name_2 = 1,
 			psyker_warp_charge_reduces_toughness_damage_taken = 1,
-			psyker_increased_vent_speed = 1,
 			psyker_damage_based_on_warp_charge = 1,
-			psyker_killing_enemy_with_warpfire_boosts = 1,
+			psyker_increased_vent_speed = 1,
 			psyker_warp_glass_cannon = 1,
 			psyker_warp_attacks_rending = 1,
 			psyker_damage_vs_ogryns_and_monsters = 1,
@@ -332,16 +349,15 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			psyker_shout_reduces_warp_charge_generation = 1,
 			psyker_warpfire_on_shout = 1,
 			psyker_toughness_on_soul = 1,
-			psyker_aura_souls_on_kill = 1,
 			psyker_increased_max_souls = 1,
-			-- Stat nodes
+			-- Stat nodes (names verified against psyker_tree.lua)
+			base_toughness_node_buff_medium_5 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
-			base_toughness_damage_reduction_node_buff_medium_2 = 1,
-			base_toughness_node_buff_medium_1 = 1,
-			base_toughness_node_buff_medium_2 = 1,
-			base_ranged_damage_node_buff_medium_1 = 1,
-			base_stamina_node_buff_low_1 = 1,
 			base_crit_chance_node_buff_low_1 = 1,
+			base_toughness_node_buff_medium_4 = 1,
+			base_ranged_damage_node_buff_medium_4 = 1,
+			base_stamina_node_buff_low_1 = 1,
+			base_toughness_damage_reduction_node_buff_low_4 = 1,
 		},
 	},
 	ogryn = {
@@ -350,44 +366,48 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "ogryn_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/ogryn_powermaul_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_heavystubber_p2_m1",
+			slot_primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m2",
 		},
+		-- Weapon overrides: Bully Club + Rumbler replace Power Maul + Heavy Stubber.
+		-- Bully Club: massive stagger, synergizes with Heavy Hitter keystone heavy-attack rewards.
+		-- Rumbler (grenade launcher): AoE area denial, no aim or sustained-fire ramp-up needed.
+		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
 					{
-						id = "content/items/traits/bespoke_ogryn_powermaul_p1/explosion_on_activated_attacks_on_armor",
+						id = "content/items/traits/bespoke_ogryn_club_p2/staggered_targets_receive_increased_damage_debuff",
 						rarity = 4,
 						value = 1,
 					},
 					{
-						id = "content/items/traits/bespoke_ogryn_powermaul_p1/staggered_targets_receive_increased_damage_debuff",
+						id = "content/items/traits/bespoke_ogryn_club_p2/toughness_recovery_on_multiple_hits",
 						rarity = 4,
 						value = 1,
 					},
 				},
 				perks = {
 					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
 			slot_secondary = {
 				traits = {
 					{
-						id = "content/items/traits/bespoke_ogryn_heavystubber_p2/power_bonus_on_continuous_fire",
+						id = "content/items/traits/bespoke_ogryn_thumper_p1/power_bonus_on_continuous_fire",
 						rarity = 4,
 						value = 1,
 					},
 					{
-						id = "content/items/traits/bespoke_ogryn_heavystubber_p2/stagger_count_bonus_damage",
+						id = "content/items/traits/bespoke_ogryn_thumper_p1/suppression_on_close_kill",
 						rarity = 4,
 						value = 1,
 					},
 				},
 				perks = {
 					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_crit_chance", rarity = 4 },
+					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
 		},
@@ -411,43 +431,46 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: 22-ogryn-heavy-gunlugger (Point Blank Barrage + Burst Limiter Override)
-		-- Zero bot-unfriendly talents. Pure ranged/toughness synergy with Heavy Stubber.
+		-- Source: bot-ogryn (Indomitable + Heavy Hitter + Bully Club + Rumbler)
+		-- Indomitable charge synergizes with BetterBots charge heuristics.
+		-- Heavy Hitter rewards heavy melee attacks (BetterBots biases heavies for armored).
+		-- Bleed chain: Batter + Delight in Destruction = passive DR from bleed stacking.
+		-- Stat node names corrected (previous had 2 wrong names that did nothing).
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			ogryn_special_ammo = 1,
+			ogryn_longer_charge = 1,
 			ogryn_grenade_frag = 1,
-			ogryn_damage_vs_suppressed_coherency = 1,
-			ogryn_leadbelcher_no_ammo_chance = 1,
-			-- Class talents
+			ogryn_melee_damage_coherency_improved = 1,
+			ogryn_passive_heavy_hitter = 1,
+			-- Class talents (all passive/hit/kill-triggered)
+			ogryn_ogryn_killer = 1,
+			ogryn_toughness_while_bracing = 1,
 			ogryn_multi_heavy_toughness = 1,
 			ogryn_single_heavy_toughness = 1,
-			ogryn_toughness_while_bracing = 1,
-			ogryn_ogryn_killer = 1,
 			ogryn_targets_recieve_damage_taken_increase_debuff = 1,
-			ogryn_increased_ammo_reserve = 1,
-			ogryn_bracing_reduces_damage_taken = 1,
-			ogryn_ally_elite_kills_grant_cooldown = 1,
-			ogryn_kills_grant_crit_chance = 1,
 			ogryn_revenge_damage = 1,
-			ogryn_damage_taken_by_all_increases_strength_tdr = 1,
-			ogryn_ranged_damage_immunity = 1,
 			ogryn_damage_reduction_on_high_stamina = 1,
-			ogryn_crit_damage_increase = 1,
-			ogryn_wield_speed_increase = 1,
+			ogryn_weakspot_damage = 1,
+			ogryn_heavy_bleeds = 1,
+			ogryn_nearby_bleeds_reduce_damage_taken = 1,
+			ogryn_toughness_on_low_health = 1,
+			ogryn_windup_reduces_damage_taken = 1,
+			ogryn_rending_on_elite_kills = 1,
+			ogryn_stacking_attack_speed = 1,
+			ogryn_damage_reduction_after_elite_kill = 1,
 			-- Keystone/ability modifiers
-			ogryn_leadbelcher_cooldown_reduction = 1,
-			ogryn_leadbelcher_crits = 1,
-			ogryn_special_ammo_armor_pen = 1,
-			ogryn_ranged_stance_toughness_regen = 1,
-			ogryn_blo_ally_ranged_buffs = 1,
-			-- Stat nodes
-			base_toughness_node_buff_medium_1 = 1,
+			ogryn_charge_toughness = 1,
+			ogryn_charge_trample = 1,
+			ogryn_heavy_hitter_max_stacks_improves_attack_speed = 1,
+			ogryn_heavy_hitter_tdr = 1,
+			ogryn_heavy_hitter_stagger = 1,
+			-- Stat nodes (names verified against ogryn_tree.lua)
 			base_toughness_node_buff_medium_2 = 1,
-			base_toughness_node_buff_medium_3 = 1,
-			base_reload_speed_node_buff_medium_1 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
-			base_ranged_damage_node_buff_medium_1 = 1,
+			base_toughness_damage_reduction_node_buff_low_5 = 1,
+			base_armor_pen_node_buff_low_1 = 1,
+			base_melee_damage_node_buff_medium_2 = 1,
+			base_toughness_node_buff_low_2 = 1,
 		},
 	},
 }
@@ -719,10 +742,15 @@ local function resolve_profile(profile)
 		return profile, false
 	end
 
-	-- Real character profiles from Tertium/SoloPlay carry a stable character_id.
-	-- Yield before archetype checks so veteran player characters are not mistaken
-	-- for vanilla default bot profiles.
-	if profile.character_id then
+	-- Real backend character profiles (Tertium-assigned player characters) always
+	-- have a persistent `name` field from the character backend. Vanilla bot profiles
+	-- (including Tertium "None" pass-throughs) never have `name` — they use
+	-- `name_list_id` instead. Neither `character_id` nor `current_level` is reliable:
+	-- vanilla bots get character_id="high_bot_N" and current_level=1 after parse_profile().
+	-- This check is load-order-independent and handles both #68 scenarios:
+	-- (a) real Tertium veterans preserved, (b) Tertium "None" stubs overridden.
+	local has_real_character = profile.character_id and profile.name
+	if has_real_character then
 		if _debug_enabled() then
 			_debug_log(
 				"bot_profiles:yield_character_id:" .. tostring(slot_index),
@@ -731,6 +759,8 @@ local function resolve_profile(profile)
 					.. tostring(slot_index)
 					.. " (character_id="
 					.. tostring(profile.character_id)
+					.. ", name="
+					.. tostring(profile.name)
 					.. ")"
 			)
 		end

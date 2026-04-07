@@ -192,12 +192,14 @@ describe("bot_profiles", function()
 	end)
 
 	describe("Tertium compatibility", function()
-		it("yields when a veteran profile already has a real character_id and logs the preservation", function()
+		it("yields when a veteran profile has character_id AND name (real backend character)", function()
 			_mock_settings.bot_slot_1_profile = "zealot"
 			_debug_enabled_result = true
 			local tertium_profile = {
 				archetype = "veteran",
 				character_id = "char-vet-001",
+				name = "Hammerkeeper",
+				current_level = 30,
 				loadout = {},
 				talents = {},
 			}
@@ -210,6 +212,35 @@ describe("bot_profiles", function()
 			assert.equals(0, _debug_logs[1].fixed_t)
 			assert.matches("preserving external profile for bot slot 1", _debug_logs[1].message, 1, true)
 			assert.matches("char-vet-001", _debug_logs[1].message, 1, true)
+		end)
+
+		it("does NOT yield for Tertium 'None' slots (character_id but no name)", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			local tertium_none_profile = {
+				archetype = "veteran",
+				character_id = "high_bot_2",
+				current_level = 1,
+				name_list_id = "veteran_names",
+				loadout = {},
+				talents = {},
+			}
+			-- Vanilla bot profiles (Tertium "None" pass-through) have character_id and
+			-- current_level=1 after parse_profile(), but no `name` field. BetterBots
+			-- should NOT yield — it should override with its class-diverse profile.
+			local _, swapped = BotProfiles.resolve_profile(tertium_none_profile)
+			assert.is_false(swapped)
+		end)
+
+		it("does NOT yield when character_id present but name is nil", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			local profile = {
+				archetype = "veteran",
+				character_id = "high_bot_1",
+				loadout = {},
+				talents = {},
+			}
+			local _, swapped = BotProfiles.resolve_profile(profile)
+			assert.is_false(swapped)
 		end)
 
 		it("yields when profile archetype is a non-veteran string", function()
