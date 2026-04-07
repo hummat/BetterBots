@@ -133,7 +133,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
 | #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Closed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Validated on 1.11.3. |
-| #54 | Push poxbursters | **Closed** | `_should_push` outnumbered gate bypassed for poxburster breed. **Note:** hook silently broken by #67 (hook_require clobbering). |
+| #54 | Push poxbursters | **Open** | `_should_push` outnumbered gate bypass is shipped, but the original hook was later clobbered by #67. The consolidated hook is now back in place, but a fresh poxburster repro is still needed before reclosing the issue. |
 | #55 | Prioritize mastiff-pounced enemies | **Closed** | Original score boost shipped in v0.9.0. **Follow-up:** friendly mastiff pins are now explicitly de-prioritized on `dev/v0.9.1` (#69). |
 | #53 | Rumbler VFX timing gap | **Closed** | Pre-call hook on loadout init. |
 | #47 | Combat-aware engagement leash | **Closed** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. 700+ override events. |
@@ -142,27 +142,27 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 **Unit tests**: 579 tests via busted.
 
-## v0.9.1 — Hotfix (planned)
+## v0.9.1 — Hotfix
 
 User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07).
 
 | Issue | Feature | Severity | Status |
 |-------|---------|----------|--------|
-| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Implemented on `dev/v0.9.1` — run `0` validated the consolidated install + melee-choice half; poxburster push still needs a live repro before close |
+| #67 | hook_require clobbering (melee light + poxburster push) | **Closed** | April 7 logs showed the consolidated `bt_bot_melee_action` hook install plus repeated `melee choice ...` lines, which is enough to confirm the clobbering regression itself is fixed. |
 | #68 | Veteran class swap with other mods | **Closed** | Validated in run `0`: external real profiles with `character_id` were preserved for bot slots 1-4 |
-| #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation of the restore-after-error path |
+| #73 | Exception-safe shared state mutation in hooks | **Closed** | Defensive failure-path hardening. Tests pass; no restore-after-error log fired in the April 7 runs, but keeping this open for a vanilla throw repro is unnecessary. |
 | #69 | Mastiff-pinned target fixation | **Closed** | Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring |
 | #70 | Arbites whistle ignores dog position | **Closed** | Validated in run `0`: `grenade_whistle_block_companion_far` held invalid whistles while valid whistles still consumed charges |
-| #71 | Ogryn grenade mid-horde | P2 | Implemented on `dev/v0.9.1` — committed grenade swaps now block at `<4m`, and single-target throws also block under crowd pressure; pending in-game validation |
-| #72 | Configurable ammo policy | P3 | Implemented on `dev/v0.9.1` — opportunistic fire and pickup onset share one threshold, and bots only take ammo when eligible humans are above the configured reserve; pending in-game validation |
+| #71 | Ogryn grenade mid-horde | **Closed** | April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` approvals only above 4m. That is the requested fix. |
+| #72 | Configurable ammo policy | **Closed** | April 7 logs exercised both the lowered ranged fire gate and the pickup gate in runtime under different threshold settings. |
 
-**Unit tests**: 613 tests via busted.
+**Unit tests**: 632 tests via busted.
 
 ## Next Steps
 
 ### Later batches
 
-- **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS), #58 (ScriptUnit guard)
+- **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS)
 - **v1.0.0 "Bot Identity"**: #37 (objective-aware), #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)
 - **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #49 (Arbites companion tag, DLC)

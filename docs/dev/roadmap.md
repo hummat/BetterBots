@@ -91,13 +91,13 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 67 | **P0: hook_require clobbering** | DMF `hook_require` is per-mod last-write-wins. Three modules on `bt_bot_melee_action` → only engagement_leash survives. Melee light bias (#52) and poxburster push (#54) silently broken. Fix: consolidate into single `hook_require` call. |
+| 67 | **P0: hook_require clobbering** | **Done.** April 7 logs show the consolidated `bt_bot_melee_action` hook install and repeated `melee choice ...` lines, confirming the clobbering regression is fixed. |
 | 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
-| 73 | **P1: exception-safe shared state mutation** | `engagement_leash` and `vfx_suppression` temporarily mutate shared state, restore after the original call, and corrupt that state if the original throws. Fix: `pcall`/restore/rethrow around the mutated-state window. |
-| 69 | P2: Mastiff-pinned target fixation | Implemented on `dev/v0.9.1`. Friendly mastiff-pinned targets are explicitly penalized in melee and ranged target scoring so bots prefer live threats. Pending in-game validation. |
-| 70 | P2: Arbites whistle ignores dog position | Implemented on `dev/v0.9.1`. `build_context()` now captures the live mastiff unit/position and `_grenade_whistle` blocks remote detonation when the companion is missing, has no target, or is >10m from the current target. Pending in-game validation. |
-| 71 | P2: Ogryn grenade mid-horde | Implemented on `dev/v0.9.1`. Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics (rock/krak/missile) also block under crowd pressure. Pending in-game validation. |
-| 72 | P3: Configurable ammo policy | Implemented on `dev/v0.9.1`. Opportunistic ranged fire and ammo pickup onset now share one user-configurable threshold, and bots only claim ammo when eligible humans are above the configured reserve. Pending in-game validation. |
+| 73 | **P1: exception-safe shared state mutation** | **Done.** Wrapped the temporary shared-state mutations in restore-on-error guards. Kept as defensive hardening; reopen only on actual repro. |
+| 69 | P2: Mastiff-pinned target fixation | **Done.** Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring. |
+| 70 | P2: Arbites whistle ignores dog position | **Done.** Validated in run `0`: invalid whistles were held and valid whistles still consumed charges. |
+| 71 | P2: Ogryn grenade mid-horde | **Done.** April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` only above 4m. |
+| 72 | P3: Configurable ammo policy | **Done.** April 7 logs exercised both the lowered ranged fire gate and ammo pickup decisions in runtime. |
 
 ### v0.10.0 — "Team Coordination"
 
@@ -109,7 +109,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 7 | Revive-with-ability | Inject defensive ability (taunt/stealth/shout) before revive interact node. Requires BT injection research. |
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
 | 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
-| 58 | ScriptUnit.extension guard | 2-line `has_extension` guard on 2 hot paths. Defensive fix. |
 
 ### v1.0.0 — "Bot Identity"
 
