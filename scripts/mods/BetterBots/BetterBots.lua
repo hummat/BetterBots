@@ -212,6 +212,9 @@ assert(PingSystem, "BetterBots: failed to load ping_system module")
 local HealingDeferral = mod:io_dofile("BetterBots/scripts/mods/BetterBots/healing_deferral")
 assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 
+local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
+assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
@@ -451,6 +454,15 @@ HealingDeferral.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+})
+
+AmmoPolicy.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	perf = Perf,
+	settings = Settings,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -830,6 +842,7 @@ mod:hook_require(
 -- Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
 	HealingDeferral.install_behavior_ext_hooks(BotBehaviorExtension)
+	AmmoPolicy.install_behavior_ext_hooks(BotBehaviorExtension)
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",
