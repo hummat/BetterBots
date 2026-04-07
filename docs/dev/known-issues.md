@@ -30,7 +30,7 @@
 
 4. ~~Arbites whistle ignores mastiff position~~ **Fixed on `dev/v0.9.1`** (#70). `build_context()` now records the live mastiff unit/position and `_grenade_whistle` blocks activation when the companion is missing, has no current target, or is more than 10m from the target. Pending in-game validation before release.
 
-5. **Ogryn grenade mid-horde** (#71). `_grenade_horde` heuristic triggers on `num_nearby >= 5` with no melee-distance gate. Ogryn interrupts melee combat to throw a grenade while surrounded.
+5. ~~Ogryn grenade mid-horde~~ **Fixed on `dev/v0.9.1`** (#71). Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics also block under crowd pressure. Crowd-control and area-denial grenades are still allowed in dense fights. Pending in-game validation before release.
 
 6. **Ammo threshold dead band** (#72). BetterBots fire gate at 20% (`condition_patch.lua`), vanilla `needs_ammo` at 10% (`bot_behavior_extension.lua`). Bots idle in the 10-20% band — neither shooting nor seeking ammo.
 

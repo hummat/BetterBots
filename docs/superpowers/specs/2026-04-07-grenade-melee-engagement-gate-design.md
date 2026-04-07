@@ -16,47 +16,48 @@ This means a fix only in `_grenade_horde(...)` would still leave B.F. Rock and o
 
 ## Decision
 
-Add a shared melee-engagement gate for grenade heuristics that represent committed throw sequences, with explicit per-template opt-outs for fast or defensive special cases.
+Add a shared close-melee gate for grenade heuristics that represent committed throw sequences, plus a separate crowd-pressure block only for single-target throw heuristics.
 
 Block activation when either of these is true:
 
-- `context.target_enemy_distance < 4`
-- `context.num_nearby >= 4`
+- shared committed-throw block: `context.target_enemy_distance < 4`
+- single-target throw block only: `context.num_nearby >= 4`
 
-This gate applies before template-specific throw logic for committed throw profiles. It does not apply to all grenade/blitz templates indiscriminately.
+The close-melee gate applies before template-specific throw logic for committed throw profiles. The crowd-pressure block applies only to `_grenade_priority_target(...)` callers such as rock, krak, and missile launcher. It does not apply to crowd-control or area-denial heuristics such as smoke, shock, fire, or mines.
 
 ## Rationale
 
-Distance-only is insufficient. A bot can still be surrounded and decide to throw at a distant special, which matches the reported B.F. Rock failure mode.
+Distance-only is insufficient for single-target throws. A bot can still be surrounded and decide to throw at a distant special, which matches the reported B.F. Rock failure mode.
 
-Density-only is too blunt. Aggregate nearby count alone can suppress otherwise reasonable throws when the bot is not actually under immediate melee pressure.
+Density-only is too blunt as a shared rule. Crowd-control and area-denial grenades are often useful precisely because enemy density is high.
 
-The combined rule is the simplest policy that matches the real cost of these actions. In `grenade_fallback.lua`, standard swap-and-throw templates incur wield plus aim/hold delays. While that sequence runs, the bot is effectively stepping out of melee. If the bot is already in melee range or surrounded by several enemies, entering that sequence is usually wrong.
+The split rule is the simplest policy that matches actual grenade roles. In `grenade_fallback.lua`, standard swap-and-throw templates incur wield plus aim/hold delays, so entering that sequence while an enemy is already inside melee range is usually wrong for any committed throw. But high density alone should not suppress smoke, shock, fire, or mine placement, because those grenades are designed for pressure situations. High density should only be used as an extra block for single-target throws that pull the bot out of melee to answer one distant target.
 
 ## Scope
 
 ### In scope
 
+- Grenade heuristics that lead to committed swap-and-throw or swap-and-place sequences
 - Ogryn box, cluster box, frag, and rock
 - Veteran frag, smoke, and krak
 - Zealot fire grenade and shock grenade
-- Arbites grenades that use swap-and-throw flow
-- Hive Scum grenade templates that use swap-and-throw flow
+- Arbites grenades and shock mine
+- Hive Scum grenade templates and missile launcher
 
 ### Out of scope
 
 - Ability-based/no-swap paths such as Arbites whistle
 - Fast or special-case profiles that should opt out explicitly in this change, such as zealot throwing knives
-- Control/defensive blitz heuristics that are intentionally useful under pressure, unless a concrete bug is reported for them
 - Re-tuning individual grenade thresholds beyond the shared melee-engagement gate
 
 ## Implementation Plan
 
 1. Add a helper in `heuristics.lua` that answers whether grenade/blitz activation should be blocked for melee engagement.
-2. Apply that helper to `_grenade_horde(...)`.
-3. Apply that helper to `_grenade_priority_target(...)`, but allow explicit opt-out via `opts` so fast/special-case templates are not forced into the block.
-4. Keep the rule local to grenade heuristics rather than pushing it into `grenade_fallback.lua`.
-5. Use rule names that make the block visible in logs and tests.
+2. Apply the shared close-melee helper to `_grenade_horde(...)`, `_grenade_defensive(...)`, and `_grenade_mine(...)`.
+3. Apply the shared close-melee helper to `_grenade_priority_target(...)`, and add a priority-only crowd-pressure block there for distant single-target throws.
+4. Allow explicit opt-out via `opts` so fast/special-case templates are not forced into either block.
+5. Keep the rule local to grenade heuristics rather than pushing it into `grenade_fallback.lua`.
+6. Use rule names that make the block visible in logs and tests.
 
 ## Why Not Put This In `grenade_fallback.lua`
 
@@ -76,7 +77,7 @@ The new block should produce deterministic rule text so regressions are obvious 
 Preferred rule names:
 
 - `*_block_melee_range`
-- `*_block_melee_pressure`
+- `*_block_priority_melee_pressure`
 
 If a single shared suffix is clearer in the implementation, use that instead, but it must distinguish this block from generic `hold`.
 
@@ -85,9 +86,11 @@ If a single shared suffix is clearer in the implementation, use that instead, bu
 Update `tests/heuristics_spec.lua` to cover:
 
 - Ogryn box blocks when `target_enemy_distance < 4`
-- Ogryn box blocks when `num_nearby >= 4` even if target distance is safe
-- Ogryn rock blocks under the same melee-engagement conditions
-- Veteran krak blocks under the same melee-engagement conditions
+- Ogryn box still activates for valid horde conditions when the target is not in melee range
+- Ogryn rock blocks when `target_enemy_distance < 4`
+- Ogryn rock blocks when `num_nearby >= 4` even if target distance is safe
+- Veteran krak blocks under the same priority-target conditions
+- Veteran smoke, zealot shock, and Arbites shock mine are not blocked by nearby-count pressure alone
 - Zealot throwing knives remain on their existing behavior if explicitly opted out
 - Existing positive cases still pass when target distance and nearby count are both safe
 
@@ -100,7 +103,8 @@ Update `tests/heuristics_spec.lua` to cover:
 ## Acceptance Criteria
 
 - Bots do not start swap-and-throw grenade/blitz sequences while already in melee range.
-- Bots do not start swap-and-throw grenade/blitz sequences while surrounded by a small horde, even if the chosen target is farther away.
+- Single-target grenade throws do not start while the bot is surrounded by melee pressure, even if the chosen target is farther away.
 - Ability-based/no-swap blitz paths are unchanged.
 - Fast opt-out templates keep their current behavior unless explicitly retuned.
-- Unit tests cover both horde-type and priority-target grenade paths.
+- Crowd-control and area-denial grenade paths are not suppressed just because enemy density is high.
+- Unit tests cover both crowd and single-target grenade paths.
