@@ -22,7 +22,7 @@ local _rescue_intent
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
-local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
+local _bot_ranged_ammo_threshold
 
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
@@ -75,20 +75,18 @@ local function _override_ranged_ammo_condition_args(condition_args)
 		return condition_args
 	end
 
+	local threshold = _bot_ranged_ammo_threshold and _bot_ranged_ammo_threshold() or 0.20
 	local adjusted_args = {}
 	for key, value in pairs(condition_args) do
 		adjusted_args[key] = value
 	end
-	adjusted_args.ammo_percentage = BETTERBOTS_RANGED_AMMO_THRESHOLD
+	adjusted_args.ammo_percentage = threshold
 
 	if _debug_enabled() then
 		_debug_log(
 			"ranged_ammo_threshold_override",
 			_fixed_time(),
-			"ranged ammo gate lowered from "
-				.. tostring(NORMAL_RANGED_AMMO_THRESHOLD)
-				.. " to "
-				.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD),
+			"ranged ammo gate lowered from " .. tostring(NORMAL_RANGED_AMMO_THRESHOLD) .. " to " .. tostring(threshold),
 			10
 		)
 	end
@@ -354,7 +352,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					"ranged_ammo_override_active:" .. tostring(unit),
 					_fixed_time(),
 					"ranged permitted with lowered ammo gate (threshold="
-						.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD)
+						.. tostring(_bot_ranged_ammo_threshold and _bot_ranged_ammo_threshold() or 0.20)
 						.. ")",
 					10
 				)
@@ -401,6 +399,7 @@ function M.wire(deps)
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
 	_is_combat_template_enabled = deps.is_combat_template_enabled
+	_bot_ranged_ammo_threshold = deps.bot_ranged_ammo_threshold
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)

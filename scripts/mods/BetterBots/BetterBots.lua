@@ -475,6 +475,7 @@ ConditionPatch.wire({
 	Debug = Debug,
 	EventLog = EventLog,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
+	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
 })
 
 AbilityQueue.wire({
