@@ -26,7 +26,7 @@
 
 2. ~~Stance cancellation complexity (#12).~~ **Closed.** Stances have no release input (`transition = "stay"`). Early cancellation would require template injection or `stop_action()` + buff cleanup — decided not to pursue.
 
-3. **Mastiff-pinned target fixation** (#69). Pounce priority boost (#55) gives +5 melee score to any enemy with `blackboard.disable.type == "pounced"`, including enemies pinned by the Arbites player's own mastiff. Bots stare at pinned targets instead of engaging active threats.
+3. ~~Mastiff-pinned target fixation~~ **Fixed on `dev/v0.9.1`** (#69). Friendly mastiff-pinned targets are now explicitly penalized in both melee and ranged target scoring instead of being boosted, so bots should switch to active threats. Pending in-game validation before release.
 
 4. **Arbites whistle ignores mastiff position** (#70). `_grenade_whistle` heuristic checks enemy presence near the bot but has no awareness of the companion dog's position. The explosion fires at the dog's world position with only 0.3s `trigger_time`.
 

@@ -2,6 +2,7 @@ describe("TargetSelection", function()
 	local TargetSelection
 	local _mod
 	local original_slot_weight
+	local original_line_of_sight_weight
 
 	local function make_smart_tag_system(target_unit, is_human)
 		return {
@@ -25,6 +26,18 @@ describe("TargetSelection", function()
 	before_each(function()
 		TargetSelection = require("scripts.mods.BetterBots.target_selection")
 		_G.BLACKBOARDS = {}
+		_G.ScriptUnit = {
+			has_extension = function(unit, name)
+				if name == "unit_data_system" and unit and unit._breed then
+					return {
+						breed = function()
+							return unit._breed
+						end,
+					}
+				end
+				return nil
+			end,
+		}
 
 		-- Default: no smart tags
 		_G.Managers = {
@@ -71,6 +84,9 @@ describe("TargetSelection", function()
 		original_slot_weight = function(_unit, _target_unit, _target_distance_sq, _target_breed, _target_ally)
 			return 5 -- arbitrary base score
 		end
+		original_line_of_sight_weight = function()
+			return 1
+		end
 
 		-- Mock Ammo
 		package.loaded["scripts/utilities/ammo"] = {
@@ -84,14 +100,21 @@ describe("TargetSelection", function()
 				return 0.0
 			end,
 		}
+		package.loaded["scripts/utilities/breed"] = {
+			is_companion = function(breed)
+				return breed and breed.breed_type == "companion"
+			end,
+		}
 
 		TargetSelection.register_hooks()
 	end)
 
 	after_each(function()
 		package.loaded["scripts/utilities/ammo"] = nil
+		package.loaded["scripts/utilities/breed"] = nil
 		_G.Managers = nil
 		_G.BLACKBOARDS = nil
+		_G.ScriptUnit = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -264,24 +287,30 @@ describe("TargetSelection", function()
 		assert.are.equal(5, score)
 	end)
 
-	-- #55: pounced target boost
-	describe("pounced target boost (#55)", function()
-		it("boosts score for enemy pounced by companion mastiff", function()
+	-- #69: friendly mastiff-pinned targets should be de-prioritized, not boosted.
+	describe("friendly companion pin handling (#69)", function()
+		it("penalizes melee slot score for enemy pinned by friendly companion mastiff", function()
 			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
 			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
 			}
 
 			local unit = { has_ammo = true }
 			local breed = { tags = { elite = true }, name = "renegade_captain" }
 			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
-			assert.are.equal(10, score) -- 5 base + 5 pounced bonus
+			assert.are.equal(-95, score) -- 5 base - 100 pinned-target penalty
 		end)
 
-		it("boosts score even when base slot_weight is zero (no bot slot assigned)", function()
+		it("penalizes melee slot score even when base slot_weight is zero", function()
 			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
 			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
 			}
 
 			local zero_slot_weight = function()
@@ -291,13 +320,30 @@ describe("TargetSelection", function()
 			local unit = { has_ammo = true }
 			local breed = { tags = { elite = true }, name = "renegade_captain" }
 			local score = _mod.handlers.slot_weight(zero_slot_weight, unit, target_unit, 100, breed, nil)
-			assert.are.equal(5, score) -- 0 base + 5 pounced bonus
+			assert.are.equal(-100, score)
 		end)
 
-		it("does not boost for non-pounced disabled enemies", function()
+		it("penalizes ranged line-of-sight score for enemy pinned by friendly companion mastiff", function()
 			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
 			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = true, type = "consumed", attacker_unit = {} },
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+			}
+
+			local unit = { has_ammo = true }
+			local score = _mod.handlers.line_of_sight_weight(original_line_of_sight_weight, unit, target_unit)
+			assert.are.equal(-99, score) -- 1 base - 100 pinned-target penalty
+		end)
+
+		it("does not penalize non-companion pounced targets", function()
+			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "minion" },
+			}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
 			}
 
 			local unit = { has_ammo = true }
@@ -306,7 +352,22 @@ describe("TargetSelection", function()
 			assert.are.equal(5, score)
 		end)
 
-		it("does not boost when disable component is absent", function()
+		it("does not penalize non-pounced disabled enemies", function()
+			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "consumed", attacker_unit = attacker_unit },
+			}
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "renegade_captain" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score)
+		end)
+
+		it("does not penalize when disable component is absent", function()
 			local target_unit = {}
 			_G.BLACKBOARDS[target_unit] = {}
 
@@ -316,10 +377,13 @@ describe("TargetSelection", function()
 			assert.are.equal(5, score)
 		end)
 
-		it("does not boost when enemy is not disabled", function()
+		it("does not penalize when enemy is not disabled", function()
 			local target_unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
 			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = false, type = "pounced" },
+				disable = { is_disabled = false, type = "pounced", attacker_unit = attacker_unit },
 			}
 
 			local unit = { has_ammo = true }
@@ -328,29 +392,7 @@ describe("TargetSelection", function()
 			assert.are.equal(5, score)
 		end)
 
-		it("stacks with player tag boost", function()
-			local target_unit = {}
-			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
-			}
-
-			_G.Managers = {
-				state = {
-					extension = {
-						system = function()
-							return make_smart_tag_system(target_unit, true)
-						end,
-					},
-				},
-			}
-
-			local unit = { has_ammo = true }
-			local breed = { tags = { elite = true }, name = "renegade_captain" }
-			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
-			assert.are.equal(13, score) -- 5 base + 3 tag + 5 pounced
-		end)
-
-		it("includes the acting bot in the pounced-target debug key", function()
+		it("includes the acting bot in the companion-pin debug key", function()
 			local logs = {}
 			TargetSelection.init({
 				mod = _mod,
@@ -372,45 +414,65 @@ describe("TargetSelection", function()
 
 			local target_unit = {}
 			local unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
 			_G.BLACKBOARDS[target_unit] = {
-				disable = { is_disabled = true, type = "pounced", attacker_unit = {} },
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
 			}
 
 			local breed = { tags = { elite = true }, name = "renegade_captain" }
 			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
 
-			assert.are.equal(10, score)
+			assert.are.equal(-95, score)
 			assert.equals(1, #logs)
-			assert.equals("target_sel_pounced:" .. tostring(target_unit) .. ":" .. tostring(unit), logs[1].key)
+			assert.equals("target_sel_companion_pin:" .. tostring(target_unit) .. ":" .. tostring(unit), logs[1].key)
 		end)
 	end)
 
-	-- #55: pure function unit test
-	describe("is_pounced_by_companion", function()
-		it("returns true for pounced enemy", function()
+	-- #69: pure function unit tests
+	describe("is_friendly_companion_pin", function()
+		it("returns true for enemy pinned by friendly companion", function()
 			local enemy = {}
-			_G.BLACKBOARDS[enemy] = {
-				disable = { is_disabled = true, type = "pounced" },
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
 			}
-			assert.is_true(TargetSelection.is_pounced_by_companion(enemy))
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+			}
+			assert.is_true(TargetSelection.is_friendly_companion_pin(enemy))
 		end)
 
-		it("returns false for non-pounced disabled enemy", function()
+		it("returns false for non-companion attacker", function()
 			local enemy = {}
-			_G.BLACKBOARDS[enemy] = {
-				disable = { is_disabled = true, type = "consumed" },
+			local attacker_unit = {
+				_breed = { breed_type = "minion" },
 			}
-			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+			}
+			assert.is_false(TargetSelection.is_friendly_companion_pin(enemy))
 		end)
 
 		it("returns false when no blackboard", function()
-			assert.is_false(TargetSelection.is_pounced_by_companion({}))
+			assert.is_false(TargetSelection.is_friendly_companion_pin({}))
 		end)
 
 		it("returns false when disable not set", function()
 			local enemy = {}
 			_G.BLACKBOARDS[enemy] = {}
-			assert.is_false(TargetSelection.is_pounced_by_companion(enemy))
+			assert.is_false(TargetSelection.is_friendly_companion_pin(enemy))
+		end)
+
+		it("returns false when enemy is not disabled", function()
+			local enemy = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
+			_G.BLACKBOARDS[enemy] = {
+				disable = { is_disabled = false, type = "pounced", attacker_unit = attacker_unit },
+			}
+			assert.is_false(TargetSelection.is_friendly_companion_pin(enemy))
 		end)
 	end)
 end)

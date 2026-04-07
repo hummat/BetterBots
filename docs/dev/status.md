@@ -134,7 +134,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 |-------|---------|--------|----------|
 | #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Closed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Validated on 1.11.3. |
 | #54 | Push poxbursters | **Closed** | `_should_push` outnumbered gate bypassed for poxburster breed. **Note:** hook silently broken by #67 (hook_require clobbering). |
-| #55 | Prioritize mastiff-pounced enemies | **Closed** | Score boost for immobilized targets. **Note:** also boosts friendly mastiff pins (#69). |
+| #55 | Prioritize mastiff-pounced enemies | **Closed** | Original score boost shipped in v0.9.0. **Follow-up:** friendly mastiff pins are now explicitly de-prioritized on `dev/v0.9.1` (#69). |
 | #53 | Rumbler VFX timing gap | **Closed** | Pre-call hook on loadout init. |
 | #47 | Combat-aware engagement leash | **Closed** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. 700+ override events. |
 | #39 | Healing deferral | **Closed** | Validated: 80+ health station deferral events. |
@@ -151,7 +151,7 @@ User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07
 | #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
 | #68 | Veteran class swap with other mods | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
 | #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
-| #69 | Mastiff-pinned target fixation | P2 | Open |
+| #69 | Mastiff-pinned target fixation | P2 | Implemented on `dev/v0.9.1` — friendly companion-pinned targets are penalized in melee and ranged target scoring, pending in-game validation |
 | #70 | Arbites whistle ignores dog position | P2 | Open |
 | #71 | Ogryn grenade mid-horde | P2 | Open |
 | #72 | Ammo threshold dead band (10-20%) | P3 | Open |
