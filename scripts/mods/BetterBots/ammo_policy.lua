@@ -66,6 +66,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local bot_group = self._bot_group
 		if bot_group and bot_group:ammo_pickup_order_unit(unit) ~= nil then
 			pickup_component.needs_ammo = true
+			_log("ammo_pickup_order:" .. tostring(unit), "ammo pickup preserved due to explicit order")
 			if perf_t0 then
 				_perf.finish("ammo_policy.update_ammo", perf_t0)
 			end
@@ -76,6 +77,14 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local bot_threshold = _bot_threshold()
 		if bot_ammo_percentage > bot_threshold then
 			pickup_component.needs_ammo = false
+			_log(
+				"ammo_pickup_hold:" .. tostring(unit),
+				"ammo pickup blocked: bot reserve above threshold ("
+					.. tostring(bot_ammo_percentage)
+					.. " > "
+					.. tostring(bot_threshold)
+					.. ")"
+			)
 			if perf_t0 then
 				_perf.finish("ammo_policy.update_ammo", perf_t0)
 			end
@@ -86,6 +95,14 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			_all_eligible_humans_above_threshold(self._side and self._side.valid_human_units, _human_threshold())
 
 		pickup_component.needs_ammo = humans_ok
+		if humans_ok then
+			_log("ammo_pickup_allow:" .. tostring(unit), "ammo pickup permitted: all eligible humans above reserve")
+		else
+			_log(
+				"ammo_pickup_block_human_reserve:" .. tostring(unit),
+				"ammo pickup blocked: eligible human below reserve"
+			)
+		end
 
 		if perf_t0 then
 			_perf.finish("ammo_policy.update_ammo", perf_t0)

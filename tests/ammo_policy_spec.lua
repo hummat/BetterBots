@@ -24,7 +24,7 @@ describe("ammo_policy", function()
 				}
 			end,
 			debug_enabled = function()
-				return false
+				return overrides and overrides.debug_enabled or false
 			end,
 			fixed_time = function()
 				return 100
@@ -33,6 +33,16 @@ describe("ammo_policy", function()
 			ammo_module = overrides and overrides.ammo_module,
 			settings = overrides and overrides.settings,
 		})
+	end
+
+	local function find_debug_log(pattern)
+		for i = 1, #debug_logs do
+			if string.find(debug_logs[i].message, pattern, 1, true) then
+				return debug_logs[i]
+			end
+		end
+
+		return nil
 	end
 
 	it("registers a BotBehaviorExtension _update_ammo hook", function()
@@ -202,5 +212,153 @@ describe("ammo_policy", function()
 		update_hook(self, "bot1")
 
 		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("clears stale needs_ammo when bot rises above threshold", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.30 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = true },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_false(self._pickup_component.needs_ammo)
+	end)
+
+	it("treats no eligible humans as reserve guard satisfied", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.10 or 0.10
+				end,
+				uses_ammo = function(unit)
+					return unit == "bot1"
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "staff_user" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("logs when human reserve blocks ammo pickup", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.20 or 0.75
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = true },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_false(self._pickup_component.needs_ammo)
+		assert.is_truthy(find_debug_log("ammo pickup blocked: eligible human below reserve"))
+	end)
+
+	it("logs when all eligible humans allow ammo pickup", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.20 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_true(self._pickup_component.needs_ammo)
+		assert.is_truthy(find_debug_log("ammo pickup permitted: all eligible humans above reserve"))
 	end)
 end)
