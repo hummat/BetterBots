@@ -4,7 +4,7 @@
 
 1. **DMF `hook_require` clobbering** (#67). Three modules register `hook_require` on `bt_bot_melee_action` from the same mod — DMF stores callbacks as `_file_hooks_by_file[path][mod_name]`, so only the last registration (EngagementLeash) survives. Melee light bias (#52) and poxburster push (#54) are silently broken since v0.9.0.
 
-2. **Veteran bots replaced by wrong class** (#68). `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran player character. DMF hook ordering flips when any additional mod is loaded, causing BetterBots to overwrite Tertium's veteran profile with its default slot class.
+2. ~~Veteran bots replaced by wrong class~~ **Validated and closed** (#68). Run `0` (`console-2026-04-07-15.36.11-a46f7c58-38a2-401c-aefc-1e4e4dfcc9f5.log`) logged preserved external profiles with real `character_id` values for bot slots 1-4, confirming BetterBots yielded to Tertium/SoloPlay profiles instead of overwriting them.
 
 3. **Exception-unsafe shared state mutation** (#73). `engagement_leash.lua` temporarily mutates shared `action_data` singleton fields before calling vanilla, and `vfx_suppression.lua` temporarily mutates `extension_init_data.is_local_unit` during visual-loadout init. If the original function throws, the old code skipped restoration and left the mutated state behind for the rest of the session.
 
@@ -26,9 +26,9 @@
 
 2. ~~Stance cancellation complexity (#12).~~ **Closed.** Stances have no release input (`transition = "stay"`). Early cancellation would require template injection or `stop_action()` + buff cleanup — decided not to pursue.
 
-3. ~~Mastiff-pinned target fixation~~ **Fixed on `dev/v0.9.1`** (#69). Friendly mastiff-pinned targets are now explicitly penalized in both melee and ranged target scoring instead of being boosted, so bots should switch to active threats. Pending in-game validation before release.
+3. ~~Mastiff-pinned target fixation~~ **Validated and closed** (#69). Run `0` logged both melee and ranged `friendly companion pin -100` penalties against pinned enemies, confirming bots now de-prioritize already-controlled mastiff targets.
 
-4. ~~Arbites whistle ignores mastiff position~~ **Fixed on `dev/v0.9.1`** (#70). `build_context()` now records the live mastiff unit/position and `_grenade_whistle` blocks activation when the companion is missing, has no current target, or is more than 10m from the target. Pending in-game validation before release.
+4. ~~Arbites whistle ignores mastiff position~~ **Validated and closed** (#70). Run `0` logged repeated `grenade_whistle_block_companion_far` holds plus successful `adamant_whistle` charge consumes, confirming the mastiff-distance gate blocks empty-space whistles while still allowing valid detonations.
 
 5. ~~Ogryn grenade mid-horde~~ **Fixed on `dev/v0.9.1`** (#71). Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics also block under crowd pressure. Crowd-control and area-denial grenades are still allowed in dense fights. Pending in-game validation before release.
 

@@ -148,11 +148,11 @@ User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07
 
 | Issue | Feature | Severity | Status |
 |-------|---------|----------|--------|
-| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
-| #68 | Veteran class swap with other mods | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
-| #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
-| #69 | Mastiff-pinned target fixation | P2 | Implemented on `dev/v0.9.1` — friendly companion-pinned targets are penalized in melee and ranged target scoring, pending in-game validation |
-| #70 | Arbites whistle ignores dog position | P2 | Implemented on `dev/v0.9.1` — whistle now requires a live mastiff within 10m of the current target, pending in-game validation |
+| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Implemented on `dev/v0.9.1` — run `0` validated the consolidated install + melee-choice half; poxburster push still needs a live repro before close |
+| #68 | Veteran class swap with other mods | **Closed** | Validated in run `0`: external real profiles with `character_id` were preserved for bot slots 1-4 |
+| #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation of the restore-after-error path |
+| #69 | Mastiff-pinned target fixation | **Closed** | Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring |
+| #70 | Arbites whistle ignores dog position | **Closed** | Validated in run `0`: `grenade_whistle_block_companion_far` held invalid whistles while valid whistles still consumed charges |
 | #71 | Ogryn grenade mid-horde | P2 | Implemented on `dev/v0.9.1` — committed grenade swaps now block at `<4m`, and single-target throws also block under crowd pressure; pending in-game validation |
 | #72 | Configurable ammo policy | P3 | Implemented on `dev/v0.9.1` — opportunistic fire and pickup onset share one threshold, and bots only take ammo when eligible humans are above the configured reserve; pending in-game validation |
 
