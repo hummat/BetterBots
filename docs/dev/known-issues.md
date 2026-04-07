@@ -6,7 +6,9 @@
 
 2. **Veteran bots replaced by wrong class** (#68). `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran player character. DMF hook ordering flips when any additional mod is loaded, causing BetterBots to overwrite Tertium's veteran profile with its default slot class.
 
-3. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
+3. **Exception-unsafe shared state mutation** (#73). `engagement_leash.lua` temporarily mutates shared `action_data` singleton fields before calling vanilla, and `vfx_suppression.lua` temporarily mutates `extension_init_data.is_local_unit` during visual-loadout init. If the original function throws, the old code skipped restoration and left the mutated state behind for the rest of the session.
+
+4. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
 
 2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 

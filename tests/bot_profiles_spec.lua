@@ -187,6 +187,22 @@ describe("bot_profiles", function()
 	end)
 
 	describe("Tertium compatibility", function()
+		it("yields when a veteran profile already has a real character_id", function()
+			_mock_settings.bot_slot_1_profile = "zealot"
+			_debug_enabled_result = true
+			local tertium_profile = {
+				archetype = "veteran",
+				character_id = "char-vet-001",
+				loadout = {},
+				talents = {},
+			}
+			local resolved, swapped = BotProfiles.resolve_profile(tertium_profile)
+			assert.is_false(swapped)
+			assert.equals("veteran", resolved.archetype)
+			assert.equals("char-vet-001", resolved.character_id)
+			assert.equals(0, #_debug_logs, "real character profiles must yield before replacement resolution")
+		end)
+
 		it("yields when profile archetype is a non-veteran string", function()
 			_mock_settings.bot_slot_1_profile = "ogryn"
 			local tertium_profile = {

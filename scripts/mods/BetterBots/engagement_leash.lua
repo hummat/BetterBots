@@ -214,7 +214,8 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			action_data.override_engage_range_to_follow_position = effective_leash
 			action_data.override_engage_range_to_follow_position_challenge = effective_leash
 
-			local result = func(
+			local ok, result = pcall(
+				func,
 				self,
 				self_unit,
 				target_unit,
@@ -229,6 +230,13 @@ function M.install_melee_hooks(BtBotMeleeAction)
 
 			action_data.override_engage_range_to_follow_position = orig_override
 			action_data.override_engage_range_to_follow_position_challenge = orig_challenge
+			if perf_t0 then
+				_perf.finish("engagement_leash._allow_engage", perf_t0)
+			end
+
+			if not ok then
+				error(result, 0)
+			end
 
 			if _debug_enabled() and reason ~= "base" then
 				_debug_log(
@@ -243,10 +251,6 @@ function M.install_melee_hooks(BtBotMeleeAction)
 						.. "m) result="
 						.. tostring(result)
 				)
-			end
-
-			if perf_t0 then
-				_perf.finish("engagement_leash._allow_engage", perf_t0)
 			end
 			return result
 		end
@@ -267,9 +271,12 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			local orig_engage_range = action_data.engage_range
 			action_data.engage_range = action_data.engage_range_near_follow_position
 
-			local result = func(self, self_position, target_position, action_data, follow_position)
+			local ok, result = pcall(func, self, self_position, target_position, action_data, follow_position)
 
 			action_data.engage_range = orig_engage_range
+			if not ok then
+				error(result, 0)
+			end
 			return result
 		end
 	)

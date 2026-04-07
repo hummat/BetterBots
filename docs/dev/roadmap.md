@@ -93,6 +93,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|-------|-------|
 | 67 | **P0: hook_require clobbering** | DMF `hook_require` is per-mod last-write-wins. Three modules on `bt_bot_melee_action` → only engagement_leash survives. Melee light bias (#52) and poxburster push (#54) silently broken. Fix: consolidate into single `hook_require` call. |
 | 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
+| 73 | **P1: exception-safe shared state mutation** | `engagement_leash` and `vfx_suppression` temporarily mutate shared state, restore after the original call, and corrupt that state if the original throws. Fix: `pcall`/restore/rethrow around the mutated-state window. |
 | 69 | P2: Mastiff-pinned target fixation | Pounce priority boost (#55) applies +5 to friendly mastiff pins. Bots stare at pinned targets. Fix: restore `score > 0` guard or check `disable.attacker_unit`. |
 | 70 | P2: Arbites whistle ignores dog position | `_grenade_whistle` checks enemy presence near bot, not mastiff position. Explosion fires at dog's location with 0.3s trigger_time. Fix: add companion position to context + distance gate. |
 | 71 | P2: Ogryn grenade mid-horde | `_grenade_horde` has no melee distance gate. Ogryn pulls out rock while surrounded. Fix: add `target_enemy_distance < 4` block. |

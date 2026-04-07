@@ -148,8 +148,9 @@ User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07
 
 | Issue | Feature | Severity | Status |
 |-------|---------|----------|--------|
-| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Open — root cause confirmed |
-| #68 | Veteran class swap with other mods | **P1** | Open — root cause confirmed |
+| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
+| #68 | Veteran class swap with other mods | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
+| #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
 | #69 | Mastiff-pinned target fixation | P2 | Open |
 | #70 | Arbites whistle ignores dog position | P2 | Open |
 | #71 | Ogryn grenade mid-horde | P2 | Open |

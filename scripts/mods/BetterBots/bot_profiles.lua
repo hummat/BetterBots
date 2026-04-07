@@ -715,6 +715,13 @@ local function resolve_profile(profile)
 		return profile, false
 	end
 
+	-- Real character profiles from Tertium/SoloPlay carry a stable character_id.
+	-- Yield before archetype checks so veteran player characters are not mistaken
+	-- for vanilla default bot profiles.
+	if profile.character_id then
+		return profile, false
+	end
+
 	-- If another mod (Tertium4Or5/6) already swapped the profile to a non-veteran
 	-- class, yield — vanilla only spawns veterans, so a non-veteran archetype means
 	-- another mod provided a real player character for this slot.

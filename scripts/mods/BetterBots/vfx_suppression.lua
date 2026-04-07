@@ -57,15 +57,23 @@ function M.register_hooks()
 				function(func, self, extension_init_context, unit, extension_init_data, ...)
 					local player = extension_init_data and extension_init_data.player
 					local is_bot = player and not player:is_human_controlled()
+					local original_is_local_unit = extension_init_data and extension_init_data.is_local_unit
 
 					if is_bot then
 						extension_init_data.is_local_unit = false
 					end
 
-					func(self, extension_init_context, unit, extension_init_data, ...)
+					local ok, result = pcall(func, self, extension_init_context, unit, extension_init_data, ...)
 
 					if is_bot then
-						extension_init_data.is_local_unit = true
+						extension_init_data.is_local_unit = original_is_local_unit
+					end
+
+					if not ok then
+						error(result, 0)
+					end
+
+					if is_bot then
 						if _debug_enabled() then
 							_debug_log(
 								"vfx_fix_loadout:" .. tostring(unit),
@@ -76,6 +84,8 @@ function M.register_hooks()
 							)
 						end
 					end
+
+					return result
 				end
 			)
 		end
