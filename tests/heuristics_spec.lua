@@ -1470,6 +1470,76 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("blocks horde grenades in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("keeps horde grenades available outside melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("horde", rule)
+		end)
+
+		it("blocks priority grenades under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_friend_rock",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("priority_melee_pressure", rule)
+		end)
+
+		it("blocks krak grenades in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					num_nearby = 2,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("blocks krak grenades under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("priority_melee_pressure", rule)
+		end)
+
 		it("uses defensive smoke only under pressure", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"veteran_smoke_grenade",
@@ -1493,6 +1563,51 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("hold", rule)
+		end)
+
+		it("keeps defensive smoke available under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_smoke_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					ranged_count = 2,
+					toughness_pct = 0.25,
+					target_enemy = "gunner",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("blocks shock mine only in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("keeps shock mine available under crowd pressure when not in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("elite_pack", rule)
 		end)
 
 		it("uses Assail against elite targets at safe peril", function()
@@ -1550,6 +1665,20 @@ describe("heuristics", function()
 			assert.matches("peril", rule)
 		end)
 
+		it("keeps zealot throwing knives opted out of the melee gate", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 7,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
 		it("uses Smite on priority targets at safe peril", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",
@@ -1576,6 +1705,21 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("peril", rule)
+		end)
+
+		it("keeps Smite opted out of the melee gate", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 7,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
 		end)
 
 		it("uses Chain Lightning for low-peril crowd control", function()
