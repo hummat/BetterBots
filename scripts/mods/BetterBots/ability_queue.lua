@@ -34,6 +34,13 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local fixed_t = _fixed_time()
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_missing_ext:" .. tostring(unit),
+				fixed_t,
+				"unit_data_system extension absent (stale unit?)"
+			)
+		end
 		return
 	end
 	local ability_component = unit_data_extension:read_component(ability_component_name)

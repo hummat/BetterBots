@@ -126,6 +126,13 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"missing_ext:unit_data:" .. tostring(unit),
+				_fixed_time(),
+				"unit_data_system extension absent (stale unit?)"
+			)
+		end
 		return _return_with_perf(perf_t0, false)
 	end
 	local ability_component = unit_data_extension:read_component(ability_component_name)
@@ -214,6 +221,13 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	local used_input = activation_data.used_input
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"missing_ext:action_input:" .. tostring(unit),
+				_fixed_time(),
+				"action_input_system extension absent (stale unit?)"
+			)
+		end
 		return _return_with_perf(perf_t0, false)
 	end
 	local action_input_is_valid = _action_input_is_bot_queueable(
