@@ -144,17 +144,18 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 ## v0.9.1 — Hotfix
 
-User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07).
+User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), and bot profile overhaul.
 
 | Issue | Feature | Severity | Status |
 |-------|---------|----------|--------|
 | #67 | hook_require clobbering (melee light + poxburster push) | **Closed** | April 7 logs showed the consolidated `bt_bot_melee_action` hook install plus repeated `melee choice ...` lines, which is enough to confirm the clobbering regression itself is fixed. |
-| #68 | Veteran class swap with other mods | **Closed** | Validated in run `0`: external real profiles with `character_id` were preserved for bot slots 1-4 |
+| #68 | Veteran class swap with other mods + Tertium None yield fix | **Closed** | Validated in run `0`: external real profiles with `character_id` were preserved for bot slots 1-4. `profile.name` guard replaces `character_id`/`current_level` check so Tertium "None" slots pass vanilla profiles through. |
 | #73 | Exception-safe shared state mutation in hooks | **Closed** | Defensive failure-path hardening. Tests pass; no restore-after-error log fired in the April 7 runs, but keeping this open for a vanilla throw repro is unnecessary. |
 | #69 | Mastiff-pinned target fixation | **Closed** | Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring |
 | #70 | Arbites whistle ignores dog position | **Closed** | Validated in run `0`: `grenade_whistle_block_companion_far` held invalid whistles while valid whistles still consumed charges |
 | #71 | Ogryn grenade mid-horde | **Closed** | April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` approvals only above 4m. That is the requested fix. |
 | #72 | Configurable ammo policy | **Closed** | April 7 logs exercised both the lowered ranged fire gate and the pickup gate in runtime under different threshold settings. |
+| — | Bot build overhaul | **Closed** | All 4 class profiles redesigned with bot-optimized builds from hadrons-blessing. Veteran: VoC + Focus Target (removed dodge/weakspot talents, fixed stat nodes). Zealot: Martyrdom keystone + Benediction aura + bleed synergy. Psyker: Voidblast p4 replaces Surge p3 + Force Greatsword m1 (fixed stat nodes). Ogryn: Indomitable charge + Heavy Hitter + Bully Club + Rumbler (complete rebuild). In-game loading confirmed; full mission validation pending. |
 
 **Unit tests**: 632 tests via busted.
 

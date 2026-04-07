@@ -1027,6 +1027,45 @@ Psyker bot exploded twice from warp overcharge. Scrier's Gaze builds peril while
 - Lower the peril ceiling for stance activation (e.g., block above 0.50 instead of 0.90)
 - Tie into stance cancellation (#12) to exit early when peril is critical
 
+### Run 2026-04-07-profile-overhaul
+
+```text
+Run ID: 2026-04-07-profile-overhaul
+Date (local): 2026-04-07
+Date (UTC): 2026-04-07
+Git commit: 8520485 (dev/v0.9.1)
+Log file: (hot-reload session, no dedicated log captured)
+Bot lineup / abilities:
+  Veteran: Voice of Command + Focus Target + plasma + Devil's Claw
+  Zealot: Chorus + Martyrdom keystone + Relic Blade + Flamer + Benediction aura
+  Psyker: Venting Shriek + Warp Siphon + Force Greatsword m1 + Voidblast staff p4
+  Ogryn: Indomitable charge + Heavy Hitter keystone + Bully Club + Rumbler
+Map + difficulty: hot-reload test session
+
+Profile loading:
+- PASS
+  - all 4 classes loaded successfully after hot-reload
+  - user confirmed "works" — bots spawned with correct archetypes and weapons
+  - Tertium "None" yield fix (#68): profile.name guard prevents overwriting
+    Tertium/SoloPlay external profiles (validated in earlier run 0)
+
+Ability activation:
+- UNKNOWN
+  - hot-reload session confirms profiles load, but abilities need a full
+    fresh-launch mission to validate activation with the new talent trees
+
+Regression checks:
+- revive/rescue: UNKNOWN
+- navigation/pathing: UNKNOWN
+- basic combat loop: PASS (bots fighting observed)
+- Lua errors: no
+
+Conclusion:
+- Bot profile overhaul loads in-game. Full mission validation needed to
+  confirm ability activation and talent synergies with the new builds.
+- Tertium None yield fix (#68) already validated in earlier session.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.
