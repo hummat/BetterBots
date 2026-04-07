@@ -32,7 +32,7 @@
 
 5. ~~Ogryn grenade mid-horde~~ **Fixed on `dev/v0.9.1`** (#71). Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics also block under crowd pressure. Crowd-control and area-denial grenades are still allowed in dense fights. Pending in-game validation before release.
 
-6. **Ammo threshold dead band** (#72). BetterBots fire gate at 20% (`condition_patch.lua`), vanilla `needs_ammo` at 10% (`bot_behavior_extension.lua`). Bots idle in the 10-20% band — neither shooting nor seeking ammo.
+6. ~~Ammo threshold dead band~~ **Fixed on `dev/v0.9.1`** (#72). Opportunistic ranged fire and ammo pickup onset now share one configurable threshold, and bots only claim ammo when eligible human ammo users are above the configured reserve. Pending in-game validation before release.
 
 7. BT preemption during revive.
    - BT re-evaluates every frame even while a node is running.

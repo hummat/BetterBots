@@ -75,6 +75,8 @@ Bots use per-ability heuristics to decide [i]when[/i] to activate — based on e
 [*][b]Ability categories:[/b] enable/disable stances, charges, shouts, stealth, deployables, grenades independently
 [*][b]Behavior presets:[/b] Testing / Aggressive / Balanced / Conservative — controls how eagerly bots use abilities
 [*][b]Feature toggles:[/b] bot sprinting, elite/special pinging, distant-special penalty, poxburster suppression, melee improvements, ranged improvements. Disable everything to revert to vanilla bot behavior.
+[*]Bot ranged ammo threshold
+[*]Human ammo reserve threshold
 [*]Healing deferral mode and thresholds
 [*]`Info / Debug / Trace` log levels
 [*]Optional JSONL event log and `/bb_perf` runtime timing
@@ -120,7 +122,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Force staff charged fire (all 4 staves)
 [*]Weapon/enemy-aware ADS vs hip-fire
 [*][color=green]✓[/color] Poxburster push
-[*][color=green]✓[/color] Ammo conservation — lowered shoot threshold from 50% to 20%
+[*][color=green]✓[/color] Configurable ammo policy — opportunistic fire and pickup onset share one threshold, plus a human ammo reserve guard
 [/list]
 
 [b]Long-term[/b]

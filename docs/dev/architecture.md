@@ -82,51 +82,56 @@ This mod targets bot ability activation in three paths:
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
     - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
-20. ADS fix for T5/T6 bots (#35):
+20. Ammo policy (#72, via `ammo_policy.lua`):
+    - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
+    - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
+    - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
+    - explicit ammo pickup orders are preserved
+21. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
-21. Bot sprinting (#36, via `sprint.lua`):
+22. Bot sprinting (#36, via `sprint.lua`):
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-22. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
+23. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
-23. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
+24. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
     - hook `BtBotMeleeAction._choose_attack`
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
-24. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+25. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - feeds the BetterBots `_choose_attack` replacement with weapon-specific arc/penetration data instead of leaving bots on the vanilla light-only fallback
-25. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+26. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-26. Melee target selection distance penalty (#19, via `target_selection.lua`):
+27. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
-27. Runtime perf measurement (`perf.lua`):
+28. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
-28. Tiered debug log levels (#40, via `log_levels.lua`):
+29. Tiered debug log levels (#40, via `log_levels.lua`):
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
     - backward-compatible: nil `call_level` defaults to `"debug"`
-29. Shared rule tables (`shared_rules.lua`):
+30. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
-30. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
+31. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
     - hook `BotSynchronizerHost.add_bot`: resolve per-slot class setting → swap archetype, weapons, talents, cosmetics, blessings/perks
     - hook `BotPlayer.set_profile` (#65): block lossy network-sync overwrite for BetterBots-resolved profiles (`_bb_resolved` sentinel). Tags profiles with `is_local_profile = true` to bypass 1.11+ `validate_talent_layouts` in `unit_templates.lua`
-31. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
+32. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
     - hook `BtBotMeleeAction._allow_engage`: dynamically inflate `override_engage_range_to_follow_position` based on combat context (already engaged → 20m stickiness, post-charge grace → 20m for 4s, under melee attack → 20m, ranged foray → 20m when ranged enemy targets bot)
     - hook `BtBotMeleeAction._is_in_engage_range`: extend approach range from 6m to 10m when engagement extension conditions hold
     - coherency-scaled base leash: `max(12m, coherency_radius + 4m)` via `UnitCoherencyExtension:current_radius()`, hard cap 25m (30m with always-in-coherency talent)

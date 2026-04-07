@@ -97,7 +97,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 69 | P2: Mastiff-pinned target fixation | Implemented on `dev/v0.9.1`. Friendly mastiff-pinned targets are explicitly penalized in melee and ranged target scoring so bots prefer live threats. Pending in-game validation. |
 | 70 | P2: Arbites whistle ignores dog position | Implemented on `dev/v0.9.1`. `build_context()` now captures the live mastiff unit/position and `_grenade_whistle` blocks remote detonation when the companion is missing, has no target, or is >10m from the current target. Pending in-game validation. |
 | 71 | P2: Ogryn grenade mid-horde | Implemented on `dev/v0.9.1`. Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics (rock/krak/missile) also block under crowd pressure. Pending in-game validation. |
-| 72 | P3: Ammo threshold dead band | BetterBots fire gate at 20%, vanilla `needs_ammo` at 10%. Bots idle in 10-20% band. Fix: hook `_update_ammo` or lower threshold. |
+| 72 | P3: Configurable ammo policy | Implemented on `dev/v0.9.1`. Opportunistic ranged fire and ammo pickup onset now share one user-configurable threshold, and bots only claim ammo when eligible humans are above the configured reserve. Pending in-game validation. |
 
 ### v0.10.0 — "Team Coordination"
 
