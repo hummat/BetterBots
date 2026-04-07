@@ -17,8 +17,8 @@ local _fixed_time
 local _perf
 local _is_enabled
 
--- One-shot dedup: log poxburster suppression once per bot per targeting evaluation.
--- Weak-keyed so entries are GC'd when bots despawn.
+-- One-shot dedup: log poxburster suppression once per bot lifetime (weak-keyed,
+-- cleared on GC). Entries are never explicitly reset.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_near_any_position(origin_position, positions, threshold, distance_fn)

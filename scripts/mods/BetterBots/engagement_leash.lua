@@ -1,12 +1,11 @@
 -- Engagement leash: coherency-anchored combat engagement range (#47)
 --
--- Hooks BtBotMeleeAction._allow_engage and _is_in_engage_range to extend
--- vanilla engagement distances based on combat context:
--- - Already engaged: extend to coherency stickiness_limit (20m)
--- - Post-charge grace: 4s window after movement abilities
--- - Under melee attack: self-defense override
--- - Ranged foray: push toward ranged enemies targeting the bot
--- - Hard cap: 25m (30m if always-in-coherency talent)
+-- _allow_engage hook: extends vanilla engagement distances based on combat
+-- context (already engaged, post-charge grace, target within 3m, ranged foray).
+-- Hard cap: 25m (30m with always-in-coherency talent).
+--
+-- _is_in_engage_range hook: unconditionally normalizes the engage range to
+-- the near-follow-position distance. Does not extend distances.
 
 local M = {}
 
@@ -31,18 +30,16 @@ local COHERENCY_CACHE_REFRESH_S = 1
 -- Per-bot state (weak-keyed on unit)
 local _bot_state = setmetatable({}, { __mode = "k" })
 
--- Movement ability templates that trigger post-charge grace
+-- Movement ability templates that trigger post-charge grace.
+-- Only base template names — ability_component.template_name always reflects the
+-- base ability_template, not talent variant names (e.g. zealot_targeted_dash → zealot_dash).
 local MOVEMENT_ABILITIES = {
 	zealot_dash = true,
-	zealot_targeted_dash = true,
-	zealot_targeted_dash_improved = true,
-	zealot_targeted_dash_improved_double = true,
 	ogryn_charge = true,
-	ogryn_charge_increased_distance = true,
 	adamant_charge = true,
 }
 
--- Special rules for "always in coherency" (Zealot aura)
+-- Special rules for Zealot coherency talents
 local ALWAYS_COHERENCY_RULES = {
 	"zealot_always_at_least_one_coherency",
 	"zealot_always_at_least_two_coherency",
