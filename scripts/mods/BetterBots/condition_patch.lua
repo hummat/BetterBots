@@ -124,7 +124,10 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return _return_with_perf(perf_t0, false)
 	end
 
-	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return _return_with_perf(perf_t0, false)
+	end
 	local ability_component = unit_data_extension:read_component(ability_component_name)
 	local ability_template_name = ability_component.template_name
 	local fixed_t = _fixed_time()
@@ -209,7 +212,10 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local used_input = activation_data.used_input
-	local action_input_extension = ScriptUnit.extension(unit, "action_input_system")
+	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
+	if not action_input_extension then
+		return _return_with_perf(perf_t0, false)
+	end
 	local action_input_is_valid = _action_input_is_bot_queueable(
 		action_input_extension,
 		ability_extension,

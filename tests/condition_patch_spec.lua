@@ -489,6 +489,31 @@ describe("condition_patch", function()
 			assert.equals(0.4, seen_ammo_percentage)
 		end)
 
+		it("returns false without throwing when unit_data_system extension is absent", function()
+			local unit = "stale_bot"
+			-- No extensions registered for this unit — has_extension returns nil
+			local bb = { behavior = {}, perception = { target_enemy = nil } }
+			local conditions = {
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local ok, result = pcall(
+				conditions.can_activate_ability,
+				unit,
+				bb,
+				{}, -- scratchpad (ability_component_name absent → won't match action_data's)
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_false(result)
+		end)
+
 		it("logs when BetterBots overrides the vanilla ranged ammo threshold", function()
 			_debug_enabled_result = true
 			local target = "gunner1"

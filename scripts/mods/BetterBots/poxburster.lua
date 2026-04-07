@@ -259,6 +259,7 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		end
 
 		local result = func(self, unit, target_unit, scratchpad)
+		scratchpad._bb_bot_unit = unit
 		if result then
 			return result
 		end
@@ -299,7 +300,7 @@ function M.install_melee_hooks(BtBotMeleeAction)
 				if push_available then
 					if _debug_enabled() then
 						_debug_log(
-							"poxburster_push:" .. tostring(target_unit) .. ":" .. tostring(scratchpad.unit),
+							"poxburster_push:" .. tostring(target_unit) .. ":" .. tostring(scratchpad._bb_bot_unit),
 							fixed_t,
 							"pushing poxburster (bypassed outnumbered gate)",
 							1
@@ -309,7 +310,10 @@ function M.install_melee_hooks(BtBotMeleeAction)
 				else
 					if _debug_enabled() then
 						_debug_log(
-							"poxburster_push_blocked:" .. tostring(target_unit) .. ":" .. tostring(scratchpad.unit),
+							"poxburster_push_blocked:"
+								.. tostring(target_unit)
+								.. ":"
+								.. tostring(scratchpad._bb_bot_unit),
 							fixed_t,
 							"poxburster push unavailable (action not valid)",
 							2

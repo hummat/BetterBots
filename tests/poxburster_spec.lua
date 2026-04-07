@@ -173,8 +173,55 @@ describe("poxburster", function()
 			assert.matches("suppressed poxburster target_enemy %(near_human_player%)", debug_logs[1].message)
 		end)
 
-		it("includes the acting bot in the poxburster push log key", function()
-			local captured_hook
+		it("_should_defend seeds _bb_bot_unit on scratchpad", function()
+			local captured_defend_hook
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if system_name ~= "unit_data_system" then
+						return nil
+					end
+					if unit == "poxburster" then
+						return {
+							breed = function()
+								return { name = "chaos_poxwalker_bomber" }
+							end,
+						}
+					end
+					return nil
+				end,
+			}
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local scratchpad = {}
+			captured_defend_hook(function()
+				return false
+			end, nil, "bot_unit_A", "poxburster", scratchpad)
+
+			assert.equals("bot_unit_A", scratchpad._bb_bot_unit)
+		end)
+
+		it("includes the acting bot in the poxburster push log key via _bb_bot_unit", function()
+			local captured_push_hook
 			local logged = {}
 
 			Poxburster.init({
@@ -182,7 +229,7 @@ describe("poxburster", function()
 					hook_safe = function() end,
 					hook = function(_self, _target, method_name, handler)
 						if method_name == "_should_push" then
-							captured_hook = handler
+							captured_push_hook = handler
 						end
 					end,
 				},
@@ -203,8 +250,9 @@ describe("poxburster", function()
 			})
 			Poxburster.install_melee_hooks({})
 
+			-- _bb_bot_unit is seeded by _should_defend; simulate that here
 			local scratchpad = {
-				unit = "bot_unit",
+				_bb_bot_unit = "bot_unit",
 				weapon_extension = {
 					action_input_is_currently_valid = function()
 						return true
@@ -218,14 +266,14 @@ describe("poxburster", function()
 				name = "chaos_poxwalker_bomber",
 			}
 
-			local pushed, action_input = captured_hook(function()
+			local pushed, action_input = captured_push_hook(function()
 				return false, nil, false
 			end, nil, defense_meta_data, scratchpad, true, "poxburster", target_breed, 12.5)
 
 			assert.is_true(pushed)
 			assert.equals("push", action_input)
 			assert.equals(1, #logged)
-			assert.equals("poxburster_push:poxburster:" .. tostring(scratchpad.unit), logged[1].key)
+			assert.equals("poxburster_push:poxburster:" .. tostring(scratchpad._bb_bot_unit), logged[1].key)
 		end)
 
 		it("suppresses poxbursters from all secondary perception slots", function()

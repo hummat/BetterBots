@@ -32,7 +32,10 @@ local _action_input_is_bot_queueable
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
 	local fixed_t = _fixed_time()
-	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return
+	end
 	local ability_component = unit_data_extension:read_component(ability_component_name)
 	local ability_template_name = ability_component and ability_component.template_name
 	local state = _fallback_state_by_unit[unit]

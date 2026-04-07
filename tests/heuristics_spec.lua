@@ -1948,6 +1948,35 @@ describe("heuristics", function()
 			assert.equals("dog_pos", context.companion_position)
 			assert.equals("target_pos", context.target_enemy_position)
 		end)
+
+		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()
+			local grenadier_breed = {
+				tags = { minion = true, special = true },
+				game_object_type = "minion_ranged",
+				challenge_rating = 2,
+			}
+			script_unit_extensions = {
+				hazard_bot = {
+					perception_system = {
+						enemies_in_proximity = function()
+							return { "grenadier_unit" }, 1
+						end,
+					},
+				},
+				grenadier_unit = {
+					unit_data_system = {
+						breed = function()
+							return grenadier_breed
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.ranged_count)
+			assert.equals(0, context.melee_count)
+		end)
 	end)
 
 	describe("behavior_profile", function()

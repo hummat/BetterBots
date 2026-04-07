@@ -16,6 +16,7 @@ end)
 
 local _mock_settings = {}
 local _debug_logs = {}
+local _echo_messages = {}
 local _debug_enabled_result = false
 
 local mock_mod = {
@@ -23,6 +24,9 @@ local mock_mod = {
 		return _mock_settings[setting_id]
 	end,
 	hook = function() end,
+	echo = function(_self, msg)
+		_echo_messages[#_echo_messages + 1] = msg
+	end,
 }
 
 local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
@@ -64,6 +68,7 @@ describe("bot_profiles", function()
 	before_each(function()
 		_mock_settings = {}
 		_debug_logs = {}
+		_echo_messages = {}
 		_debug_enabled_result = false
 		BotProfiles.reset()
 	end)
@@ -322,9 +327,10 @@ describe("bot_profiles", function()
 				assert.is_true(found_set_profile, "must hook BotPlayer.set_profile")
 			end)
 
-			it("blocks set_profile when existing profile has _bb_resolved", function()
+			it("blocks set_profile when existing profile has _bb_resolved within time window", function()
 				local set_profile_handler
 				local debug_logs = {}
+				local echo_messages = {}
 				local hook_mod = {
 					get = function(_self, setting_id)
 						return _mock_settings[setting_id]
@@ -333,6 +339,9 @@ describe("bot_profiles", function()
 						if target == "BotPlayer" and method == "set_profile" then
 							set_profile_handler = handler
 						end
+					end,
+					echo = function(_self, msg)
+						echo_messages[#echo_messages + 1] = msg
 					end,
 				}
 				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
@@ -354,6 +363,9 @@ describe("bot_profiles", function()
 				Profiles.register_hooks()
 				assert.is_not_nil(set_profile_handler, "handler must be captured")
 
+				-- Simulate a recent resolve: set timestamp to now
+				Profiles._set_last_resolve_t(os.clock())
+
 				local original_called = false
 				local original_func = function(_self, _profile)
 					original_called = true
@@ -364,8 +376,13 @@ describe("bot_profiles", function()
 				local new_profile = { archetype = "zealot", _from_network = true }
 
 				set_profile_handler(original_func, bot_self, new_profile)
-				assert.is_false(original_called, "should block overwrite for _bb_resolved profile")
-				assert.is_nil(bot_self._profile._bb_resolved, "sentinel consumed after one-shot block")
+				assert.is_false(original_called, "should block overwrite for _bb_resolved profile within window")
+				assert.is_nil(bot_self._profile._bb_resolved, "sentinel consumed after block")
+				-- Warning echo must be emitted (unconditional, production-visible)
+				assert.equals(1, #echo_messages)
+				assert.matches("BetterBots WARNING", echo_messages[1], 1, true)
+				assert.matches("blocked network-sync profile overwrite", echo_messages[1], 1, true)
+				-- Debug log also emitted (debug_enabled=true)
 				assert.equals(1, #debug_logs)
 				assert.equals("bot_profiles:set_profile_blocked", debug_logs[1].key)
 				assert.equals(0, debug_logs[1].fixed_t)
@@ -376,13 +393,60 @@ describe("bot_profiles", function()
 				-- Second call should pass through (sentinel consumed)
 				original_called = false
 				set_profile_handler(original_func, bot_self, new_profile)
-				assert.is_true(original_called, "should allow subsequent updates after one-shot block")
+				assert.is_true(original_called, "should allow subsequent updates after sentinel consumed")
 				assert.equals(2, #debug_logs)
 				assert.equals("bot_profiles:set_profile_passthrough", debug_logs[2].key)
 				assert.equals(0, debug_logs[2].fixed_t)
 				assert.is_nil(debug_logs[2].interval)
 				assert.equals("debug", debug_logs[2].level)
 				assert.equals("allowed profile update (no _bb_resolved sentinel)", debug_logs[2].message)
+			end)
+
+			it("does NOT block set_profile when time window has expired", function()
+				local set_profile_handler
+				local echo_messages = {}
+				local hook_mod = {
+					get = function(_self, setting_id)
+						return _mock_settings[setting_id]
+					end,
+					hook = function(_self, target, method, handler)
+						if target == "BotPlayer" and method == "set_profile" then
+							set_profile_handler = handler
+						end
+					end,
+					echo = function(_self, msg)
+						echo_messages[#echo_messages + 1] = msg
+					end,
+				}
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = hook_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.register_hooks()
+				assert.is_not_nil(set_profile_handler, "handler must be captured")
+
+				-- Simulate an expired window: set timestamp to 10 s in the past
+				Profiles._set_last_resolve_t(os.clock() - 10)
+
+				local original_called = false
+				local original_func = function(_self, _profile)
+					original_called = true
+				end
+				local bot_self = {
+					_profile = { _bb_resolved = true, archetype = "zealot" },
+				}
+				local new_profile = { archetype = "zealot" }
+
+				set_profile_handler(original_func, bot_self, new_profile)
+				assert.is_true(original_called, "should allow update after time window expires")
+				-- No warning echo — window expired, not blocked
+				assert.equals(0, #echo_messages)
+				-- Sentinel untouched (hook passed through without consuming it)
+				assert.is_true(bot_self._profile._bb_resolved, "sentinel untouched when window expired")
 			end)
 
 			it("allows set_profile when existing profile is NOT _bb_resolved", function()

@@ -15,6 +15,10 @@ local _debug_enabled
 -- Reset on GameplayStateRun enter.
 local _spawn_counter = 0
 
+-- Timestamp of the last resolve_profile swap (os.clock). Used to time-window the
+-- set_profile sentinel so it only blocks within 5 s of the swap that tagged the profile.
+local _last_resolve_t = -math.huge
+
 local SLOT_SETTING_IDS = {
 	"bot_slot_1_profile",
 	"bot_slot_2_profile",
@@ -826,6 +830,7 @@ local function resolve_profile(profile)
 	-- (2) our BotPlayer.set_profile hook blocks the lossy overwrite (_bb_resolved)
 	profile.is_local_profile = true
 	profile._bb_resolved = true
+	_last_resolve_t = os.clock()
 
 	if _debug_enabled() then
 		_debug_log(
@@ -847,11 +852,12 @@ local function register_hooks()
 	-- Guard against 1.11+ network-sync profile overwrite (#65).
 	-- ProfileSynchronizerClient reconstructs the profile from JSON (losing weapon
 	-- overrides, running validate_talent_layouts) then calls set_profile, replacing
-	-- our fully-resolved profile. One-shot block: consume the sentinel on first
-	-- intercept so legitimate later profile updates (e.g. queued sync, profile_changed)
-	-- pass through normally.
+	-- our fully-resolved profile. Time-windowed block: only intercept within 5 s of
+	-- the resolve_profile swap that tagged the profile, so legitimate later profile
+	-- updates (e.g. queued sync, profile_changed) pass through normally.
 	_mod:hook("BotPlayer", "set_profile", function(func, self, profile)
-		if self._profile and self._profile._bb_resolved then
+		if self._profile and self._profile._bb_resolved and os.clock() - _last_resolve_t < 5 then
+			_mod:echo("BetterBots WARNING: blocked network-sync profile overwrite (bot customization preserved)")
 			if _debug_enabled() then
 				_debug_log(
 					"bot_profiles:set_profile_blocked",
@@ -880,6 +886,7 @@ end
 
 local function reset()
 	_spawn_counter = 0
+	_last_resolve_t = -math.huge
 	-- Clear resolved cache — item catalog may have changed between missions
 	for k in pairs(_resolved_profiles) do
 		_resolved_profiles[k] = nil
@@ -897,5 +904,11 @@ return {
 	resolve_profile = resolve_profile,
 	_get_profiles = function()
 		return DEFAULT_PROFILE_TEMPLATES
+	end,
+	_get_last_resolve_t = function()
+		return _last_resolve_t
+	end,
+	_set_last_resolve_t = function(t)
+		_last_resolve_t = t
 	end,
 }
