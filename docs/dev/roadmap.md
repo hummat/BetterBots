@@ -95,7 +95,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
 | 73 | **P1: exception-safe shared state mutation** | `engagement_leash` and `vfx_suppression` temporarily mutate shared state, restore after the original call, and corrupt that state if the original throws. Fix: `pcall`/restore/rethrow around the mutated-state window. |
 | 69 | P2: Mastiff-pinned target fixation | Implemented on `dev/v0.9.1`. Friendly mastiff-pinned targets are explicitly penalized in melee and ranged target scoring so bots prefer live threats. Pending in-game validation. |
-| 70 | P2: Arbites whistle ignores dog position | `_grenade_whistle` checks enemy presence near bot, not mastiff position. Explosion fires at dog's location with 0.3s trigger_time. Fix: add companion position to context + distance gate. |
+| 70 | P2: Arbites whistle ignores dog position | Implemented on `dev/v0.9.1`. `build_context()` now captures the live mastiff unit/position and `_grenade_whistle` blocks remote detonation when the companion is missing, has no target, or is >10m from the current target. Pending in-game validation. |
 | 71 | P2: Ogryn grenade mid-horde | `_grenade_horde` has no melee distance gate. Ogryn pulls out rock while surrounded. Fix: add `target_enemy_distance < 4` block. |
 | 72 | P3: Ammo threshold dead band | BetterBots fire gate at 20%, vanilla `needs_ammo` at 10%. Bots idle in 10-20% band. Fix: hook `_update_ammo` or lower threshold. |
 

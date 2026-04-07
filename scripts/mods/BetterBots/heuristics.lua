@@ -5,6 +5,7 @@ local _armor_type_super_armor
 local _is_testing_profile
 local _resolve_preset
 local _overlapping_liquids = {}
+local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
 	gas = true,
@@ -134,11 +135,14 @@ local function build_context(unit, blackboard)
 		toughness_pct = 1,
 		peril_pct = nil,
 		target_enemy = nil,
+		target_enemy_position = nil,
 		target_enemy_distance = nil,
 		target_enemy_type = nil,
 		priority_target_enemy = nil,
 		opportunity_target_enemy = nil,
 		urgent_target_enemy = nil,
+		companion_unit = nil,
+		companion_position = nil,
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
@@ -158,9 +162,23 @@ local function build_context(unit, blackboard)
 		context.in_hazard = _position_in_hostile_hazard(unit_position)
 	end
 
+	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
+	local companion_units = companion_spawner_extension and companion_spawner_extension:companion_units()
+	if companion_units then
+		for i = 1, #companion_units do
+			local companion_unit = companion_units[i]
+			if companion_unit and (not ALIVE or ALIVE[companion_unit]) then
+				context.companion_unit = companion_unit
+				context.companion_position = POSITION_LOOKUP and POSITION_LOOKUP[companion_unit] or nil
+				break
+			end
+		end
+	end
+
 	local perception_component = blackboard and blackboard.perception
 	if perception_component then
 		context.target_enemy = perception_component.target_enemy
+		context.target_enemy_position = POSITION_LOOKUP and POSITION_LOOKUP[context.target_enemy] or nil
 		context.target_enemy_distance = perception_component.target_enemy_distance
 		context.target_enemy_type = perception_component.target_enemy_type
 		context.priority_target_enemy = perception_component.priority_target_enemy
@@ -1333,6 +1351,21 @@ local function _grenade_mine(context, rule_prefix, preset)
 end
 
 local function _grenade_whistle(context)
+	if not context.companion_unit or not context.companion_position then
+		return false, "grenade_whistle_block_no_companion"
+	end
+
+	if not context.target_enemy or not context.target_enemy_position then
+		return false, "grenade_whistle_block_no_target"
+	end
+
+	if
+		Vector3.distance_squared(context.companion_position, context.target_enemy_position)
+		> WHISTLE_MAX_COMPANION_DISTANCE_SQ
+	then
+		return false, "grenade_whistle_block_companion_far"
+	end
+
 	if context.target_is_elite_special or context.priority_target_enemy or context.urgent_target_enemy then
 		return true, "grenade_whistle_priority_target"
 	end

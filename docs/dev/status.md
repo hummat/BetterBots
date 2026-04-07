@@ -152,7 +152,7 @@ User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07
 | #68 | Veteran class swap with other mods | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
 | #73 | Exception-safe shared state mutation in hooks | **P1** | Implemented on `dev/v0.9.1` — tests pass, pending in-game validation |
 | #69 | Mastiff-pinned target fixation | P2 | Implemented on `dev/v0.9.1` — friendly companion-pinned targets are penalized in melee and ranged target scoring, pending in-game validation |
-| #70 | Arbites whistle ignores dog position | P2 | Open |
+| #70 | Arbites whistle ignores dog position | P2 | Implemented on `dev/v0.9.1` — whistle now requires a live mastiff within 10m of the current target, pending in-game validation |
 | #71 | Ogryn grenade mid-horde | P2 | Open |
 | #72 | Ammo threshold dead band (10-20%) | P3 | Open |
 

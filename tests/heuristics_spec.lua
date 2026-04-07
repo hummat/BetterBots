@@ -1602,6 +1602,56 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		describe("adamant_whistle", function()
+			local saved_vector3
+
+			before_each(function()
+				saved_vector3 = rawget(_G, "Vector3")
+				_G.Vector3 = {
+					distance_squared = function(a, b)
+						local dx = a[1] - b[1]
+						local dy = a[2] - b[2]
+						local dz = a[3] - b[3]
+						return dx * dx + dy * dy + dz * dz
+					end,
+				}
+			end)
+
+			after_each(function()
+				_G.Vector3 = saved_vector3
+			end)
+
+			it("uses whistle when the companion is close enough to an elite target", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 8, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = { 1, 0, 0 },
+					})
+				)
+				assert.is_true(result)
+				assert.matches("priority_target", rule)
+			end)
+
+			it("holds whistle when the companion is too far from the target", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 11, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+					})
+				)
+				assert.is_false(result)
+				assert.matches("companion_far", rule)
+			end)
+		end)
+
 		describe("grenade preset offsets", function()
 			local evaluate_grenade = Heuristics.evaluate_grenade_heuristic
 
@@ -1629,9 +1679,11 @@ describe("heuristics", function()
 		local saved_managers
 		local saved_position_lookup
 		local saved_script_unit
+		local saved_alive
 		local liquid_results_return_mode
 		local current_fixed_t
 		local captured_liquid_results
+		local script_unit_extensions
 
 		before_each(function()
 			liquid_results_return_mode = "table"
@@ -1640,6 +1692,8 @@ describe("heuristics", function()
 			saved_managers = rawget(_G, "Managers")
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
+			saved_alive = rawget(_G, "ALIVE")
+			script_unit_extensions = nil
 
 			_G.Managers = {
 				state = {
@@ -1672,10 +1726,16 @@ describe("heuristics", function()
 			}
 			_G.POSITION_LOOKUP = {
 				hazard_bot = "hazard_pos",
+				target_enemy = "target_pos",
+				mastiff = "dog_pos",
+			}
+			_G.ALIVE = {
+				mastiff = true,
 			}
 			_G.ScriptUnit = {
-				has_extension = function()
-					return nil
+				has_extension = function(unit, extension_name)
+					local extensions = script_unit_extensions and script_unit_extensions[unit]
+					return extensions and extensions[extension_name] or nil
 				end,
 			}
 			Heuristics.init({
@@ -1695,6 +1755,7 @@ describe("heuristics", function()
 			_G.Managers = saved_managers
 			_G.POSITION_LOOKUP = saved_position_lookup
 			_G.ScriptUnit = saved_script_unit
+			_G.ALIVE = saved_alive
 		end)
 
 		it("marks context as hazardous when hostile liquid overlaps the bot position", function()
@@ -1720,6 +1781,28 @@ describe("heuristics", function()
 			assert.is_true(second_context.in_hazard)
 			assert.are.equal(2, #captured_liquid_results)
 			assert.are.equal(captured_liquid_results[1], captured_liquid_results[2])
+		end)
+
+		it("captures the live companion unit and positions in context", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = {
+						companion_units = function()
+							return { "mastiff" }
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.equals("mastiff", context.companion_unit)
+			assert.equals("dog_pos", context.companion_position)
+			assert.equals("target_pos", context.target_enemy_position)
 		end)
 	end)
 

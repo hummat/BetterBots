@@ -28,7 +28,7 @@
 
 3. ~~Mastiff-pinned target fixation~~ **Fixed on `dev/v0.9.1`** (#69). Friendly mastiff-pinned targets are now explicitly penalized in both melee and ranged target scoring instead of being boosted, so bots should switch to active threats. Pending in-game validation before release.
 
-4. **Arbites whistle ignores mastiff position** (#70). `_grenade_whistle` heuristic checks enemy presence near the bot but has no awareness of the companion dog's position. The explosion fires at the dog's world position with only 0.3s `trigger_time`.
+4. ~~Arbites whistle ignores mastiff position~~ **Fixed on `dev/v0.9.1`** (#70). `build_context()` now records the live mastiff unit/position and `_grenade_whistle` blocks activation when the companion is missing, has no current target, or is more than 10m from the target. Pending in-game validation before release.
 
 5. **Ogryn grenade mid-horde** (#71). `_grenade_horde` heuristic triggers on `num_nearby >= 5` with no melee-distance gate. Ogryn interrupts melee combat to throw a grenade while surrounded.
 
