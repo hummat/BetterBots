@@ -30,4 +30,36 @@ describe("debug", function()
 		assert.is_true(snapshot.in_hazard)
 		assert.equals(2, snapshot.num_nearby)
 	end)
+
+	it("drops positive infinity target_enemy_distance from context snapshots", function()
+		local snapshot = Debug.context_snapshot({
+			target_enemy_distance = math.huge,
+		})
+
+		assert.is_nil(snapshot.target_enemy_distance)
+	end)
+
+	it("drops negative infinity target_ally_distance from context snapshots", function()
+		local snapshot = Debug.context_snapshot({
+			target_ally_distance = -math.huge,
+		})
+
+		assert.is_nil(snapshot.target_ally_distance)
+	end)
+
+	it("drops NaN target_enemy_distance from context snapshots", function()
+		local snapshot = Debug.context_snapshot({
+			target_enemy_distance = 0 / 0,
+		})
+
+		assert.is_nil(snapshot.target_enemy_distance)
+	end)
+
+	it("keeps finite target_enemy_distance in context snapshots", function()
+		local snapshot = Debug.context_snapshot({
+			target_enemy_distance = 15.5,
+		})
+
+		assert.equals(15.5, snapshot.target_enemy_distance)
+	end)
 end)

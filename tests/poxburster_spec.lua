@@ -220,6 +220,130 @@ describe("poxburster", function()
 			assert.equals("bot_unit_A", scratchpad._bb_bot_unit)
 		end)
 
+		it("_should_defend passes through when vanilla already wants to defend", function()
+			local captured_defend_hook
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local scratchpad = {}
+			local result = captured_defend_hook(function()
+				return true
+			end, nil, "bot_unit_A", "horde_enemy", scratchpad)
+
+			assert.is_true(result)
+			assert.equals("bot_unit_A", scratchpad._bb_bot_unit)
+		end)
+
+		it("_should_defend bypasses the defend gate for poxburster targets", function()
+			local captured_defend_hook
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if system_name ~= "unit_data_system" then
+						return nil
+					end
+					if unit == "poxburster" then
+						return {
+							breed = function()
+								return { name = "chaos_poxwalker_bomber" }
+							end,
+						}
+					end
+					return nil
+				end,
+			}
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local result = captured_defend_hook(function()
+				return false
+			end, nil, "bot_unit_A", "poxburster", {})
+
+			assert.is_true(result)
+		end)
+
+		it("_should_defend keeps vanilla false for non-poxburster targets", function()
+			local captured_defend_hook
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if system_name ~= "unit_data_system" then
+						return nil
+					end
+					if unit == "horde_enemy" then
+						return {
+							breed = function()
+								return { name = "chaos_poxwalker" }
+							end,
+						}
+					end
+					return nil
+				end,
+			}
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local result = captured_defend_hook(function()
+				return false
+			end, nil, "bot_unit_A", "horde_enemy", {})
+
+			assert.is_false(result)
+		end)
+
 		it("includes the acting bot in the poxburster push log key via _bb_bot_unit", function()
 			local captured_push_hook
 			local logged = {}
