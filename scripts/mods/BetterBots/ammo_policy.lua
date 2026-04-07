@@ -73,35 +73,34 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
-		local bot_ammo_percentage = _Ammo.current_total_percentage(unit)
-		local bot_threshold = _bot_threshold()
-		if bot_ammo_percentage > bot_threshold then
-			pickup_component.needs_ammo = false
-			_log(
-				"ammo_pickup_hold:" .. tostring(unit),
-				"ammo pickup blocked: bot reserve above threshold ("
-					.. tostring(bot_ammo_percentage)
-					.. " > "
-					.. tostring(bot_threshold)
-					.. ")"
-			)
-			if perf_t0 then
-				_perf.finish("ammo_policy.update_ammo", perf_t0)
-			end
-			return
-		end
-
 		local humans_ok =
 			_all_eligible_humans_above_threshold(self._side and self._side.valid_human_units, _human_threshold())
 
-		pickup_component.needs_ammo = humans_ok
 		if humans_ok then
+			-- All humans are stocked — bot picks up freely to top off.
+			pickup_component.needs_ammo = true
 			_log("ammo_pickup_allow:" .. tostring(unit), "ammo pickup permitted: all eligible humans above reserve")
 		else
-			_log(
-				"ammo_pickup_block_human_reserve:" .. tostring(unit),
-				"ammo pickup blocked: eligible human below reserve"
-			)
+			-- A human is low — bot only picks up when desperate (below bot threshold).
+			local bot_ammo_percentage = _Ammo.current_total_percentage(unit)
+			local bot_threshold = _bot_threshold()
+			local bot_desperate = bot_ammo_percentage <= bot_threshold
+			pickup_component.needs_ammo = bot_desperate
+			if bot_desperate then
+				_log(
+					"ammo_pickup_desperate:" .. tostring(unit),
+					"ammo pickup permitted: bot desperate ("
+						.. string.format("%.0f%% <= %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
+						.. ") despite human reserve low"
+				)
+			else
+				_log(
+					"ammo_pickup_defer:" .. tostring(unit),
+					"ammo pickup deferred to human ("
+						.. string.format("bot %.0f%% > %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
+						.. ")"
+				)
+			end
 		end
 
 		if perf_t0 then

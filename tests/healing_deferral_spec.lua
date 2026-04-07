@@ -60,10 +60,10 @@ describe("healing_deferral", function()
 							return "stations_only"
 						end
 						if setting_id == "healing_deferral_human_threshold" then
-							return "100"
+							return 100
 						end
 						if setting_id == "healing_deferral_emergency_threshold" then
-							return "never"
+							return 0
 						end
 					end,
 				},
@@ -130,10 +130,10 @@ describe("healing_deferral", function()
 							return "stations_only"
 						end
 						if setting_id == "healing_deferral_human_threshold" then
-							return "75"
+							return 75
 						end
 						if setting_id == "healing_deferral_emergency_threshold" then
-							return "10"
+							return 10
 						end
 					end,
 				},

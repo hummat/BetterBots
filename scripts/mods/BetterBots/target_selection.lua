@@ -61,6 +61,9 @@ local function _is_friendly_companion_pin(target_unit)
 	end
 
 	local attacker_breed = unit_data_extension:breed()
+	if not attacker_breed then
+		return false
+	end
 
 	return _breed_utils and _breed_utils.is_companion(attacker_breed) or false
 end
@@ -175,6 +178,7 @@ function M.register_hooks()
 		)
 
 		_mod:hook(BotTargetSelection, "line_of_sight_weight", function(func, unit, target_unit)
+			local perf_t0 = _perf and _perf.begin()
 			local score = func(unit, target_unit)
 
 			if (not _is_enabled or _is_enabled()) and target_unit and _is_friendly_companion_pin(target_unit) then
@@ -192,6 +196,9 @@ function M.register_hooks()
 				end
 			end
 
+			if perf_t0 then
+				_perf.finish("target_selection.line_of_sight_weight", perf_t0)
+			end
 			return score
 		end)
 

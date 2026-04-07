@@ -23,18 +23,23 @@ local VALID_MODES = {
 	stations_only = true,
 	stations_and_deployables = true,
 }
-local HUMAN_THRESHOLD_BY_SETTING = {
-	["50"] = 0.50,
-	["75"] = 0.75,
-	["90"] = 0.90,
-	["100"] = 1.00,
-}
-local EMERGENCY_THRESHOLD_BY_SETTING = {
-	never = 0,
-	["10"] = 0.10,
-	["25"] = 0.25,
-	["40"] = 0.40,
-}
+local function _read_percent_setting(setting_id, default_value, min_value, max_value)
+	if not _mod then
+		return default_value
+	end
+
+	local raw_value = _mod:get(setting_id)
+	local numeric_value = tonumber(raw_value)
+	if not numeric_value then
+		return default_value
+	end
+
+	if numeric_value < min_value or numeric_value > max_value then
+		return default_value
+	end
+
+	return numeric_value / 100
+end
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -58,21 +63,11 @@ local function _read_mode_setting()
 end
 
 local function _read_human_threshold_setting()
-	if not _mod then
-		return DEFERRAL_THRESHOLD
-	end
-
-	local value = _mod:get(HUMAN_THRESHOLD_SETTING_ID)
-	return HUMAN_THRESHOLD_BY_SETTING[value] or DEFERRAL_THRESHOLD
+	return _read_percent_setting(HUMAN_THRESHOLD_SETTING_ID, DEFERRAL_THRESHOLD, 50, 100)
 end
 
 local function _read_emergency_threshold_setting()
-	if not _mod then
-		return EMERGENCY_THRESHOLD
-	end
-
-	local value = _mod:get(EMERGENCY_THRESHOLD_SETTING_ID)
-	return EMERGENCY_THRESHOLD_BY_SETTING[value] or EMERGENCY_THRESHOLD
+	return _read_percent_setting(EMERGENCY_THRESHOLD_SETTING_ID, EMERGENCY_THRESHOLD, 0, 50)
 end
 
 local function _resolve_settings()

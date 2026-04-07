@@ -86,7 +86,10 @@ local function _override_ranged_ammo_condition_args(unit, condition_args)
 		_debug_log(
 			"ranged_ammo_threshold_override:" .. tostring(unit),
 			_fixed_time(),
-			"ranged ammo gate lowered from " .. tostring(NORMAL_RANGED_AMMO_THRESHOLD) .. " to " .. tostring(threshold),
+			"ranged ammo gate lowered from "
+				.. string.format("%.0f%%", NORMAL_RANGED_AMMO_THRESHOLD * 100)
+				.. " to "
+				.. string.format("%.0f%%", threshold * 100),
 			10
 		)
 	end
@@ -352,7 +355,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					"ranged_ammo_override_active:" .. tostring(unit),
 					_fixed_time(),
 					"ranged permitted with lowered ammo gate (threshold="
-						.. tostring(_bot_ranged_ammo_threshold and _bot_ranged_ammo_threshold() or 0.20)
+						.. string.format("%.0f%%", adjusted_args.ammo_percentage * 100)
 						.. ")",
 					10
 				)

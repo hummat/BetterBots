@@ -558,9 +558,19 @@ EngagementLeash.register_hooks()
 -- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod
 -- on the same path silently clobber each other (#67). Single callback installs all hooks.
 mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", function(BtBotMeleeAction)
-	MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
-	Poxburster.install_melee_hooks(BtBotMeleeAction)
-	EngagementLeash.install_melee_hooks(BtBotMeleeAction)
+	local ok, err
+	ok, err = pcall(MeleeAttackChoice.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: melee_attack_choice hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(Poxburster.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: poxburster melee hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(EngagementLeash.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: engagement_leash hook install failed: " .. tostring(err))
+	end
 	if _debug_enabled() then
 		_debug_log(
 			"hook_require:bt_bot_melee_action",
@@ -717,7 +727,10 @@ mod:hook_require(
 
 -- Charge consume tracking + VFX suppression (#42). Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
-	VfxSuppression.install_ability_ext_hooks(PlayerUnitAbilityExtension)
+	local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
+	if not ok then
+		mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
+	end
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
 		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 			return
@@ -850,8 +863,15 @@ mod:hook_require(
 -- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39) + main update tick.
 -- Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
-	HealingDeferral.install_behavior_ext_hooks(BotBehaviorExtension)
-	AmmoPolicy.install_behavior_ext_hooks(BotBehaviorExtension)
+	local ok, err
+	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: healing_deferral behavior hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(AmmoPolicy.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
+	end
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",
