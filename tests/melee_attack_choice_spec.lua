@@ -74,14 +74,10 @@ describe("melee_attack_choice", function()
 		assert.equals(weapon_meta_data.control_attack, chosen)
 	end)
 
-	it("registers a _choose_attack hook", function()
+	it("installs a _choose_attack hook via install_melee_hooks", function()
 		local MeleeAttackChoice = load_module()
 		local hooked_method
 		local stub_mod = {
-			hook_require = function(_, path, callback)
-				assert.equals("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", path)
-				callback({})
-			end,
 			hook = function(_, _, method_name, _handler)
 				hooked_method = method_name
 			end,
@@ -105,7 +101,7 @@ describe("melee_attack_choice", function()
 			ARMOR_TYPE_ARMORED = ARMORED,
 		})
 
-		MeleeAttackChoice.register_hooks()
+		MeleeAttackChoice.install_melee_hooks({})
 
 		assert.equals("_choose_attack", hooked_method)
 		_G.Armor = nil
@@ -116,9 +112,6 @@ describe("melee_attack_choice", function()
 		local hook_handler
 		local debug_logs = {}
 		local stub_mod = {
-			hook_require = function(_, _, callback)
-				callback({})
-			end,
 			hook = function(_, _, _, handler)
 				hook_handler = handler
 			end,
@@ -148,7 +141,7 @@ describe("melee_attack_choice", function()
 			ARMOR_TYPE_ARMORED = ARMORED,
 		})
 
-		MeleeAttackChoice.register_hooks()
+		MeleeAttackChoice.install_melee_hooks({})
 
 		local light_attack = attack_meta({ arc = 0, penetrating = false })
 		local heavy_attack = attack_meta({ arc = 2, penetrating = true })

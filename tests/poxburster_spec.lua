@@ -179,11 +179,6 @@ describe("poxburster", function()
 
 			Poxburster.init({
 				mod = {
-					hook_require = function(_self, path, callback)
-						if path == "scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action" then
-							callback({})
-						end
-					end,
 					hook_safe = function() end,
 					hook = function(_self, _target, method_name, handler)
 						if method_name == "_should_push" then
@@ -206,7 +201,7 @@ describe("poxburster", function()
 					return 42
 				end,
 			})
-			Poxburster.register_hooks()
+			Poxburster.install_melee_hooks({})
 
 			local scratchpad = {
 				unit = "bot_unit",

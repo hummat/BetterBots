@@ -541,6 +541,15 @@ HealingDeferral.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 
+-- Consolidated bt_bot_melee_action hook_require: three modules hook this path.
+-- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod
+-- on the same path silently clobber each other (#67). Single callback installs all hooks.
+mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", function(BtBotMeleeAction)
+	MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
+	Poxburster.install_melee_hooks(BtBotMeleeAction)
+	EngagementLeash.install_melee_hooks(BtBotMeleeAction)
+end)
+
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
 
@@ -684,8 +693,9 @@ mod:hook_require(
 	end
 )
 
--- Charge consume tracking
+-- Charge consume tracking + VFX suppression (#42). Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
+	VfxSuppression.install_ability_ext_hooks(PlayerUnitAbilityExtension)
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
 		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 			return
@@ -815,8 +825,10 @@ mod:hook_require(
 	end
 )
 
--- BotBehaviorExtension: ADS gestalt injection (#35) + main update tick
+-- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39) + main update tick.
+-- Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+	HealingDeferral.install_behavior_ext_hooks(BotBehaviorExtension)
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",

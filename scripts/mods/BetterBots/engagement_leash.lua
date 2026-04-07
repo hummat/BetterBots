@@ -156,15 +156,26 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
-function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
-		function(BtBotMeleeAction)
-			_mod:hook(
-				BtBotMeleeAction,
-				"_allow_engage",
-				function(
-					func,
+-- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
+function M.install_melee_hooks(BtBotMeleeAction)
+	_mod:hook(
+		BtBotMeleeAction,
+		"_allow_engage",
+		function(
+			func,
+			self,
+			self_unit,
+			target_unit,
+			target_position,
+			target_breed,
+			scratchpad,
+			action_data,
+			already_engaged,
+			aim_position,
+			follow_position
+		)
+			if _is_enabled and not _is_enabled() then
+				return func(
 					self,
 					self_unit,
 					target_unit,
@@ -176,108 +187,95 @@ function M.register_hooks()
 					aim_position,
 					follow_position
 				)
-					if _is_enabled and not _is_enabled() then
-						return func(
-							self,
-							self_unit,
-							target_unit,
-							target_position,
-							target_breed,
-							scratchpad,
-							action_data,
-							already_engaged,
-							aim_position,
-							follow_position
-						)
-					end
+			end
 
-					if action_data.override_engage_range_to_follow_position == math.huge then
-						return func(
-							self,
-							self_unit,
-							target_unit,
-							target_position,
-							target_breed,
-							scratchpad,
-							action_data,
-							already_engaged,
-							aim_position,
-							follow_position
-						)
-					end
+			if action_data.override_engage_range_to_follow_position == math.huge then
+				return func(
+					self,
+					self_unit,
+					target_unit,
+					target_position,
+					target_breed,
+					scratchpad,
+					action_data,
+					already_engaged,
+					aim_position,
+					follow_position
+				)
+			end
 
-					local perf_t0 = _perf and _perf.begin()
-					local t = _fixed_time()
-					local effective_leash, reason =
-						M.compute_effective_leash(self_unit, target_unit, target_breed, already_engaged, t)
+			local perf_t0 = _perf and _perf.begin()
+			local t = _fixed_time()
+			local effective_leash, reason =
+				M.compute_effective_leash(self_unit, target_unit, target_breed, already_engaged, t)
 
-					local orig_override = action_data.override_engage_range_to_follow_position
-					local orig_challenge = action_data.override_engage_range_to_follow_position_challenge
-					action_data.override_engage_range_to_follow_position = effective_leash
-					action_data.override_engage_range_to_follow_position_challenge = effective_leash
+			local orig_override = action_data.override_engage_range_to_follow_position
+			local orig_challenge = action_data.override_engage_range_to_follow_position_challenge
+			action_data.override_engage_range_to_follow_position = effective_leash
+			action_data.override_engage_range_to_follow_position_challenge = effective_leash
 
-					local result = func(
-						self,
-						self_unit,
-						target_unit,
-						target_position,
-						target_breed,
-						scratchpad,
-						action_data,
-						already_engaged,
-						aim_position,
-						follow_position
-					)
-
-					action_data.override_engage_range_to_follow_position = orig_override
-					action_data.override_engage_range_to_follow_position_challenge = orig_challenge
-
-					if _debug_enabled() and reason ~= "base" then
-						_debug_log(
-							"leash:" .. reason .. ":" .. tostring(self_unit),
-							t,
-							"engagement leash "
-								.. reason
-								.. " → "
-								.. effective_leash
-								.. "m (was "
-								.. orig_override
-								.. "m) result="
-								.. tostring(result)
-						)
-					end
-
-					if perf_t0 then
-						_perf.finish("engagement_leash._allow_engage", perf_t0)
-					end
-					return result
-				end
+			local result = func(
+				self,
+				self_unit,
+				target_unit,
+				target_position,
+				target_breed,
+				scratchpad,
+				action_data,
+				already_engaged,
+				aim_position,
+				follow_position
 			)
 
-			_mod:hook(
-				BtBotMeleeAction,
-				"_is_in_engage_range",
-				function(func, self, self_position, target_position, action_data, follow_position)
-					if _is_enabled and not _is_enabled() then
-						return func(self, self_position, target_position, action_data, follow_position)
-					end
+			action_data.override_engage_range_to_follow_position = orig_override
+			action_data.override_engage_range_to_follow_position_challenge = orig_challenge
 
-					if action_data.engage_range == math.huge then
-						return func(self, self_position, target_position, action_data, follow_position)
-					end
+			if _debug_enabled() and reason ~= "base" then
+				_debug_log(
+					"leash:" .. reason .. ":" .. tostring(self_unit),
+					t,
+					"engagement leash "
+						.. reason
+						.. " → "
+						.. effective_leash
+						.. "m (was "
+						.. orig_override
+						.. "m) result="
+						.. tostring(result)
+				)
+			end
 
-					local orig_engage_range = action_data.engage_range
-					action_data.engage_range = action_data.engage_range_near_follow_position
+			if perf_t0 then
+				_perf.finish("engagement_leash._allow_engage", perf_t0)
+			end
+			return result
+		end
+	)
 
-					local result = func(self, self_position, target_position, action_data, follow_position)
+	_mod:hook(
+		BtBotMeleeAction,
+		"_is_in_engage_range",
+		function(func, self, self_position, target_position, action_data, follow_position)
+			if _is_enabled and not _is_enabled() then
+				return func(self, self_position, target_position, action_data, follow_position)
+			end
 
-					action_data.engage_range = orig_engage_range
-					return result
-				end
-			)
+			if action_data.engage_range == math.huge then
+				return func(self, self_position, target_position, action_data, follow_position)
+			end
+
+			local orig_engage_range = action_data.engage_range
+			action_data.engage_range = action_data.engage_range_near_follow_position
+
+			local result = func(self, self_position, target_position, action_data, follow_position)
+
+			action_data.engage_range = orig_engage_range
+			return result
 		end
 	)
 end
+
+function M.register_hooks() end
 
 M._CONSTANTS = {
 	BASE_LEASH = BASE_LEASH,

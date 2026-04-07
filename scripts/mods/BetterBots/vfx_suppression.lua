@@ -21,31 +21,29 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 end
 
-function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/ability/player_unit_ability_extension",
-		function(PlayerUnitAbilityExtension)
-			_mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
-				local player = extension_init_data.player
-				if player and not player:is_human_controlled() then
-					local ctx = self._equipped_ability_effect_scripts_context
-					if ctx then
-						ctx.is_local_unit = false
-						if _debug_enabled() then
-							_debug_log(
-								"vfx_fix_ability:" .. tostring(unit),
-								0,
-								"patched ability effect context is_local_unit=false for bot",
-								nil,
-								"info"
-							)
-						end
-					end
+-- Called from the consolidated player_unit_ability_extension hook_require in BetterBots.lua (#67).
+function M.install_ability_ext_hooks(PlayerUnitAbilityExtension)
+	_mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
+		local player = extension_init_data.player
+		if player and not player:is_human_controlled() then
+			local ctx = self._equipped_ability_effect_scripts_context
+			if ctx then
+				ctx.is_local_unit = false
+				if _debug_enabled() then
+					_debug_log(
+						"vfx_fix_ability:" .. tostring(unit),
+						0,
+						"patched ability effect context is_local_unit=false for bot",
+						nil,
+						"info"
+					)
 				end
-			end)
+			end
 		end
-	)
+	end)
+end
 
+function M.register_hooks()
 	-- #53: use pre-call hook to set is_local_unit=false BEFORE the original init
 	-- constructs wieldable slot scripts. AimProjectileEffects.init caches
 	-- context.is_local_unit on its own field — a hook_safe (post-call) is too late.
