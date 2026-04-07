@@ -719,6 +719,17 @@ local function resolve_profile(profile)
 	-- Yield before archetype checks so veteran player characters are not mistaken
 	-- for vanilla default bot profiles.
 	if profile.character_id then
+		if _debug_enabled() then
+			_debug_log(
+				"bot_profiles:yield_character_id:" .. tostring(slot_index),
+				0,
+				"preserving external profile for bot slot "
+					.. tostring(slot_index)
+					.. " (character_id="
+					.. tostring(profile.character_id)
+					.. ")"
+			)
+		end
 		return profile, false
 	end
 

@@ -46,7 +46,7 @@ return {
 						setting_id = "bot_ranged_ammo_threshold",
 						type = "numeric",
 						default_value = 20,
-						range = { 5, 30 },
+						range = { 0, 100 },
 						step_size = 5,
 					},
 					{

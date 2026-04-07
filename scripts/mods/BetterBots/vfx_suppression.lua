@@ -70,6 +70,15 @@ function M.register_hooks()
 					end
 
 					if not ok then
+						if is_bot and _debug_enabled() then
+							_debug_log(
+								"vfx_fix_restore_error:" .. tostring(unit),
+								0,
+								"restored visual loadout is_local_unit after init error",
+								nil,
+								"info"
+							)
+						end
 						error(result, 0)
 					end
 

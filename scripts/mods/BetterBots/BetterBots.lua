@@ -561,6 +561,15 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_me
 	MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
 	Poxburster.install_melee_hooks(BtBotMeleeAction)
 	EngagementLeash.install_melee_hooks(BtBotMeleeAction)
+	if _debug_enabled() then
+		_debug_log(
+			"hook_require:bt_bot_melee_action",
+			0,
+			"installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)",
+			nil,
+			"info"
+		)
+	end
 end)
 
 -- Hooks that remain in main: template injection, sprint, BT enter,

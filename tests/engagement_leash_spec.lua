@@ -339,6 +339,7 @@ describe("engagement_leash", function()
 
 		it("restores shared override ranges when _allow_engage throws", function()
 			local hook_handlers = {}
+			local debug_logs = {}
 			local stub_mod = {
 				hook = function(_, _, method_name, handler)
 					hook_handlers[method_name] = handler
@@ -347,9 +348,17 @@ describe("engagement_leash", function()
 
 			EngagementLeash.init({
 				mod = stub_mod,
-				debug_log = function() end,
+				debug_log = function(key, fixed_t, message, interval, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						interval = interval,
+						level = level,
+					}
+				end,
 				debug_enabled = function()
-					return false
+					return true
 				end,
 				fixed_time = function()
 					return 0
@@ -379,10 +388,15 @@ describe("engagement_leash", function()
 			assert.is_false(ok)
 			assert.equals(99, action_data.override_engage_range_to_follow_position)
 			assert.equals(88, action_data.override_engage_range_to_follow_position_challenge)
+			assert.equals(1, #debug_logs)
+			assert.equals("leash_restore_error:" .. tostring(unit), debug_logs[1].key)
+			assert.equals("info", debug_logs[1].level)
+			assert.matches("restored engagement leash overrides after vanilla error", debug_logs[1].message, 1, true)
 		end)
 
 		it("restores shared engage_range when _is_in_engage_range throws", function()
 			local hook_handlers = {}
+			local debug_logs = {}
 			local stub_mod = {
 				hook = function(_, _, method_name, handler)
 					hook_handlers[method_name] = handler
@@ -391,9 +405,17 @@ describe("engagement_leash", function()
 
 			EngagementLeash.init({
 				mod = stub_mod,
-				debug_log = function() end,
+				debug_log = function(key, fixed_t, message, interval, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						interval = interval,
+						level = level,
+					}
+				end,
 				debug_enabled = function()
-					return false
+					return true
 				end,
 				fixed_time = function()
 					return 0
@@ -418,6 +440,10 @@ describe("engagement_leash", function()
 
 			assert.is_false(ok)
 			assert.equals(77, action_data.engage_range)
+			assert.equals(1, #debug_logs)
+			assert.equals("leash_range_restore_error:" .. tostring(action_data), debug_logs[1].key)
+			assert.equals("info", debug_logs[1].level)
+			assert.matches("restored engagement range after vanilla error", debug_logs[1].message, 1, true)
 		end)
 	end)
 end)

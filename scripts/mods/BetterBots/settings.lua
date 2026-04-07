@@ -169,7 +169,7 @@ function M.is_testing_profile()
 end
 
 function M.bot_ranged_ammo_threshold()
-	return _read_percent_setting(BOT_RANGED_AMMO_THRESHOLD_SETTING_ID, DEFAULT_BOT_RANGED_AMMO_THRESHOLD, 5, 30)
+	return _read_percent_setting(BOT_RANGED_AMMO_THRESHOLD_SETTING_ID, DEFAULT_BOT_RANGED_AMMO_THRESHOLD, 0, 100)
 end
 
 function M.human_ammo_reserve_threshold()

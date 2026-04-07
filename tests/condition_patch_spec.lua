@@ -163,6 +163,16 @@ local function find_debug_log(pattern)
 	return nil
 end
 
+local function find_debug_log_by_key(key)
+	for i = 1, #_debug_logs do
+		if _debug_logs[i].key == key then
+			return _debug_logs[i]
+		end
+	end
+
+	return nil
+end
+
 describe("condition_patch", function()
 	before_each(function()
 		reset()
@@ -524,6 +534,7 @@ describe("condition_patch", function()
 			assert.is_true(result)
 			assert.is_truthy(find_debug_log("ranged ammo gate lowered"))
 			assert.is_truthy(find_debug_log("to 0.25"))
+			assert.is_not_nil(find_debug_log_by_key("ranged_ammo_threshold_override:bot1"))
 		end)
 	end)
 end)

@@ -392,7 +392,7 @@ describe("TargetSelection", function()
 			assert.are.equal(5, score)
 		end)
 
-		it("includes the acting bot in the companion-pin debug key", function()
+		it("includes the acting bot in the companion-pin debug key and dedups repeated melee logs", function()
 			local logs = {}
 			TargetSelection.init({
 				mod = _mod,
@@ -423,10 +423,53 @@ describe("TargetSelection", function()
 
 			local breed = { tags = { elite = true }, name = "renegade_captain" }
 			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			local score_repeat = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
 
 			assert.are.equal(-95, score)
+			assert.are.equal(-95, score_repeat)
 			assert.equals(1, #logs)
 			assert.equals("target_sel_companion_pin:" .. tostring(target_unit) .. ":" .. tostring(unit), logs[1].key)
+		end)
+
+		it("dedups repeated ranged companion-pin logs", function()
+			local logs = {}
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function(key, fixed_t, message)
+					logs[#logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local target_unit = {}
+			local unit = {}
+			local attacker_unit = {
+				_breed = { breed_type = "companion" },
+			}
+			_G.BLACKBOARDS[target_unit] = {
+				disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+			}
+
+			local score = _mod.handlers.line_of_sight_weight(original_line_of_sight_weight, unit, target_unit)
+			local score_repeat = _mod.handlers.line_of_sight_weight(original_line_of_sight_weight, unit, target_unit)
+
+			assert.are.equal(-99, score)
+			assert.are.equal(-99, score_repeat)
+			assert.equals(1, #logs)
+			assert.equals(
+				"target_sel_companion_pin_ranged:" .. tostring(target_unit) .. ":" .. tostring(unit),
+				logs[1].key
+			)
 		end)
 	end)
 

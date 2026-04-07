@@ -10,6 +10,8 @@ local _debug_enabled
 local _fixed_time
 local _perf
 local _is_enabled
+local _logged_companion_pin_melee = {}
+local _logged_companion_pin_ranged = {}
 local CHASE_RANGE_SQ = 324
 local DEFAULT_MONSTER_WEIGHT = 2
 local FRIENDLY_COMPANION_PIN_PENALTY = 100
@@ -77,6 +79,8 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
 	_is_enabled = deps.is_enabled
+	_logged_companion_pin_melee = {}
+	_logged_companion_pin_ranged = {}
 end
 
 function M.register_hooks()
@@ -105,14 +109,21 @@ function M.register_hooks()
 					if target_unit and _is_friendly_companion_pin(target_unit) then
 						score = score - FRIENDLY_COMPANION_PIN_PENALTY
 						if _debug_enabled() then
-							_debug_log(
-								"target_sel_companion_pin:" .. tostring(target_unit) .. ":" .. tostring(unit),
-								_fixed_time(),
-								"penalizing friendly companion pin "
-									.. tostring(target_breed.name)
-									.. " -"
-									.. FRIENDLY_COMPANION_PIN_PENALTY
-							)
+							local log_key = "target_sel_companion_pin:"
+								.. tostring(target_unit)
+								.. ":"
+								.. tostring(unit)
+							if not _logged_companion_pin_melee[log_key] then
+								_logged_companion_pin_melee[log_key] = true
+								_debug_log(
+									log_key,
+									_fixed_time(),
+									"penalizing friendly companion pin "
+										.. tostring(target_breed.name)
+										.. " -"
+										.. FRIENDLY_COMPANION_PIN_PENALTY
+								)
+							end
 						end
 					-- Issue #48: Boost score for player-tagged enemies
 					elseif score > 0 and _has_human_player_tag(target_unit) then
@@ -169,11 +180,15 @@ function M.register_hooks()
 			if (not _is_enabled or _is_enabled()) and target_unit and _is_friendly_companion_pin(target_unit) then
 				score = score - FRIENDLY_COMPANION_PIN_PENALTY
 				if _debug_enabled() then
-					_debug_log(
-						"target_sel_companion_pin_ranged:" .. tostring(target_unit) .. ":" .. tostring(unit),
-						_fixed_time(),
-						"penalizing ranged target for friendly companion pin -" .. FRIENDLY_COMPANION_PIN_PENALTY
-					)
+					local log_key = "target_sel_companion_pin_ranged:" .. tostring(target_unit) .. ":" .. tostring(unit)
+					if not _logged_companion_pin_ranged[log_key] then
+						_logged_companion_pin_ranged[log_key] = true
+						_debug_log(
+							log_key,
+							_fixed_time(),
+							"penalizing ranged target for friendly companion pin -" .. FRIENDLY_COMPANION_PIN_PENALTY
+						)
+					end
 				end
 			end
 

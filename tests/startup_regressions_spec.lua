@@ -136,6 +136,23 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
 	end)
 
+	it("emits an install log for the consolidated bt_bot_melee_action hook", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('"hook_require:bt_bot_melee_action"', 1))
+	end)
+
+	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('setting_id = "bot_ranged_ammo_threshold"', 1))
+		assert.is_truthy(source:find("range = { 0, 100 }", 1, true))
+	end)
+
 	it("heuristics.lua uses breed.ranged for ranged_count (not tags.ranged)", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/heuristics.lua", "r"))
 		local source = assert(handle:read("*a"))

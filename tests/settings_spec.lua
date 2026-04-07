@@ -105,6 +105,16 @@ describe("settings", function()
 			assert.are.equal(0.95, Settings.human_ammo_reserve_threshold())
 		end)
 
+		it("accepts full bot ranged ammo threshold extremes", function()
+			Settings.init(mock_mod({
+				bot_ranged_ammo_threshold = 0,
+				bot_human_ammo_reserve_threshold = 100,
+			}))
+
+			assert.are.equal(0.00, Settings.bot_ranged_ammo_threshold())
+			assert.are.equal(1.00, Settings.human_ammo_reserve_threshold())
+		end)
+
 		it("falls back to defaults for invalid ammo slider values", function()
 			Settings.init(mock_mod({
 				bot_ranged_ammo_threshold = "bad",

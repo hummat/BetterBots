@@ -235,6 +235,15 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			end
 
 			if not ok then
+				if _debug_enabled() then
+					_debug_log(
+						"leash_restore_error:" .. tostring(self_unit),
+						t,
+						"restored engagement leash overrides after vanilla error",
+						nil,
+						"info"
+					)
+				end
 				error(result, 0)
 			end
 
@@ -269,12 +278,22 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			end
 
 			local orig_engage_range = action_data.engage_range
+			local t = _fixed_time()
 			action_data.engage_range = action_data.engage_range_near_follow_position
 
 			local ok, result = pcall(func, self, self_position, target_position, action_data, follow_position)
 
 			action_data.engage_range = orig_engage_range
 			if not ok then
+				if _debug_enabled() then
+					_debug_log(
+						"leash_range_restore_error:" .. tostring(action_data),
+						t,
+						"restored engagement range after vanilla error",
+						nil,
+						"info"
+					)
+				end
 				error(result, 0)
 			end
 			return result

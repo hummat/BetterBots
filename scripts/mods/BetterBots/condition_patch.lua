@@ -70,7 +70,7 @@ local function _return_with_perf(perf_t0, ...)
 	return ...
 end
 
-local function _override_ranged_ammo_condition_args(condition_args)
+local function _override_ranged_ammo_condition_args(unit, condition_args)
 	if not condition_args or condition_args.ammo_percentage ~= NORMAL_RANGED_AMMO_THRESHOLD then
 		return condition_args
 	end
@@ -84,7 +84,7 @@ local function _override_ranged_ammo_condition_args(condition_args)
 
 	if _debug_enabled() then
 		_debug_log(
-			"ranged_ammo_threshold_override",
+			"ranged_ammo_threshold_override:" .. tostring(unit),
 			_fixed_time(),
 			"ranged ammo gate lowered from " .. tostring(NORMAL_RANGED_AMMO_THRESHOLD) .. " to " .. tostring(threshold),
 			10
@@ -344,7 +344,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 				end
 				return false
 			end
-			local adjusted_args = _override_ranged_ammo_condition_args(condition_args)
+			local adjusted_args = _override_ranged_ammo_condition_args(unit, condition_args)
 			local result =
 				orig_has_target_and_ammo(unit, blackboard, scratchpad, adjusted_args, action_data, is_running)
 			if result and adjusted_args ~= condition_args and _debug_enabled() then

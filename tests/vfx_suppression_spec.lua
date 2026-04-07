@@ -58,6 +58,7 @@ describe("vfx_suppression", function()
 	it("restores the original is_local_unit value when visual loadout init throws", function()
 		local VfxSuppression = load_module()
 		local visual_loadout_init
+		local debug_logs = {}
 		local stub_mod = {
 			hook_require = function(_, path, callback)
 				if path == "scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension" then
@@ -80,9 +81,17 @@ describe("vfx_suppression", function()
 
 		VfxSuppression.init({
 			mod = stub_mod,
-			debug_log = function() end,
+			debug_log = function(key, fixed_t, message, interval, level)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+					interval = interval,
+					level = level,
+				}
+			end,
 			debug_enabled = function()
-				return false
+				return true
 			end,
 		})
 		VfxSuppression.register_hooks()
@@ -104,5 +113,9 @@ describe("vfx_suppression", function()
 
 		assert.is_false(ok)
 		assert.equals(true, extension_init_data.is_local_unit)
+		assert.equals(1, #debug_logs)
+		assert.equals("vfx_fix_restore_error:bot_unit", debug_logs[1].key)
+		assert.equals("info", debug_logs[1].level)
+		assert.matches("restored visual loadout is_local_unit after init error", debug_logs[1].message, 1, true)
 	end)
 end)
