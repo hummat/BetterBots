@@ -121,7 +121,8 @@ return {
 		en = "Bot ranged ammo threshold",
 	},
 	bot_ranged_ammo_threshold_description = {
-		en = "Bots stop opportunistic ranged fire below this reserve and start looking for ammo at or below it. Priority-target shots are unchanged.",
+		en = "Bots stop opportunistic ranged fire below this reserve and start looking for ammo at or below it. "
+			.. "Priority-target shots are unchanged.",
 	},
 	bot_human_ammo_reserve_threshold = {
 		en = "Human ammo reserve threshold",
