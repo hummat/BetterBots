@@ -10,7 +10,10 @@ _G.cjson = _G.cjson
 local EventLog = dofile("scripts/mods/BetterBots/event_log.lua")
 
 describe("event_log", function()
+	local saved_mods
+
 	before_each(function()
+		saved_mods = rawget(_G, "Mods")
 		EventLog._reset()
 		EventLog.init({
 			mod = { warning = function() end },
@@ -18,6 +21,10 @@ describe("event_log", function()
 				return { num_nearby = ctx and ctx.num_nearby or 0 }
 			end,
 		})
+	end)
+
+	after_each(function()
+		_G.Mods = saved_mods
 	end)
 
 	describe("emit", function()
@@ -114,6 +121,45 @@ describe("event_log", function()
 			assert.is_true(EventLog.is_enabled())
 			EventLog.set_enabled(false)
 			assert.is_false(EventLog.is_enabled())
+		end)
+	end)
+
+	describe("flush", function()
+		it("clears the buffer without crashing when io.open fails", function()
+			_G.Mods = {
+				lua = {
+					io = {
+						open = function()
+							return nil, "permission denied"
+						end,
+					},
+					os = {
+						execute = function() end,
+						time = function()
+							return 123
+						end,
+					},
+				},
+			}
+
+			EventLog._reset()
+			EventLog.init({
+				mod = { warning = function() end },
+				context_snapshot = function(ctx)
+					return { num_nearby = ctx and ctx.num_nearby or 0 }
+				end,
+			})
+			EventLog.set_enabled(true)
+			EventLog.start_session(0)
+			EventLog.emit({ event = "test" })
+
+			local ok, err = pcall(function()
+				EventLog.end_session()
+			end)
+
+			assert.is_true(ok)
+			assert.is_nil(err)
+			assert.are.equal(0, #EventLog._get_buffer())
 		end)
 	end)
 end)

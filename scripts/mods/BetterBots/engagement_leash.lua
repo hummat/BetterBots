@@ -1,12 +1,11 @@
 -- Engagement leash: coherency-anchored combat engagement range (#47)
 --
--- Hooks BtBotMeleeAction._allow_engage and _is_in_engage_range to extend
--- vanilla engagement distances based on combat context:
--- - Already engaged: extend to coherency stickiness_limit (20m)
--- - Post-charge grace: 4s window after movement abilities
--- - Under melee attack: self-defense override
--- - Ranged foray: push toward ranged enemies targeting the bot
--- - Hard cap: 25m (30m if always-in-coherency talent)
+-- _allow_engage hook: extends vanilla engagement distances based on combat
+-- context (already engaged, post-charge grace, target within 3m, ranged foray).
+-- Hard cap: 25m (30m with always-in-coherency talent).
+--
+-- _is_in_engage_range hook: unconditionally normalizes the engage range to
+-- the near-follow-position distance. Does not extend distances.
 
 local M = {}
 
@@ -31,18 +30,16 @@ local COHERENCY_CACHE_REFRESH_S = 1
 -- Per-bot state (weak-keyed on unit)
 local _bot_state = setmetatable({}, { __mode = "k" })
 
--- Movement ability templates that trigger post-charge grace
+-- Movement ability templates that trigger post-charge grace.
+-- Only base template names — ability_component.template_name always reflects the
+-- base ability_template, not talent variant names (e.g. zealot_targeted_dash → zealot_dash).
 local MOVEMENT_ABILITIES = {
 	zealot_dash = true,
-	zealot_targeted_dash = true,
-	zealot_targeted_dash_improved = true,
-	zealot_targeted_dash_improved_double = true,
 	ogryn_charge = true,
-	ogryn_charge_increased_distance = true,
 	adamant_charge = true,
 }
 
--- Special rules for "always in coherency" (Zealot aura)
+-- Special rules for Zealot coherency talents
 local ALWAYS_COHERENCY_RULES = {
 	"zealot_always_at_least_one_coherency",
 	"zealot_always_at_least_two_coherency",
@@ -156,15 +153,26 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
-function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
-		function(BtBotMeleeAction)
-			_mod:hook(
-				BtBotMeleeAction,
-				"_allow_engage",
-				function(
-					func,
+-- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
+function M.install_melee_hooks(BtBotMeleeAction)
+	_mod:hook(
+		BtBotMeleeAction,
+		"_allow_engage",
+		function(
+			func,
+			self,
+			self_unit,
+			target_unit,
+			target_position,
+			target_breed,
+			scratchpad,
+			action_data,
+			already_engaged,
+			aim_position,
+			follow_position
+		)
+			if _is_enabled and not _is_enabled() then
+				return func(
 					self,
 					self_unit,
 					target_unit,
@@ -176,108 +184,121 @@ function M.register_hooks()
 					aim_position,
 					follow_position
 				)
-					if _is_enabled and not _is_enabled() then
-						return func(
-							self,
-							self_unit,
-							target_unit,
-							target_position,
-							target_breed,
-							scratchpad,
-							action_data,
-							already_engaged,
-							aim_position,
-							follow_position
-						)
-					end
+			end
 
-					if action_data.override_engage_range_to_follow_position == math.huge then
-						return func(
-							self,
-							self_unit,
-							target_unit,
-							target_position,
-							target_breed,
-							scratchpad,
-							action_data,
-							already_engaged,
-							aim_position,
-							follow_position
-						)
-					end
+			if action_data.override_engage_range_to_follow_position == math.huge then
+				return func(
+					self,
+					self_unit,
+					target_unit,
+					target_position,
+					target_breed,
+					scratchpad,
+					action_data,
+					already_engaged,
+					aim_position,
+					follow_position
+				)
+			end
 
-					local perf_t0 = _perf and _perf.begin()
-					local t = _fixed_time()
-					local effective_leash, reason =
-						M.compute_effective_leash(self_unit, target_unit, target_breed, already_engaged, t)
+			local perf_t0 = _perf and _perf.begin()
+			local t = _fixed_time()
+			local effective_leash, reason =
+				M.compute_effective_leash(self_unit, target_unit, target_breed, already_engaged, t)
 
-					local orig_override = action_data.override_engage_range_to_follow_position
-					local orig_challenge = action_data.override_engage_range_to_follow_position_challenge
-					action_data.override_engage_range_to_follow_position = effective_leash
-					action_data.override_engage_range_to_follow_position_challenge = effective_leash
+			local orig_override = action_data.override_engage_range_to_follow_position
+			local orig_challenge = action_data.override_engage_range_to_follow_position_challenge
+			action_data.override_engage_range_to_follow_position = effective_leash
+			action_data.override_engage_range_to_follow_position_challenge = effective_leash
 
-					local result = func(
-						self,
-						self_unit,
-						target_unit,
-						target_position,
-						target_breed,
-						scratchpad,
-						action_data,
-						already_engaged,
-						aim_position,
-						follow_position
+			local ok, result = pcall(
+				func,
+				self,
+				self_unit,
+				target_unit,
+				target_position,
+				target_breed,
+				scratchpad,
+				action_data,
+				already_engaged,
+				aim_position,
+				follow_position
+			)
+
+			action_data.override_engage_range_to_follow_position = orig_override
+			action_data.override_engage_range_to_follow_position_challenge = orig_challenge
+			if perf_t0 then
+				_perf.finish("engagement_leash._allow_engage", perf_t0)
+			end
+
+			if not ok then
+				if _debug_enabled() then
+					_debug_log(
+						"leash_restore_error:" .. tostring(self_unit),
+						t,
+						"restored engagement leash overrides after vanilla error",
+						nil,
+						"info"
 					)
-
-					action_data.override_engage_range_to_follow_position = orig_override
-					action_data.override_engage_range_to_follow_position_challenge = orig_challenge
-
-					if _debug_enabled() and reason ~= "base" then
-						_debug_log(
-							"leash:" .. reason .. ":" .. tostring(self_unit),
-							t,
-							"engagement leash "
-								.. reason
-								.. " → "
-								.. effective_leash
-								.. "m (was "
-								.. orig_override
-								.. "m) result="
-								.. tostring(result)
-						)
-					end
-
-					if perf_t0 then
-						_perf.finish("engagement_leash._allow_engage", perf_t0)
-					end
-					return result
 				end
-			)
+				error(result, 0)
+			end
 
-			_mod:hook(
-				BtBotMeleeAction,
-				"_is_in_engage_range",
-				function(func, self, self_position, target_position, action_data, follow_position)
-					if _is_enabled and not _is_enabled() then
-						return func(self, self_position, target_position, action_data, follow_position)
-					end
+			if _debug_enabled() and reason ~= "base" then
+				_debug_log(
+					"leash:" .. reason .. ":" .. tostring(self_unit),
+					t,
+					"engagement leash "
+						.. reason
+						.. " → "
+						.. effective_leash
+						.. "m (was "
+						.. orig_override
+						.. "m) result="
+						.. tostring(result)
+				)
+			end
+			return result
+		end
+	)
 
-					if action_data.engage_range == math.huge then
-						return func(self, self_position, target_position, action_data, follow_position)
-					end
+	_mod:hook(
+		BtBotMeleeAction,
+		"_is_in_engage_range",
+		function(func, self, self_position, target_position, action_data, follow_position)
+			if _is_enabled and not _is_enabled() then
+				return func(self, self_position, target_position, action_data, follow_position)
+			end
 
-					local orig_engage_range = action_data.engage_range
-					action_data.engage_range = action_data.engage_range_near_follow_position
+			if action_data.engage_range == math.huge then
+				return func(self, self_position, target_position, action_data, follow_position)
+			end
 
-					local result = func(self, self_position, target_position, action_data, follow_position)
+			local orig_engage_range = action_data.engage_range
+			local t = _fixed_time()
+			action_data.engage_range = action_data.engage_range_near_follow_position
 
-					action_data.engage_range = orig_engage_range
-					return result
+			local ok, result = pcall(func, self, self_position, target_position, action_data, follow_position)
+
+			action_data.engage_range = orig_engage_range
+			if not ok then
+				if _debug_enabled() then
+					_debug_log(
+						"leash_range_restore_error:" .. tostring(action_data),
+						t,
+						"restored engagement range after vanilla error",
+						nil,
+						"info"
+					)
 				end
-			)
+				error(result, 0)
+			end
+			return result
 		end
 	)
 end
+
+function M.register_hooks() end
 
 M._CONSTANTS = {
 	BASE_LEASH = BASE_LEASH,

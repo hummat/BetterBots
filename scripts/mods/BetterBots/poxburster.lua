@@ -17,8 +17,8 @@ local _fixed_time
 local _perf
 local _is_enabled
 
--- One-shot dedup: log poxburster suppression once per bot per targeting evaluation.
--- Weak-keyed so entries are GC'd when bots despawn.
+-- One-shot dedup: log poxburster suppression once per bot lifetime (weak-keyed,
+-- cleared on GC). Entries are never explicitly reset.
 local _pox_suppress_logged = setmetatable({}, { __mode = "k" })
 
 local function _is_near_any_position(origin_position, positions, threshold, distance_fn)
@@ -242,100 +242,87 @@ function M.register_hooks()
 			end
 		)
 	end)
+end
 
-	-- #54: hook melee action to make bots push poxbursters.
-	-- The approach action has explicit push counter-kill logic: when a player
-	-- pushes during lunge within 5m, a power=2000 counter-hit triggers
-	-- staggered_during_lunge → instakill → attributed explosion.
-	_mod:hook_require(
-		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
-		function(BtBotMeleeAction)
-			-- Defend gate: vanilla requires num_melee_attackers > 0, but an
-			-- approaching poxburster hasn't attacked yet. Override so the bot
-			-- enters the block → push flow.
-			_mod:hook(BtBotMeleeAction, "_should_defend", function(func, self, unit, target_unit, scratchpad)
-				if _is_enabled and not _is_enabled() then
-					return func(self, unit, target_unit, scratchpad)
-				end
+-- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
+-- #54: hook melee action to make bots push poxbursters.
+-- The approach action has explicit push counter-kill logic: when a player
+-- pushes during lunge within 5m, a power=2000 counter-hit triggers
+-- staggered_during_lunge → instakill → attributed explosion.
+function M.install_melee_hooks(BtBotMeleeAction)
+	-- Defend gate: vanilla requires num_melee_attackers > 0, but an
+	-- approaching poxburster hasn't attacked yet. Override so the bot
+	-- enters the block → push flow.
+	_mod:hook(BtBotMeleeAction, "_should_defend", function(func, self, unit, target_unit, scratchpad)
+		if _is_enabled and not _is_enabled() then
+			return func(self, unit, target_unit, scratchpad)
+		end
 
-				local result = func(self, unit, target_unit, scratchpad)
-				if result then
-					return result
-				end
+		local result = func(self, unit, target_unit, scratchpad)
+		scratchpad._bb_bot_unit = unit
+		if result then
+			return result
+		end
 
-				local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
-				local target_breed = data_ext and data_ext:breed()
-				if target_breed and target_breed.name == POXBURSTER_BREED_NAME then
+		local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
+		local target_breed = data_ext and data_ext:breed()
+		if target_breed and target_breed.name == POXBURSTER_BREED_NAME then
+			if _debug_enabled() then
+				_debug_log(
+					"poxburster_defend:" .. tostring(unit),
+					_fixed_time(),
+					"defend gate bypassed for poxburster target",
+					2
+				)
+			end
+			return true
+		end
+
+		return false
+	end)
+
+	-- Push gate: vanilla requires outnumbered (num_enemies > 1). A lone
+	-- poxburster fails this. Bypass — pushing is life-or-death here.
+	_mod:hook(
+		BtBotMeleeAction,
+		"_should_push",
+		function(func, self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
+			if _is_enabled and not _is_enabled() then
+				return func(self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
+			end
+
+			if target_breed and target_breed.name == POXBURSTER_BREED_NAME and in_melee_range then
+				local push_action_input = defense_meta_data.push_action_input
+				local weapon_extension = scratchpad.weapon_extension
+				local push_available =
+					weapon_extension:action_input_is_currently_valid("weapon_action", push_action_input, nil, fixed_t)
+
+				if push_available then
 					if _debug_enabled() then
 						_debug_log(
-							"poxburster_defend:" .. tostring(unit),
-							_fixed_time(),
-							"defend gate bypassed for poxburster target",
+							"poxburster_push:" .. tostring(target_unit) .. ":" .. tostring(scratchpad._bb_bot_unit),
+							fixed_t,
+							"pushing poxburster (bypassed outnumbered gate)",
+							1
+						)
+					end
+					return true, push_action_input
+				else
+					if _debug_enabled() then
+						_debug_log(
+							"poxburster_push_blocked:"
+								.. tostring(target_unit)
+								.. ":"
+								.. tostring(scratchpad._bb_bot_unit),
+							fixed_t,
+							"poxburster push unavailable (action not valid)",
 							2
 						)
 					end
-					return true
 				end
+			end
 
-				return false
-			end)
-
-			-- Push gate: vanilla requires outnumbered (num_enemies > 1). A lone
-			-- poxburster fails this. Bypass — pushing is life-or-death here.
-			_mod:hook(
-				BtBotMeleeAction,
-				"_should_push",
-				function(func, self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
-					if _is_enabled and not _is_enabled() then
-						return func(
-							self,
-							defense_meta_data,
-							scratchpad,
-							in_melee_range,
-							target_unit,
-							target_breed,
-							fixed_t
-						)
-					end
-
-					if target_breed and target_breed.name == POXBURSTER_BREED_NAME and in_melee_range then
-						local push_action_input = defense_meta_data.push_action_input
-						local weapon_extension = scratchpad.weapon_extension
-						local push_available = weapon_extension:action_input_is_currently_valid(
-							"weapon_action",
-							push_action_input,
-							nil,
-							fixed_t
-						)
-
-						if push_available then
-							if _debug_enabled() then
-								_debug_log(
-									"poxburster_push:" .. tostring(target_unit) .. ":" .. tostring(scratchpad.unit),
-									fixed_t,
-									"pushing poxburster (bypassed outnumbered gate)",
-									1
-								)
-							end
-							return true, push_action_input
-						else
-							if _debug_enabled() then
-								_debug_log(
-									"poxburster_push_blocked:"
-										.. tostring(target_unit)
-										.. ":"
-										.. tostring(scratchpad.unit),
-									fixed_t,
-									"poxburster push unavailable (action not valid)",
-									2
-								)
-							end
-						end
-					end
-
-					return func(self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
-				end
-			)
+			return func(self, defense_meta_data, scratchpad, in_melee_range, target_unit, target_breed, fixed_t)
 		end
 	)
 end

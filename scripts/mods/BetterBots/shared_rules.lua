@@ -13,7 +13,7 @@ M.RESCUE_CHARGE_RULES = {
 	adamant_charge_ally_aid = true,
 }
 
--- Parser-level validation for bot ability inputs. Checks whether the action
+-- Parser-level pre-check for bot ability inputs. Checks whether the action
 -- input has a matching sequence config in the parser before falling back to
 -- the action handler's action_input_is_currently_valid.
 function M.action_input_is_bot_queueable(

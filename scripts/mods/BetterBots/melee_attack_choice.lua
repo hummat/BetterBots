@@ -136,73 +136,70 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
-function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
-		function(BtBotMeleeAction)
-			_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
-				if _is_enabled and not _is_enabled() then
-					return func(self, target_unit, target_breed, scratchpad)
-				end
-				local num_enemies = scratchpad.num_enemies_in_proximity or 0
-				local armor = _armor_api()
-				local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
-				local weapon_template = scratchpad.weapon_template or {}
-				local chosen =
-					choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
-				local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
-
-				if
-					_debug_enabled()
-					and ((target_armor ~= _armored_type and num_enemies > 1) or target_armor == _armored_type)
-				then
-					local weapon_name = tostring(weapon_template.name or weapon_template.display_name or "weapon")
-					local armor_bucket = target_armor == _armored_type and "armored" or "unarmored"
-					local choice_key = weapon_name
-						.. ":"
-						.. tostring(chosen_attack)
-						.. ":"
-						.. armor_bucket
-						.. ":"
-						.. _enemy_bucket(num_enemies)
-
-					if not _logged_choice_keys[choice_key] then
-						_logged_choice_keys[choice_key] = true
-						_debug_log(
-							"melee_choice:" .. choice_key,
-							_fixed_time(),
-							"melee choice "
-								.. tostring(chosen_attack)
-								.. " vs "
-								.. armor_bucket
-								.. " target (crowd="
-								.. tostring(num_enemies)
-								.. ", bucket="
-								.. _enemy_bucket(num_enemies)
-								.. ", weapon="
-								.. weapon_name
-								.. ")"
-						)
-					end
-				elseif
-					_debug_enabled()
-					and target_armor ~= _armored_type
-					and num_enemies > 1
-					and chosen == (weapon_template.attack_meta_data or {}).light_attack
-				then
-					_debug_log(
-						"melee_light_bias:"
-							.. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
-						_fixed_time(),
-						"melee light-bias selected light attack for unarmored horde target"
-					)
-				end
-
-				return chosen
-			end)
+-- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
+function M.install_melee_hooks(BtBotMeleeAction)
+	_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
+		if _is_enabled and not _is_enabled() then
+			return func(self, target_unit, target_breed, scratchpad)
 		end
-	)
+		local num_enemies = scratchpad.num_enemies_in_proximity or 0
+		local armor = _armor_api()
+		local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
+		local weapon_template = scratchpad.weapon_template or {}
+		local chosen =
+			choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
+		local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
+
+		if
+			_debug_enabled()
+			and ((target_armor ~= _armored_type and num_enemies > 1) or target_armor == _armored_type)
+		then
+			local weapon_name = tostring(weapon_template.name or weapon_template.display_name or "weapon")
+			local armor_bucket = target_armor == _armored_type and "armored" or "unarmored"
+			local choice_key = weapon_name
+				.. ":"
+				.. tostring(chosen_attack)
+				.. ":"
+				.. armor_bucket
+				.. ":"
+				.. _enemy_bucket(num_enemies)
+
+			if not _logged_choice_keys[choice_key] then
+				_logged_choice_keys[choice_key] = true
+				_debug_log(
+					"melee_choice:" .. choice_key,
+					_fixed_time(),
+					"melee choice "
+						.. tostring(chosen_attack)
+						.. " vs "
+						.. armor_bucket
+						.. " target (crowd="
+						.. tostring(num_enemies)
+						.. ", bucket="
+						.. _enemy_bucket(num_enemies)
+						.. ", weapon="
+						.. weapon_name
+						.. ")"
+				)
+			end
+		elseif
+			_debug_enabled()
+			and target_armor ~= _armored_type
+			and num_enemies > 1
+			and chosen == (weapon_template.attack_meta_data or {}).light_attack
+		then
+			_debug_log(
+				"melee_light_bias:" .. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
+				_fixed_time(),
+				"melee light-bias selected light attack for unarmored horde target"
+			)
+		end
+
+		return chosen
+	end)
 end
+
+function M.register_hooks() end
 
 M.choose_attack_meta_data = choose_attack_meta_data
 M.DEFAULT_ATTACK_META_DATA = DEFAULT_ATTACK_META_DATA

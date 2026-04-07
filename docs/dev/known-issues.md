@@ -4,9 +4,11 @@
 
 1. **DMF `hook_require` clobbering** (#67). Three modules register `hook_require` on `bt_bot_melee_action` from the same mod — DMF stores callbacks as `_file_hooks_by_file[path][mod_name]`, so only the last registration (EngagementLeash) survives. Melee light bias (#52) and poxburster push (#54) are silently broken since v0.9.0.
 
-2. **Veteran bots replaced by wrong class** (#68). `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran player character. DMF hook ordering flips when any additional mod is loaded, causing BetterBots to overwrite Tertium's veteran profile with its default slot class.
+2. ~~Veteran bots replaced by wrong class~~ **Validated and closed** (#68). Run `0` (`console-2026-04-07-15.36.11-a46f7c58-38a2-401c-aefc-1e4e4dfcc9f5.log`) logged preserved external profiles with real `character_id` values for bot slots 1-4, confirming BetterBots yielded to Tertium/SoloPlay profiles instead of overwriting them.
 
-3. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
+3. **Exception-unsafe shared state mutation** (#73). `engagement_leash.lua` temporarily mutates shared `action_data` singleton fields before calling vanilla, and `vfx_suppression.lua` temporarily mutates `extension_init_data.is_local_unit` during visual-loadout init. If the original function throws, the old code skipped restoration and left the mutated state behind for the rest of the session.
+
+4. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
 
 2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 
@@ -24,13 +26,13 @@
 
 2. ~~Stance cancellation complexity (#12).~~ **Closed.** Stances have no release input (`transition = "stay"`). Early cancellation would require template injection or `stop_action()` + buff cleanup — decided not to pursue.
 
-3. **Mastiff-pinned target fixation** (#69). Pounce priority boost (#55) gives +5 melee score to any enemy with `blackboard.disable.type == "pounced"`, including enemies pinned by the Arbites player's own mastiff. Bots stare at pinned targets instead of engaging active threats.
+3. ~~Mastiff-pinned target fixation~~ **Validated and closed** (#69). Run `0` logged both melee and ranged `friendly companion pin -100` penalties against pinned enemies, confirming bots now de-prioritize already-controlled mastiff targets.
 
-4. **Arbites whistle ignores mastiff position** (#70). `_grenade_whistle` heuristic checks enemy presence near the bot but has no awareness of the companion dog's position. The explosion fires at the dog's world position with only 0.3s `trigger_time`.
+4. ~~Arbites whistle ignores mastiff position~~ **Validated and closed** (#70). Run `0` logged repeated `grenade_whistle_block_companion_far` holds plus successful `adamant_whistle` charge consumes, confirming the mastiff-distance gate blocks empty-space whistles while still allowing valid detonations.
 
-5. **Ogryn grenade mid-horde** (#71). `_grenade_horde` heuristic triggers on `num_nearby >= 5` with no melee-distance gate. Ogryn interrupts melee combat to throw a grenade while surrounded.
+5. ~~Ogryn grenade mid-horde~~ **Fixed on `dev/v0.9.1`** (#71). Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics also block under crowd pressure. Crowd-control and area-denial grenades are still allowed in dense fights. Pending in-game validation before release.
 
-6. **Ammo threshold dead band** (#72). BetterBots fire gate at 20% (`condition_patch.lua`), vanilla `needs_ammo` at 10% (`bot_behavior_extension.lua`). Bots idle in the 10-20% band — neither shooting nor seeking ammo.
+6. ~~Ammo threshold dead band~~ **Fixed on `dev/v0.9.1`** (#72). Opportunistic ranged fire and ammo pickup onset now share one configurable threshold, and bots only claim ammo when eligible human ammo users are above the configured reserve. Pending in-game validation before release.
 
 7. BT preemption during revive.
    - BT re-evaluates every frame even while a node is running.

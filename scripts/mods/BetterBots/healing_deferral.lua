@@ -23,18 +23,23 @@ local VALID_MODES = {
 	stations_only = true,
 	stations_and_deployables = true,
 }
-local HUMAN_THRESHOLD_BY_SETTING = {
-	["50"] = 0.50,
-	["75"] = 0.75,
-	["90"] = 0.90,
-	["100"] = 1.00,
-}
-local EMERGENCY_THRESHOLD_BY_SETTING = {
-	never = 0,
-	["10"] = 0.10,
-	["25"] = 0.25,
-	["40"] = 0.40,
-}
+local function _read_percent_setting(setting_id, default_value, min_value, max_value)
+	if not _mod then
+		return default_value
+	end
+
+	local raw_value = _mod:get(setting_id)
+	local numeric_value = tonumber(raw_value)
+	if not numeric_value then
+		return default_value
+	end
+
+	if numeric_value < min_value or numeric_value > max_value then
+		return default_value
+	end
+
+	return numeric_value / 100
+end
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -58,21 +63,11 @@ local function _read_mode_setting()
 end
 
 local function _read_human_threshold_setting()
-	if not _mod then
-		return DEFERRAL_THRESHOLD
-	end
-
-	local value = _mod:get(HUMAN_THRESHOLD_SETTING_ID)
-	return HUMAN_THRESHOLD_BY_SETTING[value] or DEFERRAL_THRESHOLD
+	return _read_percent_setting(HUMAN_THRESHOLD_SETTING_ID, DEFERRAL_THRESHOLD, 50, 100)
 end
 
 local function _read_emergency_threshold_setting()
-	if not _mod then
-		return EMERGENCY_THRESHOLD
-	end
-
-	local value = _mod:get(EMERGENCY_THRESHOLD_SETTING_ID)
-	return EMERGENCY_THRESHOLD_BY_SETTING[value] or EMERGENCY_THRESHOLD
+	return _read_percent_setting(EMERGENCY_THRESHOLD_SETTING_ID, EMERGENCY_THRESHOLD, 0, 50)
 end
 
 local function _resolve_settings()
@@ -184,54 +179,54 @@ local function _warn_missing_health_once()
 	_log("healing_deferral_missing_health", "healing deferral disabled: health utility unavailable")
 end
 
-function M.register_hooks()
-	_mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
-		_mod:hook_safe(BotBehaviorExtension, "_update_health_stations", function(self, unit)
-			local perf_t0 = _perf and _perf.begin()
-			if not (_health and _health.current_health_percent) then
-				_warn_missing_health_once()
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_stations", perf_t0)
-				end
-				return
-			end
-
-			local settings = _resolve_settings()
-			if not _mode_allows_resource(settings.mode, "health_station") then
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_stations", perf_t0)
-				end
-				return
-			end
-
-			local health_station_component = self._health_station_component
-			if not (health_station_component and health_station_component.needs_health) then
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_stations", perf_t0)
-				end
-				return
-			end
-
-			local side = self._side
-			local human_needs_healing =
-				_any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
-			local bot_health_pct = _health.current_health_percent(unit)
-
-			if not _should_defer_resource("health_station", bot_health_pct, human_needs_healing, settings) then
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_stations", perf_t0)
-				end
-				return
-			end
-
-			_apply_health_station_deferral(health_station_component)
-			_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+-- Called from the consolidated bot_behavior_extension hook_require in BetterBots.lua (#67).
+function M.install_behavior_ext_hooks(BotBehaviorExtension)
+	_mod:hook_safe(BotBehaviorExtension, "_update_health_stations", function(self, unit)
+		local perf_t0 = _perf and _perf.begin()
+		if not (_health and _health.current_health_percent) then
+			_warn_missing_health_once()
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
 			end
-		end)
-	end)
+			return
+		end
 
+		local settings = _resolve_settings()
+		if not _mode_allows_resource(settings.mode, "health_station") then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
+		local health_station_component = self._health_station_component
+		if not (health_station_component and health_station_component.needs_health) then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
+		local side = self._side
+		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
+		local bot_health_pct = _health.current_health_percent(unit)
+
+		if not _should_defer_resource("health_station", bot_health_pct, human_needs_healing, settings) then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
+		_apply_health_station_deferral(health_station_component)
+		_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+		if perf_t0 then
+			_perf.finish("healing_deferral.health_stations", perf_t0)
+		end
+	end)
+end
+
+function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 		_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
 			local perf_t0 = _perf and _perf.begin()

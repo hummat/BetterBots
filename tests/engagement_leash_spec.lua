@@ -249,14 +249,17 @@ describe("engagement_leash", function()
 	end)
 
 	describe("is_movement_ability", function()
-		it("recognizes all charge/dash templates", function()
+		it("recognizes base charge/dash templates", function()
 			assert.is_true(EngagementLeash.is_movement_ability("zealot_dash"))
-			assert.is_true(EngagementLeash.is_movement_ability("zealot_targeted_dash"))
-			assert.is_true(EngagementLeash.is_movement_ability("zealot_targeted_dash_improved"))
-			assert.is_true(EngagementLeash.is_movement_ability("zealot_targeted_dash_improved_double"))
 			assert.is_true(EngagementLeash.is_movement_ability("ogryn_charge"))
-			assert.is_true(EngagementLeash.is_movement_ability("ogryn_charge_increased_distance"))
 			assert.is_true(EngagementLeash.is_movement_ability("adamant_charge"))
+		end)
+
+		it("rejects talent variant names (template_name always uses base form)", function()
+			assert.is_false(EngagementLeash.is_movement_ability("zealot_targeted_dash"))
+			assert.is_false(EngagementLeash.is_movement_ability("zealot_targeted_dash_improved"))
+			assert.is_false(EngagementLeash.is_movement_ability("zealot_targeted_dash_improved_double"))
+			assert.is_false(EngagementLeash.is_movement_ability("ogryn_charge_increased_distance"))
 		end)
 
 		it("rejects non-movement abilities", function()
@@ -335,6 +338,115 @@ describe("engagement_leash", function()
 
 			assert.is_nil(breed.ranged)
 			assert.equals("test_breed", breed.name)
+		end)
+
+		it("restores shared override ranges when _allow_engage throws", function()
+			local hook_handlers = {}
+			local debug_logs = {}
+			local stub_mod = {
+				hook = function(_, _, method_name, handler)
+					hook_handlers[method_name] = handler
+				end,
+			}
+
+			EngagementLeash.init({
+				mod = stub_mod,
+				debug_log = function(key, fixed_t, message, interval, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						interval = interval,
+						level = level,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				perf = nil,
+				is_enabled = function()
+					return true
+				end,
+			})
+			EngagementLeash.install_melee_hooks({})
+
+			local unit = make_unit("bot")
+			local target = make_unit("enemy")
+			POSITION_LOOKUP_STUB[unit] = make_pos(0, 0, 0)
+			POSITION_LOOKUP_STUB[target] = make_pos(10, 0, 0)
+			local action_data = {
+				override_engage_range_to_follow_position = 99,
+				override_engage_range_to_follow_position_challenge = 88,
+			}
+
+			local ok = pcall(function()
+				hook_handlers._allow_engage(function()
+					error("boom")
+				end, nil, unit, target, nil, make_breed(), nil, action_data, false, nil, nil)
+			end)
+
+			assert.is_false(ok)
+			assert.equals(99, action_data.override_engage_range_to_follow_position)
+			assert.equals(88, action_data.override_engage_range_to_follow_position_challenge)
+			assert.equals(1, #debug_logs)
+			assert.equals("leash_restore_error:" .. tostring(unit), debug_logs[1].key)
+			assert.equals("info", debug_logs[1].level)
+			assert.matches("restored engagement leash overrides after vanilla error", debug_logs[1].message, 1, true)
+		end)
+
+		it("restores shared engage_range when _is_in_engage_range throws", function()
+			local hook_handlers = {}
+			local debug_logs = {}
+			local stub_mod = {
+				hook = function(_, _, method_name, handler)
+					hook_handlers[method_name] = handler
+				end,
+			}
+
+			EngagementLeash.init({
+				mod = stub_mod,
+				debug_log = function(key, fixed_t, message, interval, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+						interval = interval,
+						level = level,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				perf = nil,
+				is_enabled = function()
+					return true
+				end,
+			})
+			EngagementLeash.install_melee_hooks({})
+
+			local action_data = {
+				engage_range = 77,
+				engage_range_near_follow_position = 11,
+			}
+
+			local ok = pcall(function()
+				hook_handlers._is_in_engage_range(function()
+					error("boom")
+				end, nil, nil, nil, action_data, nil)
+			end)
+
+			assert.is_false(ok)
+			assert.equals(77, action_data.engage_range)
+			assert.equals(1, #debug_logs)
+			assert.equals("leash_range_restore_error:" .. tostring(action_data), debug_logs[1].key)
+			assert.equals("info", debug_logs[1].level)
+			assert.matches("restored engagement range after vanilla error", debug_logs[1].message, 1, true)
 		end)
 	end)
 end)

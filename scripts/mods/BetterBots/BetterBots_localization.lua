@@ -117,6 +117,21 @@ return {
 	enable_engagement_leash_description = {
 		en = "Bots stay in combat longer instead of breaking off to follow. Uses coherency-based ranges.",
 	},
+	bot_ranged_ammo_threshold = {
+		en = "Bot ranged ammo threshold",
+	},
+	bot_ranged_ammo_threshold_description = {
+		en = "Bots stop opportunistic ranged fire below this reserve. "
+			.. "When a human is low on ammo, bots only pick up ammo at or below this threshold. "
+			.. "Priority-target shots are unchanged.",
+	},
+	bot_human_ammo_reserve_threshold = {
+		en = "Human ammo reserve threshold",
+	},
+	bot_human_ammo_reserve_threshold_description = {
+		en = "Bots freely pick up ammo when every eligible human ammo user is above this reserve. "
+			.. "When a human is below this reserve, bots defer ammo to humans unless desperate.",
+	},
 	-- Healing deferral
 	healing_deferral_mode = {
 		en = "Healing deferral mode",
@@ -143,31 +158,8 @@ return {
 		en = "Emergency override",
 	},
 	healing_deferral_emergency_threshold_description = {
-		en = "Bots ignore deferral and heal themselves when their own health drops below this threshold.",
-	},
-	healing_deferral_threshold_10 = {
-		en = "10%% health",
-	},
-	healing_deferral_threshold_25 = {
-		en = "25%% health",
-	},
-	healing_deferral_threshold_40 = {
-		en = "40%% health",
-	},
-	healing_deferral_threshold_50 = {
-		en = "50%% health",
-	},
-	healing_deferral_threshold_75 = {
-		en = "75%% health",
-	},
-	healing_deferral_threshold_90 = {
-		en = "90%% health",
-	},
-	healing_deferral_threshold_100 = {
-		en = "100%% health",
-	},
-	healing_deferral_emergency_never = {
-		en = "Never override (bots may die)",
+		en = "Bots ignore deferral and heal themselves when their own health drops below this threshold. "
+			.. "Set to 0 to never override (bots may die).",
 	},
 	-- Bot profiles
 	bot_slot_1_profile = {

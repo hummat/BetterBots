@@ -91,12 +91,13 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 67 | **P0: hook_require clobbering** | DMF `hook_require` is per-mod last-write-wins. Three modules on `bt_bot_melee_action` → only engagement_leash survives. Melee light bias (#52) and poxburster push (#54) silently broken. Fix: consolidate into single `hook_require` call. |
+| 67 | **P0: hook_require clobbering** | **Done.** April 7 logs show the consolidated `bt_bot_melee_action` hook install and repeated `melee choice ...` lines, confirming the clobbering regression is fixed. |
 | 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
-| 69 | P2: Mastiff-pinned target fixation | Pounce priority boost (#55) applies +5 to friendly mastiff pins. Bots stare at pinned targets. Fix: restore `score > 0` guard or check `disable.attacker_unit`. |
-| 70 | P2: Arbites whistle ignores dog position | `_grenade_whistle` checks enemy presence near bot, not mastiff position. Explosion fires at dog's location with 0.3s trigger_time. Fix: add companion position to context + distance gate. |
-| 71 | P2: Ogryn grenade mid-horde | `_grenade_horde` has no melee distance gate. Ogryn pulls out rock while surrounded. Fix: add `target_enemy_distance < 4` block. |
-| 72 | P3: Ammo threshold dead band | BetterBots fire gate at 20%, vanilla `needs_ammo` at 10%. Bots idle in 10-20% band. Fix: hook `_update_ammo` or lower threshold. |
+| 73 | **P1: exception-safe shared state mutation** | **Done.** Wrapped the temporary shared-state mutations in restore-on-error guards. Kept as defensive hardening; reopen only on actual repro. |
+| 69 | P2: Mastiff-pinned target fixation | **Done.** Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring. |
+| 70 | P2: Arbites whistle ignores dog position | **Done.** Validated in run `0`: invalid whistles were held and valid whistles still consumed charges. |
+| 71 | P2: Ogryn grenade mid-horde | **Done.** April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` only above 4m. |
+| 72 | P3: Configurable ammo policy | **Done.** April 7 logs exercised both the lowered ranged fire gate and ammo pickup decisions in runtime. |
 
 ### v0.10.0 — "Team Coordination"
 
@@ -108,7 +109,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 7 | Revive-with-ability | Inject defensive ability (taunt/stealth/shout) before revive interact node. Requires BT injection research. |
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
 | 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
-| 58 | ScriptUnit.extension guard | 2-line `has_extension` guard on 2 hot paths. Defensive fix. |
 
 ### v1.0.0 — "Bot Identity"
 

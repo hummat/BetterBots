@@ -1470,6 +1470,76 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("blocks horde grenades in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("keeps horde grenades available outside melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("horde", rule)
+		end)
+
+		it("blocks priority grenades under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_friend_rock",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("priority_melee_pressure", rule)
+		end)
+
+		it("blocks krak grenades in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					num_nearby = 2,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("blocks krak grenades under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("priority_melee_pressure", rule)
+		end)
+
 		it("uses defensive smoke only under pressure", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"veteran_smoke_grenade",
@@ -1493,6 +1563,51 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("hold", rule)
+		end)
+
+		it("keeps defensive smoke available under crowd pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_smoke_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					ranged_count = 2,
+					toughness_pct = 0.25,
+					target_enemy = "gunner",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("blocks shock mine only in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 3,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("melee_range", rule)
+		end)
+
+		it("keeps shock mine available under crowd pressure when not in melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("elite_pack", rule)
 		end)
 
 		it("uses Assail against elite targets at safe peril", function()
@@ -1550,6 +1665,20 @@ describe("heuristics", function()
 			assert.matches("peril", rule)
 		end)
 
+		it("keeps zealot throwing knives opted out of the melee gate", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 7,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
 		it("uses Smite on priority targets at safe peril", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",
@@ -1578,6 +1707,21 @@ describe("heuristics", function()
 			assert.matches("peril", rule)
 		end)
 
+		it("keeps Smite opted out of the melee gate", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					num_nearby = 4,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 7,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
 		it("uses Chain Lightning for low-peril crowd control", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_chain_lightning",
@@ -1600,6 +1744,56 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("hold", rule)
+		end)
+
+		describe("adamant_whistle", function()
+			local saved_vector3
+
+			before_each(function()
+				saved_vector3 = rawget(_G, "Vector3")
+				_G.Vector3 = {
+					distance_squared = function(a, b)
+						local dx = a[1] - b[1]
+						local dy = a[2] - b[2]
+						local dz = a[3] - b[3]
+						return dx * dx + dy * dy + dz * dz
+					end,
+				}
+			end)
+
+			after_each(function()
+				_G.Vector3 = saved_vector3
+			end)
+
+			it("uses whistle when the companion is close enough to an elite target", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 8, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = { 1, 0, 0 },
+					})
+				)
+				assert.is_true(result)
+				assert.matches("priority_target", rule)
+			end)
+
+			it("holds whistle when the companion is too far from the target", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 11, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+					})
+				)
+				assert.is_false(result)
+				assert.matches("companion_far", rule)
+			end)
 		end)
 
 		describe("grenade preset offsets", function()
@@ -1629,9 +1823,11 @@ describe("heuristics", function()
 		local saved_managers
 		local saved_position_lookup
 		local saved_script_unit
+		local saved_alive
 		local liquid_results_return_mode
 		local current_fixed_t
 		local captured_liquid_results
+		local script_unit_extensions
 
 		before_each(function()
 			liquid_results_return_mode = "table"
@@ -1640,6 +1836,8 @@ describe("heuristics", function()
 			saved_managers = rawget(_G, "Managers")
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
+			saved_alive = rawget(_G, "ALIVE")
+			script_unit_extensions = nil
 
 			_G.Managers = {
 				state = {
@@ -1672,10 +1870,16 @@ describe("heuristics", function()
 			}
 			_G.POSITION_LOOKUP = {
 				hazard_bot = "hazard_pos",
+				target_enemy = "target_pos",
+				mastiff = "dog_pos",
+			}
+			_G.ALIVE = {
+				mastiff = true,
 			}
 			_G.ScriptUnit = {
-				has_extension = function()
-					return nil
+				has_extension = function(unit, extension_name)
+					local extensions = script_unit_extensions and script_unit_extensions[unit]
+					return extensions and extensions[extension_name] or nil
 				end,
 			}
 			Heuristics.init({
@@ -1695,6 +1899,7 @@ describe("heuristics", function()
 			_G.Managers = saved_managers
 			_G.POSITION_LOOKUP = saved_position_lookup
 			_G.ScriptUnit = saved_script_unit
+			_G.ALIVE = saved_alive
 		end)
 
 		it("marks context as hazardous when hostile liquid overlaps the bot position", function()
@@ -1720,6 +1925,57 @@ describe("heuristics", function()
 			assert.is_true(second_context.in_hazard)
 			assert.are.equal(2, #captured_liquid_results)
 			assert.are.equal(captured_liquid_results[1], captured_liquid_results[2])
+		end)
+
+		it("captures the live companion unit and positions in context", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = {
+						companion_units = function()
+							return { "mastiff" }
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.equals("mastiff", context.companion_unit)
+			assert.equals("dog_pos", context.companion_position)
+			assert.equals("target_pos", context.target_enemy_position)
+		end)
+
+		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()
+			local grenadier_breed = {
+				tags = { minion = true, special = true },
+				game_object_type = "minion_ranged",
+				challenge_rating = 2,
+			}
+			script_unit_extensions = {
+				hazard_bot = {
+					perception_system = {
+						enemies_in_proximity = function()
+							return { "grenadier_unit" }, 1
+						end,
+					},
+				},
+				grenadier_unit = {
+					unit_data_system = {
+						breed = function()
+							return grenadier_breed
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.ranged_count)
+			assert.equals(0, context.melee_count)
 		end)
 	end)
 

@@ -22,7 +22,7 @@ local _rescue_intent
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
-local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
+local _bot_ranged_ammo_threshold
 
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
@@ -70,25 +70,26 @@ local function _return_with_perf(perf_t0, ...)
 	return ...
 end
 
-local function _override_ranged_ammo_condition_args(condition_args)
+local function _override_ranged_ammo_condition_args(unit, condition_args)
 	if not condition_args or condition_args.ammo_percentage ~= NORMAL_RANGED_AMMO_THRESHOLD then
 		return condition_args
 	end
 
+	local threshold = _bot_ranged_ammo_threshold and _bot_ranged_ammo_threshold() or 0.20
 	local adjusted_args = {}
 	for key, value in pairs(condition_args) do
 		adjusted_args[key] = value
 	end
-	adjusted_args.ammo_percentage = BETTERBOTS_RANGED_AMMO_THRESHOLD
+	adjusted_args.ammo_percentage = threshold
 
 	if _debug_enabled() then
 		_debug_log(
-			"ranged_ammo_threshold_override",
+			"ranged_ammo_threshold_override:" .. tostring(unit),
 			_fixed_time(),
 			"ranged ammo gate lowered from "
-				.. tostring(NORMAL_RANGED_AMMO_THRESHOLD)
+				.. string.format("%.0f%%", NORMAL_RANGED_AMMO_THRESHOLD * 100)
 				.. " to "
-				.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD),
+				.. string.format("%.0f%%", threshold * 100),
 			10
 		)
 	end
@@ -123,7 +124,17 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return _return_with_perf(perf_t0, false)
 	end
 
-	local unit_data_extension = ScriptUnit.extension(unit, "unit_data_system")
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"missing_ext:unit_data:" .. tostring(unit),
+				_fixed_time(),
+				"unit_data_system extension absent (stale unit?)"
+			)
+		end
+		return _return_with_perf(perf_t0, false)
+	end
 	local ability_component = unit_data_extension:read_component(ability_component_name)
 	local ability_template_name = ability_component.template_name
 	local fixed_t = _fixed_time()
@@ -208,7 +219,17 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 	end
 
 	local used_input = activation_data.used_input
-	local action_input_extension = ScriptUnit.extension(unit, "action_input_system")
+	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
+	if not action_input_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"missing_ext:action_input:" .. tostring(unit),
+				_fixed_time(),
+				"action_input_system extension absent (stale unit?)"
+			)
+		end
+		return _return_with_perf(perf_t0, false)
+	end
 	local action_input_is_valid = _action_input_is_bot_queueable(
 		action_input_extension,
 		ability_extension,
@@ -346,7 +367,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 				end
 				return false
 			end
-			local adjusted_args = _override_ranged_ammo_condition_args(condition_args)
+			local adjusted_args = _override_ranged_ammo_condition_args(unit, condition_args)
 			local result =
 				orig_has_target_and_ammo(unit, blackboard, scratchpad, adjusted_args, action_data, is_running)
 			if result and adjusted_args ~= condition_args and _debug_enabled() then
@@ -354,7 +375,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					"ranged_ammo_override_active:" .. tostring(unit),
 					_fixed_time(),
 					"ranged permitted with lowered ammo gate (threshold="
-						.. tostring(BETTERBOTS_RANGED_AMMO_THRESHOLD)
+						.. string.format("%.0f%%", adjusted_args.ammo_percentage * 100)
 						.. ")",
 					10
 				)
@@ -401,6 +422,7 @@ function M.wire(deps)
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
 	_is_combat_template_enabled = deps.is_combat_template_enabled
+	_bot_ranged_ammo_threshold = deps.bot_ranged_ammo_threshold
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)

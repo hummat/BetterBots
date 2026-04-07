@@ -212,6 +212,9 @@ assert(PingSystem, "BetterBots: failed to load ping_system module")
 local HealingDeferral = mod:io_dofile("BetterBots/scripts/mods/BetterBots/healing_deferral")
 assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 
+local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
+assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
@@ -453,6 +456,15 @@ HealingDeferral.init({
 	perf = Perf,
 })
 
+AmmoPolicy.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	perf = Perf,
+	settings = Settings,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -475,6 +487,7 @@ ConditionPatch.wire({
 	Debug = Debug,
 	EventLog = EventLog,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
+	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
 })
 
 AbilityQueue.wire({
@@ -540,6 +553,34 @@ ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
+
+-- Consolidated bt_bot_melee_action hook_require: three modules hook this path.
+-- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod
+-- on the same path silently clobber each other (#67). Single callback installs all hooks.
+mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", function(BtBotMeleeAction)
+	local ok, err
+	ok, err = pcall(MeleeAttackChoice.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: melee_attack_choice hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(Poxburster.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: poxburster melee hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(EngagementLeash.install_melee_hooks, BtBotMeleeAction)
+	if not ok then
+		mod:echo("BetterBots: engagement_leash hook install failed: " .. tostring(err))
+	end
+	if _debug_enabled() then
+		_debug_log(
+			"hook_require:bt_bot_melee_action",
+			0,
+			"installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)",
+			nil,
+			"info"
+		)
+	end
+end)
 
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
@@ -684,8 +725,12 @@ mod:hook_require(
 	end
 )
 
--- Charge consume tracking
+-- Charge consume tracking + VFX suppression (#42). Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
+	local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
+	if not ok then
+		mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
+	end
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
 		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 			return
@@ -815,8 +860,18 @@ mod:hook_require(
 	end
 )
 
--- BotBehaviorExtension: ADS gestalt injection (#35) + main update tick
+-- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39) + main update tick.
+-- Consolidated: both modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+	local ok, err
+	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: healing_deferral behavior hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(AmmoPolicy.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
+	end
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",

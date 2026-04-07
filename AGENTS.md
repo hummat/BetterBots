@@ -336,7 +336,7 @@ scripts/mods/BetterBots/
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
-  bot_profiles.lua                          # Default class-diverse bot profiles: archetype/weapon/talent/cosmetic per slot (#45/#63)
+  bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
   engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
   log_levels.lua                            # Tiered debug log level constants and resolution (#40)
