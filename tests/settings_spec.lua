@@ -77,6 +77,45 @@ describe("settings", function()
 		end)
 	end)
 
+	describe("ammo policy settings", function()
+		it("returns default ammo thresholds when mod returns nil", function()
+			Settings.init(mock_mod({}))
+
+			assert.are.equal(0.20, Settings.bot_ranged_ammo_threshold())
+			assert.are.equal(0.80, Settings.human_ammo_reserve_threshold())
+		end)
+
+		it("normalizes numeric slider values into percentages", function()
+			Settings.init(mock_mod({
+				bot_ranged_ammo_threshold = 25,
+				bot_human_ammo_reserve_threshold = 85,
+			}))
+
+			assert.are.equal(0.25, Settings.bot_ranged_ammo_threshold())
+			assert.are.equal(0.85, Settings.human_ammo_reserve_threshold())
+		end)
+
+		it("accepts stringified slider values from DMF", function()
+			Settings.init(mock_mod({
+				bot_ranged_ammo_threshold = "15",
+				bot_human_ammo_reserve_threshold = "95",
+			}))
+
+			assert.are.equal(0.15, Settings.bot_ranged_ammo_threshold())
+			assert.are.equal(0.95, Settings.human_ammo_reserve_threshold())
+		end)
+
+		it("falls back to defaults for invalid ammo slider values", function()
+			Settings.init(mock_mod({
+				bot_ranged_ammo_threshold = "bad",
+				bot_human_ammo_reserve_threshold = -1,
+			}))
+
+			assert.are.equal(0.20, Settings.bot_ranged_ammo_threshold())
+			assert.are.equal(0.80, Settings.human_ammo_reserve_threshold())
+		end)
+	end)
+
 	describe("category gates", function()
 		it("disables stance templates when enable_stances is off", function()
 			Settings.init(mock_mod({ enable_stances = false }))

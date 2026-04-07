@@ -43,6 +43,20 @@ return {
 					{ setting_id = "enable_ranged_improvements", type = "checkbox", default_value = true },
 					{ setting_id = "enable_engagement_leash", type = "checkbox", default_value = true },
 					{
+						setting_id = "bot_ranged_ammo_threshold",
+						type = "numeric",
+						default_value = 20,
+						range = { 5, 30 },
+						step_size = 5,
+					},
+					{
+						setting_id = "bot_human_ammo_reserve_threshold",
+						type = "numeric",
+						default_value = 80,
+						range = { 50, 100 },
+						step_size = 5,
+					},
+					{
 						setting_id = "healing_deferral_mode",
 						type = "dropdown",
 						default_value = "stations_and_deployables",

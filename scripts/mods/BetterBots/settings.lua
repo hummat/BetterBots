@@ -80,6 +80,10 @@ local VALID_PRESETS = {
 	balanced = true,
 	conservative = true,
 }
+local DEFAULT_BOT_RANGED_AMMO_THRESHOLD = 0.20
+local DEFAULT_HUMAN_AMMO_RESERVE_THRESHOLD = 0.80
+local BOT_RANGED_AMMO_THRESHOLD_SETTING_ID = "bot_ranged_ammo_threshold"
+local HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID = "bot_human_ammo_reserve_threshold"
 
 local function _setting_enabled(setting_id)
 	if not _mod then
@@ -92,6 +96,24 @@ local function _setting_enabled(setting_id)
 	end
 
 	return value == true
+end
+
+local function _read_percent_setting(setting_id, default_value, min_value, max_value)
+	if not _mod then
+		return default_value
+	end
+
+	local raw_value = _mod:get(setting_id)
+	local numeric_value = tonumber(raw_value)
+	if not numeric_value then
+		return default_value
+	end
+
+	if numeric_value < min_value or numeric_value > max_value then
+		return default_value
+	end
+
+	return numeric_value / 100
 end
 
 -- Minimal veteran class_tag resolution for the dual-category gate.
@@ -144,6 +166,14 @@ end
 
 function M.is_testing_profile()
 	return M.resolve_preset() == "testing"
+end
+
+function M.bot_ranged_ammo_threshold()
+	return _read_percent_setting(BOT_RANGED_AMMO_THRESHOLD_SETTING_ID, DEFAULT_BOT_RANGED_AMMO_THRESHOLD, 5, 30)
+end
+
+function M.human_ammo_reserve_threshold()
+	return _read_percent_setting(HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID, DEFAULT_HUMAN_AMMO_RESERVE_THRESHOLD, 50, 100)
 end
 
 function M.is_combat_template_enabled(template_name, ability_extension)
