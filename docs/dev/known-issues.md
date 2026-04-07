@@ -2,7 +2,11 @@
 
 ## High severity
 
-1. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
+1. **DMF `hook_require` clobbering** (#67). Three modules register `hook_require` on `bt_bot_melee_action` from the same mod — DMF stores callbacks as `_file_hooks_by_file[path][mod_name]`, so only the last registration (EngagementLeash) survives. Melee light bias (#52) and poxburster push (#54) are silently broken since v0.9.0.
+
+2. **Veteran bots replaced by wrong class** (#68). `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran player character. DMF hook ordering flips when any additional mod is loaded, causing BetterBots to overwrite Tertium's veteran profile with its default slot class.
+
+3. ~~Non-veteran bot profiles crash on Darktide 1.11.0 (Warband)~~ **Fixed** (#65). Root cause: `ProfileSynchronizerClient` overwrites the BotPlayer's profile with a JSON-reconstructed version that loses weapon overrides and has talents stripped by `validate_talent_layouts` (new in 1.11). Fix: tag resolved profiles with `is_local_profile = true` (bypasses `unit_templates.lua` validation) and `_bb_resolved = true`, hook `BotPlayer.set_profile` to block the lossy overwrite.
 
 2. ~~DMF toggle safety is incomplete.~~ **Fixed in v0.8.0** (#57): `is_togglable = false`. The mod mutates global singletons (`AbilityTemplates`, `bt_bot_conditions`, `Overheat`, breed data) — DMF's `disable_all_hooks()` cannot revert these. Restart to disable.
 
@@ -20,7 +24,15 @@
 
 2. ~~Stance cancellation complexity (#12).~~ **Closed.** Stances have no release input (`transition = "stay"`). Early cancellation would require template injection or `stop_action()` + buff cleanup — decided not to pursue.
 
-3. BT preemption during revive.
+3. **Mastiff-pinned target fixation** (#69). Pounce priority boost (#55) gives +5 melee score to any enemy with `blackboard.disable.type == "pounced"`, including enemies pinned by the Arbites player's own mastiff. Bots stare at pinned targets instead of engaging active threats.
+
+4. **Arbites whistle ignores mastiff position** (#70). `_grenade_whistle` heuristic checks enemy presence near the bot but has no awareness of the companion dog's position. The explosion fires at the dog's world position with only 0.3s `trigger_time`.
+
+5. **Ogryn grenade mid-horde** (#71). `_grenade_horde` heuristic triggers on `num_nearby >= 5` with no melee-distance gate. Ogryn interrupts melee combat to throw a grenade while surrounded.
+
+6. **Ammo threshold dead band** (#72). BetterBots fire gate at 20% (`condition_patch.lua`), vanilla `needs_ammo` at 10% (`bot_behavior_extension.lua`). Bots idle in the 10-20% band — neither shooting nor seeking ammo.
+
+7. BT preemption during revive.
    - BT re-evaluates every frame even while a node is running.
    - Ability activation (priority 8-9) CAN interrupt an in-progress revive (priority 2) if `can_revive` becomes false momentarily.
    - Fix: Check `blackboard.behavior.current_interaction_unit ~= nil` in ability condition to block activation during any active interaction.

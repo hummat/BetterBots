@@ -85,6 +85,19 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | — | Parser-level input validation | **Done.** `_action_input_is_bot_queueable` in shared_rules.lua: check parser sequence_configs before action handler validation. Fixes 1.11.x action input rejection. |
 | — | Event log JSON fix | **Done.** `_json_safe_number` sanitizes `math.huge`/`NaN` before `cjson.encode`. |
 
+### v0.9.1 — Hotfix (user-reported regressions)
+
+*Theme: fix regressions and behavior issues reported on Nexus after v0.9.0.*
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 67 | **P0: hook_require clobbering** | DMF `hook_require` is per-mod last-write-wins. Three modules on `bt_bot_melee_action` → only engagement_leash survives. Melee light bias (#52) and poxburster push (#54) silently broken. Fix: consolidate into single `hook_require` call. |
+| 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
+| 69 | P2: Mastiff-pinned target fixation | Pounce priority boost (#55) applies +5 to friendly mastiff pins. Bots stare at pinned targets. Fix: restore `score > 0` guard or check `disable.attacker_unit`. |
+| 70 | P2: Arbites whistle ignores dog position | `_grenade_whistle` checks enemy presence near bot, not mastiff position. Explosion fires at dog's location with 0.3s trigger_time. Fix: add companion position to context + distance gate. |
+| 71 | P2: Ogryn grenade mid-horde | `_grenade_horde` has no melee distance gate. Ogryn pulls out rock while surrounded. Fix: add `target_enemy_distance < 4` block. |
+| 72 | P3: Ammo threshold dead band | BetterBots fire gate at 20%, vanilla `needs_ammo` at 10%. Bots idle in 10-20% band. Fix: hook `_update_ammo` or lower threshold. |
+
 ### v0.10.0 — "Team Coordination"
 
 *Theme: bots coordinate with each other and fight smarter per-weapon.*

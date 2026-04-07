@@ -128,24 +128,40 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 
 **Unit tests**: 518 tests via busted.
 
-## v0.9.0 — "Combat Awareness" (in progress on `dev/v0.9.0`)
+## v0.9.0 — "Combat Awareness" (2026-04-02)
 
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
-| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Fixed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Awaiting in-game validation. |
-| #54 | Push poxbursters | **Done** | `_should_push` outnumbered gate bypassed for poxburster breed + push logging |
-| #55 | Prioritize mastiff-pounced enemies | **Done** | Score boost for immobilized targets in `target_selection.lua` |
-| #53 | Rumbler VFX timing gap | **Done** | Pre-call hook on loadout init (crash was from profiles, not VFX — restored after #65 investigation) |
-| #47 | Combat-aware engagement leash | **Done** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides |
-| #37 | Objective-aware ability activation | Not started | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
+| #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Closed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Validated on 1.11.3. |
+| #54 | Push poxbursters | **Closed** | `_should_push` outnumbered gate bypassed for poxburster breed. **Note:** hook silently broken by #67 (hook_require clobbering). |
+| #55 | Prioritize mastiff-pounced enemies | **Closed** | Score boost for immobilized targets. **Note:** also boosts friendly mastiff pins (#69). |
+| #53 | Rumbler VFX timing gap | **Closed** | Pre-call hook on loadout init. |
+| #47 | Combat-aware engagement leash | **Closed** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. 700+ override events. |
+| #39 | Healing deferral | **Closed** | Validated: 80+ health station deferral events. |
+| #37 | Objective-aware ability activation | Deferred to v1.0.0 | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
+
+**Unit tests**: 579 tests via busted.
+
+## v0.9.1 — Hotfix (planned)
+
+User-reported regressions and behavior issues from Nexus feedback (2026-04-05/07).
+
+| Issue | Feature | Severity | Status |
+|-------|---------|----------|--------|
+| #67 | hook_require clobbering (melee light + poxburster push) | **P0** | Open — root cause confirmed |
+| #68 | Veteran class swap with other mods | **P1** | Open — root cause confirmed |
+| #69 | Mastiff-pinned target fixation | P2 | Open |
+| #70 | Arbites whistle ignores dog position | P2 | Open |
+| #71 | Ogryn grenade mid-horde | P2 | Open |
+| #72 | Ammo threshold dead band (10-20%) | P3 | Open |
 
 ## Next Steps
 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS), #58 (ScriptUnit guard)
-- **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
+- **v1.0.0 "Bot Identity"**: #37 (objective-aware), #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)
-- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #39 (healing deferral), #49 (Arbites companion tag, DLC)
+- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #49 (Arbites companion tag, DLC)
 
 See `docs/dev/roadmap.md` for full batch details.
