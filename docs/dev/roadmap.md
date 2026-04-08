@@ -108,6 +108,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 14 | Ability cooldown staggering | Post-activation category cooldown (~100-150 LOC). Emergency overrides for critical abilities. Feasibility analysis complete. |
 | 37 | Objective-aware ability activation (P1) | Shield/Escort interaction profiles in `build_context()`, threshold adjustments for nearby defensive abilities, and close-range mobility suppression. Leave dash-toward / per-type tuning for later phases. |
 | 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target`, reusing ping-system target priority and dedup/backoff logic. Arbites is testable; no longer validation-gated. |
+| 81 | Expand settings surface | Slider controls for post-v0.8.0 features: player-tag bonus, horde light bias, sprint distance, special chase range (slider-with-zero = off), plus smart targeting and daemonhost avoidance toggles. Replaces `enable_sprint`/`enable_special_penalty` checkboxes. |
 
 Follow-up after `#37` P1:
 - `#7` revive-with-ability narrows to the reviving bot self-casting a defensive ability. The high-value nearby protection slice should already be covered by interaction-aware ally protection, so the remaining BT injection work is smaller and can wait.
