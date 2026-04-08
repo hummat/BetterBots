@@ -26,29 +26,43 @@ ally_interaction_profile = nil,    -- "shield" or "escort"
 
 ## Detection
 
-A **new loop** in `build_context()` over `side.valid_player_units` (all alive teammates, max 3). Separate from the existing coherency loop — wider range catches allies outside coherency (~8m).
+A **new loop** in `build_context()` over `side.valid_player_units` (all teammates on the same side). Separate from the existing coherency loop — wider range catches allies outside coherency (~8m). The loop **must skip `ally_unit == unit`** (self-exclusion) since `valid_player_units` includes the bot itself.
 
-Two detection paths in the same loop:
+Three detection paths in the same loop, checked in order:
 
-### Shield profile (interaction component)
+### 1. Minigame state (terminal decode phase)
 
 ```lua
-local interaction_component = ally_data:read_component("interaction")
-if interaction_component.state == INTERACTION_STATE_IS_INTERACTING then
-    -- classify interaction_component.type into profile
+local ally_char_state = ally_data:read_component("character_state")
+if ally_char_state.state_name == "minigame" then
+    -- shield profile (terminal hacking)
 end
 ```
 
-### Escort profile (inventory component)
+**Why this is needed:** `decoding` has `duration = 0` in `interaction_templates.lua` — it's an instant interaction that immediately transitions to `player_character_state_minigame`. The minigame state explicitly clears `interaction.state = none` on entry (line 77 of `player_character_state_minigame.lua`). Without this check, the entire terminal-hacking phase — the most important objective interaction — would be invisible to the scan.
+
+### 2. Sustained interaction (hold interactions)
 
 ```lua
-local inventory_component = ally_data:read_component("inventory")
-if inventory_component.wielded_slot == "slot_luggable" then
+if ally_char_state.state_name == "interacting" then
+    local interacting_state = ally_data:read_component("interacting_character_state")
+    local interaction_type = interacting_state.interaction_template
+    -- classify interaction_type into profile via SHIELD_INTERACTION_TYPES lookup
+end
+```
+
+Uses `character_state.state_name` as the primary signal (catches all sustained interactions), then reads `interacting_character_state.interaction_template` for type classification. This is more reliable than reading the `interaction` component directly, which can be stale.
+
+### 3. Escort profile (luggable carrying)
+
+```lua
+local ally_inventory = ally_data:read_component("inventory")
+if ally_inventory.wielded_slot == "slot_luggable" then
     -- escort profile
 end
 ```
 
-**Why two paths:** `luggable` and `luggable_socket` have `duration = 0` in `interaction_templates.lua` — they are instant pickup/deposit events, not sustained interactions. Carrying a battery is tracked via the inventory system (`wielded_slot`), not the interaction system. All Shield-profile interactions are sustained holds (1-4s duration) and are visible in the interaction component.
+**Why a separate path:** `luggable` and `luggable_socket` have `duration = 0` in `interaction_templates.lua` — they are instant pickup/deposit events, not sustained interactions. Carrying a battery is tracked via the inventory system (`wielded_slot`), not the interaction or character state system.
 
 ### Priority
 
@@ -68,12 +82,13 @@ Cache the `side_system` reference as a module-local via `init(deps)` (same patte
 
 ## Profile Classification
 
-| Profile | Interaction types | Detection |
-|---------|-------------------|-----------|
-| **shield** | `scanning`, `setup_decoding`, `decoding`, `setup_breach_charge`, `revive`, `rescue`, `pull_up`, `remove_net`, `health_station`, `servo_skull`, `servo_skull_activator` | `read_component("interaction")` — `.state == is_interacting` + `.type` lookup |
-| **escort** | Carrying a luggable (battery, power cell) | `read_component("inventory")` — `.wielded_slot == "slot_luggable"` |
+| Profile | Detected via | Types / condition |
+|---------|-------------|-------------------|
+| **shield** | `character_state.state_name == "minigame"` | Terminal decode phase (always shield) |
+| **shield** | `character_state.state_name == "interacting"` + `interacting_character_state.interaction_template` lookup | `scanning`, `setup_decoding`, `setup_breach_charge`, `revive`, `rescue`, `pull_up`, `remove_net`, `health_station`, `servo_skull`, `servo_skull_activator` |
+| **escort** | `inventory.wielded_slot == "slot_luggable"` | Carrying a battery / power cell |
 
-Types not in either table are ignored (instant pickups, hub interactions, etc.).
+Interaction types not in the shield lookup are ignored (instant pickups, hub interactions, etc.). `decoding` is intentionally absent from the interaction lookup — it has `duration = 0` and immediately transitions to the minigame character state, which is caught by the first detection path.
 
 **Note:** The issue body uses `"scanning_interaction"` — this string does not exist in the engine. The correct template key is `"scanning"` (verified in `interaction_templates.lua`).
 
@@ -86,7 +101,7 @@ Each rule is an early-return branch added before existing rules in the heuristic
 | Ability | Rule | Rationale |
 |---------|------|-----------|
 | Ogryn Taunt | `num_nearby >= 1 AND toughness > 0.30` → activate | Pull aggro from fewer enemies than normal when ally vulnerable |
-| Veteran VoC (Shout) | `num_nearby >= 1` → activate | Stagger/suppress near interacting ally |
+| Veteran VoC (Shout) | `num_nearby >= 1` → activate | Stagger/suppress near interacting ally. **Note:** VoC is dispatched via the special `veteran_combat_ability` path (class_tag `"squad_leader"`), not a standalone template function. The interaction branch goes inside `_can_activate_veteran_combat_ability`. |
 | Psyker Force Field | `ranged_count >= 1 OR num_nearby >= 2` → activate | Dome provides ranged cover for stationary ally |
 | Zealot Relic | `allies_in_coherency >= 1` → activate | Toughness regen aura protects the group during interaction |
 | Arbites Drone | Lower `team_horde_nearby` threshold by 1 | Earlier drone deployment near vulnerable ally |
@@ -133,25 +148,29 @@ Rule ordering in each charge heuristic:
 
 ### Interaction scan log
 
-One log per detected interacting ally, per bot:
+One log in `build_context()` per detected interacting ally, per bot:
 - Key: `"interaction_scan:" .. tostring(unit)`
-- Content: ally unit, type, profile, distance
+- Content: ally unit, type/state, profile, distance
 - Throttled (one-shot per unique ally interaction)
+- **Wiring:** `_debug_log` and `_debug_enabled` must be added as module-local dependencies in `heuristics.lua` via `init(deps)`. Currently `heuristics.lua` has no debug logging — this is the first addition.
 
 ### Per-heuristic logs
 
-Each new interaction branch gets a `_debug_log` call:
-- Key format: `"<ability>_protect_interactor:" .. tostring(unit)`
-- Content: profile, interaction type, distance, resulting rule
-- Per-bot discriminator in key (mandatory per CLAUDE.md logging rules)
+Heuristic functions do not log directly — they return `(can_activate, rule)` and the caller (`condition_patch._can_activate_ability` → `_Debug.log_ability_decision`) handles logging. The new interaction-specific rule names (e.g., `"ogryn_taunt_protect_interactor"`, `"zealot_dash_block_protecting_interactor"`) will be captured automatically by the existing logging infrastructure. No per-heuristic debug log calls needed.
+
+## TeamCooldown Interaction
+
+Objective protection activations **respect TeamCooldown** — no bypass. Rationale: if two bots both want to taunt to protect the same interactor, staggering is still valuable. TeamCooldown already has emergency overrides (ally-aid bypass) that will fire for truly critical situations.
 
 ## Testing
 
 Unit tests extending existing `heuristics_spec.lua` structure:
 
-- **Context construction**: verify `ally_interacting` fields populate from mock side/interaction data
-- **Shield detection**: mock `interaction` component with various types and states
-- **Escort detection**: mock `inventory` component with `wielded_slot = "slot_luggable"`
+- **Context construction**: verify `ally_interacting` fields populate from mock side data
+- **Shield detection (interacting)**: mock `character_state.state_name = "interacting"` + `interacting_character_state.interaction_template` with various types
+- **Shield detection (minigame)**: mock `character_state.state_name = "minigame"` → shield profile
+- **Escort detection**: mock `inventory.wielded_slot = "slot_luggable"`
+- **Self-exclusion**: bot's own unit is skipped in the scan
 - **Per-heuristic branches**: each defensive ability activates at lowered thresholds when `ally_interacting`
 - **Charge suppression**: verify interaction block fires before and overrides `_ally_aid`
 - **Grenade thresholds**: verify lowered thresholds for AoE types, unchanged for single-target
@@ -168,6 +187,9 @@ Estimated ~35-45 new test cases.
 - No dedicated settings toggle — gated by per-ability toggles from #6
 - No BT modifications — pure heuristic-layer changes
 - No escort-specific heuristic branching — both profiles produce identical behavior in P1; the distinction is carried in context fields for P2
+- No hold-the-zone / survive-event phase awareness — those are mission-objective-system states, not ally interaction states. Out of scope.
+- No `health_station` scope distinction — `health_station` is included as a vulnerability signal (player is locked in a 3s hold animation), not because it's a mission objective. The feature is "protect vulnerable allies," not strictly "protect objective-performing allies."
+- Revive/rescue/pull_up/remove_net overlap with existing `target_ally_needs_aid` is intentional — `ally_needs_aid` triggers charge-toward, while `ally_interacting` triggers defensive-stay. Complementary signals, not redundant.
 
 ## Files Modified
 
