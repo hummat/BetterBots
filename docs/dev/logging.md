@@ -118,6 +118,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)
 - `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
 - `suppressed <template> (team_cd:<category>)` (team cooldown staggering — another bot already activated the same category within the suppression window; direct validation signal for `#14`)
+- `shield (<type>) dist=<N>` / `escort (luggable) dist=<N>` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
 
 ## Intentionally suppressed (noise reduction)
 
