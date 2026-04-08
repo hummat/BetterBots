@@ -64,19 +64,22 @@ git commit -m "feat(#37): add ally_interacting context field defaults"
 - Modify: `scripts/mods/BetterBots/heuristics.lua:1-6` (module-local deps)
 - Modify: `scripts/mods/BetterBots/heuristics.lua:1799-1807` (init function)
 - Modify: `scripts/mods/BetterBots/heuristics.lua` (after coherency loop, around line 281)
-- Modify: `scripts/mods/BetterBots/BetterBots.lua:255-262` (Heuristics.init call)
+- Modify: `scripts/mods/BetterBots/BetterBots.lua:255-262` (Heuristics.init call — debug deps only)
 - Modify: `tests/heuristics_spec.lua` (build_context describe block, around line 1822)
 
 - [ ] **Step 1: Write failing tests for interaction scan**
 
-Append to `tests/heuristics_spec.lua` inside the existing `describe("build_context", ...)` block (after line 1880). These tests exercise `build_context` directly by mocking engine globals.
+Append to `tests/heuristics_spec.lua` inside the existing `describe("build_context", ...)` block (after line 1880). These tests exercise `build_context` directly by mocking engine globals. The `side_system` is mocked via `Managers.state.extension.system()` (not `Heuristics.init`) because `build_context` looks it up dynamically.
+
+Tests use helper functions to reduce boilerplate. For the priority test, use Vector3-like tables `{x=N, y=0, z=0}` so distance computation works.
 
 ```lua
 		describe("ally interaction scan", function()
 			local side_player_units
 
-			before_each(function()
-				side_player_units = {}
+			-- Helper: mock side_system via Managers global
+			local function setup_side_system(units)
+				side_player_units = units
 				local original_system = _G.Managers.state.extension.system
 				_G.Managers.state.extension.system = function(_, system_name)
 					if system_name == "side_system" then
@@ -379,7 +382,6 @@ Expected: New tests FAIL because `build_context` does not populate `ally_interac
 In `scripts/mods/BetterBots/heuristics.lua`, add after the existing module-locals (after line 6, `local _resolve_preset`):
 
 ```lua
-local _side_system
 local _debug_log
 local _debug_enabled
 
@@ -402,8 +404,10 @@ local SHIELD_INTERACTION_TYPES = {
 In `scripts/mods/BetterBots/heuristics.lua`, add after the `target_is_super_armor` block (around line 281), before the cache write (`_decision_context_cache[unit] = ...`):
 
 ```lua
-	if _side_system then
-		local side = _side_system.side_by_unit[unit]
+	local side_system = Managers and Managers.state and Managers.state.extension
+		and Managers.state.extension:system("side_system")
+	if side_system then
+		local side = side_system.side_by_unit[unit]
 		local player_units = side and side.valid_player_units
 		if player_units then
 			local best_distance_sq = math.huge
@@ -441,14 +445,14 @@ In `scripts/mods/BetterBots/heuristics.lua`, add after the `target_is_super_armo
 						if profile then
 							local ally_position = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 							local dist_sq = math.huge
-							if unit_position and ally_position and type(ally_position) ~= "string" then
+							if unit_position and ally_position and ally_position.x then
 								local dx = ally_position.x - unit_position.x
 								local dy = ally_position.y - unit_position.y
 								local dz = ally_position.z - unit_position.z
 								dist_sq = dx * dx + dy * dy + dz * dz
 							end
 
-							if dist_sq < best_distance_sq then
+							if not context.ally_interacting or dist_sq < best_distance_sq then
 								best_distance_sq = dist_sq
 								context.ally_interacting = true
 								context.ally_interaction_type = interaction_type
@@ -477,7 +481,10 @@ In `scripts/mods/BetterBots/heuristics.lua`, add after the `target_is_super_armo
 	end
 ```
 
-**Note:** The `type(ally_position) ~= "string"` guard handles unit tests where POSITION_LOOKUP values are strings, not Vector3. In-game this is always a Vector3.
+**Key design choices:**
+- `side_system` is looked up dynamically via `Managers.state.extension:system()` — NOT cached in `init()`. `init()` runs at module load time before extension systems exist. `build_context()` only runs during gameplay when `side_system` is guaranteed alive.
+- `not context.ally_interacting or dist_sq < best_distance_sq` — the first found ally is always accepted (since `ally_interacting` starts false), subsequent allies replace only if closer. This avoids the `math.huge < math.huge` dead-code bug.
+- `ally_position.x` check (not `type() ~= "string"`) — idiomatic Lua duck-typing for Vector3 presence.
 
 - [ ] **Step 5: Wire side_system and debug deps into init**
 
@@ -491,15 +498,16 @@ In `scripts/mods/BetterBots/heuristics.lua`, update the `init` function (around 
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
 		_is_testing_profile = deps.is_testing_profile
 		_resolve_preset = deps.resolve_preset
-		_side_system = deps.side_system
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 	end,
 ```
 
-- [ ] **Step 6: Wire side_system in BetterBots.lua**
+**Note:** `side_system` is NOT wired through init — it's looked up dynamically in `build_context()` because `init()` runs at module load time before extension systems exist.
 
-In `scripts/mods/BetterBots/BetterBots.lua`, update the `Heuristics.init` call (around line 255). Add `side_system`, `debug_log`, and `debug_enabled`:
+- [ ] **Step 6: Wire debug deps in BetterBots.lua**
+
+In `scripts/mods/BetterBots/BetterBots.lua`, update the `Heuristics.init` call (around line 255). Add `debug_log` and `debug_enabled`:
 
 ```lua
 Heuristics.init({
@@ -509,13 +517,12 @@ Heuristics.init({
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_testing_profile = Settings.is_testing_profile,
 	resolve_preset = Settings.resolve_preset,
-	side_system = Managers.state.extension:system("side_system"),
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 })
 ```
 
-**Caution:** `Managers.state.extension:system("side_system")` must be called after the extension system is ready. The existing init block in `BetterBots.lua` runs in `on_game_state_changed` which is after extension systems initialize, so this is safe.
+**Note:** `side_system` is NOT passed here — `Heuristics.init` runs at module load time (line 255 of BetterBots.lua), before extension systems exist. The `side_system` is looked up dynamically inside `build_context()` which only runs during gameplay.
 
 - [ ] **Step 7: Run tests**
 
