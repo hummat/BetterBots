@@ -14,6 +14,7 @@ local _Debug
 local _EventLog
 local _is_combat_template_enabled
 local _perf
+local _TeamCooldown
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -271,6 +272,21 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		end
 	end
 
+	if can_activate and _TeamCooldown then
+		local team_suppressed, team_reason = _TeamCooldown.is_suppressed(unit, ability_template_name, fixed_t, rule)
+		if team_suppressed then
+			if _debug_enabled() then
+				_debug_log(
+					"team_cd:" .. ability_template_name .. ":" .. tostring(unit),
+					fixed_t,
+					"suppressed " .. ability_template_name .. " (" .. tostring(team_reason) .. ")"
+				)
+			end
+			can_activate = false
+			rule = "team_cooldown_suppressed"
+		end
+	end
+
 	_Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
 
 	if _EventLog.is_enabled() then
@@ -423,6 +439,7 @@ function M.wire(deps)
 	_EventLog = deps.EventLog
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 	_bot_ranged_ammo_threshold = deps.bot_ranged_ammo_threshold
+	_TeamCooldown = deps.TeamCooldown
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
