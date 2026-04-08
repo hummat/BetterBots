@@ -1825,12 +1825,14 @@ describe("heuristics", function()
 		local saved_script_unit
 		local saved_alive
 		local liquid_results_return_mode
+		local side_system
 		local current_fixed_t
 		local captured_liquid_results
 		local script_unit_extensions
 
 		before_each(function()
 			liquid_results_return_mode = "table"
+			side_system = nil
 			current_fixed_t = 42
 			captured_liquid_results = {}
 			saved_managers = rawget(_G, "Managers")
@@ -1843,27 +1845,35 @@ describe("heuristics", function()
 				state = {
 					extension = {
 						system = function(_, system_name)
-							assert.equals("liquid_area_system", system_name)
-							return {
-								find_liquid_areas_in_position = function(_, position, results)
-									assert.equals("hazard_pos", position)
-									captured_liquid_results[#captured_liquid_results + 1] = results
-									results[1] = {
-										source_side_name = function()
-											return "enemy"
-										end,
-										area_template_name = function()
-											return "cultist_grenadier_gas"
-										end,
-									}
+							if system_name == "liquid_area_system" then
+								return {
+									find_liquid_areas_in_position = function(_, position, results)
+										captured_liquid_results[#captured_liquid_results + 1] = results
 
-									if liquid_results_return_mode == "number" then
-										return 1
-									end
+										if position == "hazard_pos" then
+											results[1] = {
+												source_side_name = function()
+													return "enemy"
+												end,
+												area_template_name = function()
+													return "cultist_grenadier_gas"
+												end,
+											}
 
-									return results
-								end,
-							}
+											if liquid_results_return_mode == "number" then
+												return 1
+											end
+										end
+
+										return results
+									end,
+								}
+							end
+							if system_name == "side_system" then
+								return side_system
+							end
+
+							assert.is_true(false, "unexpected system lookup: " .. tostring(system_name))
 						end,
 					},
 				},
@@ -1976,6 +1986,247 @@ describe("heuristics", function()
 
 			assert.equals(1, context.ranged_count)
 			assert.equals(0, context.melee_count)
+		end)
+
+		it("defaults when no allies are interacting", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot" },
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interacting_distance)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("detects shield interactions via interacting character state", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "interacting" }
+							end
+							if component_name == "interacting_character_state" then
+								return { interaction_template = "scanning" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("scanning", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects shield interactions via minigame character state", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("minigame", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects escort interactions via luggable slot", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "walking" }
+							end
+							if component_name == "inventory" then
+								return { wielded_slot = "slot_luggable" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("luggable", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("escort", context.ally_interaction_profile)
+		end)
+
+		it("skips self when scanning ally interactions", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot" },
+					},
+				},
+			}
+			script_unit_extensions = {
+				hazard_bot = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("ignores non-shield interaction types", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "interacting" }
+							end
+							if component_name == "interacting_character_state" then
+								return { interaction_template = "ammunition" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("ignores dead allies", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("picks the closest interacting ally", function()
+			side_system = {
+				side_by_unit = {
+					bot_unit = {
+						valid_player_units = { "bot_unit", "far_ally", "close_ally" },
+					},
+				},
+			}
+			_G.ALIVE.far_ally = true
+			_G.ALIVE.close_ally = true
+			_G.POSITION_LOOKUP.bot_unit = { x = 0, y = 0, z = 0 }
+			_G.POSITION_LOOKUP.far_ally = { x = 20, y = 0, z = 0 }
+			_G.POSITION_LOOKUP.close_ally = { x = 5, y = 0, z = 0 }
+			script_unit_extensions = {
+				far_ally = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+				close_ally = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("bot_unit", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("close_ally", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+			assert.is_true(math.abs(context.ally_interacting_distance - 5) < 0.001)
 		end)
 	end)
 

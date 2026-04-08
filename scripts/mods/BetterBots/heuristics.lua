@@ -4,8 +4,22 @@ local _super_armor_breed_cache
 local _armor_type_super_armor
 local _is_testing_profile
 local _resolve_preset
+local _debug_log
+local _debug_enabled
 local _overlapping_liquids = {}
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
+local SHIELD_INTERACTION_TYPES = {
+	scanning = true,
+	setup_decoding = true,
+	setup_breach_charge = true,
+	revive = true,
+	rescue = true,
+	pull_up = true,
+	remove_net = true,
+	health_station = true,
+	servo_skull = true,
+	servo_skull_activator = true,
+}
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
 	gas = true,
@@ -282,6 +296,84 @@ local function build_context(unit, blackboard)
 			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
 			context.target_is_monster = _is_tagged(tags, "monster")
 			context.target_is_super_armor = _breed_has_super_armor(target_breed)
+		end
+	end
+
+	local side_system = Managers
+		and Managers.state
+		and Managers.state.extension
+		and Managers.state.extension:system("side_system")
+	if side_system then
+		local side = side_system.side_by_unit[unit]
+		local player_units = side and side.valid_player_units
+		if player_units then
+			local best_distance_sq = math.huge
+			for i = 1, #player_units do
+				local ally_unit = player_units[i]
+				if ally_unit ~= unit and (not ALIVE or ALIVE[ally_unit]) then
+					local ally_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+					if ally_data then
+						local profile = nil
+						local interaction_type = nil
+
+						local char_state = ally_data:read_component("character_state")
+						local state_name = char_state and char_state.state_name
+
+						if state_name == "minigame" then
+							profile = "shield"
+							interaction_type = "minigame"
+						elseif state_name == "interacting" then
+							local interacting_state = ally_data:read_component("interacting_character_state")
+							local template = interacting_state and interacting_state.interaction_template
+							if template and SHIELD_INTERACTION_TYPES[template] then
+								profile = "shield"
+								interaction_type = template
+							end
+						end
+
+						if not profile then
+							local inventory = ally_data:read_component("inventory")
+							if inventory and inventory.wielded_slot == "slot_luggable" then
+								profile = "escort"
+								interaction_type = "luggable"
+							end
+						end
+
+						if profile then
+							local ally_position = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+							local dist_sq = math.huge
+							if unit_position and ally_position and ally_position.x then
+								local dx = ally_position.x - unit_position.x
+								local dy = ally_position.y - unit_position.y
+								local dz = ally_position.z - unit_position.z
+								dist_sq = dx * dx + dy * dy + dz * dz
+							end
+
+							if not context.ally_interacting or dist_sq < best_distance_sq then
+								best_distance_sq = dist_sq
+								context.ally_interacting = true
+								context.ally_interaction_type = interaction_type
+								context.ally_interacting_unit = ally_unit
+								context.ally_interacting_distance = dist_sq < math.huge and math.sqrt(dist_sq) or nil
+								context.ally_interaction_profile = profile
+							end
+						end
+					end
+				end
+			end
+
+			if context.ally_interacting and _debug_enabled and _debug_enabled() then
+				_debug_log(
+					"interaction_scan:" .. tostring(unit),
+					_fixed_time(),
+					context.ally_interaction_profile
+						.. " ("
+						.. tostring(context.ally_interaction_type)
+						.. ") dist="
+						.. string.format("%.1f", context.ally_interacting_distance or -1),
+					5
+				)
+			end
 		end
 	end
 
@@ -1809,6 +1901,8 @@ return {
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
 		_is_testing_profile = deps.is_testing_profile
 		_resolve_preset = deps.resolve_preset
+		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

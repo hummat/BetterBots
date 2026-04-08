@@ -259,6 +259,8 @@ Heuristics.init({
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_testing_profile = Settings.is_testing_profile,
 	resolve_preset = Settings.resolve_preset,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
 })
 
 ItemFallback.init({
