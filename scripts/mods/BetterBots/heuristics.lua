@@ -1428,7 +1428,8 @@ local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, p
 	end
 
 	local t = GRENADE_HORDE_PRESETS[preset] or GRENADE_HORDE_PRESETS.balanced
-	local adj_nearby = min_nearby + t.nearby_offset
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local adj_nearby = min_nearby + t.nearby_offset - interaction_offset
 	local adj_challenge = min_challenge + t.challenge_offset
 	if context.num_nearby >= adj_nearby and context.challenge_rating_sum >= adj_challenge then
 		return true, rule_prefix .. "_horde"
@@ -1484,15 +1485,22 @@ local function _grenade_defensive(context, rule_prefix, preset)
 	end
 
 	local t = GRENADE_DEFENSIVE_PRESETS[preset] or GRENADE_DEFENSIVE_PRESETS.balanced
+	local interaction_offset = context.ally_interacting and 1 or 0
 	if context.target_ally_needs_aid and context.num_nearby >= 2 then
 		return true, rule_prefix .. "_ally_aid"
 	end
 
-	if context.ranged_count >= (2 + t.count_offset) and context.toughness_pct < (0.50 + t.toughness_offset) then
+	if
+		context.ranged_count >= (2 + t.count_offset - interaction_offset)
+		and context.toughness_pct < (0.50 + t.toughness_offset)
+	then
 		return true, rule_prefix .. "_pressure"
 	end
 
-	if context.num_nearby >= (4 + t.count_offset) and context.toughness_pct < (0.35 + t.toughness_offset) then
+	if
+		context.num_nearby >= (4 + t.count_offset - interaction_offset)
+		and context.toughness_pct < (0.35 + t.toughness_offset)
+	then
 		return true, rule_prefix .. "_pressure"
 	end
 
@@ -1506,11 +1514,12 @@ local function _grenade_mine(context, rule_prefix, preset)
 	end
 
 	local t = GRENADE_MINE_PRESETS[preset] or GRENADE_MINE_PRESETS.balanced
+	local interaction_offset = context.ally_interacting and 1 or 0
 	if context.elite_count >= (3 + t.elite_offset) then
 		return true, rule_prefix .. "_elite_pack"
 	end
 
-	if context.num_nearby >= (5 + t.density_offset) and context.challenge_rating_sum >= 3.0 then
+	if context.num_nearby >= (5 + t.density_offset - interaction_offset) and context.challenge_rating_sum >= 3.0 then
 		return true, rule_prefix .. "_hold_point"
 	end
 
@@ -1598,11 +1607,15 @@ local function _grenade_chain_lightning(context)
 	end
 
 	local t = CHAIN_LIGHTNING_THRESHOLDS[context.preset] or CHAIN_LIGHTNING_THRESHOLDS.balanced
-	if context.num_nearby >= t.crowd then
+	local interaction_offset = context.ally_interacting and 1 or 0
+	if context.num_nearby >= t.crowd - interaction_offset then
 		return true, "grenade_chain_lightning_crowd"
 	end
 
-	if context.num_nearby >= t.mixed_nearby and (context.elite_count + context.special_count) >= 1 then
+	if
+		context.num_nearby >= t.mixed_nearby - interaction_offset
+		and (context.elite_count + context.special_count) >= 1
+	then
 		return true, "grenade_chain_lightning_crowd"
 	end
 

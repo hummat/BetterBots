@@ -2062,6 +2062,108 @@ describe("heuristics", function()
 				assert.is_false(ok_con)
 			end)
 		end)
+
+		describe("interaction protection - grenade thresholds", function()
+			local evaluate_grenade = Heuristics.evaluate_grenade_heuristic
+
+			it("horde grenade activates at lower threshold with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"veteran_frag_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 5,
+						challenge_rating_sum = 2.5,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("horde", rule)
+			end)
+
+			it("horde grenade holds at normal threshold without ally interacting", function()
+				local ok = evaluate_grenade(
+					"veteran_frag_grenade",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 5,
+						challenge_rating_sum = 2.5,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_false(ok)
+			end)
+
+			it("chain_lightning activates at lower crowd with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"psyker_chain_lightning",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("crowd", rule)
+			end)
+
+			it("chain_lightning holds at normal threshold without ally interacting", function()
+				local ok = evaluate_grenade(
+					"psyker_chain_lightning",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 3,
+					})
+				)
+				assert.is_false(ok)
+			end)
+
+			it("defensive grenade activates at lower count with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"veteran_smoke_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+						toughness_pct = 0.30,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("pressure", rule)
+			end)
+
+			it("mine activates at lower density with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"adamant_shock_mine",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 4,
+						challenge_rating_sum = 3.0,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("hold_point", rule)
+			end)
+
+			it("single-target blitz unchanged with ally interacting", function()
+				local ok_with = evaluate_grenade(
+					"veteran_krak_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						target_enemy_distance = 8,
+					})
+				)
+				local ok_without = evaluate_grenade(
+					"veteran_krak_grenade",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 1,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.equals(ok_with, ok_without)
+			end)
+		end)
 	end)
 
 	describe("build_context", function()
