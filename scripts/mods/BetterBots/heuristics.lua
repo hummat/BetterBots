@@ -153,6 +153,11 @@ local function build_context(unit, blackboard)
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
 		in_hazard = false,
+		ally_interacting = false,
+		ally_interaction_type = nil,
+		ally_interacting_unit = nil,
+		ally_interacting_distance = nil,
+		ally_interaction_profile = nil,
 	}
 
 	context.preset = _resolve_preset and _resolve_preset() or "balanced"
