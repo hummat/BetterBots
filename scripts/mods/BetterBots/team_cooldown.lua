@@ -45,7 +45,7 @@ local function _is_emergency(rule)
 	if EMERGENCY_RULES[rule] then
 		return true
 	end
-	if string.find(rule, "_rescue", 1, true) then
+	if string.find(rule, "_ally_aid", 1, true) then
 		return true
 	end
 	return false

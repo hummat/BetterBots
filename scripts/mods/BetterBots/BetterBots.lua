@@ -784,7 +784,9 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				ability_name = ability_name,
 				fixed_t = fixed_t,
 			}
-			TeamCooldown.record(unit, ability_name, fixed_t)
+			if ability_name ~= "unknown" then
+				TeamCooldown.record(unit, ability_name, fixed_t)
+			end
 
 			if EventLog.is_enabled() then
 				local bot_slot = Debug.bot_slot_for_unit(unit)

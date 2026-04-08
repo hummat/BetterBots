@@ -95,15 +95,15 @@ describe("team_cooldown", function()
 			assert.is_false(suppressed)
 		end)
 
-		it("bypasses suppression for any rule containing _rescue", function()
+		it("bypasses suppression for any rule containing _ally_aid", function()
 			TeamCooldown.record(unit_a, "zealot_dash", 10)
-			local suppressed = TeamCooldown.is_suppressed(unit_b, "zealot_dash", 11, "zealot_dash_rescue")
+			local suppressed = TeamCooldown.is_suppressed(unit_b, "zealot_dash", 11, "zealot_dash_ally_aid")
 			assert.is_false(suppressed)
 		end)
 
-		it("bypasses suppression for adamant_charge_rescue", function()
+		it("bypasses suppression for adamant_charge_ally_aid", function()
 			TeamCooldown.record(unit_a, "adamant_charge", 10)
-			local suppressed = TeamCooldown.is_suppressed(unit_b, "adamant_charge", 11, "adamant_charge_rescue")
+			local suppressed = TeamCooldown.is_suppressed(unit_b, "adamant_charge", 11, "adamant_charge_ally_aid")
 			assert.is_false(suppressed)
 		end)
 
@@ -131,6 +131,33 @@ describe("team_cooldown", function()
 			TeamCooldown.record(unit_a, "zealot_dash", 10)
 			assert.is_true(TeamCooldown.is_suppressed(unit_b, "zealot_dash", 13.9))
 			assert.is_false(TeamCooldown.is_suppressed(unit_b, "zealot_dash", 14.1))
+		end)
+	end)
+
+	describe("structural invariants", function()
+		it("suppresses every mapped template within its configured window", function()
+			local templates = {
+				"ogryn_taunt_shout",
+				"adamant_shout",
+				"psyker_shout",
+				"zealot_dash",
+				"zealot_targeted_dash",
+				"zealot_targeted_dash_improved",
+				"zealot_targeted_dash_improved_double",
+				"ogryn_charge",
+				"ogryn_charge_increased_distance",
+				"adamant_charge",
+			}
+
+			for i = 1, #templates do
+				local template_name = templates[i]
+
+				TeamCooldown.reset()
+				TeamCooldown.record(unit_a, template_name, 10)
+
+				local suppressed = TeamCooldown.is_suppressed(unit_b, template_name, 10.5)
+				assert.is_true(suppressed, template_name .. " should be suppressed within its window")
+			end
 		end)
 	end)
 

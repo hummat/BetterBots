@@ -561,5 +561,94 @@ describe("condition_patch", function()
 			assert.is_truthy(find_debug_log("to 25%"))
 			assert.is_not_nil(find_debug_log_by_key("ranged_ammo_threshold_override:bot1"))
 		end)
+
+		it("blocks ability activation when team cooldown suppression is active", function()
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = {
+					read_component = function(_self, component_name)
+						assert.equals("combat_ability_action", component_name)
+						return { template_name = "ogryn_taunt_shout" }
+					end,
+				},
+				ability_system = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				},
+				action_input_system = {
+					_action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								ogryn_taunt_shout = {
+									shout_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true, "ogryn_taunt_surrounded", {}
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function()
+						return true, "team_cd:taunt"
+					end,
+				},
+			})
+
+			local ability_templates = {
+				ogryn_taunt_shout = {
+					ability_meta_data = {
+						activation = {
+							action_input = "shout_pressed",
+						},
+					},
+				},
+			}
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				{ behavior = {}, perception = {} },
+				{},
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_false(result)
+		end)
 	end)
 end)
