@@ -106,7 +106,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | # | Issue | Notes |
 |---|-------|-------|
 | 14 | Ability cooldown staggering | **Done.** Post-activation category cooldown (~130 LOC). 3 categories (taunt/aoe_shout/dash), emergency overrides, ally-aid bypass. 25 tests. Needs in-game validation (`team_cd:` log entries). |
-| 37 | Objective-aware ability activation (P1) | Shield/Escort interaction profiles in `build_context()`, threshold adjustments for nearby defensive abilities, and close-range mobility suppression. Leave dash-toward / per-type tuning for later phases. |
+| 37 | Objective-aware ability activation (P1) | **Done.** 3-path interaction detection (minigame/interacting/luggable), 7 defensive heuristic branches, 3 charge suppressions, 4 grenade threshold adjustments. 31 tests. Needs in-game validation (`interaction_scan:` log entries). |
 | 7 | Revive-with-ability (P1) | Reviving bot self-casts a defensive ability before starting revive. Implement after #37 — reuses `ally_interacting` context fields. P1 scope: gate in existing condition hook / fallback path (no BT node injection). |
 | 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target`, reusing ping-system target priority and dedup/backoff logic. Arbites is testable; no longer validation-gated. |
 | 81 | Expand settings surface | Slider controls for post-v0.8.0 features: player-tag bonus, horde light bias, sprint distance, special chase range (slider-with-zero = off), plus smart targeting and daemonhost avoidance toggles. Replaces `enable_sprint`/`enable_special_penalty` checkboxes. |
