@@ -1579,6 +1579,84 @@ describe("heuristics", function()
 				assert.matches("protect_interactor", rule)
 			end)
 		end)
+
+		describe("charge suppression", function()
+			it("zealot_dash blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+						target_ally_needs_aid = true,
+						target_ally_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("zealot_dash does not block when ally beyond 12m", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 15,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+						target_ally_needs_aid = true,
+						target_ally_distance = 10,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("ally_aid", rule)
+			end)
+
+			it("zealot_dash overrides ally_aid when protecting interactor", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 6,
+						target_enemy = "enemy",
+						target_enemy_distance = 8,
+						target_ally_needs_aid = true,
+						target_ally_distance = 5,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("ogryn_charge blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"ogryn_charge",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("adamant_charge blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"adamant_charge",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+		end)
 	end)
 
 	-- unknown template
