@@ -17,7 +17,7 @@ This mod targets bot ability activation in three paths:
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does twenty-nine things:
+`scripts/mods/BetterBots/BetterBots.lua` does thirty-three things:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -136,6 +136,13 @@ This mod targets bot ability activation in three paths:
     - hook `BtBotMeleeAction._is_in_engage_range`: extend approach range from 6m to 10m when engagement extension conditions hold
     - coherency-scaled base leash: `max(12m, coherency_radius + 4m)` via `UnitCoherencyExtension:current_radius()`, hard cap 25m (30m with always-in-coherency talent)
     - per-bot state in weak-keyed table with 1s coherency cache refresh
+33. Team-level ability cooldown staggering (#14, via `team_cooldown.lua`):
+    - pure state tracker: records activations per ability category, suppresses same-category activations from other bots within a time window
+    - 3 categories: `taunt` (8s window), `aoe_shout` (6s), `dash` (4s) — roughly half the ability cooldown
+    - stances and grenades excluded: stances are self-buffs (independent benefit), grenades are consumable charges (no regeneration)
+    - emergency overrides bypass suppression: `psyker_shout_high_peril`, `zealot_stealth_emergency`, `ogryn_charge_escape`, any `_ally_aid` rule
+    - recording in `use_ability_charge` hook, suppression gate in `condition_patch._can_activate_ability`
+    - reset on game state change (hot-reload safe)
 
 ## DMF module loading pattern
 
