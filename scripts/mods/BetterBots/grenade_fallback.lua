@@ -20,6 +20,7 @@ local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
+local _TeamCooldown
 local _resolve_bot_target_unit_fn
 
 -- State tracking (weak-keyed by unit)
@@ -994,6 +995,20 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
+	if _TeamCooldown then
+		local team_suppressed, team_reason = _TeamCooldown.is_grenade_suppressed(unit, grenade_name, fixed_t, rule)
+		if team_suppressed then
+			if _debug_enabled() then
+				_debug_log(
+					"team_cd:" .. grenade_name .. ":" .. tostring(unit),
+					fixed_t,
+					"grenade suppressed " .. grenade_name .. " (" .. tostring(team_reason) .. ")"
+				)
+			end
+			return
+		end
+	end
+
 	local template_entry = _resolve_template_entry(grenade_name, context, rule)
 	if not template_entry then
 		if _debug_enabled() then
@@ -1165,6 +1180,7 @@ return {
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
+		_TeamCooldown = refs.TeamCooldown
 		local bot_targeting = refs.bot_targeting
 		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 	end,
