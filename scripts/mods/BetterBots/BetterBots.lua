@@ -511,7 +511,6 @@ GrenadeFallback.wire({
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
 	bot_targeting = BotTargeting,
-	TeamCooldown = TeamCooldown,
 })
 
 local function _should_lock_weapon_switch(unit)
@@ -755,7 +754,6 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 			local unit = self._unit
 			if unit then
 				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
-				TeamCooldown.record_grenade(unit, grenade_name, _fixed_time())
 			end
 
 			if _debug_enabled() then
