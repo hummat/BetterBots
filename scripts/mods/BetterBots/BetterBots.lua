@@ -4,6 +4,7 @@ local ArmorSettings = require("scripts/settings/damage/armor_settings")
 local LogLevels = mod:io_dofile("BetterBots/scripts/mods/BetterBots/log_levels")
 local SharedRules = mod:io_dofile("BetterBots/scripts/mods/BetterBots/shared_rules")
 local BotTargeting = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_targeting")
+local TeamCooldown = mod:io_dofile("BetterBots/scripts/mods/BetterBots/team_cooldown")
 local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
@@ -488,6 +489,7 @@ ConditionPatch.wire({
 	EventLog = EventLog,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
+	TeamCooldown = TeamCooldown,
 })
 
 AbilityQueue.wire({
@@ -509,6 +511,7 @@ GrenadeFallback.wire({
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
 	bot_targeting = BotTargeting,
+	TeamCooldown = TeamCooldown,
 })
 
 local function _should_lock_weapon_switch(unit)
@@ -752,6 +755,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 			local unit = self._unit
 			if unit then
 				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
+				TeamCooldown.record_grenade(unit, grenade_name, _fixed_time())
 			end
 
 			if _debug_enabled() then
@@ -782,6 +786,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				ability_name = ability_name,
 				fixed_t = fixed_t,
 			}
+			TeamCooldown.record(unit, ability_name, fixed_t)
 
 			if EventLog.is_enabled() then
 				local bot_slot = Debug.bot_slot_for_unit(unit)
@@ -1035,6 +1040,7 @@ function mod.on_game_state_changed(status, state)
 		_refresh_debug_log_level()
 		Perf.enter_run()
 		BotProfiles.reset()
+		TeamCooldown.reset()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil
 		end
