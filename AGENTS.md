@@ -328,6 +328,7 @@ scripts/mods/BetterBots/
   melee_attack_choice.lua                   # Melee attack-choice hook: bias lights into unarmored hordes while preserving armored heavy preference (#52)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
+  team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
   target_selection.lua                      # Melee target selection distance penalty for specials
   ping_system.lua                           # Bot elite/special pinging system
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
@@ -369,6 +370,7 @@ tests/
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
   engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
+  team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder

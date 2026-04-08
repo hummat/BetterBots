@@ -68,7 +68,7 @@ local function record(unit, template_name, fixed_t)
 	}
 end
 
-local function record_grenade(unit, grenade_name, fixed_t)
+local function record_grenade(unit, grenade_name, fixed_t) -- luacheck: ignore 212/grenade_name
 	_last_activation_by_category.grenade = {
 		unit = unit,
 		fixed_t = fixed_t,
@@ -106,7 +106,7 @@ local function is_suppressed(unit, template_name, fixed_t, rule)
 	return false, nil
 end
 
-local function is_grenade_suppressed(unit, grenade_name, fixed_t, rule)
+local function is_grenade_suppressed(unit, grenade_name, fixed_t, rule) -- luacheck: ignore 212/grenade_name
 	if _is_emergency(rule) then
 		return false, nil
 	end
