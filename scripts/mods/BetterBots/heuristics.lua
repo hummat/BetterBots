@@ -470,6 +470,9 @@ local function _can_activate_veteran_combat_ability(
 		if context.in_hazard and context.num_nearby >= 1 then
 			return true, "veteran_voc_hazard"
 		end
+		if context.ally_interacting and context.num_nearby >= 1 then
+			return true, "veteran_voc_protect_interactor"
+		end
 		if context.num_nearby >= thresholds_voc.surrounded then
 			return true, "veteran_voc_surrounded"
 		end
@@ -883,6 +886,9 @@ local function _can_activate_ogryn_taunt(context, thresholds)
 	if context.toughness_pct < 0.20 and context.health_pct < 0.30 then
 		return false, "ogryn_taunt_block_too_fragile"
 	end
+	if context.ally_interacting and context.num_nearby >= 1 and context.toughness_pct > 0.30 then
+		return true, "ogryn_taunt_protect_interactor"
+	end
 	if context.target_ally_needs_aid and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
 		return true, "ogryn_taunt_ally_aid"
 	end
@@ -1087,6 +1093,9 @@ local ADAMANT_SHOUT_THRESHOLDS = {
 }
 
 local function _can_activate_adamant_shout(context, thresholds)
+	if context.ally_interacting and context.num_nearby >= 1 then
+		return true, "adamant_shout_protect_interactor"
+	end
 	if context.toughness_pct < thresholds.low_toughness and context.num_nearby >= thresholds.low_toughness_nearby then
 		return true, "adamant_shout_low_toughness"
 	end
@@ -1172,6 +1181,9 @@ local function _can_activate_zealot_relic(context, thresholds)
 	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
 		return false, "zealot_relic_block_overwhelmed"
 	end
+	if context.ally_interacting and context.allies_in_coherency >= 1 then
+		return true, "zealot_relic_protect_interactor"
+	end
 	if
 		context.avg_ally_toughness_pct < thresholds.team_toughness
 		and context.allies_in_coherency >= 2
@@ -1215,6 +1227,9 @@ local FORCE_FIELD_THRESHOLDS = {
 local function _can_activate_force_field(context, thresholds)
 	if context.num_nearby == 0 and not context.target_enemy then
 		return false, "force_field_block_no_threats"
+	end
+	if context.ally_interacting and (context.ranged_count >= 1 or context.num_nearby >= 2) then
+		return true, "force_field_protect_interactor"
 	end
 	if context.target_ally_needs_aid then
 		return true, "force_field_ally_aid"
@@ -1262,7 +1277,11 @@ local function _can_activate_drone(context, thresholds)
 	if context.num_nearby <= thresholds.block_low_value_enemies then
 		return false, "drone_block_low_value"
 	end
-	if context.allies_in_coherency >= 2 and context.num_nearby >= thresholds.team_horde_nearby then
+	local team_horde_threshold = thresholds.team_horde_nearby
+	if context.ally_interacting then
+		team_horde_threshold = team_horde_threshold - 1
+	end
+	if context.allies_in_coherency >= 2 and context.num_nearby >= team_horde_threshold then
 		return true, "drone_team_horde"
 	end
 	if
@@ -1277,6 +1296,9 @@ end
 local function _can_activate_stimm_field(context)
 	if context.allies_in_coherency == 0 then
 		return false, "stimm_block_no_allies"
+	end
+	if context.ally_interacting then
+		return true, "stimm_protect_interactor"
 	end
 	if context.max_ally_corruption_pct > 0.30 then
 		return true, "stimm_corruption_heal"

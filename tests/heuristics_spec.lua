@@ -1414,6 +1414,173 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- interaction protection branches (#37 Task 3)
+	describe("interaction protection", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		describe("ogryn_taunt", function()
+			it("activates with ally interacting and 1 enemy", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						toughness_pct = 0.50,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+
+			it("blocks when too fragile overrides interactor protection", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 2,
+						toughness_pct = 0.15,
+						health_pct = 0.25,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("too_fragile", rule)
+			end)
+
+			it("holds with 0 enemies despite ally interacting", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 0,
+						toughness_pct = 0.50,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("low_value", rule)
+			end)
+		end)
+
+		describe("force_field", function()
+			it("activates with ranged threats during interaction", function()
+				local ok, rule = eval_item(
+					"psyker_force_field",
+					ctx({
+						ally_interacting = true,
+						ranged_count = 1,
+						num_nearby = 0,
+						target_enemy = "unit",
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+
+			it("activates with 2+ melee during interaction", function()
+				local ok, rule = eval_item(
+					"psyker_force_field",
+					ctx({
+						ally_interacting = true,
+						ranged_count = 0,
+						num_nearby = 2,
+						target_enemy = "unit",
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("zealot_relic", function()
+			it("activates with ally interacting and allies in coherency", function()
+				local ok, rule = eval_item(
+					"zealot_relic",
+					ctx({
+						ally_interacting = true,
+						allies_in_coherency = 1,
+						num_nearby = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("drone", function()
+			it("activates at lowered threshold with ally interacting", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+						allies_in_coherency = 2,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("team_horde", rule)
+			end)
+
+			it("holds at 3 enemies without ally interacting", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 3,
+						allies_in_coherency = 2,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("hold", rule)
+			end)
+		end)
+
+		describe("stimm_field", function()
+			it("activates unconditionally with ally interacting", function()
+				local ok, rule = eval_item(
+					"broker_ability_stimm_field",
+					ctx({
+						ally_interacting = true,
+						allies_in_coherency = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("stimm_protect_interactor", rule)
+			end)
+		end)
+
+		describe("adamant_shout", function()
+			it("activates with 1 enemy during interaction", function()
+				local ok, rule = evaluate(
+					"adamant_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("veteran_voc", function()
+			it("activates with 1 enemy during interaction", function()
+				local ok, rule = evaluate(
+					"veteran_combat_ability",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						toughness_pct = 0.90,
+					}),
+					{
+						ability_extension = helper.make_veteran_ability_extension("squad_leader", "veteran_shout"),
+						conditions = helper.make_conditions(false),
+					}
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()
