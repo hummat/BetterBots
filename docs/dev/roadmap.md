@@ -101,12 +101,23 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 ### v0.10.0 — "Team Coordination"
 
-*Theme: bots coordinate with each other and fight smarter per-weapon.*
+*Theme: bots coordinate with each other, protect interacting allies, and direct companions deliberately.*
 
 | # | Issue | Notes |
 |---|-------|-------|
 | 14 | Ability cooldown staggering | Post-activation category cooldown (~100-150 LOC). Emergency overrides for critical abilities. Feasibility analysis complete. |
-| 7 | Revive-with-ability | Inject defensive ability (taunt/stealth/shout) before revive interact node. Requires BT injection research. |
+| 37 | Objective-aware ability activation (P1) | Shield/Escort interaction profiles in `build_context()`, threshold adjustments for nearby defensive abilities, and close-range mobility suppression. Leave dash-toward / per-type tuning for later phases. |
+| 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target`, reusing ping-system target priority and dedup/backoff logic. Arbites is testable; no longer validation-gated. |
+
+Follow-up after `#37` P1:
+- `#7` revive-with-ability narrows to the reviving bot self-casting a defensive ability. The high-value nearby protection slice should already be covered by interaction-aware ally protection, so the remaining BT injection work is smaller and can wait.
+
+### v0.11.0 — "Combat Execution"
+
+*Theme: improve charge commitment and ranged fire behavior once coordination work lands.*
+
+| # | Issue | Notes |
+|---|-------|-------|
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
 | 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
 
@@ -138,8 +149,8 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
 | 17 | Daemonhost avoidance | Code + tests shipped v0.6.0. Needs in-game daemonhost encounter to verify. |
-| 39 | Healing deferral | Implemented v0.7.0. Needs in-game trigger to validate deferral path. |
-| 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target` tag. Arbites DLC available. |
+| 54 | Push poxbursters | Consolidated melee hook shipped in v0.9.1. Needs a fresh poxburster repro before reclosing the issue. |
+| 74 | Poxburster push debug log keys | Implemented on `dev/v0.9.1`. Needs one validation run to confirm per-bot discriminator logging in live play. |
 
 ## Design principles
 

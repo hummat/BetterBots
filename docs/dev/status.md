@@ -138,7 +138,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 | #53 | Rumbler VFX timing gap | **Closed** | Pre-call hook on loadout init. |
 | #47 | Combat-aware engagement leash | **Closed** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. 700+ override events. |
 | #39 | Healing deferral | **Closed** | Validated: 80+ health station deferral events. |
-| #37 | Objective-aware ability activation | Deferred to v1.0.0 | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
+| #37 | Objective-aware ability activation | Deferred to v0.10.0 (P1) | Phased design (P1 thresholds → P2 dash-toward → P3 per-type) |
 
 **Unit tests**: 579 tests via busted.
 
@@ -161,12 +161,16 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
+- **Validation before new coding**: run one focused poxburster session for `#54` and `#74`; keep `#17` as opportunistic validation when a daemonhost finally spawns.
+
 ### Later batches
 
-- **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS)
-- **v1.0.0 "Bot Identity"**: #37 (objective-aware), #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
+- **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #37 P1 (objective-aware protection), #49 (Arbites companion-command smart tag)
+- **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS)
+- **Follow-up after v0.10**: #7 (revive-with-ability BT injection polish once `#37` shrinks the scope)
+- **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
-- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #49 (Arbites companion tag, DLC)
+- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #54 (poxburster push), #74 (poxburster push debug keys)
 
 Planning artifacts for `#80`:
 
