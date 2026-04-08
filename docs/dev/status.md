@@ -165,7 +165,12 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 - **v0.10.0 "Team Coordination"**: #14 (cooldown staggering), #7 (revive-with-ability), #13 (navmesh charges), #41 (weapon-aware ADS)
 - **v1.0.0 "Bot Identity"**: #37 (objective-aware), #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
-- **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response)
+- **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
 - **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #49 (Arbites companion tag, DLC)
+
+Planning artifacts for `#80`:
+
+- Spec: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`
+- Plan: `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`
 
 See `docs/dev/roadmap.md` for full batch details.

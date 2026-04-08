@@ -128,6 +128,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | # | Issue | Notes |
 |---|-------|-------|
 | 22 | Utility-based ability scoring | Replace boolean heuristics with spline-interpolated utility curves. Darktide has native `utility.lua` + `bot_utility_considerations.lua` — framework exists, needs wiring. Architectural upgrade. |
+| 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` (companion command smart tag) and is intentionally narrower than `#22`. |
 | 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
 | 56 | Communication wheel response | React to com wheel commands (battle cry → aggression boost, need help → converge). `Vo.on_demand_vo_event` hook for detection. ForTheEmperor compat. |
 
