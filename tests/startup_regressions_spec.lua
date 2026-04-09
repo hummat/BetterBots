@@ -101,6 +101,14 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/revive_ability"%)', 1))
 	end)
 
+	it("loads companion_tag through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/companion_tag"%)', 1))
+	end)
+
 	it("initializes and registers extracted runtime modules", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -116,6 +124,8 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MeleeAttackChoice%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ReviveAbility%.init%(", 1))
 		assert.is_truthy(source:find("ReviveAbility%.register_hooks%(", 1))
+		assert.is_truthy(source:find("CompanionTag%.init%(", 1))
+		assert.is_truthy(source:find("CompanionTag%.update%(", 1))
 	end)
 
 	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()

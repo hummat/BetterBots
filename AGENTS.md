@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, team_cooldown, settings, revive_ability, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, companion_tag, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, team_cooldown, settings, revive_ability, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -331,6 +331,7 @@ scripts/mods/BetterBots/
   team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
   target_selection.lua                      # Melee target selection distance penalty for specials
   ping_system.lua                           # Bot elite/special pinging system
+  companion_tag.lua                         # Arbites Cyber-Mastiff companion-command smart tag (#49)
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
   animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
   airlock_guard.lua                          # Airlock teleport crash guard: narrow nil-node guard for vanilla has_node bug
@@ -362,6 +363,7 @@ tests/
   ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                 # grenade throw state machine
   ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff
+  companion_tag_spec.lua                    # Arbites companion-command tag: guard checks, target priority, dedup
   boss_engagement_spec.lua                  # boss/miniboss targeting self-defense exception
   healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection

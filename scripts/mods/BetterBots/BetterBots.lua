@@ -210,6 +210,9 @@ assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
 local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
 assert(PingSystem, "BetterBots: failed to load ping_system module")
 
+local CompanionTag = mod:io_dofile("BetterBots/scripts/mods/BetterBots/companion_tag")
+assert(CompanionTag, "BetterBots: failed to load companion_tag module")
+
 local HealingDeferral = mod:io_dofile("BetterBots/scripts/mods/BetterBots/healing_deferral")
 assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 
@@ -311,8 +314,9 @@ Sprint.init({
 	fixed_time = _fixed_time,
 	perf = Perf,
 	shared_rules = SharedRules,
-	is_enabled = function()
-		return Settings.is_feature_enabled("sprint")
+	sprint_follow_distance = Settings.sprint_follow_distance,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
 	end,
 })
 
@@ -333,6 +337,7 @@ MeleeAttackChoice.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("melee_improvements")
 	end,
+	melee_horde_light_bias = Settings.melee_horde_light_bias,
 })
 
 RangedMetaData.init({
@@ -348,9 +353,8 @@ TargetSelection.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
-	is_enabled = function()
-		return Settings.is_feature_enabled("special_penalty")
-	end,
+	player_tag_bonus = Settings.player_tag_bonus,
+	special_chase_penalty_range = Settings.special_chase_penalty_range,
 })
 
 Poxburster.init({
@@ -384,6 +388,9 @@ SmartTargeting.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_targeting = BotTargeting,
+	is_enabled = function()
+		return Settings.is_feature_enabled("smart_targeting")
+	end,
 })
 
 VfxSuppression.init({
@@ -418,6 +425,9 @@ ConditionPatch.init({
 	CONDITIONS_PATCH_VERSION = CONDITIONS_PATCH_VERSION,
 	perf = Perf,
 	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 AbilityQueue.init({
@@ -464,6 +474,16 @@ PingSystem.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	bot_targeting = BotTargeting,
+})
+
+CompanionTag.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	bot_targeting = BotTargeting,
 })
 
 HealingDeferral.init({
@@ -978,6 +998,9 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 			perf_t0 = Perf.begin()
 			PingSystem.update(unit, blackboard)
 			Perf.finish("ping_system", perf_t0)
+			perf_t0 = Perf.begin()
+			CompanionTag.update(unit, blackboard)
+			Perf.finish("companion_tag", perf_t0)
 		end
 		perf_t0 = Perf.begin()
 		EventLog.try_flush(_fixed_time())
