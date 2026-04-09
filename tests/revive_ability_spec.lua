@@ -47,8 +47,6 @@ rawset(_G, "require", _mock_require)
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local ReviveAbility = dofile("scripts/mods/BetterBots/revive_ability.lua")
 
-rawset(_G, "require", _orig_require)
-
 -- Mock factories
 local function make_unit(id)
 	return { _test_id = id or "bot_1" }
@@ -74,6 +72,9 @@ local function make_ability_ext(can_use, charges)
 		end,
 		remaining_ability_charges = function(_, _ability_type)
 			return charges or 1
+		end,
+		action_input_is_currently_valid = function(_, _ability_component_name, _action_input, _used_input, _fixed_t)
+			return true
 		end,
 	}
 end
@@ -180,10 +181,85 @@ describe("revive_ability", function()
 		init_module()
 	end)
 
+	teardown(function()
+		rawset(_G, "require", _orig_require)
+	end)
+
 	it("loads without error", function()
 		assert.is_table(ReviveAbility)
 		assert.is_function(ReviveAbility.init)
 		assert.is_function(ReviveAbility.wire)
 		assert.is_function(ReviveAbility.try_pre_revive)
+	end)
+
+	describe("try_pre_revive", function()
+		local unit, blackboard
+
+		before_each(function()
+			_debug_on = true
+			unit = make_unit("bot_1")
+			blackboard = make_blackboard(3)
+		end)
+
+		it("queues ability for revive interaction with enemies nearby", function()
+			setup_unit(unit, "ogryn_taunt_shout")
+			_ability_templates.ogryn_taunt_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+			local action_data = { interaction_type = "revive" }
+			local result = ReviveAbility.try_pre_revive(unit, blackboard, action_data)
+			assert.is_true(result)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("combat_ability_action", _recorded_inputs[1].component)
+			assert.equals("shout_pressed", _recorded_inputs[1].input)
+		end)
+
+		it("sets up fallback state machine for hold+release", function()
+			setup_unit(unit, "psyker_shout")
+			_ability_templates.psyker_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+			local action_data = { interaction_type = "revive" }
+			ReviveAbility.try_pre_revive(unit, blackboard, action_data)
+			local state = _fallback_state[unit]
+			assert.is_not_nil(state)
+			assert.is_true(state.active)
+			assert.equals(100 + 0.075, state.hold_until)
+			assert.equals("shout_released", state.wait_action_input)
+			assert.is_false(state.wait_sent)
+		end)
+
+		it("queues stealth ability (zealot_invisibility)", function()
+			setup_unit(unit, "zealot_invisibility")
+			_ability_templates.zealot_invisibility = {
+				ability_meta_data = {
+					activation = { action_input = "stance_pressed" },
+				},
+			}
+			local action_data = { interaction_type = "revive" }
+			local result = ReviveAbility.try_pre_revive(unit, blackboard, action_data)
+			assert.is_true(result)
+			assert.equals("stance_pressed", _recorded_inputs[1].input)
+		end)
+
+		it("queues veteran stealth ability", function()
+			setup_unit(unit, "veteran_stealth_combat_ability")
+			_ability_templates.veteran_stealth_combat_ability = {
+				ability_meta_data = {
+					activation = { action_input = "combat_ability_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "combat_ability_released" },
+				},
+			}
+			local action_data = { interaction_type = "rescue" }
+			local result = ReviveAbility.try_pre_revive(unit, blackboard, action_data)
+			assert.is_true(result)
+			assert.equals("combat_ability_pressed", _recorded_inputs[1].input)
+		end)
 	end)
 end)
