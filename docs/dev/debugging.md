@@ -65,6 +65,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 | `shield/escort (<type>) dist=<N>` | Ally detected in objective interaction — profile, interaction type, distance. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
+| `revive ability queued: <template> (interaction=<type>, enemies=<N>)` | Bot fired a defensive ability before starting a rescue interaction. Key: `revive_ability:<template>:<unit>` (#7) |
 
 **Preferred: use `bb-log`** (project root):
 ```bash

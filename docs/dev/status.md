@@ -162,11 +162,13 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 ## Next Steps
 
 - **Validation before new coding**: run one focused poxburster session for `#54` and `#74`; keep `#17` as opportunistic validation when a daemonhost finally spawns.
-- **#14 team cooldown staggering**: code complete (25 tests, 655 total), awaiting in-game validation. Look for `team_cd:` entries in `bb-log` output to confirm suppression fires when multiple bots face the same threat.
+- **#14 team cooldown staggering**: code complete (25 tests), awaiting in-game validation. Look for `team_cd:` entries in `bb-log` output.
+- **#37 objective-aware activation**: code complete (31 tests), awaiting in-game validation. Look for `interaction_scan:` entries.
+- **#7 revive-with-ability**: code complete (18 tests), awaiting in-game validation. Look for `revive_ability:` entries. Hook on BtBotInteractAction.enter, 5-template whitelist (shouts+stealth), state machine handoff to ability_queue.
 
 ### Later batches
 
-- **v0.10.0 "Team Coordination"**: ~~#14 (cooldown staggering)~~, #37 P1 (objective-aware protection), #7 P1 (revive-with-ability, after #37), #49 (Arbites companion-command smart tag), #81 (settings surface expansion)
+- **v0.10.0 "Team Coordination"**: ~~#14 (cooldown staggering)~~, ~~#37 P1 (objective-aware protection)~~, ~~#7 P1 (revive-with-ability)~~, #49 (Arbites companion-command smart tag), #81 (settings surface expansion)
 - **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)

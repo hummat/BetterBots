@@ -339,6 +339,7 @@ scripts/mods/BetterBots/
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
   engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
+  revive_ability.lua                        # Pre-revive defensive ability activation (#7)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
   log_levels.lua                            # Tiered debug log level constants and resolution (#40)
   perf.lua                                  # Per-hook runtime recorder + /bb_perf command
@@ -370,6 +371,7 @@ tests/
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
   engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
+  revive_ability_spec.lua                   # revive-with-ability hook + guards
   team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
   log_levels_spec.lua                       # log level resolution
