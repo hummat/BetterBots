@@ -54,14 +54,18 @@ function M.wire(deps)
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 
-function M.try_pre_revive(unit, blackboard, action_data)
+function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 212/_blackboard
 	local interaction_type = action_data and action_data.interaction_type
 	if not RESCUE_INTERACTION_TYPES[interaction_type] then
 		return false
 	end
 
-	local perception = blackboard and blackboard.perception
-	local enemies_nearby = perception and perception.enemies_in_proximity or 0
+	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
+	local enemies_nearby = 0
+	if perception_extension then
+		local _, num = perception_extension:enemies_in_proximity()
+		enemies_nearby = num or 0
+	end
 	if enemies_nearby < 1 then
 		return false
 	end

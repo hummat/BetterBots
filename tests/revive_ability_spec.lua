@@ -90,24 +90,33 @@ local function make_unit_data_ext(template_name)
 	}
 end
 
-local function setup_unit(unit, template_name, can_use, charges)
+local _perception_enemy_count = 3
+
+local function make_perception_ext(num_enemies)
+	return {
+		enemies_in_proximity = function()
+			local n = num_enemies or _perception_enemy_count
+			return {}, n
+		end,
+	}
+end
+
+local function setup_unit(unit, template_name, can_use, charges, num_enemies)
 	local action_input_ext = make_action_input_ext()
 	local ability_ext = make_ability_ext(can_use ~= false, charges or 1)
 	local unit_data_ext = make_unit_data_ext(template_name)
+	local perception_ext = make_perception_ext(num_enemies)
 	_extensions[unit] = {
 		unit_data_system = unit_data_ext,
 		ability_system = ability_ext,
 		action_input_system = action_input_ext,
+		perception_system = perception_ext,
 	}
 	return action_input_ext, ability_ext, unit_data_ext
 end
 
-local function make_blackboard(enemies)
-	return {
-		perception = {
-			enemies_in_proximity = enemies or 3,
-		},
-	}
+local function make_blackboard()
+	return {}
 end
 
 local _fallback_state = {}
@@ -198,7 +207,7 @@ describe("revive_ability", function()
 		before_each(function()
 			_debug_on = true
 			unit = make_unit("bot_1")
-			blackboard = make_blackboard(3)
+			blackboard = make_blackboard()
 		end)
 
 		it("queues ability for revive interaction with enemies nearby", function()
@@ -286,8 +295,8 @@ describe("revive_ability", function()
 			end)
 
 			it("rejects when no enemies nearby", function()
-				setup_unit(unit, "ogryn_taunt_shout")
-				blackboard = make_blackboard(0)
+				setup_unit(unit, "ogryn_taunt_shout", true, 1, 0)
+				blackboard = make_blackboard()
 				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
 				assert.is_false(result)
 			end)
@@ -388,7 +397,7 @@ describe("revive_ability", function()
 
 		before_each(function()
 			unit = make_unit("bot_1")
-			blackboard = make_blackboard(5)
+			blackboard = make_blackboard()
 			init_module()
 			setup_unit(unit, "adamant_shout")
 			_ability_templates.adamant_shout = {
@@ -422,7 +431,7 @@ describe("revive_ability", function()
 			assert.equals("revive_ability", evt.event)
 			assert.equals("adamant_shout", evt.template)
 			assert.equals("rescue", evt.interaction)
-			assert.equals(5, evt.enemies)
+			assert.equals(3, evt.enemies)
 		end)
 	end)
 end)
