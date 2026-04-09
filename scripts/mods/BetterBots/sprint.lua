@@ -5,6 +5,8 @@ local _fixed_time
 local _perf
 local _sprint_follow_distance
 local _is_daemonhost_avoidance_enabled
+local _logged_sprint_disabled = false
+local _logged_dh_avoidance_off = false
 
 local DEFAULT_SPRINT_FOLLOW_DISTANCE = 12
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
@@ -129,7 +131,18 @@ local function _should_sprint(self, unit, _input)
 
 	-- Never sprint near daemonhosts — triggers aggro via sprint_flat_bonus
 	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
-	if dh_avoidance and _is_near_daemonhost(unit) then
+	if not dh_avoidance then
+		if _debug_enabled() and not _logged_dh_avoidance_off then
+			_logged_dh_avoidance_off = true
+			_debug_log(
+				"dh_avoidance_off:sprint",
+				_fixed_time(),
+				"daemonhost sprint avoidance disabled by setting",
+				nil,
+				"info"
+			)
+		end
+	elseif _is_near_daemonhost(unit) then
 		return false, "daemonhost_nearby"
 	end
 
@@ -186,6 +199,10 @@ local function on_update_movement(func, self, unit, input, dt, t)
 
 	local follow_dist = _sprint_follow_distance and _sprint_follow_distance() or DEFAULT_SPRINT_FOLLOW_DISTANCE
 	if follow_dist <= 0 then
+		if _debug_enabled() and not _logged_sprint_disabled then
+			_logged_sprint_disabled = true
+			_debug_log("sprint_disabled", _fixed_time(), "sprint disabled (follow_distance=0)", nil, "info")
+		end
 		if perf_t0 then
 			_perf.finish("sprint.update_movement", perf_t0)
 		end

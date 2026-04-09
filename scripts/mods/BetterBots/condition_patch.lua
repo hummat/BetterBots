@@ -8,6 +8,7 @@ local _fixed_time
 local _is_suppressed
 local _equipped_combat_ability_name
 local _is_daemonhost_avoidance_enabled
+local _logged_dh_avoidance_off = false
 
 local _Heuristics
 local _MetaData
@@ -352,6 +353,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+			if not dh_avoidance and not _logged_dh_avoidance_off and _debug_enabled() then
+				_logged_dh_avoidance_off = true
+				_debug_log(
+					"dh_avoidance_off:combat",
+					_fixed_time(),
+					"DH combat avoidance disabled by setting",
+					nil,
+					"info"
+				)
+			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
 					_debug_log(

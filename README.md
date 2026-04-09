@@ -11,7 +11,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 
 > **Solo Play only.** Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. It does **not** work in public matchmaking or any other online mode.
 
-## Latest (v0.9.1)
+## Highlights
 
 - Bot-optimized class profiles with curated builds (weapons, talents, blessings, perks)
 - Ammo awareness: bots defer ammo pickups when humans are low

@@ -1128,6 +1128,36 @@ end
 -- All modules are assert-guarded above; if any failed to load we'd have
 -- crashed already.  The count serves as a deployment sanity check in logs.
 -- Bump when adding/removing modules.
-local _MODULE_COUNT = 26
+local _MODULE_COUNT = 32
 mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
+
+-- Log non-default slider/toggle settings at startup so post-mortem log inspection
+-- can confirm which features were active during the session.
+if _debug_enabled() then
+	local preset = Settings.resolve_preset()
+	local parts = { "preset=" .. preset }
+	local sprint_dist = Settings.sprint_follow_distance()
+	if sprint_dist ~= 12 then
+		parts[#parts + 1] = "sprint_dist=" .. sprint_dist
+	end
+	local chase_range = Settings.special_chase_penalty_range()
+	if chase_range ~= 18 then
+		parts[#parts + 1] = "chase_range=" .. chase_range
+	end
+	local tag_bonus = Settings.player_tag_bonus()
+	if tag_bonus ~= 3 then
+		parts[#parts + 1] = "tag_bonus=" .. tag_bonus
+	end
+	local horde_bias = Settings.melee_horde_light_bias()
+	if horde_bias ~= 4 then
+		parts[#parts + 1] = "horde_bias=" .. horde_bias
+	end
+	if not Settings.is_feature_enabled("smart_targeting") then
+		parts[#parts + 1] = "smart_targeting=off"
+	end
+	if not Settings.is_feature_enabled("daemonhost_avoidance") then
+		parts[#parts + 1] = "dh_avoidance=off"
+	end
+	_debug_log("startup:settings", 0, "settings: " .. table.concat(parts, ", "), nil, "info")
+end

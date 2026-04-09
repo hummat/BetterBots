@@ -138,6 +138,13 @@ function M.update(unit, blackboard)
 	-- Don't re-tag if we already tagged this target and it's still alive
 	local last_tagged = _last_tagged_target_by_bot[unit]
 	if last_tagged and last_tagged == target_unit and _has_companion_tag(smart_tag_system, target_unit) then
+		if _debug_enabled() then
+			_debug_log(
+				"companion_tag_hold:" .. tostring(unit),
+				fixed_t,
+				"holding existing companion tag on " .. _target_name(target_unit)
+			)
+		end
 		return
 	end
 
