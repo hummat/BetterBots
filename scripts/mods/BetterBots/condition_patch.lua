@@ -7,6 +7,7 @@ local _debug_enabled
 local _fixed_time
 local _is_suppressed
 local _equipped_combat_ability_name
+local _is_daemonhost_avoidance_enabled
 
 local _Heuristics
 local _MetaData
@@ -346,10 +347,12 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	-- #17: suppress melee/ranged combat when the bot's current target IS a
 	-- non-aggroed daemonhost. Target-specific (not proximity-based) so bots
 	-- can still fight hordes/specials in mixed encounters near a sleeping DH.
+	-- Gated by daemonhost_avoidance setting (#81).
 	local orig_bot_in_melee_range = conditions.bot_in_melee_range
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
-			if _is_dormant_daemonhost_target(unit, blackboard) then
+			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
 					_debug_log(
 						"dh_suppress_melee:" .. tostring(unit),
@@ -373,7 +376,8 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			action_data,
 			is_running
 		)
-			if _is_dormant_daemonhost_target(unit, blackboard) then
+			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
 					_debug_log(
 						"dh_suppress_ranged:" .. tostring(unit),
@@ -426,6 +430,7 @@ function M.init(deps)
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES

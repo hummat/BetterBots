@@ -3,9 +3,10 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _perf
-local _is_enabled
+local _sprint_follow_distance
+local _is_daemonhost_avoidance_enabled
 
-local SPRINT_FOLLOW_DISTANCE = 12
+local DEFAULT_SPRINT_FOLLOW_DISTANCE = 12
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
 local DAEMONHOST_COMBAT_RANGE_SQ = 10 * 10
 local DAEMONHOST_BREED_NAMES = {
@@ -127,22 +128,26 @@ local function _should_sprint(self, unit, _input)
 	end
 
 	-- Never sprint near daemonhosts — triggers aggro via sprint_flat_bonus
-	if _is_near_daemonhost(unit) then
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if dh_avoidance and _is_near_daemonhost(unit) then
 		return false, "daemonhost_nearby"
 	end
 
 	-- Get follow distance from group extension
-	local group_extension = self._group_extension
-	if group_extension then
-		local bot_group_data = group_extension:bot_group_data()
-		local follow_unit = bot_group_data and bot_group_data.follow_unit
-		if follow_unit and ALIVE[follow_unit] then
-			local unit_position = POSITION_LOOKUP[unit]
-			local follow_position = POSITION_LOOKUP[follow_unit]
-			if unit_position and follow_position then
-				local dist_sq = Vector3.distance_squared(unit_position, follow_position)
-				if dist_sq > SPRINT_FOLLOW_DISTANCE * SPRINT_FOLLOW_DISTANCE then
-					return true, "catch_up"
+	local follow_dist = _sprint_follow_distance and _sprint_follow_distance() or DEFAULT_SPRINT_FOLLOW_DISTANCE
+	if follow_dist > 0 then
+		local group_extension = self._group_extension
+		if group_extension then
+			local bot_group_data = group_extension:bot_group_data()
+			local follow_unit = bot_group_data and bot_group_data.follow_unit
+			if follow_unit and ALIVE[follow_unit] then
+				local unit_position = POSITION_LOOKUP[unit]
+				local follow_position = POSITION_LOOKUP[follow_unit]
+				if unit_position and follow_position then
+					local dist_sq = Vector3.distance_squared(unit_position, follow_position)
+					if dist_sq > follow_dist * follow_dist then
+						return true, "catch_up"
+					end
 				end
 			end
 		end
@@ -179,7 +184,8 @@ local function on_update_movement(func, self, unit, input, dt, t)
 	local perf_t0 = _perf and _perf.begin()
 	func(self, unit, input, dt, t)
 
-	if _is_enabled and not _is_enabled() then
+	local follow_dist = _sprint_follow_distance and _sprint_follow_distance() or DEFAULT_SPRINT_FOLLOW_DISTANCE
+	if follow_dist <= 0 then
 		if perf_t0 then
 			_perf.finish("sprint.update_movement", perf_t0)
 		end
@@ -232,7 +238,8 @@ Sprint.init = function(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
-	_is_enabled = deps.is_enabled
+	_sprint_follow_distance = deps.sprint_follow_distance
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 end

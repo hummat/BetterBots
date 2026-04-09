@@ -61,14 +61,15 @@ local DEPLOYABLE_ITEMS = {
 }
 
 -- Feature gates: feature_name → setting_id
+-- sprint and special_penalty replaced by slider-with-zero (#81).
 local FEATURE_GATES = {
-	sprint = "enable_sprint",
 	pinging = "enable_pinging",
-	special_penalty = "enable_special_penalty",
 	poxburster = "enable_poxburster",
 	melee_improvements = "enable_melee_improvements",
 	ranged_improvements = "enable_ranged_improvements",
 	engagement_leash = "enable_engagement_leash",
+	smart_targeting = "enable_smart_targeting",
+	daemonhost_avoidance = "enable_daemonhost_avoidance",
 }
 
 -- Preset system
@@ -174,6 +175,63 @@ end
 
 function M.human_ammo_reserve_threshold()
 	return _read_percent_setting(HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID, DEFAULT_HUMAN_AMMO_RESERVE_THRESHOLD, 50, 100)
+end
+
+-- Read a raw numeric setting (no percentage conversion).
+-- Returns default_value when nil, non-numeric, or out of [min_value, max_value].
+local function _read_numeric_setting(setting_id, default_value, min_value, max_value)
+	if not _mod then
+		return default_value
+	end
+
+	local raw_value = _mod:get(setting_id)
+	local numeric_value = tonumber(raw_value)
+	if not numeric_value then
+		return default_value
+	end
+
+	if numeric_value < min_value or numeric_value > max_value then
+		return default_value
+	end
+
+	return numeric_value
+end
+
+-- Slider-with-zero migration helper: read the slider setting, but if it's nil
+-- (user hasn't touched it) AND a legacy checkbox was explicitly false, return 0.
+local function _read_slider_with_legacy(slider_id, legacy_id, default_value, min_value, max_value)
+	if not _mod then
+		return default_value
+	end
+
+	local slider_raw = _mod:get(slider_id)
+	if slider_raw ~= nil then
+		return _read_numeric_setting(slider_id, default_value, min_value, max_value)
+	end
+
+	-- Slider not set — check legacy checkbox migration
+	local legacy_value = _mod:get(legacy_id)
+	if legacy_value == false then
+		return 0
+	end
+
+	return default_value
+end
+
+function M.player_tag_bonus()
+	return _read_numeric_setting("player_tag_bonus", 3, 0, 10)
+end
+
+function M.melee_horde_light_bias()
+	return _read_numeric_setting("melee_horde_light_bias", 4, 0, 10)
+end
+
+function M.sprint_follow_distance()
+	return _read_slider_with_legacy("sprint_follow_distance", "enable_sprint", 12, 0, 30)
+end
+
+function M.special_chase_penalty_range()
+	return _read_slider_with_legacy("special_chase_penalty_range", "enable_special_penalty", 18, 0, 30)
 end
 
 function M.is_combat_template_enabled(template_name, ability_extension)

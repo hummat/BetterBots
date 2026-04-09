@@ -75,23 +75,11 @@ return {
 		en = "Conservative - emergency-only, suited for Auric/Maelstrom",
 	},
 	-- Feature toggles
-	enable_sprint = {
-		en = "Bot sprinting",
-	},
-	enable_sprint_description = {
-		en = "Bots sprint to catch up, during traversal, and for ally rescue",
-	},
 	enable_pinging = {
 		en = "Elite & special pinging",
 	},
 	enable_pinging_description = {
-		en = "Bots ping elites and specials they detect",
-	},
-	enable_special_penalty = {
-		en = "Distant special targeting",
-	},
-	enable_special_penalty_description = {
-		en = "Bots prefer ranged attacks against distant specials instead of charging into melee",
+		en = "Bots ping elites and specials they detect. Also controls Arbites companion (dog) targeting.",
 	},
 	enable_poxburster = {
 		en = "Poxburster safe targeting",
@@ -116,6 +104,46 @@ return {
 	},
 	enable_engagement_leash_description = {
 		en = "Bots stay in combat longer instead of breaking off to follow. Uses coherency-based ranges.",
+	},
+	enable_smart_targeting = {
+		en = "Smart blitz targeting",
+	},
+	enable_smart_targeting_description = {
+		en = "Seed bot blitz targeting from perception. Disabling restores vanilla blitz targeting.",
+	},
+	enable_daemonhost_avoidance = {
+		en = "Daemonhost avoidance",
+	},
+	enable_daemonhost_avoidance_description = {
+		en = "Suppress combat and sprinting near dormant daemonhosts. Disabling lets bots engage freely (advanced).",
+	},
+	sprint_follow_distance = {
+		en = "Sprint catch-up distance",
+	},
+	sprint_follow_distance_description = {
+		en = "Bots sprint to catch up when further than this distance from the group leader. "
+			.. "Also enables traversal and rescue sprinting. Set to 0 to disable all sprinting.",
+	},
+	special_chase_penalty_range = {
+		en = "Special chase penalty range",
+	},
+	special_chase_penalty_range_description = {
+		en = "Bots prefer ranged attacks against specials beyond this distance instead of charging into melee. "
+			.. "Set to 0 to disable the penalty.",
+	},
+	player_tag_bonus = {
+		en = "Player tag response",
+	},
+	player_tag_bonus_description = {
+		en = "How aggressively bots prioritize targets pinged by the human player. "
+			.. "Higher values make bots respond faster. Set to 0 to ignore player pings.",
+	},
+	melee_horde_light_bias = {
+		en = "Melee horde light bias",
+	},
+	melee_horde_light_bias_description = {
+		en = "Bias bots toward light attacks into unarmored hordes for better cleave. "
+			.. "Higher values prefer lights more. Set to 0 for vanilla attack selection.",
 	},
 	bot_ranged_ammo_threshold = {
 		en = "Bot ranged ammo threshold",

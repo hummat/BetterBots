@@ -344,6 +344,85 @@ describe("condition_patch", function()
 			assert.is_true(orig_called)
 		end)
 
+		it("allows melee against dormant daemonhost when avoidance is disabled", function()
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "none"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+				is_daemonhost_avoidance_enabled = function()
+					return false
+				end,
+			})
+
+			local target = "dh_avoidance_off"
+			setup_breed(target, "chaos_daemonhost")
+
+			local bb = make_blackboard(target)
+			local orig_called = false
+			local conditions = {
+				bot_in_melee_range = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_dh_off")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_true(result) -- not suppressed when avoidance disabled
+			assert.is_true(orig_called) -- original was called
+
+			-- Re-init without the gate for other tests
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function(key, fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return _debug_enabled_result
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "none"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+			})
+		end)
+
 		it("suppresses ranged against dormant daemonhost target", function()
 			local target = "dh1"
 			setup_breed(target, "chaos_daemonhost")

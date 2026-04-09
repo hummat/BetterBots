@@ -337,6 +337,143 @@ describe("sprint", function()
 		end)
 	end)
 
+	describe("settings wiring (#81)", function()
+		before_each(function()
+			reset()
+		end)
+
+		it("skips catch-up sprint when sprint_follow_distance=0", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 0
+				end,
+			})
+
+			local unit = "bot_disabled"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(50, 0, 0)
+			_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- Catch-up is gated by follow_dist > 0, so falls through to traversal
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			-- Restore default
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
+		end)
+
+		it("uses configurable sprint follow distance", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 25
+				end,
+			})
+
+			local unit = "bot_custom"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(20, 0, 0) -- 20m < 25m threshold
+			_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- 20m < 25m, so no catch-up; falls through to traversal (no enemies)
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
+		end)
+
+		it("allows sprint near daemonhost when avoidance is disabled", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return false
+				end,
+			})
+
+			local unit = "bot_dh_off"
+			local dh = "daemonhost_close"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(10, 0, 0) -- inside 20m safe range
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			setup_perception(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self()
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- DH avoidance disabled, so not blocked; traversal (no enemies)
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
+		end)
+	end)
+
 	describe("is_near_daemonhost", function()
 		it("returns false with no side system", function()
 			_positions["bot1"] = pos(0, 0, 0)

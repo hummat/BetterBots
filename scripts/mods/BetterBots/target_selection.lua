@@ -9,13 +9,17 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _perf
-local _is_enabled
+local _player_tag_bonus
+local _special_chase_penalty_range
 local _logged_companion_pin_melee = {}
 local _logged_companion_pin_ranged = {}
-local CHASE_RANGE_SQ = 324
 local DEFAULT_MONSTER_WEIGHT = 2
 local FRIENDLY_COMPANION_PIN_PENALTY = 100
-local PLAYER_TAG_BONUS = 3.0
+
+-- Per-frame cache for chase_range_sq to avoid repeated settings reads in the hot
+-- slot_weight path (runs per-target per-bot per-frame).
+local _cached_chase_range_sq
+local _cached_chase_range_t
 
 -- Returns true if target_unit is currently tagged by a human player (not a bot ping).
 local function _has_human_player_tag(target_unit)
@@ -24,8 +28,8 @@ local function _has_human_player_tag(target_unit)
 		return false
 	end
 
-	local smart_tag_system = state_ext:system("smart_tag_system")
-	if not smart_tag_system then
+	local ok, smart_tag_system = pcall(state_ext.system, state_ext, "smart_tag_system")
+	if not ok or not smart_tag_system then
 		return false
 	end
 
@@ -81,7 +85,10 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
-	_is_enabled = deps.is_enabled
+	_player_tag_bonus = deps.player_tag_bonus
+	_special_chase_penalty_range = deps.special_chase_penalty_range
+	_cached_chase_range_sq = nil
+	_cached_chase_range_t = nil
 	_logged_companion_pin_melee = {}
 	_logged_companion_pin_ranged = {}
 end
@@ -108,66 +115,70 @@ function M.register_hooks()
 				local perf_t0 = _perf and _perf.begin()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
 
-				if not _is_enabled or _is_enabled() then
-					if target_unit and _is_friendly_companion_pin(target_unit) then
-						score = score - FRIENDLY_COMPANION_PIN_PENALTY
-						if _debug_enabled() then
-							local log_key = "target_sel_companion_pin:"
-								.. tostring(target_unit)
-								.. ":"
-								.. tostring(unit)
-							if not _logged_companion_pin_melee[log_key] then
-								_logged_companion_pin_melee[log_key] = true
-								_debug_log(
-									log_key,
-									_fixed_time(),
-									"penalizing friendly companion pin "
-										.. tostring(target_breed.name)
-										.. " -"
-										.. FRIENDLY_COMPANION_PIN_PENALTY
-								)
-							end
+				if target_unit and _is_friendly_companion_pin(target_unit) then
+					score = score - FRIENDLY_COMPANION_PIN_PENALTY
+					if _debug_enabled() then
+						local log_key = "target_sel_companion_pin:" .. tostring(target_unit) .. ":" .. tostring(unit)
+						if not _logged_companion_pin_melee[log_key] then
+							_logged_companion_pin_melee[log_key] = true
+							_debug_log(
+								log_key,
+								_fixed_time(),
+								"penalizing friendly companion pin "
+									.. tostring(target_breed.name)
+									.. " -"
+									.. FRIENDLY_COMPANION_PIN_PENALTY
+							)
 						end
-					-- Issue #48: Boost score for player-tagged enemies
-					elseif score > 0 and _has_human_player_tag(target_unit) then
-						score = score + PLAYER_TAG_BONUS
+					end
+				-- Issue #48: Boost score for player-tagged enemies
+				elseif score > 0 and _has_human_player_tag(target_unit) then
+					local tag_bonus = _player_tag_bonus and _player_tag_bonus() or 3
+					if tag_bonus > 0 then
+						score = score + tag_bonus
 						if _debug_enabled() then
 							_debug_log(
 								"target_sel_tag_boost:" .. tostring(target_unit) .. ":" .. tostring(unit),
 								_fixed_time(),
-								"boosting score for player-tagged "
-									.. tostring(target_breed.name)
-									.. " +"
-									.. PLAYER_TAG_BONUS
+								"boosting score for player-tagged " .. tostring(target_breed.name) .. " +" .. tag_bonus
 							)
 						end
 					end
+				end
 
-					-- Issue #19: Stop chasing distant specials for melee
-					-- If target is a special at >18m and bot has sufficient ammo (>50%),
-					-- massively penalize melee score. This forces the bot to either shoot it
-					-- or pick a closer target for melee.
-					local tags = target_breed.tags
-					local ammo_percent = nil
-					if target_distance_sq > CHASE_RANGE_SQ and tags and tags.special then
-						ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
-					end
+				-- Issue #19: Stop chasing distant specials for melee
+				-- Cache chase_range_sq per frame to avoid per-target settings reads.
+				local fixed_t = _fixed_time()
+				if _cached_chase_range_t ~= fixed_t then
+					local chase_range = _special_chase_penalty_range and _special_chase_penalty_range() or 18
+					_cached_chase_range_sq = chase_range > 0 and chase_range * chase_range or 0
+					_cached_chase_range_t = fixed_t
+				end
+				local tags = target_breed.tags
+				local ammo_percent = nil
+				if
+					_cached_chase_range_sq > 0
+					and target_distance_sq > _cached_chase_range_sq
+					and tags
+					and tags.special
+				then
+					ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
+				end
 
-					if ammo_percent and ammo_percent > 0.5 then
-						if _debug_enabled() then
-							_debug_log(
-								"target_sel_penalty:" .. tostring(unit),
-								_fixed_time(),
-								"penalizing melee score for distant special "
-									.. tostring(target_breed.name)
-									.. " dist_sq="
-									.. target_distance_sq
-									.. " ammo="
-									.. ammo_percent
-							)
-						end
-						score = score - 100
+				if ammo_percent and ammo_percent > 0.5 then
+					if _debug_enabled() then
+						_debug_log(
+							"target_sel_penalty:" .. tostring(unit),
+							_fixed_time(),
+							"penalizing melee score for distant special "
+								.. tostring(target_breed.name)
+								.. " dist_sq="
+								.. target_distance_sq
+								.. " ammo="
+								.. ammo_percent
+						)
 					end
+					score = score - 100
 				end
 
 				if perf_t0 then
@@ -181,7 +192,7 @@ function M.register_hooks()
 			local perf_t0 = _perf and _perf.begin()
 			local score = func(unit, target_unit)
 
-			if (not _is_enabled or _is_enabled()) and target_unit and _is_friendly_companion_pin(target_unit) then
+			if target_unit and _is_friendly_companion_pin(target_unit) then
 				score = score - FRIENDLY_COMPANION_PIN_PENALTY
 				if _debug_enabled() then
 					local log_key = "target_sel_companion_pin_ranged:" .. tostring(target_unit) .. ":" .. tostring(unit)
@@ -206,25 +217,22 @@ function M.register_hooks()
 			local perf_t0 = _perf and _perf.begin()
 			local weight, override = func(unit, target_unit, target_breed, t)
 
-			if not _is_enabled or _is_enabled() then
-				local tags = target_breed and target_breed.tags or nil
-
-				if
-					tags
-					and tags.monster
-					and (not weight or weight <= 0)
-					and _is_monster_targeting_unit(target_unit, unit)
-				then
-					if _debug_enabled() then
-						_debug_log(
-							"boss_targeting_bot:" .. tostring(unit),
-							_fixed_time(),
-							"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
-						)
-					end
-					weight = DEFAULT_MONSTER_WEIGHT
-					override = false
+			local tags = target_breed and target_breed.tags or nil
+			if
+				tags
+				and tags.monster
+				and (not weight or weight <= 0)
+				and _is_monster_targeting_unit(target_unit, unit)
+			then
+				if _debug_enabled() then
+					_debug_log(
+						"boss_targeting_bot:" .. tostring(unit),
+						_fixed_time(),
+						"restoring monster weight for boss targeting bot " .. tostring(target_breed.name)
+					)
 				end
+				weight = DEFAULT_MONSTER_WEIGHT
+				override = false
 			end
 
 			if perf_t0 then
