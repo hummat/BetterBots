@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, settings, startup_regressions)
+- `make test` — unit tests via busted (heuristics, meta_data, resolve_decision, event_log, sprint, melee_meta_data, melee_attack_choice, ranged_meta_data, grenade_fallback, condition_patch, target_selection, ping_system, boss_engagement, debug, healing_deferral, item_fallback, log_levels, perf, poxburster, animation_guard, smart_targeting, bot_profiles, engagement_leash, team_cooldown, settings, revive_ability, startup_regressions)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
