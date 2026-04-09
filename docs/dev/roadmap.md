@@ -108,8 +108,8 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 14 | Ability cooldown staggering | **Done.** Post-activation category cooldown (~130 LOC). 3 categories (taunt/aoe_shout/dash), emergency overrides, ally-aid bypass. 25 tests. Needs in-game validation (`team_cd:` log entries). |
 | 37 | Objective-aware ability activation (P1) | **Done.** 3-path interaction detection (minigame/interacting/luggable), 7 defensive heuristic branches, 3 charge suppressions, 4 grenade threshold adjustments. 31 tests. Needs in-game validation (`interaction_scan:` log entries). |
 | 7 | Revive-with-ability (P1) | **Done.** Hook on BtBotInteractAction.enter fires shout/stealth before rescue interactions. 5-template whitelist, state machine handoff to ability_queue. 18 tests. Needs in-game validation (`revive_ability:` log entries). |
-| 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target`, reusing ping-system target priority and dedup/backoff logic. Arbites is testable; no longer validation-gated. |
-| 81 | Expand settings surface | Slider controls for post-v0.8.0 features: player-tag bonus, horde light bias, sprint distance, special chase range (slider-with-zero = off), plus smart targeting and daemonhost avoidance toggles. Replaces `enable_sprint`/`enable_special_penalty` checkboxes. |
+| 49 | Arbites companion-command smart tag | **Done.** Places `enemy_companion_target` tags on high-priority enemies for Cyber-Mastiff targeting override. Shared helpers extracted to bot_targeting.lua. 16 tests. DLC-blocked for in-game validation. |
+| 81 | Expand settings surface | **Done.** 4 slider-with-zero controls (sprint distance, chase penalty range, tag bonus, horde light bias) + 2 toggles (smart targeting, DH avoidance). Legacy checkbox migration. 29 tests. Needs in-game validation. |
 
 ### v0.11.0 — "Combat Execution"
 
