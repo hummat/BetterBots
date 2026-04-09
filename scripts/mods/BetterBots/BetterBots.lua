@@ -222,6 +222,9 @@ assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
 
+local ReviveAbility = mod:io_dofile("BetterBots/scripts/mods/BetterBots/revive_ability")
+assert(ReviveAbility, "BetterBots: failed to load revive_ability module")
+
 -- Init each module with its dependencies
 Settings.init({
 	mod = mod,
@@ -431,6 +434,18 @@ AbilityQueue.init({
 	shared_rules = SharedRules,
 })
 
+ReviveAbility.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	is_suppressed = _is_suppressed,
+	equipped_combat_ability_name = _equipped_combat_ability_name,
+	fallback_state_by_unit = _fallback_state_by_unit,
+	perf = Perf,
+	shared_rules = SharedRules,
+})
+
 GrenadeFallback.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -504,6 +519,13 @@ AbilityQueue.wire({
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
+ReviveAbility.wire({
+	MetaData = MetaData,
+	EventLog = EventLog,
+	Debug = Debug,
+	is_combat_template_enabled = Settings.is_combat_template_enabled,
+})
+
 GrenadeFallback.wire({
 	build_context = Heuristics.build_context,
 	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
@@ -557,6 +579,7 @@ ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
+ReviveAbility.register_hooks()
 
 -- Consolidated bt_bot_melee_action hook_require: three modules hook this path.
 -- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod

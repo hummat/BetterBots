@@ -187,7 +187,24 @@ function M.try_pre_revive(unit, blackboard, action_data)
 end
 
 function M.register_hooks()
-	-- Hook registration in Task 3
+	_mod:hook_require(
+		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action",
+		function(BtBotInteractAction)
+			local orig_enter = BtBotInteractAction.enter
+			BtBotInteractAction.enter = function(self, unit, breed, blackboard, scratchpad, action_data, t)
+				local perf_t0 = _perf and _perf.begin()
+				M.try_pre_revive(unit, blackboard, action_data)
+				if perf_t0 and _perf then
+					_perf.finish("revive_ability", perf_t0)
+				end
+				return orig_enter(self, unit, breed, blackboard, scratchpad, action_data, t)
+			end
+
+			if _debug_enabled and _debug_enabled() then
+				_debug_log("revive_ability:hook_installed", 0, "installed BtBotInteractAction.enter hook")
+			end
+		end
+	)
 end
 
 -- Exposed for testing
