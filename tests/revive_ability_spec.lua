@@ -261,5 +261,168 @@ describe("revive_ability", function()
 			assert.is_true(result)
 			assert.equals("combat_ability_pressed", _recorded_inputs[1].input)
 		end)
+
+		describe("rejection guards", function()
+			before_each(function()
+				_ability_templates.ogryn_taunt_shout = {
+					ability_meta_data = {
+						activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+						wait_action = { action_input = "shout_released" },
+					},
+				}
+			end)
+
+			it("rejects non-rescue interaction types", function()
+				setup_unit(unit, "ogryn_taunt_shout")
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "health_station" })
+				assert.is_false(result)
+				assert.equals(0, #_recorded_inputs)
+			end)
+
+			it("rejects nil action_data", function()
+				setup_unit(unit, "ogryn_taunt_shout")
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, nil)
+				assert.is_false(result)
+			end)
+
+			it("rejects when no enemies nearby", function()
+				setup_unit(unit, "ogryn_taunt_shout")
+				blackboard = make_blackboard(0)
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects when suppressed", function()
+				_suppressed = true
+				_suppressed_reason = "dodging"
+				setup_unit(unit, "ogryn_taunt_shout")
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects non-whitelisted ability (charge)", function()
+				setup_unit(unit, "ogryn_charge")
+				_ability_templates.ogryn_charge = {
+					ability_meta_data = {
+						activation = { action_input = "aim_pressed", min_hold_time = 0.01 },
+						wait_action = { action_input = "aim_released" },
+					},
+				}
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects non-whitelisted ability (stance)", function()
+				setup_unit(unit, "veteran_combat_ability")
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects when ability on cooldown", function()
+				setup_unit(unit, "ogryn_taunt_shout", false)
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects when no charges remaining", function()
+				setup_unit(unit, "ogryn_taunt_shout", true, 0)
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("rejects when category disabled", function()
+				_combat_template_enabled = false
+				setup_unit(unit, "ogryn_taunt_shout")
+				local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+				assert.is_false(result)
+			end)
+
+			it("fires for all rescue interaction types", function()
+				for _, itype in ipairs({ "revive", "rescue", "pull_up", "remove_net" }) do
+					_recorded_inputs = {}
+					_fallback_state = {}
+					ReviveAbility.init({
+						mod = { echo = function() end, hook = function() end, hook_require = function() end },
+						debug_log = function() end,
+						debug_enabled = function()
+							return false
+						end,
+						fixed_time = function()
+							return 100
+						end,
+						is_suppressed = function()
+							return false
+						end,
+						equipped_combat_ability_name = function()
+							return "test"
+						end,
+						fallback_state_by_unit = _fallback_state,
+						shared_rules = SharedRules,
+					})
+					ReviveAbility.wire({
+						MetaData = { inject = function() end },
+						EventLog = {
+							is_enabled = function()
+								return false
+							end,
+						},
+						Debug = {
+							bot_slot_for_unit = function()
+								return 1
+							end,
+						},
+						is_combat_template_enabled = function()
+							return true
+						end,
+					})
+					setup_unit(unit, "ogryn_taunt_shout")
+					local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = itype })
+					assert.is_true(result, "expected true for interaction_type=" .. itype)
+				end
+			end)
+		end)
+	end)
+
+	describe("logging", function()
+		local unit, blackboard
+
+		before_each(function()
+			unit = make_unit("bot_1")
+			blackboard = make_blackboard(5)
+			init_module()
+			setup_unit(unit, "adamant_shout")
+			_ability_templates.adamant_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+		end)
+
+		it("emits debug log with per-bot key", function()
+			_debug_on = true
+			ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+			assert.is_true(#_debug_logs > 0)
+			local log = _debug_logs[1]
+			assert.truthy(string.find(log.key, "revive_ability:"))
+			assert.truthy(string.find(log.key, "adamant_shout"))
+			assert.truthy(string.find(log.key, tostring(unit)))
+		end)
+
+		it("does not emit debug log when debug disabled", function()
+			_debug_on = false
+			ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+			assert.equals(0, #_debug_logs)
+		end)
+
+		it("emits event log with interaction type", function()
+			ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "rescue" })
+			assert.equals(1, #_event_log_events)
+			local evt = _event_log_events[1]
+			assert.equals("revive_ability", evt.event)
+			assert.equals("adamant_shout", evt.template)
+			assert.equals("rescue", evt.interaction)
+			assert.equals(5, evt.enemies)
+		end)
 	end)
 end)
