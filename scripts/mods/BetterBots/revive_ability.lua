@@ -60,6 +60,9 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 		return false
 	end
 
+	-- From here on, this IS a rescue interaction — log skip reasons.
+	local bot_id = tostring(unit)
+
 	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
 	local enemies_nearby = 0
 	if perception_extension then
@@ -67,6 +70,13 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 		enemies_nearby = num or 0
 	end
 	if enemies_nearby < 1 then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_enemies:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (no enemies nearby)"
+			)
+		end
 		return false
 	end
 
@@ -74,9 +84,9 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	if suppressed then
 		if _debug_enabled() then
 			_debug_log(
-				"revive_ability_suppressed:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
+				"revive_ability_skip:suppressed:" .. bot_id,
 				_fixed_time(),
-				"revive ability suppressed (" .. tostring(suppress_reason) .. ")"
+				"revive ability skipped (suppressed: " .. tostring(suppress_reason) .. ")"
 			)
 		end
 		return false
@@ -90,6 +100,13 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	local ability_component = unit_data_extension:read_component("combat_ability_action")
 	local ability_template_name = ability_component and ability_component.template_name
 	if not ability_template_name or not REVIVE_DEFENSIVE_ABILITIES[ability_template_name] then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:not_whitelisted:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (ability " .. tostring(ability_template_name) .. " not in defensive whitelist)"
+			)
+		end
 		return false
 	end
 
@@ -99,15 +116,36 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	end
 
 	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name, ability_extension) then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:disabled:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (" .. ability_template_name .. " disabled by setting)"
+			)
+		end
 		return false
 	end
 
 	if not ability_extension:can_use_ability("combat_ability") then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:cant_use:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (" .. ability_template_name .. " can_use_ability=false)"
+			)
+		end
 		return false
 	end
 
 	local charges = ability_extension:remaining_ability_charges("combat_ability")
 	if not charges or charges < 1 then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_charges:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (" .. ability_template_name .. " charges=0)"
+			)
+		end
 		return false
 	end
 
