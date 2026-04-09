@@ -193,7 +193,14 @@ function M.register_hooks()
 			local orig_enter = BtBotInteractAction.enter
 			BtBotInteractAction.enter = function(self, unit, breed, blackboard, scratchpad, action_data, t)
 				local perf_t0 = _perf and _perf.begin()
-				M.try_pre_revive(unit, blackboard, action_data)
+				local ok, err = pcall(M.try_pre_revive, unit, blackboard, action_data)
+				if not ok and _debug_enabled and _debug_enabled() then
+					_debug_log(
+						"revive_ability_error:" .. tostring(unit),
+						_fixed_time(),
+						"try_pre_revive error: " .. tostring(err)
+					)
+				end
 				if perf_t0 and _perf then
 					_perf.finish("revive_ability", perf_t0)
 				end

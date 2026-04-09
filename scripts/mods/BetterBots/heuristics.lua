@@ -365,7 +365,7 @@ local function build_context(unit, blackboard)
 			if context.ally_interacting and _debug_enabled and _debug_enabled() then
 				_debug_log(
 					"interaction_scan:" .. tostring(unit),
-					_fixed_time(),
+					fixed_t,
 					context.ally_interaction_profile
 						.. " ("
 						.. tostring(context.ally_interaction_type)
@@ -1490,17 +1490,13 @@ local function _grenade_defensive(context, rule_prefix, preset)
 		return true, rule_prefix .. "_ally_aid"
 	end
 
-	if
-		context.ranged_count >= (2 + t.count_offset - interaction_offset)
-		and context.toughness_pct < (0.50 + t.toughness_offset)
-	then
+	local ranged_threshold = math.max(1, 2 + t.count_offset - interaction_offset)
+	if context.ranged_count >= ranged_threshold and context.toughness_pct < (0.50 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
-	if
-		context.num_nearby >= (4 + t.count_offset - interaction_offset)
-		and context.toughness_pct < (0.35 + t.toughness_offset)
-	then
+	local melee_threshold = math.max(2, 4 + t.count_offset - interaction_offset)
+	if context.num_nearby >= melee_threshold and context.toughness_pct < (0.35 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
