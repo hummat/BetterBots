@@ -493,6 +493,7 @@ GrenadeFallback.init({
 	is_suppressed = _is_suppressed,
 	grenade_state_by_unit = _grenade_state_by_unit,
 	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+	perf = Perf,
 })
 
 PingSystem.init({

@@ -1685,6 +1685,35 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("revalidation hysteresis relaxes frag horde threshold by one nearby", function()
+			-- Frag needs num_nearby >= 6 on the initial check. At 5 nearby
+			-- the default call should hold, but once the bot has committed
+			-- to an aim window the revalidation check must accept to avoid
+			-- aborting an already-queued throw over a one-enemy dip.
+			local baseline = helper.make_context({ num_nearby = 5, challenge_rating_sum = 3.0 })
+			local baseline_result = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", baseline)
+			assert.is_false(baseline_result)
+
+			local revalidate = helper.make_context({ num_nearby = 5, challenge_rating_sum = 3.0 })
+			local relaxed_result, relaxed_rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", revalidate, { revalidation = true })
+			assert.is_true(relaxed_result)
+			assert.matches("horde", relaxed_rule)
+			-- The relaxation must not mutate the caller's context.
+			assert.equals(5, revalidate.num_nearby)
+		end)
+
+		it("revalidation hysteresis does not rescue truly empty context", function()
+			-- Threshold relaxation is one enemy, not unbounded: 0 nearby
+			-- must still hold even on the revalidation path.
+			local local_ctx = helper.make_context({ num_nearby = 0, challenge_rating_sum = 0 })
+			local result, rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx, { revalidation = true })
+			assert.is_false(result)
+			assert.matches("hold", rule)
+			assert.equals(0, local_ctx.num_nearby)
+		end)
+
 		it("returns false for nil context", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", nil)
 			assert.is_false(result)

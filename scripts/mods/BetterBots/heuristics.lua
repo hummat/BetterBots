@@ -21,6 +21,83 @@ local SHIELD_INTERACTION_TYPES = {
 	servo_skull = true,
 	servo_skull_activator = true,
 }
+
+-- Per-frame shared cache of interacting allies on a given side. The
+-- read_component walk over valid_player_units is identical for every bot
+-- sharing a side within a fixed_t tick, so scan once and let each bot pick
+-- its own "nearest" in build_context (distance depends on bot position).
+-- Mirrors the sprint.lua shared daemonhost scan pattern — keyed on
+-- (fixed_t, side) by reference identity.
+local _interacting_units = {}
+local _interacting_profiles = {}
+local _interacting_types = {}
+local _interacting_cache_t = nil
+local _interacting_cache_side = nil
+
+local function _scan_interacting_allies(side, fixed_t)
+	if _interacting_cache_t == fixed_t and _interacting_cache_side == side then
+		return _interacting_units, _interacting_profiles, _interacting_types
+	end
+
+	for i = #_interacting_units, 1, -1 do
+		_interacting_units[i] = nil
+		_interacting_profiles[i] = nil
+		_interacting_types[i] = nil
+	end
+
+	local player_units = side and side.valid_player_units
+	if not player_units then
+		_interacting_cache_t = fixed_t
+		_interacting_cache_side = side
+		return _interacting_units, _interacting_profiles, _interacting_types
+	end
+
+	for i = 1, #player_units do
+		local ally_unit = player_units[i]
+		if (not ALIVE) or ALIVE[ally_unit] then
+			local ally_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+			if ally_data then
+				local profile = nil
+				local interaction_type = nil
+
+				local char_state = ally_data:read_component("character_state")
+				local state_name = char_state and char_state.state_name
+
+				if state_name == "minigame" then
+					profile = "shield"
+					interaction_type = "minigame"
+				elseif state_name == "interacting" then
+					local interacting_state = ally_data:read_component("interacting_character_state")
+					local template = interacting_state and interacting_state.interaction_template
+					if template and SHIELD_INTERACTION_TYPES[template] then
+						profile = "shield"
+						interaction_type = template
+					end
+				end
+
+				if not profile then
+					local inventory = ally_data:read_component("inventory")
+					if inventory and inventory.wielded_slot == "slot_luggable" then
+						profile = "escort"
+						interaction_type = "luggable"
+					end
+				end
+
+				if profile then
+					local n = #_interacting_units + 1
+					_interacting_units[n] = ally_unit
+					_interacting_profiles[n] = profile
+					_interacting_types[n] = interaction_type
+				end
+			end
+		end
+	end
+
+	_interacting_cache_t = fixed_t
+	_interacting_cache_side = side
+
+	return _interacting_units, _interacting_profiles, _interacting_types
+end
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
 	gas = true,
@@ -306,59 +383,28 @@ local function build_context(unit, blackboard)
 		and Managers.state.extension:system("side_system")
 	if side_system then
 		local side = side_system.side_by_unit[unit]
-		local player_units = side and side.valid_player_units
-		if player_units then
+		if side then
+			local interacting_units, interacting_profiles, interacting_types = _scan_interacting_allies(side, fixed_t)
 			local best_distance_sq = math.huge
-			for i = 1, #player_units do
-				local ally_unit = player_units[i]
-				if ally_unit ~= unit and (not ALIVE or ALIVE[ally_unit]) then
-					local ally_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
-					if ally_data then
-						local profile = nil
-						local interaction_type = nil
+			for i = 1, #interacting_units do
+				local ally_unit = interacting_units[i]
+				if ally_unit ~= unit then
+					local ally_position = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+					local dist_sq = math.huge
+					if unit_position and ally_position and ally_position.x then
+						local dx = ally_position.x - unit_position.x
+						local dy = ally_position.y - unit_position.y
+						local dz = ally_position.z - unit_position.z
+						dist_sq = dx * dx + dy * dy + dz * dz
+					end
 
-						local char_state = ally_data:read_component("character_state")
-						local state_name = char_state and char_state.state_name
-
-						if state_name == "minigame" then
-							profile = "shield"
-							interaction_type = "minigame"
-						elseif state_name == "interacting" then
-							local interacting_state = ally_data:read_component("interacting_character_state")
-							local template = interacting_state and interacting_state.interaction_template
-							if template and SHIELD_INTERACTION_TYPES[template] then
-								profile = "shield"
-								interaction_type = template
-							end
-						end
-
-						if not profile then
-							local inventory = ally_data:read_component("inventory")
-							if inventory and inventory.wielded_slot == "slot_luggable" then
-								profile = "escort"
-								interaction_type = "luggable"
-							end
-						end
-
-						if profile then
-							local ally_position = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
-							local dist_sq = math.huge
-							if unit_position and ally_position and ally_position.x then
-								local dx = ally_position.x - unit_position.x
-								local dy = ally_position.y - unit_position.y
-								local dz = ally_position.z - unit_position.z
-								dist_sq = dx * dx + dy * dy + dz * dz
-							end
-
-							if not context.ally_interacting or dist_sq < best_distance_sq then
-								best_distance_sq = dist_sq
-								context.ally_interacting = true
-								context.ally_interaction_type = interaction_type
-								context.ally_interacting_unit = ally_unit
-								context.ally_interacting_distance = dist_sq < math.huge and math.sqrt(dist_sq) or nil
-								context.ally_interaction_profile = profile
-							end
-						end
+					if not context.ally_interacting or dist_sq < best_distance_sq then
+						best_distance_sq = dist_sq
+						context.ally_interacting = true
+						context.ally_interaction_type = interacting_types[i]
+						context.ally_interacting_unit = ally_unit
+						context.ally_interacting_distance = dist_sq < math.huge and math.sqrt(dist_sq) or nil
+						context.ally_interaction_profile = interacting_profiles[i]
 					end
 				end
 			end
@@ -1909,6 +1955,23 @@ local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 	local saved_preset = context.preset
 	context.preset = preset
 
+	-- Revalidation hysteresis: after the initial "throw" decision passed
+	-- and the bot has already committed to the aim window, allow a single
+	-- enemy's worth of slack on the density-based throw gates so brief
+	-- dips in proximity count don't abort frags/bombs mid-arm. Veteran
+	-- frag is the worst offender in the wild (JSONL shows every queued
+	-- attempt landing on `blocked reason=revalidation`) because
+	-- `_grenade_horde` hard-gates at `num_nearby >= 6` and the proximity
+	-- count fluctuates across the ~0.5-1 s aim window. _grenade_priority_
+	-- target templates (smite/knives/krak) don't gate on density so the
+	-- relaxation is effectively a no-op for them.
+	local relaxed_num_nearby = opts and opts.revalidation and type(context.num_nearby) == "number"
+	local saved_num_nearby
+	if relaxed_num_nearby then
+		saved_num_nearby = context.num_nearby
+		context.num_nearby = saved_num_nearby + 1
+	end
+
 	local fn = GRENADE_HEURISTICS[grenade_template_name]
 	local can_activate, rule
 	if fn then
@@ -1917,6 +1980,10 @@ local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 		can_activate, rule = true, "grenade_generic"
 	else
 		can_activate, rule = false, "grenade_no_enemies"
+	end
+
+	if relaxed_num_nearby then
+		context.num_nearby = saved_num_nearby
 	end
 
 	context.preset = saved_preset
@@ -1935,6 +2002,14 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_combat_ability_identity = deps.combat_ability_identity
+
+		_interacting_cache_t = nil
+		_interacting_cache_side = nil
+		for i = #_interacting_units, 1, -1 do
+			_interacting_units[i] = nil
+			_interacting_profiles[i] = nil
+			_interacting_types[i] = nil
+		end
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,
