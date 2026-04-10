@@ -59,7 +59,7 @@ function M.begin()
 	return os.clock()
 end
 
-function M.finish(tag, start_clock, elapsed_s)
+function M.finish(tag, start_clock, elapsed_s, opts)
 	if not (tag and start_clock) then
 		return
 	end
@@ -77,8 +77,11 @@ function M.finish(tag, start_clock, elapsed_s)
 
 	stats.total_s = stats.total_s + duration_s
 	stats.calls = stats.calls + 1
-	_total_s = _total_s + duration_s
-	_total_calls = _total_calls + 1
+
+	if not (opts and opts.include_total == false) then
+		_total_s = _total_s + duration_s
+		_total_calls = _total_calls + 1
+	end
 end
 
 function M.mark_bot_frame()

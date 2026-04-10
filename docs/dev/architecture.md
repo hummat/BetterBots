@@ -195,7 +195,7 @@ Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/de
 
 The mod piggybacks on data the engine already computes. There are no new per-frame scans, raycasts, or pathfinding queries.
 
-`/bb_perf` now reports the sum of instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters.
+`/bb_perf` reports the sum of top-level instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Some rows are breakdown-only child tags for diagnosis; these appear in the per-tag table but are excluded from the headline total when their parent hook already includes the same work. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters.
 
 **Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
 

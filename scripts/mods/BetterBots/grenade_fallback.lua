@@ -973,12 +973,12 @@ local function try_queue(unit, blackboard)
 	local ctx_t0 = _perf and _perf.begin() or nil
 	local context = _build_context(unit, blackboard)
 	if ctx_t0 and _perf then
-		_perf.finish("grenade_fallback.build_context", ctx_t0)
+		_perf.finish("grenade_fallback.build_context", ctx_t0, nil, { include_total = false })
 	end
 	local heur_t0 = _perf and _perf.begin() or nil
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
 	if heur_t0 and _perf then
-		_perf.finish("grenade_fallback.heuristic", heur_t0)
+		_perf.finish("grenade_fallback.heuristic", heur_t0, nil, { include_total = false })
 	end
 	_emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
 	if not should_throw then
