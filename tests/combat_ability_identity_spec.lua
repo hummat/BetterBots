@@ -168,6 +168,27 @@ describe("combat_ability_identity", function()
 		assert.equals(0, #mod_stub.calls)
 	end)
 
+	it("does not warn on 'none' sentinel template_name", function()
+		-- The engine's action_handler initializes combat_ability_action.template_name
+		-- to the literal "none" when no ability is active. That's not an
+		-- unrecognized template — it's a known sentinel — so resolve() must
+		-- stay silent instead of firing the unknown-template warning.
+		local debug_stub = make_debug_log_stub()
+		local mod_stub = make_mod_stub()
+		Identity.init({
+			mod = mod_stub.mod,
+			debug_log = debug_stub.debug_log,
+			debug_enabled = debug_stub.debug_enabled,
+		})
+
+		local identity = Identity.resolve(nil, nil, { template_name = "none" })
+
+		assert.equals("none", identity.template_name)
+		assert.is_false(Identity.is_revive_defensive(identity))
+		assert.equals(0, #debug_stub.calls)
+		assert.equals(0, #mod_stub.calls)
+	end)
+
 	it("flags unresolved veteran identities and warns exactly once", function()
 		local mod_stub = make_mod_stub()
 		local debug_stub = make_debug_log_stub()

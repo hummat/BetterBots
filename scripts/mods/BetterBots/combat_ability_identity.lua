@@ -106,6 +106,13 @@ local function _is_known_template(template_name)
 	if not template_name then
 		return true
 	end
+	-- Engine sentinel: action_handler initializes `template_name = "none"`
+	-- to mean "no active ability template" (see action_handler.lua and
+	-- ability_template.lua in the decompiled source). Treat it as a known
+	-- no-ability state so resolve() doesn't warn for an expected value.
+	if template_name == "none" then
+		return true
+	end
 	if template_name == "veteran_combat_ability" then
 		return true
 	end

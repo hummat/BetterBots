@@ -68,6 +68,18 @@ local function _resolve_revive_template(unit, ability_template_name, ability_ext
 	return false, effective_name
 end
 
+-- Formats a human-readable bot identifier for log correlation. Prefers the
+-- slot number (1-5) from Debug.bot_slot_for_unit so observers can match
+-- candidate/skip/queue log lines against the in-game party roster; falls
+-- back to the unit reference if the slot lookup isn't available.
+local function _format_bot_id(unit)
+	local slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(unit)
+	if slot then
+		return "bot=" .. tostring(slot)
+	end
+	return "unit=" .. tostring(unit)
+end
+
 function M.log_revive_candidate(unit, behavior_component, perception_component)
 	if not (_debug_enabled and _debug_enabled()) then
 		return false
@@ -97,7 +109,9 @@ function M.log_revive_candidate(unit, behavior_component, perception_component)
 	_debug_log(
 		"revive_candidate:" .. log_name .. ":" .. tostring(unit),
 		_fixed_time(),
-		"revive candidate observed: "
+		"["
+			.. _format_bot_id(unit)
+			.. "] revive candidate observed: "
 			.. tostring(log_name)
 			.. " (template="
 			.. tostring(ability_template_name)
@@ -117,7 +131,11 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	end
 
 	-- From here on, this IS a rescue interaction — log skip reasons.
+	-- Throttle keys still use the stringified unit for uniqueness; the
+	-- visible log message uses the slot-aware identifier so operators can
+	-- correlate candidate/skip/queue lines against the party roster.
 	local bot_id = tostring(unit)
+	local bot_tag = "[" .. _format_bot_id(unit) .. "] "
 
 	local perception_extension = ScriptUnit.has_extension(unit, "perception_system")
 	local enemies_nearby = 0
@@ -130,7 +148,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_enemies:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (no enemies nearby)"
+				bot_tag .. "revive ability skipped (no enemies nearby)"
 			)
 		end
 		return false
@@ -142,7 +160,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:suppressed:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (suppressed: " .. tostring(suppress_reason) .. ")"
+				bot_tag .. "revive ability skipped (suppressed: " .. tostring(suppress_reason) .. ")"
 			)
 		end
 		return false
@@ -154,7 +172,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_unit_data:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (no unit_data_system extension)"
+				bot_tag .. "revive ability skipped (no unit_data_system extension)"
 			)
 		end
 		return false
@@ -166,7 +184,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_ability_ext:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (no ability_system extension)"
+				bot_tag .. "revive ability skipped (no ability_system extension)"
 			)
 		end
 		return false
@@ -181,7 +199,8 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:not_whitelisted:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (ability "
+				bot_tag
+					.. "revive ability skipped (ability "
 					.. tostring(ability_template_name)
 					.. ", equipped="
 					.. tostring(effective_ability_name)
@@ -196,7 +215,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:disabled:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (" .. ability_template_name .. " disabled by setting)"
+				bot_tag .. "revive ability skipped (" .. ability_template_name .. " disabled by setting)"
 			)
 		end
 		return false
@@ -207,7 +226,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:cant_use:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (" .. ability_template_name .. " can_use_ability=false)"
+				bot_tag .. "revive ability skipped (" .. ability_template_name .. " can_use_ability=false)"
 			)
 		end
 		return false
@@ -219,7 +238,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_charges:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (" .. ability_template_name .. " charges=0)"
+				bot_tag .. "revive ability skipped (" .. ability_template_name .. " charges=0)"
 			)
 		end
 		return false
@@ -235,7 +254,8 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_meta:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped ("
+				bot_tag
+					.. "revive ability skipped ("
 					.. tostring(ability_template_name)
 					.. " missing ability_meta_data.activation)"
 			)
@@ -250,7 +270,10 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_input:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (" .. tostring(ability_template_name) .. " activation has no action_input)"
+				bot_tag
+					.. "revive ability skipped ("
+					.. tostring(ability_template_name)
+					.. " activation has no action_input)"
 			)
 		end
 		return false
@@ -262,7 +285,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_debug_log(
 				"revive_ability_skip:no_input_ext:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (no action_input_system extension)"
+				bot_tag .. "revive ability skipped (no action_input_system extension)"
 			)
 		end
 		return false
@@ -283,7 +306,8 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 				_debug_log(
 					"revive_ability_skip:not_queueable:" .. bot_id,
 					_fixed_time(),
-					"revive ability skipped ("
+					bot_tag
+						.. "revive ability skipped ("
 						.. tostring(ability_template_name)
 						.. " action_input "
 						.. tostring(action_input)
@@ -312,7 +336,8 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 		_debug_log(
 			"revive_ability:" .. tostring(effective_ability_name or ability_template_name) .. ":" .. tostring(unit),
 			fixed_t,
-			"revive ability queued: "
+			bot_tag
+				.. "revive ability queued: "
 				.. tostring(effective_ability_name or ability_template_name)
 				.. " (interaction="
 				.. tostring(interaction_type)
