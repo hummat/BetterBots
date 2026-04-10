@@ -223,7 +223,7 @@ This is intentionally "sum of instrumented BetterBots hook time", not total proc
 - No new perception scans — reads `perception_extension:enemies_in_proximity()` which the engine already computed
 - No raycasts or line-of-sight checks
 - No pathfinding or navmesh queries
-- No duplicate per-bot daemonhost list scans in sprinting — non-aggroed daemonhost units are cached once per frame/side-system before per-bot distance checks
+- No duplicate per-bot daemonhost list scans in sprinting — non-aggroed daemonhost units are cached once per frame per `(side_system, enemy_side_names)` reference before per-bot distance checks (reference equality on `enemy_side_names` is safe because vanilla `Side:relation_side_names` returns a stable cached table per relation)
 - No duplicate same-frame human ammo eligibility scan for each bot — ammo policy caches the all-humans-above-threshold result by frame, human unit table, and threshold
 - No repeated same-frame suppression component reads per bot — `_is_suppressed(unit)` caches its result by unit and `fixed_t`
 - No table allocations in the heuristic path (context is reused via cache)

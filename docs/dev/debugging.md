@@ -135,6 +135,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
 5. `/bb_reset`
    - Resets all BetterBots settings to their code-defined defaults and saves them when the DMF save hook is available.
+   - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
 
 ### Practical debug workflow

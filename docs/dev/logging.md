@@ -121,6 +121,9 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `shield (<type>) dist=<N>` / `escort (luggable) dist=<N>` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
 - `revive candidate observed: <ability> (template=<template>, need_type=<type>)` (bot selected a rescue destination while carrying a defensive revive ability; this fires before `BtBotInteractAction.enter` and distinguishes selector/path misses from interact-hook misses for `#7`)
 - `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` (bot fired a defensive ability before starting a rescue interaction; for shared veteran template this logs the equipped ability name, e.g. `veteran_combat_ability_shout`)
+- `revive_ability_skip:{no_unit_data,no_ability_ext,no_meta,no_input,no_input_ext,not_queueable}:<unit>` (six skip-reason logs inside `try_pre_revive` after the rescue-interaction gate; identifies which post-commit early return swallowed the attempt — per-bot throttle; direct diagnostic signal for `#7`)
+- `unknown_combat_template:<template_name>` (`combat_ability_identity.resolve` encountered a template not present in any of the three category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
+- `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
 
 ## Intentionally suppressed (noise reduction)
 
