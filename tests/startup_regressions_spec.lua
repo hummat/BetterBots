@@ -164,6 +164,42 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('"hook_require:bt_bot_melee_action"', 1))
 	end)
 
+	it("keeps BotBehaviorExtension hook_require consolidated in BetterBots.lua", function()
+		local main_handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local main_source = assert(main_handle:read("*a"))
+		main_handle:close()
+
+		local revive_handle = assert(io.open("scripts/mods/BetterBots/revive_ability.lua", "r"))
+		local revive_source = assert(revive_handle:read("*a"))
+		revive_handle:close()
+
+		local hook_pattern = 'hook_require%("scripts/extension_systems/behavior/bot_behavior_extension"'
+		local main_count = 0
+		for _ in main_source:gmatch(hook_pattern) do
+			main_count = main_count + 1
+		end
+		local revive_count = 0
+		for _ in revive_source:gmatch(hook_pattern) do
+			revive_count = revive_count + 1
+		end
+
+		assert.equals(1, main_count)
+		assert.equals(0, revive_count)
+		assert.is_truthy(main_source:find("ReviveAbility%.install_behavior_ext_hooks", 1))
+	end)
+
+	it("persists /bb_reset through DMF instead of the BetterBots mod object", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('rawget%(_G, "dmf"%)', 1))
+		assert.is_truthy(source:find('type%(dmf_module%.save_unsaved_settings_to_file%) == "function"', 1))
+		assert.is_truthy(source:find("dmf_module%.save_unsaved_settings_to_file%(", 1))
+		assert.is_nil(source:find("mod%.save_unsaved_settings_to_file", 1))
+		assert.is_nil(source:find("mod:save_unsaved_settings_to_file", 1))
+	end)
+
 	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))

@@ -938,8 +938,9 @@ mod:hook_require(
 	end
 )
 
--- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39) + main update tick.
--- Consolidated: both modules hook this path (#67).
+-- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39)
+-- + revive-candidate diagnostics (#7) + main update tick.
+-- Consolidated: multiple modules hook this path (#67).
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
 	local ok, err
 	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
@@ -949,6 +950,10 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	ok, err = pcall(AmmoPolicy.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
 		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(ReviveAbility.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: revive_ability behavior hook install failed: " .. tostring(err))
 	end
 	mod:hook(
 		BotBehaviorExtension,
@@ -1128,9 +1133,10 @@ mod:command("bb_reset", "Reset BetterBots settings to defaults", function()
 
 	-- Always attempt to persist, even on partial failure — keeping the successful
 	-- resets on disk is better than losing them alongside the failed ones.
-	if type(mod.save_unsaved_settings_to_file) == "function" then
+	local dmf_module = rawget(_G, "dmf")
+	if type(dmf_module) == "table" and type(dmf_module.save_unsaved_settings_to_file) == "function" then
 		pcall(function()
-			mod:save_unsaved_settings_to_file()
+			dmf_module.save_unsaved_settings_to_file()
 		end)
 	end
 
