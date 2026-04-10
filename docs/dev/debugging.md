@@ -133,6 +133,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. `/bb_perf`
    - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
+   - `grenade_fallback` has two sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call on line 968 of `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). Sub-tags are additive under the parent tag — use them to tell whether the parent cost lives in context building or heuristic dispatch.
 5. `/bb_reset`
    - Resets all BetterBots settings to their code-defined defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.

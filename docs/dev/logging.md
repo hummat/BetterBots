@@ -263,3 +263,16 @@ bb-log events holds      # false decision distribution
 bb-log events items      # item sequence success/fail
 bb-log events raw FILTER # passthrough to jq
 ```
+
+### Text-log Consume counter is profile-dependent
+
+`bb-log summary`'s "Consumes by ability" table is built from the text-log `grenade charge consumed` line, which only fires for grenade profiles whose completion signal is auto-unwield (frag, krak, fire, throwing knives, rocks, box, adamant grenades). Profiles whose completion signal is **external action confirmation** — most notably `psyker_smite` via `confirmation_action = "action_use_power"`, plus assail and chain lightning — complete the state machine via the `grenade external action confirmed` path and **never emit a consume line**. Those grenades still fire correctly; they just don't appear in the text-log Consumes table.
+
+**Authoritative counts live in the JSONL event log.** When validating "did this grenade actually fire", use:
+
+```bash
+bb-log events raw | grep '"ability":"psyker_smite"' | \
+  grep -oE '"event":"(queued|complete|blocked)"' | sort | uniq -c
+```
+
+or the equivalent `jq` filter. The `queued` → `complete` ratio tells you whether throws landed or got blocked (usually via `reason=revalidation` when density-gated templates lose the aim-window race).
