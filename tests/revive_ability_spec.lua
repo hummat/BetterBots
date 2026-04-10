@@ -6,6 +6,8 @@ local _recorded_inputs = {}
 local _suppressed = false
 local _suppressed_reason = nil
 local _combat_template_enabled = true
+local _hook_require_callbacks = {}
+local _hook_safe_calls = {}
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -65,7 +67,9 @@ local function make_action_input_ext()
 	}
 end
 
-local function make_ability_ext(can_use, charges)
+local function make_ability_ext(can_use, charges, opts)
+	local combat_ability_name = opts and opts.combat_ability_name or "test_combat_ability"
+	local combat_ability_tweak_data = opts and opts.combat_ability_tweak_data or nil
 	return {
 		can_use_ability = function(_, _ability_type)
 			return can_use
@@ -76,6 +80,12 @@ local function make_ability_ext(can_use, charges)
 		action_input_is_currently_valid = function(_, _ability_component_name, _action_input, _used_input, _fixed_t)
 			return true
 		end,
+		_equipped_abilities = {
+			combat_ability = {
+				name = combat_ability_name,
+				ability_template_tweak_data = combat_ability_tweak_data,
+			},
+		},
 	}
 end
 
@@ -101,9 +111,9 @@ local function make_perception_ext(num_enemies)
 	}
 end
 
-local function setup_unit(unit, template_name, can_use, charges, num_enemies)
+local function setup_unit(unit, template_name, can_use, charges, num_enemies, opts)
 	local action_input_ext = make_action_input_ext()
-	local ability_ext = make_ability_ext(can_use ~= false, charges or 1)
+	local ability_ext = make_ability_ext(can_use ~= false, charges or 1, opts)
 	local unit_data_ext = make_unit_data_ext(template_name)
 	local perception_ext = make_perception_ext(num_enemies)
 	_extensions[unit] = {
@@ -271,6 +281,42 @@ describe("revive_ability", function()
 			assert.equals("combat_ability_pressed", _recorded_inputs[1].input)
 		end)
 
+		it("queues veteran voice of command but not veteran stance", function()
+			setup_unit(unit, "veteran_combat_ability", true, 1, nil, {
+				combat_ability_name = "veteran_combat_ability_shout",
+			})
+			_ability_templates.veteran_combat_ability = {
+				ability_meta_data = {
+					activation = { action_input = "combat_ability_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "combat_ability_released" },
+				},
+			}
+			local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+			assert.is_true(result)
+			assert.equals("combat_ability_pressed", _recorded_inputs[1].input)
+
+			_recorded_inputs = {}
+			setup_unit(unit, "veteran_combat_ability", true, 1, nil, {
+				combat_ability_name = "veteran_combat_ability_stance",
+				combat_ability_tweak_data = { class_tag = "squad_leader" },
+			})
+			result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+			assert.is_false(result)
+			assert.equals(0, #_recorded_inputs)
+		end)
+
+		it("queues adamant stance during revive", function()
+			setup_unit(unit, "adamant_stance")
+			_ability_templates.adamant_stance = {
+				ability_meta_data = {
+					activation = { action_input = "stance_pressed" },
+				},
+			}
+			local result = ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "revive" })
+			assert.is_true(result)
+			assert.equals("stance_pressed", _recorded_inputs[1].input)
+		end)
+
 		describe("rejection guards", function()
 			before_each(function()
 				_ability_templates.ogryn_taunt_shout = {
@@ -432,6 +478,128 @@ describe("revive_ability", function()
 			assert.equals("adamant_shout", evt.template)
 			assert.equals("rescue", evt.interaction)
 			assert.equals(3, evt.enemies)
+		end)
+
+		it("logs revive candidates before interact enter for defensive revive templates", function()
+			setup_unit(unit, "veteran_combat_ability", true, 1, nil, {
+				combat_ability_name = "veteran_combat_ability_shout",
+			})
+			local behavior_component = { interaction_unit = make_unit("downed_ally") }
+			local perception_component = {
+				target_ally = behavior_component.interaction_unit,
+				target_ally_needs_aid = true,
+				target_ally_need_type = "knocked_down",
+			}
+
+			_debug_on = true
+			ReviveAbility.log_revive_candidate(unit, behavior_component, perception_component)
+
+			assert.is_true(#_debug_logs > 0)
+			local log = _debug_logs[1]
+			assert.truthy(string.find(log.key, "revive_candidate:"))
+			assert.truthy(string.find(log.message, "veteran_combat_ability_shout"))
+			assert.truthy(string.find(log.message, "knocked_down"))
+		end)
+
+		it("does not log revive candidates for non-defensive shared templates", function()
+			setup_unit(unit, "veteran_combat_ability", true, 1, nil, {
+				combat_ability_name = "veteran_combat_ability_stance",
+				combat_ability_tweak_data = { class_tag = "squad_leader" },
+			})
+			local ally = make_unit("downed_ally")
+
+			_debug_on = true
+			ReviveAbility.log_revive_candidate(unit, { interaction_unit = ally }, {
+				target_ally = ally,
+				target_ally_needs_aid = true,
+				target_ally_need_type = "knocked_down",
+			})
+
+			assert.equals(0, #_debug_logs)
+		end)
+	end)
+
+	describe("register_hooks", function()
+		it("wraps BtBotInteractAction.enter and runs pre-revive logic", function()
+			local unit = make_unit("bot_1")
+			local blackboard = make_blackboard()
+			local fake_mod = {
+				echo = function() end,
+				hook = function() end,
+				hook_safe = function(_, target, method, handler)
+					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
+				end,
+				hook_require = function(_, path, callback)
+					_hook_require_callbacks[path] = callback
+				end,
+			}
+
+			ReviveAbility.init({
+				mod = fake_mod,
+				debug_log = function(key, fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 100
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "test_ability"
+				end,
+				fallback_state_by_unit = _fallback_state,
+				perf = nil,
+				shared_rules = SharedRules,
+			})
+			ReviveAbility.wire({
+				MetaData = { inject = function() end },
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+			setup_unit(unit, "ogryn_taunt_shout")
+			_ability_templates.ogryn_taunt_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+
+			ReviveAbility.register_hooks()
+			local interact_require =
+				_hook_require_callbacks["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action"]
+			assert.is_not_nil(interact_require)
+
+			local enter_called = 0
+			local fake_action = {
+				enter = function(_self, enter_unit, _breed, _blackboard, _scratchpad, action_data, _t)
+					enter_called = enter_called + 1
+					assert.equals(unit, enter_unit)
+					assert.equals("revive", action_data.interaction_type)
+					return "orig_enter"
+				end,
+			}
+			interact_require(fake_action)
+
+			local result = fake_action.enter(fake_action, unit, nil, blackboard, {}, { interaction_type = "revive" }, 0)
+			assert.equals("orig_enter", result)
+			assert.equals(1, enter_called)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("shout_pressed", _recorded_inputs[1].input)
 		end)
 	end)
 end)

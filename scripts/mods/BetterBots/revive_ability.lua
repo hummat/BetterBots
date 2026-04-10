@@ -21,8 +21,13 @@ local REVIVE_DEFENSIVE_ABILITIES = {
 	ogryn_taunt_shout = true,
 	psyker_shout = true,
 	adamant_shout = true,
+	adamant_stance = true,
 	zealot_invisibility = true,
 	veteran_stealth_combat_ability = true,
+}
+
+local REVIVE_DEFENSIVE_COMBAT_ABILITY_NAMES = {
+	veteran_combat_ability_shout = true,
 }
 
 local RESCUE_INTERACTION_TYPES = {
@@ -30,6 +35,13 @@ local RESCUE_INTERACTION_TYPES = {
 	rescue = true,
 	pull_up = true,
 	remove_net = true,
+}
+
+local RESCUE_NEED_TYPES = {
+	knocked_down = true,
+	netted = true,
+	ledge = true,
+	hogtied = true,
 }
 
 local M = {}
@@ -52,6 +64,69 @@ function M.wire(deps)
 	_EventLog = deps.EventLog
 	_Debug = deps.Debug
 	_is_combat_template_enabled = deps.is_combat_template_enabled
+end
+
+local function _combat_ability_name(ability_extension)
+	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
+	local combat_ability = equipped_abilities and equipped_abilities.combat_ability
+	return combat_ability and combat_ability.name or nil
+end
+
+local function _resolve_revive_template(unit, ability_template_name, ability_extension)
+	if REVIVE_DEFENSIVE_ABILITIES[ability_template_name] then
+		return true, ability_template_name
+	end
+
+	if ability_template_name == "veteran_combat_ability" then
+		local combat_ability_name = _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit)
+		if REVIVE_DEFENSIVE_COMBAT_ABILITY_NAMES[combat_ability_name] then
+			return true, combat_ability_name
+		end
+	end
+
+	return false, _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit)
+end
+
+function M.log_revive_candidate(unit, behavior_component, perception_component)
+	if not (_debug_enabled and _debug_enabled()) then
+		return false
+	end
+
+	local target_ally = perception_component and perception_component.target_ally
+	local need_type = perception_component and perception_component.target_ally_need_type
+	if not target_ally or behavior_component.interaction_unit ~= target_ally or not RESCUE_NEED_TYPES[need_type] then
+		return false
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	if not unit_data_extension or not ability_extension then
+		return false
+	end
+
+	local ability_component = unit_data_extension:read_component("combat_ability_action")
+	local ability_template_name = ability_component and ability_component.template_name
+	local is_defensive, effective_ability_name =
+		_resolve_revive_template(unit, ability_template_name, ability_extension)
+	if not is_defensive then
+		return false
+	end
+
+	local log_name = effective_ability_name or ability_template_name or "unknown"
+	_debug_log(
+		"revive_candidate:" .. log_name .. ":" .. tostring(unit),
+		_fixed_time(),
+		"revive candidate observed: "
+			.. tostring(log_name)
+			.. " (template="
+			.. tostring(ability_template_name)
+			.. ", need_type="
+			.. tostring(need_type)
+			.. ")",
+		5
+	)
+
+	return true
 end
 
 function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 212/_blackboard
@@ -97,21 +172,27 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 		return false
 	end
 
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	if not ability_extension then
+		return false
+	end
+
 	local ability_component = unit_data_extension:read_component("combat_ability_action")
 	local ability_template_name = ability_component and ability_component.template_name
-	if not ability_template_name or not REVIVE_DEFENSIVE_ABILITIES[ability_template_name] then
+	local is_defensive, effective_ability_name =
+		_resolve_revive_template(unit, ability_template_name, ability_extension)
+	if not ability_template_name or not is_defensive then
 		if _debug_enabled() then
 			_debug_log(
 				"revive_ability_skip:not_whitelisted:" .. bot_id,
 				_fixed_time(),
-				"revive ability skipped (ability " .. tostring(ability_template_name) .. " not in defensive whitelist)"
+				"revive ability skipped (ability "
+					.. tostring(ability_template_name)
+					.. ", equipped="
+					.. tostring(effective_ability_name)
+					.. " not in defensive whitelist)"
 			)
 		end
-		return false
-	end
-
-	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
-	if not ability_extension then
 		return false
 	end
 
@@ -200,10 +281,10 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 
 	if _debug_enabled() then
 		_debug_log(
-			"revive_ability:" .. ability_template_name .. ":" .. tostring(unit),
+			"revive_ability:" .. tostring(effective_ability_name or ability_template_name) .. ":" .. tostring(unit),
 			fixed_t,
 			"revive ability queued: "
-				.. ability_template_name
+				.. tostring(effective_ability_name or ability_template_name)
 				.. " (interaction="
 				.. tostring(interaction_type)
 				.. ", enemies="
@@ -218,8 +299,9 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			t = fixed_t,
 			event = "revive_ability",
 			bot = bot_slot,
-			ability = _equipped_combat_ability_name(unit),
+			ability = _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit),
 			template = ability_template_name,
+			equipped_ability_name = effective_ability_name,
 			interaction = interaction_type,
 			enemies = enemies_nearby,
 		})
@@ -254,6 +336,37 @@ function M.register_hooks()
 			end
 		end
 	)
+
+	_mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+		_mod:hook_safe(
+			BotBehaviorExtension,
+			"_refresh_destination",
+			function(
+				self,
+				_t,
+				_self_position,
+				_previous_destination,
+				_hold_position,
+				_hold_position_max_distance_sq,
+				_bot_group_data,
+				_navigation_extension,
+				_follow_component,
+				perception_component
+			)
+				if not (_debug_enabled and _debug_enabled()) then
+					return
+				end
+
+				local unit = self and self._unit
+				local behavior_component = self and self._behavior_component
+				if not unit or not behavior_component or not perception_component then
+					return
+				end
+
+				M.log_revive_candidate(unit, behavior_component, perception_component)
+			end
+		)
+	end)
 end
 
 -- Exposed for testing
