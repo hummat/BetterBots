@@ -247,6 +247,12 @@ local ReviveAbility = mod:io_dofile("BetterBots/scripts/mods/BetterBots/revive_a
 assert(ReviveAbility, "BetterBots: failed to load revive_ability module")
 
 -- Init each module with its dependencies
+CombatAbilityIdentity.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+})
+
 Settings.init({
 	mod = mod,
 	combat_ability_identity = CombatAbilityIdentity,
@@ -1106,15 +1112,33 @@ mod:command("bb_perf", "Print BetterBots runtime timing stats from the current r
 end)
 
 mod:command("bb_reset", "Reset BetterBots settings to defaults", function()
+	local failures = {}
 	for setting_id, default_value in pairs(Settings.DEFAULTS) do
-		mod:set(setting_id, default_value, true)
+		local ok, err = pcall(function()
+			mod:set(setting_id, default_value, true)
+		end)
+		if not ok then
+			local entry = setting_id
+			if err ~= nil then
+				entry = entry .. " (" .. tostring(err) .. ")"
+			end
+			failures[#failures + 1] = entry
+		end
 	end
 
+	-- Always attempt to persist, even on partial failure — keeping the successful
+	-- resets on disk is better than losing them alongside the failed ones.
 	if type(mod.save_unsaved_settings_to_file) == "function" then
-		mod:save_unsaved_settings_to_file()
+		pcall(function()
+			mod:save_unsaved_settings_to_file()
+		end)
 	end
 
-	mod:echo("BetterBots: all settings reset to defaults")
+	if #failures == 0 then
+		mod:echo("BetterBots: all settings reset to defaults")
+	else
+		mod:echo("BetterBots: reset partially failed: " .. table.concat(failures, ", "))
+	end
 end)
 
 function mod.on_game_state_changed(status, state)

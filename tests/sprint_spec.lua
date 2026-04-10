@@ -228,16 +228,21 @@ describe("sprint", function()
 				breed_calls = breed_calls + 1
 				return { name = "chaos_daemonhost" }
 			end
+			-- Vanilla Side:relation_side_names returns a stable cached table
+			-- (see side.lua: Side._relation_side_names), so both bots on the
+			-- same team share the same enemy_side_names reference. Mirror that
+			-- here so the cache-by-reference check still collapses to one scan.
+			local shared_enemy_sides = { "enemy" }
 			_mock_side_system = {
 				side_by_unit = {
 					[bot1] = {
 						relation_side_names = function()
-							return { "enemy" }
+							return shared_enemy_sides
 						end,
 					},
 					[bot2] = {
 						relation_side_names = function()
-							return { "enemy" }
+							return shared_enemy_sides
 						end,
 					},
 				},
@@ -249,6 +254,64 @@ describe("sprint", function()
 			assert.is_false(Sprint.is_near_daemonhost(bot1))
 			assert.is_false(Sprint.is_near_daemonhost(bot2))
 			assert.equals(1, breed_calls)
+		end)
+
+		it("rescans when enemy_side_names reference changes in the same frame", function()
+			-- Pins the I5 fix: the daemonhost unit-list cache must key on
+			-- enemy_side_names identity, not just (fixed_t, side_system).
+			-- Without the fix, bot2's scan request silently reuses bot1's
+			-- side_a-filtered list and treats dh_a (5m from bot2) as "near",
+			-- even though bot2's real enemy side (side_b) only contains dh_b
+			-- at 30m (outside the 20m safe range).
+			local bot1 = "bot1"
+			local bot2 = "bot2"
+			local dh_a = "dh_side_a"
+			local dh_b = "dh_side_b"
+
+			_positions[bot1] = pos(0, 0, 0)
+			_positions[bot2] = pos(0, 0, 0)
+			_positions[dh_a] = pos(5, 0, 0) -- within 20m of both bots
+			_positions[dh_b] = pos(30, 0, 0) -- outside 20m of both bots
+			_alive[dh_a] = true
+			_alive[dh_b] = true
+			setup_breed(dh_a, "chaos_daemonhost")
+			setup_breed(dh_b, "chaos_daemonhost")
+
+			-- Two bots on two different teams, each with their own
+			-- enemy_side_names table reference. The mock side system returns
+			-- different enemy unit lists depending on the side name queried.
+			local enemy_sides_a = { "side_a" }
+			local enemy_sides_b = { "side_b" }
+			_mock_side_system = {
+				side_by_unit = {
+					[bot1] = {
+						relation_side_names = function()
+							return enemy_sides_a
+						end,
+					},
+					[bot2] = {
+						relation_side_names = function()
+							return enemy_sides_b
+						end,
+					},
+				},
+				get_side_from_name = function(_self, name)
+					if name == "side_a" then
+						return { ai_target_units = { dh_a } }
+					elseif name == "side_b" then
+						return { ai_target_units = { dh_b } }
+					end
+					return nil
+				end,
+			}
+
+			-- bot1 scans side_a, finds dh_a at 5m → near.
+			assert.is_true(Sprint.is_near_daemonhost(bot1))
+			-- bot2 must re-scan side_b (different enemy_side_names reference),
+			-- find only dh_b at 30m → not near. If the cache key ignores
+			-- enemy_side_names, bot2 sees the leaked {dh_a} list and returns
+			-- true instead.
+			assert.is_false(Sprint.is_near_daemonhost(bot2))
 		end)
 
 		it("sprints to catch up when far from follow unit", function()

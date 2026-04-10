@@ -58,6 +58,7 @@ end
 rawset(_G, "require", _mock_require)
 
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local ConditionPatch = dofile("scripts/mods/BetterBots/condition_patch.lua")
 
 -- Restore require
@@ -728,6 +729,132 @@ describe("condition_patch", function()
 
 			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
 			assert.is_false(result)
+		end)
+
+		it("passes the veteran shout semantic key into the team cooldown lookup", function()
+			-- Regression for #14 / c7c9954: team cooldown family lookups must use
+			-- identity.semantic_key (veteran_combat_ability_shout), not the raw
+			-- engine template_name (veteran_combat_ability) — otherwise Veteran
+			-- shout bots never match the aoe_shout category map.
+			local unit = "vet_bot"
+			_extensions[unit] = {
+				unit_data_system = {
+					read_component = function(_self, component_name)
+						assert.equals("combat_ability_action", component_name)
+						return { template_name = "veteran_combat_ability" }
+					end,
+				},
+				ability_system = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+					_equipped_abilities = {
+						combat_ability = {
+							name = "veteran_combat_ability_shout",
+							ability_template_tweak_data = { class_tag = "squad_leader" },
+						},
+					},
+				},
+				action_input_system = {
+					_action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								veteran_combat_ability = {
+									combat_ability_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			local recorded_team_key
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true, "veteran_voc_surrounded", {}
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function(_u, team_key, _t, _rule)
+						recorded_team_key = team_key
+						return false
+					end,
+				},
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+
+			local ability_templates = {
+				veteran_combat_ability = {
+					ability_meta_data = {
+						activation = {
+							action_input = "combat_ability_pressed",
+						},
+					},
+				},
+			}
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				{ behavior = {}, perception = {} },
+				{},
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			-- Restore the module-level base wiring so later tests in this spec
+			-- don't inherit the CombatAbilityIdentity and stub dependencies
+			-- injected above.
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return false
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.equals("veteran_combat_ability_shout", recorded_team_key)
+			assert.is_true(result)
 		end)
 	end)
 end)

@@ -387,14 +387,6 @@ local function build_context(unit, blackboard)
 end
 
 local function _resolve_combat_identity(ability_template_name, ability_extension)
-	if not _combat_ability_identity then
-		return {
-			template_name = ability_template_name,
-			semantic_key = ability_template_name,
-			class_tag_source = "unknown",
-		}
-	end
-
 	return _combat_ability_identity.resolve(nil, ability_extension, { template_name = ability_template_name })
 end
 
@@ -459,8 +451,7 @@ local function _can_activate_veteran_combat_ability(
 	local class_tag = identity.class_tag
 	local source = identity.class_tag_source
 	if class_tag == "squad_leader" then
-		local preset = context.preset or "balanced"
-		local thresholds_voc = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
+		local thresholds_voc = thresholds
 		if context.in_hazard and context.num_nearby >= 1 then
 			return true, "veteran_voc_hazard"
 		end
@@ -1934,6 +1925,7 @@ end
 
 return {
 	init = function(deps)
+		assert(deps.combat_ability_identity, "heuristics: combat_ability_identity dep required")
 		_fixed_time = deps.fixed_time
 		_decision_context_cache = deps.decision_context_cache
 		_super_armor_breed_cache = deps.super_armor_breed_cache

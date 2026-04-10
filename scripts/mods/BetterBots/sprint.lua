@@ -24,13 +24,23 @@ local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 -- (sprint, _is_suppressed, BT condition wrappers) query in the same tick.
 local _dh_nearest_dist_sq_by_unit = setmetatable({}, { __mode = "k" })
 local _dh_cache_t_by_unit = setmetatable({}, { __mode = "k" })
+-- Cache key: (fixed_t, side_system, enemy_side_names). enemy_side_names is
+-- compared by reference identity — vanilla Side:relation_side_names returns a
+-- stable table from Side._relation_side_names, so same side ⇒ same reference
+-- per frame. Including it prevents silent staleness if a future caller passes
+-- a different relation list in the same tick (latent correctness hole).
 local _dh_units_cache_t = nil
 local _dh_units_cache_side_system = nil
+local _dh_units_cache_enemy_sides = nil
 local _dh_units_cache = {}
 local _side_system_warned = false
 
 local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixed_t)
-	if _dh_units_cache_t == fixed_t and _dh_units_cache_side_system == side_system then
+	if
+		_dh_units_cache_t == fixed_t
+		and _dh_units_cache_side_system == side_system
+		and _dh_units_cache_enemy_sides == enemy_side_names
+	then
 		return _dh_units_cache
 	end
 
@@ -64,6 +74,7 @@ local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixe
 
 	_dh_units_cache_t = fixed_t
 	_dh_units_cache_side_system = side_system
+	_dh_units_cache_enemy_sides = enemy_side_names
 
 	return _dh_units_cache
 end
@@ -285,6 +296,7 @@ Sprint.init = function(deps)
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	_dh_units_cache_t = nil
 	_dh_units_cache_side_system = nil
+	_dh_units_cache_enemy_sides = nil
 	for i = #_dh_units_cache, 1, -1 do
 		_dh_units_cache[i] = nil
 	end

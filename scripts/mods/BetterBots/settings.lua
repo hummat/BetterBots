@@ -4,6 +4,11 @@ local _mod
 local _combat_ability_identity
 
 -- Category → setting ID mapping
+-- These tables are the authoritative list of templates covered by each gate.
+-- They are parsed by settings_spec.lua (source scan) to enforce heuristic coverage
+-- and referenced by M._CATEGORY_TABLES below so introspection stays possible.
+-- Runtime gating happens through combat_ability_identity.category_setting_id,
+-- not a reverse lookup on these tables.
 local CATEGORY_STANCES = {
 	-- veteran_combat_ability is NOT here — semantic resolver maps it to stance or shout
 	psyker_overcharge_stance = true,
@@ -34,22 +39,12 @@ local CATEGORY_STEALTH = {
 	zealot_invisibility = true,
 }
 
--- Reverse lookup: template_name → setting_id
--- Built once at load time. veteran_combat_ability excluded (semantic resolver).
-local TEMPLATE_TO_CATEGORY_SETTING = {}
-
-local CATEGORY_TO_SETTING = {
-	{ table = CATEGORY_STANCES, setting = "enable_stances" },
-	{ table = CATEGORY_CHARGES, setting = "enable_charges" },
-	{ table = CATEGORY_SHOUTS, setting = "enable_shouts" },
-	{ table = CATEGORY_STEALTH, setting = "enable_stealth" },
+M._CATEGORY_TABLES = {
+	enable_stances = CATEGORY_STANCES,
+	enable_charges = CATEGORY_CHARGES,
+	enable_shouts = CATEGORY_SHOUTS,
+	enable_stealth = CATEGORY_STEALTH,
 }
-
-for _, entry in ipairs(CATEGORY_TO_SETTING) do
-	for template_name in pairs(entry.table) do
-		TEMPLATE_TO_CATEGORY_SETTING[template_name] = entry.setting
-	end
-end
 
 -- Deployable item abilities (all map to enable_deployables)
 local DEPLOYABLE_ITEMS = {
@@ -154,6 +149,7 @@ local function _read_percent_setting(setting_id, default_value, min_value, max_v
 end
 
 function M.init(deps)
+	assert(deps.combat_ability_identity, "settings: combat_ability_identity dep required")
 	_mod = deps.mod
 	_combat_ability_identity = deps.combat_ability_identity
 end
@@ -247,20 +243,13 @@ function M.special_chase_penalty_range()
 end
 
 function M.is_combat_template_enabled(template_name, ability_extension)
-	if _combat_ability_identity then
-		local identity = _combat_ability_identity.resolve(nil, ability_extension, { template_name = template_name })
-		local semantic_setting_id = _combat_ability_identity.category_setting_id(identity)
-		if semantic_setting_id then
-			return _setting_enabled(semantic_setting_id)
-		end
-	end
-
-	local setting_id = TEMPLATE_TO_CATEGORY_SETTING[template_name]
-	if not setting_id then
+	local identity = _combat_ability_identity.resolve(nil, ability_extension, { template_name = template_name })
+	local semantic_setting_id = _combat_ability_identity.category_setting_id(identity)
+	if not semantic_setting_id then
 		return true
 	end
 
-	return _setting_enabled(setting_id)
+	return _setting_enabled(semantic_setting_id)
 end
 
 function M.is_item_ability_enabled(ability_name)

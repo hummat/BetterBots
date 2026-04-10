@@ -35,6 +35,7 @@ local RESCUE_NEED_TYPES = {
 local M = {}
 
 function M.init(deps)
+	assert(deps.combat_ability_identity, "revive_ability: combat_ability_identity dep required")
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
@@ -56,19 +57,11 @@ function M.wire(deps)
 end
 
 local function _resolve_revive_template(unit, ability_template_name, ability_extension)
-	local identity = _combat_ability_identity
-			and _combat_ability_identity.resolve(unit, ability_extension, { template_name = ability_template_name })
-		or {
-			template_name = ability_template_name,
-			ability_name = _equipped_combat_ability_name(unit),
-			semantic_key = ability_template_name,
-		}
-	local effective_name = _combat_ability_identity and _combat_ability_identity.effective_name(identity)
-		or identity.semantic_key
-		or identity.ability_name
-		or identity.template_name
+	local identity =
+		_combat_ability_identity.resolve(unit, ability_extension, { template_name = ability_template_name })
+	local effective_name = _combat_ability_identity.effective_name(identity)
 
-	if _combat_ability_identity and _combat_ability_identity.is_revive_defensive(identity) then
+	if _combat_ability_identity.is_revive_defensive(identity) then
 		return true, effective_name
 	end
 
@@ -157,11 +150,25 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_unit_data:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (no unit_data_system extension)"
+			)
+		end
 		return false
 	end
 
 	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
 	if not ability_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_ability_ext:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (no ability_system extension)"
+			)
+		end
 		return false
 	end
 
@@ -224,17 +231,40 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	local ability_meta_data = ability_template and ability_template.ability_meta_data
 	if not ability_meta_data or not ability_meta_data.activation then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_meta:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped ("
+					.. tostring(ability_template_name)
+					.. " missing ability_meta_data.activation)"
+			)
+		end
 		return false
 	end
 
 	local activation_data = ability_meta_data.activation
 	local action_input = activation_data.action_input
 	if not action_input then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_input:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (" .. tostring(ability_template_name) .. " activation has no action_input)"
+			)
+		end
 		return false
 	end
 
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"revive_ability_skip:no_input_ext:" .. bot_id,
+				_fixed_time(),
+				"revive ability skipped (no action_input_system extension)"
+			)
+		end
 		return false
 	end
 
@@ -249,6 +279,17 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			_fixed_time()
 		)
 		if not is_valid then
+			if _debug_enabled() then
+				_debug_log(
+					"revive_ability_skip:not_queueable:" .. bot_id,
+					_fixed_time(),
+					"revive ability skipped ("
+						.. tostring(ability_template_name)
+						.. " action_input "
+						.. tostring(action_input)
+						.. " not bot-queueable)"
+				)
+			end
 			return false
 		end
 	end

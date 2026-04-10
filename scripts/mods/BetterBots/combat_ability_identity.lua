@@ -2,6 +2,24 @@
 -- Keep engine template identity separate from equipped/semantic ability identity.
 local M = {}
 
+-- Optional deps for unknown-template diagnostics (C3). Wired via M.init({...}).
+-- The resolver stays functional without init; warnings simply no-op.
+local _mod
+local _debug_log
+local _debug_enabled
+local _unknown_template_warned = {}
+local _unresolved_veteran_warned = false
+
+function M.init(deps)
+	deps = deps or {}
+	_mod = deps.mod
+	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
+	-- Reset dedup caches on (re)init so hot-reload restores first-occurrence visibility.
+	_unknown_template_warned = {}
+	_unresolved_veteran_warned = false
+end
+
 local VETERAN_CLASS_TAG_TO_SEMANTIC_KEY = {
 	base = "veteran_combat_ability_stance",
 	ranger = "veteran_combat_ability_stance",
@@ -84,6 +102,67 @@ local function _resolve_veteran_semantic_key(ability_name, class_tag)
 	return VETERAN_CLASS_TAG_TO_SEMANTIC_KEY[normalized_class_tag], normalized_class_tag, source
 end
 
+local function _is_known_template(template_name)
+	if not template_name then
+		return true
+	end
+	if template_name == "veteran_combat_ability" then
+		return true
+	end
+	if CATEGORY_SETTING_BY_SEMANTIC_KEY[template_name] then
+		return true
+	end
+	if TEAM_COOLDOWN_CATEGORY_BY_SEMANTIC_KEY[template_name] then
+		return true
+	end
+	if REVIVE_DEFENSIVE_BY_SEMANTIC_KEY[template_name] then
+		return true
+	end
+	return false
+end
+
+local function _warn_unknown_template(template_name)
+	if not template_name then
+		return
+	end
+	if _unknown_template_warned[template_name] then
+		return
+	end
+
+	if _debug_log and _debug_enabled and _debug_enabled() then
+		_unknown_template_warned[template_name] = true
+		_debug_log(
+			"unknown_combat_template:" .. template_name,
+			0,
+			"combat_ability_identity: unknown template_name '"
+				.. template_name
+				.. "' — returning passthrough identity (category_setting_id/team_cooldown_category"
+				.. "/is_revive_defensive will be nil/false)",
+			0,
+			"info"
+		)
+	end
+end
+
+local function _warn_unresolved_veteran(class_tag, ability_name)
+	if _unresolved_veteran_warned then
+		return
+	end
+	_unresolved_veteran_warned = true
+
+	local message = "BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag="
+		.. tostring(class_tag)
+		.. ", ability_name="
+		.. tostring(ability_name)
+		.. "). Defaulting to stance gating."
+
+	if _mod and _mod.warning then
+		_mod:warning(message)
+	elseif _debug_log then
+		_debug_log("unresolved_veteran_combat_ability", 0, message, 0, "info")
+	end
+end
+
 function M.resolve(_unit, ability_extension, ability_component)
 	local template_name = ability_component and ability_component.template_name or nil
 	local combat_ability = _combat_ability(ability_extension)
@@ -95,10 +174,18 @@ function M.resolve(_unit, ability_extension, ability_component)
 
 	if template_name == "veteran_combat_ability" then
 		semantic_key, class_tag, class_tag_source = _resolve_veteran_semantic_key(ability_name, class_tag)
+	elseif not _is_known_template(template_name) then
+		_warn_unknown_template(template_name)
 	end
 
 	if not semantic_key then
 		semantic_key = template_name or ability_name
+	end
+
+	local unresolved = false
+	if template_name == "veteran_combat_ability" and (class_tag_source == nil or class_tag_source == "unknown") then
+		unresolved = true
+		_warn_unresolved_veteran(class_tag, ability_name)
 	end
 
 	return {
@@ -107,6 +194,7 @@ function M.resolve(_unit, ability_extension, ability_component)
 		semantic_key = semantic_key,
 		class_tag = class_tag,
 		class_tag_source = class_tag_source or "unknown",
+		unresolved = unresolved,
 	}
 end
 

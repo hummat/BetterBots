@@ -126,6 +126,70 @@ describe("resolve_decision", function()
 		end)
 	end)
 
+	describe("veteran threshold dispatch", function()
+		-- Stub a perception_system that returns N enemies so build_context produces
+		-- the surround pressure needed to distinguish VOC from stance thresholds.
+		local _saved_has_extension
+		local _num_enemies
+
+		before_each(function()
+			_saved_has_extension = _G.ScriptUnit.has_extension
+			_G.ScriptUnit.has_extension = function(_unit, system_name)
+				if system_name == "perception_system" then
+					return {
+						enemies_in_proximity = function()
+							return {}, _num_enemies or 0
+						end,
+					}
+				end
+
+				return nil
+			end
+		end)
+
+		after_each(function()
+			_G.ScriptUnit.has_extension = _saved_has_extension
+		end)
+
+		it("dispatches squad_leader veteran to VOC thresholds (voc_surrounded at 4 enemies)", function()
+			_num_enemies = 4
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					error("stance fallback must not be reached for squad_leader")
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("squad_leader", "veteran_combat_ability_shout")
+
+			local ok, rule =
+				resolve("veteran_combat_ability", conditions, "vet_bot_voc", nil, nil, nil, nil, false, ability_ext)
+
+			assert.is_true(ok)
+			assert.matches("veteran_voc_surrounded", rule)
+			assert.is_nil(string.find(rule, "stance"))
+			assert.is_nil(string.find(rule, "fallback_veteran_vanilla"))
+		end)
+
+		it("dispatches ranger veteran to stance thresholds (never VOC rule)", function()
+			_num_enemies = 4
+			local vanilla_called = false
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					vanilla_called = true
+					return true
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability_stance")
+
+			local ok, rule =
+				resolve("veteran_combat_ability", conditions, "vet_bot_stance", nil, nil, nil, nil, false, ability_ext)
+
+			assert.is_true(ok)
+			assert.matches("veteran_stance", rule)
+			assert.is_nil(string.find(rule, "voc"))
+			assert.is_true(vanilla_called)
+		end)
+	end)
+
 	describe("context is returned", function()
 		it("always returns a context table as third value", function()
 			local _, _, context = resolve("nonexistent_template", {}, "unit", nil, nil, nil, nil, false, nil)
