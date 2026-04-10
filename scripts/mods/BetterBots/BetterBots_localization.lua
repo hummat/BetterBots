@@ -1,3 +1,18 @@
+-- Settings UI color palette (markers_aio pattern). Tune these two RGB strings
+-- to restyle every group header and subtitle in the BetterBots mod options.
+local colours = {
+	title = "200,140,20", -- Imperial gold: group headers
+	subtitle = "226,199,126", -- citrine: sub-group descriptions
+}
+
+local function title(text)
+	return "{#color(" .. colours.title .. ")}" .. text .. "{#reset()}"
+end
+
+local function subtitle(text)
+	return "{#color(" .. colours.subtitle .. ")}" .. text .. "{#reset()}"
+end
+
 return {
 	mod_name = {
 		en = "Better Bots",
@@ -7,37 +22,37 @@ return {
 	},
 	-- Groups
 	abilities_group = {
-		en = "Abilities",
+		en = title("Abilities"),
 	},
 	bot_behavior_group = {
-		en = "Bot Behavior",
+		en = title("Bot Behavior"),
 	},
 	bot_feature_toggles_group = {
-		en = "Bot Behavior - Feature Toggles",
+		en = title("Bot Behavior - Feature Toggles"),
 	},
 	bot_tuning_group = {
-		en = "Bot Behavior - Tuning",
+		en = title("Bot Behavior - Tuning"),
 	},
 	healing_deferral_group = {
-		en = "Healing Deferral",
+		en = title("Healing Deferral"),
 	},
 	bot_profiles_group = {
-		en = "Bot Profiles",
+		en = title("Bot Profiles"),
 	},
 	bot_slots_core_group = {
-		en = "Bot Slots 1-3",
+		en = title("Bot Slots 1-3"),
 	},
 	bot_slots_core_group_description = {
-		en = "Core bot slots used by Solo Play.",
+		en = subtitle("Core bot slots used by Solo Play."),
 	},
 	bot_slots_tertium_group = {
-		en = "Bot Slots 4-5 (Tertium)",
+		en = title("Bot Slots 4-5 (Tertium)"),
 	},
 	bot_slots_tertium_group_description = {
-		en = "Only used when Tertium4Or5/6 adds extra bots. Leave as None without a Tertium mod.",
+		en = subtitle("Only used when Tertium4Or5/6 adds extra bots. Leave as None without a Tertium mod."),
 	},
 	diagnostics_group = {
-		en = "Diagnostics",
+		en = title("Diagnostics"),
 	},
 	-- Ability categories
 	enable_stances = {
