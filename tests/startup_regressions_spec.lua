@@ -169,8 +169,43 @@ describe("startup regressions", function()
 		local source = assert(handle:read("*a"))
 		handle:close()
 
-		assert.is_truthy(source:find('setting_id = "bot_ranged_ammo_threshold"', 1))
-		assert.is_truthy(source:find("range = { 0, 100 }", 1, true))
+		assert.is_truthy(source:find('make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5)', 1, true))
+	end)
+
+	it("keeps settings UI organized through widget factories and split behavior groups", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("local DEFAULTS = Settings.DEFAULTS", 1, true))
+		assert.is_truthy(source:find("local function make_slot_dropdown", 1, true))
+		assert.is_truthy(source:find('setting_id = "bot_feature_toggles_group"', 1, true))
+		assert.is_truthy(source:find('setting_id = "bot_tuning_group"', 1, true))
+		assert.is_truthy(source:find('setting_id = "healing_deferral_group"', 1, true))
+		assert.is_truthy(source:find('setting_id = "bot_slots_core_group"', 1, true))
+		assert.is_truthy(source:find('setting_id = "bot_slots_tertium_group"', 1, true))
+		assert.is_truthy(source:find('text = "behavior_profile_testing", value = "testing"', 1, true))
+		local loc_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
+		local localization = assert(loc_handle:read("*a"))
+		loc_handle:close()
+		assert.is_truthy(localization:find('bot_weapon_quality_max = {%s*en = "Max %(fully upgraded%)"', 1))
+	end)
+
+	it("centralizes combat ability identity instead of duplicating veteran sniffers", function()
+		local function read(path)
+			local handle = assert(io.open(path, "r"))
+			local source = assert(handle:read("*a"))
+			handle:close()
+			return source
+		end
+
+		local settings = read("scripts/mods/BetterBots/settings.lua")
+		local heuristics = read("scripts/mods/BetterBots/heuristics.lua")
+		local revive = read("scripts/mods/BetterBots/revive_ability.lua")
+
+		assert.is_nil(settings:find("local function _veteran_class_tag", 1, true))
+		assert.is_nil(heuristics:find("local function _resolve_veteran_class_tag", 1, true))
+		assert.is_nil(revive:find("local function _combat_ability_name", 1, true))
 	end)
 
 	it("heuristics.lua uses breed.ranged for ranged_count (not tags.ranged)", function()

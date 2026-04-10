@@ -133,6 +133,9 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. `/bb_perf`
    - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
+5. `/bb_reset`
+   - Resets all BetterBots settings to their code-defined defaults and saves them when the DMF save hook is available.
+   - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
 
 ### Practical debug workflow
 

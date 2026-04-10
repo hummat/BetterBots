@@ -4,6 +4,7 @@ local helper = require("test_helper")
 helper.setup_engine_stubs()
 
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 
 -- Init with minimal deps so build_context and caching work
 local fixed_t = 100
@@ -14,6 +15,7 @@ Heuristics.init({
 	decision_context_cache = {},
 	super_armor_breed_cache = {},
 	ARMOR_TYPE_SUPER_ARMOR = 6,
+	combat_ability_identity = CombatAbilityIdentity,
 })
 
 local resolve = Heuristics.resolve_decision
@@ -29,6 +31,7 @@ describe("resolve_decision", function()
 			decision_context_cache = {},
 			super_armor_breed_cache = {},
 			ARMOR_TYPE_SUPER_ARMOR = 6,
+			combat_ability_identity = CombatAbilityIdentity,
 		})
 	end)
 

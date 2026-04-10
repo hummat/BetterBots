@@ -1,5 +1,7 @@
 local helper = require("test_helper")
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+Heuristics.init({ combat_ability_identity = CombatAbilityIdentity })
 
 local ctx = helper.make_context
 local evaluate = Heuristics.evaluate_heuristic
@@ -2249,6 +2251,7 @@ describe("heuristics", function()
 				is_testing_profile = function()
 					return false
 				end,
+				combat_ability_identity = CombatAbilityIdentity,
 			})
 		end)
 

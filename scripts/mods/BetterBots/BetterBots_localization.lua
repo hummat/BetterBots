@@ -12,8 +12,29 @@ return {
 	bot_behavior_group = {
 		en = "Bot Behavior",
 	},
+	bot_feature_toggles_group = {
+		en = "Bot Behavior - Feature Toggles",
+	},
+	bot_tuning_group = {
+		en = "Bot Behavior - Tuning",
+	},
+	healing_deferral_group = {
+		en = "Healing Deferral",
+	},
 	bot_profiles_group = {
 		en = "Bot Profiles",
+	},
+	bot_slots_core_group = {
+		en = "Bot Slots 1-3",
+	},
+	bot_slots_core_group_description = {
+		en = "Core bot slots used by Solo Play.",
+	},
+	bot_slots_tertium_group = {
+		en = "Bot Slots 4-5 (Tertium)",
+	},
+	bot_slots_tertium_group_description = {
+		en = "Only used when Tertium4Or5/6 adds extra bots. Leave as None without a Tertium mod.",
 	},
 	diagnostics_group = {
 		en = "Diagnostics",
@@ -254,7 +275,7 @@ return {
 		en = "High (Damnation)",
 	},
 	bot_weapon_quality_max = {
-		en = "Max (fully empowered god-roll, expertise 500)",
+		en = "Max (fully upgraded)",
 	},
 	-- Diagnostics
 	enable_debug_logs = {

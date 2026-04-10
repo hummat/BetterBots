@@ -81,11 +81,8 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
-	local ability_extension_for_gate = ScriptUnit.has_extension(unit, "ability_system")
-	if
-		_is_combat_template_enabled
-		and not _is_combat_template_enabled(ability_template_name, ability_extension_for_gate)
-	then
+	local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+	if _is_combat_template_enabled and not _is_combat_template_enabled(ability_template_name, ability_extension) then
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_disabled_template:" .. ability_template_name .. ":" .. tostring(unit),
@@ -174,6 +171,10 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
+	if not ability_extension or not ability_extension:can_use_ability("combat_ability") then
+		return
+	end
+
 	-- Guards: only block NEW activations (after state machine cleanup above)
 	local behavior = blackboard and blackboard.behavior
 	if behavior and behavior.current_interaction_unit ~= nil then
@@ -192,7 +193,6 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
-	local ability_extension = ScriptUnit.extension(unit, "ability_system")
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	local used_input = activation_data.used_input
 	local action_input_is_valid = _action_input_is_bot_queueable(

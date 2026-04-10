@@ -1,10 +1,11 @@
 local M = {}
 
 local _mod
+local _combat_ability_identity
 
 -- Category → setting ID mapping
 local CATEGORY_STANCES = {
-	-- veteran_combat_ability is NOT here — uses dual-category gate
+	-- veteran_combat_ability is NOT here — semantic resolver maps it to stance or shout
 	psyker_overcharge_stance = true,
 	ogryn_gunlugger_stance = true,
 	adamant_stance = true,
@@ -34,7 +35,7 @@ local CATEGORY_STEALTH = {
 }
 
 -- Reverse lookup: template_name → setting_id
--- Built once at load time. veteran_combat_ability excluded (dual-category).
+-- Built once at load time. veteran_combat_ability excluded (semantic resolver).
 local TEMPLATE_TO_CATEGORY_SETTING = {}
 
 local CATEGORY_TO_SETTING = {
@@ -86,6 +87,41 @@ local DEFAULT_HUMAN_AMMO_RESERVE_THRESHOLD = 0.80
 local BOT_RANGED_AMMO_THRESHOLD_SETTING_ID = "bot_ranged_ammo_threshold"
 local HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID = "bot_human_ammo_reserve_threshold"
 
+M.DEFAULTS = {
+	enable_stances = true,
+	enable_charges = true,
+	enable_shouts = true,
+	enable_stealth = true,
+	enable_deployables = true,
+	enable_grenades = true,
+	behavior_profile = "balanced",
+	enable_pinging = true,
+	enable_poxburster = true,
+	enable_melee_improvements = true,
+	enable_ranged_improvements = true,
+	enable_engagement_leash = true,
+	enable_smart_targeting = true,
+	enable_daemonhost_avoidance = true,
+	sprint_follow_distance = 12,
+	special_chase_penalty_range = 18,
+	player_tag_bonus = 3,
+	melee_horde_light_bias = 4,
+	bot_ranged_ammo_threshold = 20,
+	bot_human_ammo_reserve_threshold = 80,
+	healing_deferral_mode = "stations_and_deployables",
+	healing_deferral_human_threshold = 90,
+	healing_deferral_emergency_threshold = 25,
+	bot_slot_1_profile = "zealot",
+	bot_slot_2_profile = "psyker",
+	bot_slot_3_profile = "ogryn",
+	bot_slot_4_profile = "none",
+	bot_slot_5_profile = "none",
+	bot_weapon_quality = "auto",
+	enable_debug_logs = "off",
+	enable_event_log = false,
+	enable_perf_timing = false,
+}
+
 local function _setting_enabled(setting_id)
 	if not _mod then
 		return true
@@ -117,33 +153,9 @@ local function _read_percent_setting(setting_id, default_value, min_value, max_v
 	return numeric_value / 100
 end
 
--- Minimal veteran class_tag resolution for the dual-category gate.
--- Duplicates _resolve_veteran_class_tag from heuristics.lua because settings.lua
--- is loaded before heuristics.lua and cannot import from it (heuristics.lua
--- receives resolve_preset from settings.lua via init(), creating a mutual dependency).
-local function _veteran_class_tag(ability_extension)
-	local equipped = ability_extension and ability_extension._equipped_abilities
-	local combat = equipped and equipped.combat_ability
-	local tweak = combat and combat.ability_template_tweak_data
-	local class_tag = tweak and tweak.class_tag
-
-	if class_tag then
-		return class_tag
-	end
-
-	local name = combat and combat.name or ""
-	if string.find(name, "shout", 1, true) then
-		return "squad_leader"
-	end
-	if string.find(name, "stance", 1, true) then
-		return "ranger"
-	end
-
-	return nil
-end
-
 function M.init(deps)
 	_mod = deps.mod
+	_combat_ability_identity = deps.combat_ability_identity
 end
 
 function M.resolve_preset()
@@ -235,14 +247,12 @@ function M.special_chase_penalty_range()
 end
 
 function M.is_combat_template_enabled(template_name, ability_extension)
-	-- Dual-category gate for veteran_combat_ability
-	if template_name == "veteran_combat_ability" then
-		local tag = _veteran_class_tag(ability_extension)
-		if tag == "squad_leader" then
-			return _setting_enabled("enable_shouts")
+	if _combat_ability_identity then
+		local identity = _combat_ability_identity.resolve(nil, ability_extension, { template_name = template_name })
+		local semantic_setting_id = _combat_ability_identity.category_setting_id(identity)
+		if semantic_setting_id then
+			return _setting_enabled(semantic_setting_id)
 		end
-		-- ranger, base, or unknown → stances
-		return _setting_enabled("enable_stances")
 	end
 
 	local setting_id = TEMPLATE_TO_CATEGORY_SETTING[template_name]

@@ -17,7 +17,7 @@ This mod targets bot ability activation in three paths:
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` does thirty-three things:
+`scripts/mods/BetterBots/BetterBots.lua` coordinates these module-level behaviors:
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
@@ -42,12 +42,13 @@ This mod targets bot ability activation in three paths:
 10. Per-template heuristics (via `heuristics.lua`):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
+    - `combat_ability_identity.lua` separates engine template identity (`ability_component.template_name`) from semantic ability identity (`ability_name` / `semantic_key`) so shared templates such as Veteran shout vs stance can route to different heuristics/settings without changing template-based engine lookups
     - `testing/aggressive/balanced/conservative` behavior presets: per-template threshold tables control when abilities fire (aggressive = early, conservative = emergency-only). Testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing hard safety/resource guards
     - `enemy_breed` export for breed classification
 11. Settings surface (`settings.lua`):
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
-    - **Veteran dual-category gate**: `veteran_combat_ability` resolves its actual class tag at runtime (`ability_extension._equipped_abilities`) to route to `enable_stances` or `enable_shouts` — it is excluded from the static `TEMPLATE_TO_CATEGORY_SETTING` lookup table
+    - **Semantic combat-ability gate**: shared templates resolve through `combat_ability_identity.lua`; Veteran shout routes to `enable_shouts`, Veteran stance/base/unknown falls back to `enable_stances` for settings compatibility, while engine metadata/input validation remains keyed by template name
     - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
@@ -203,7 +204,7 @@ The mod piggybacks on data the engine already computes. There are no new per-fra
 | `build_context()` | ~1 iteration over proximity list + coherency allies | Cached per unit per `fixed_t` — runs once per bot per frame regardless of how many call sites invoke it |
 | Heuristic evaluation | ~20 arithmetic comparisons | Pure comparisons on pre-built context table, no allocations, no engine calls |
 | `_can_activate_ability` (BT condition) | 1 `require` (cached) + `build_context` + heuristic | Only fires when BT priority selector reaches the ability node — usually short-circuited by higher-priority nodes |
-| `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, or state guard) |
+| `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, `can_use_ability("combat_ability") == false`, or state guard) |
 | Event logging (`emit`) | 1 table append per event | Buffered; flush to disk every 15s or 500 events. Off by default. |
 | Debug logging (`_debug_log`) | 1 string concat for key + 1 table lookup | Message body only built when debug enabled, but key argument is always evaluated |
 
@@ -222,6 +223,9 @@ This is intentionally "sum of instrumented BetterBots hook time", not total proc
 - No new perception scans — reads `perception_extension:enemies_in_proximity()` which the engine already computed
 - No raycasts or line-of-sight checks
 - No pathfinding or navmesh queries
+- No duplicate per-bot daemonhost list scans in sprinting — non-aggroed daemonhost units are cached once per frame/side-system before per-bot distance checks
+- No duplicate same-frame human ammo eligibility scan for each bot — ammo policy caches the all-humans-above-threshold result by frame, human unit table, and threshold
+- No repeated same-frame suppression component reads per bot — `_is_suppressed(unit)` caches its result by unit and `fixed_t`
 - No table allocations in the heuristic path (context is reused via cache)
 
 ### Known minor waste

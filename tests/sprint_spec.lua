@@ -213,6 +213,44 @@ describe("sprint", function()
 			assert.equals("enemies_nearby", reason)
 		end)
 
+		it("shares daemonhost scan results across bots in the same frame", function()
+			local bot1 = "bot1"
+			local bot2 = "bot2"
+			local daemonhost = "daemonhost"
+			local breed_calls = 0
+
+			_positions[bot1] = pos(0, 0, 0)
+			_positions[bot2] = pos(10, 0, 0)
+			_positions[daemonhost] = pos(30, 0, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			_extensions[daemonhost].unit_data_system.breed = function()
+				breed_calls = breed_calls + 1
+				return { name = "chaos_daemonhost" }
+			end
+			_mock_side_system = {
+				side_by_unit = {
+					[bot1] = {
+						relation_side_names = function()
+							return { "enemy" }
+						end,
+					},
+					[bot2] = {
+						relation_side_names = function()
+							return { "enemy" }
+						end,
+					},
+				},
+				get_side_from_name = function()
+					return { ai_target_units = { daemonhost } }
+				end,
+			}
+
+			assert.is_false(Sprint.is_near_daemonhost(bot1))
+			assert.is_false(Sprint.is_near_daemonhost(bot2))
+			assert.equals(1, breed_calls)
+		end)
+
 		it("sprints to catch up when far from follow unit", function()
 			local unit = "bot1"
 			local follow = "player1"

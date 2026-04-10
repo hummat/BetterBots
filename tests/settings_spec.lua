@@ -1,5 +1,6 @@
 local Settings = dofile("scripts/mods/BetterBots/settings.lua")
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local helper = require("tests.test_helper")
 
 local function mock_mod(overrides)
@@ -9,6 +10,7 @@ local function mock_mod(overrides)
 				return overrides and overrides[setting_id]
 			end,
 		},
+		combat_ability_identity = CombatAbilityIdentity,
 	}
 end
 
@@ -222,7 +224,7 @@ describe("settings", function()
 		end)
 	end)
 
-	describe("veteran dual-category gate", function()
+	describe("veteran semantic stance/shout gate", function()
 		it("gates as stance when class_tag is ranger", function()
 			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability")
 
@@ -468,12 +470,12 @@ describe("settings", function()
 				end
 			end
 
-			-- veteran_combat_ability is handled via dual-category gate, NOT in CATEGORY_ tables.
+			-- veteran_combat_ability is handled via semantic identity, NOT in CATEGORY_ tables.
 			-- The test above would never find it in a CATEGORY_ block, but assert it's absent
 			-- to catch regressions.
 			assert.is_nil(
 				template_names["veteran_combat_ability"],
-				"veteran_combat_ability must NOT appear in any CATEGORY_ table (uses dual-category gate)"
+				"veteran_combat_ability must NOT appear in any CATEGORY_ table (uses semantic identity)"
 			)
 
 			Heuristics.init({
@@ -489,6 +491,7 @@ describe("settings", function()
 				resolve_preset = function()
 					return "balanced"
 				end,
+				combat_ability_identity = CombatAbilityIdentity,
 			})
 
 			for template_name in pairs(template_names) do

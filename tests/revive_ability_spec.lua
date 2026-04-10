@@ -47,6 +47,7 @@ end
 rawset(_G, "require", _mock_require)
 
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local ReviveAbility = dofile("scripts/mods/BetterBots/revive_ability.lua")
 
 -- Mock factories
@@ -165,6 +166,7 @@ local function init_module()
 		fallback_state_by_unit = _fallback_state,
 		perf = nil,
 		shared_rules = SharedRules,
+		combat_ability_identity = CombatAbilityIdentity,
 	})
 
 	local mock_meta_data = {
@@ -413,6 +415,7 @@ describe("revive_ability", function()
 						end,
 						fallback_state_by_unit = _fallback_state,
 						shared_rules = SharedRules,
+						combat_ability_identity = CombatAbilityIdentity,
 					})
 					ReviveAbility.wire({
 						MetaData = { inject = function() end },
@@ -554,6 +557,7 @@ describe("revive_ability", function()
 				fallback_state_by_unit = _fallback_state,
 				perf = nil,
 				shared_rules = SharedRules,
+				combat_ability_identity = CombatAbilityIdentity,
 			})
 			ReviveAbility.wire({
 				MetaData = { inject = function() end },

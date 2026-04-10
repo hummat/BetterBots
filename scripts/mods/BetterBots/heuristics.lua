@@ -6,6 +6,7 @@ local _is_testing_profile
 local _resolve_preset
 local _debug_log
 local _debug_enabled
+local _combat_ability_identity
 local _overlapping_liquids = {}
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
 local SHIELD_INTERACTION_TYPES = {
@@ -385,25 +386,16 @@ local function build_context(unit, blackboard)
 	return context
 end
 
-local function _resolve_veteran_class_tag(ability_extension)
-	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
-	local combat_ability = equipped_abilities and equipped_abilities.combat_ability
-	local tweak_data = combat_ability and combat_ability.ability_template_tweak_data
-	local class_tag = tweak_data and tweak_data.class_tag
-	local ability_name = combat_ability and combat_ability.name or ""
-
-	if class_tag then
-		return class_tag, "class_tag"
+local function _resolve_combat_identity(ability_template_name, ability_extension)
+	if not _combat_ability_identity then
+		return {
+			template_name = ability_template_name,
+			semantic_key = ability_template_name,
+			class_tag_source = "unknown",
+		}
 	end
 
-	if string.find(ability_name, "shout", 1, true) then
-		return "squad_leader", "ability_name"
-	end
-	if string.find(ability_name, "stance", 1, true) then
-		return "ranger", "ability_name"
-	end
-
-	return nil, "unknown"
+	return _combat_ability_identity.resolve(nil, ability_extension, { template_name = ability_template_name })
 end
 
 -- Per-preset threshold tables: aggressive fires abilities at first sign of pressure
@@ -463,7 +455,9 @@ local function _can_activate_veteran_combat_ability(
 	context,
 	thresholds
 )
-	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
+	local identity = _resolve_combat_identity("veteran_combat_ability", ability_extension)
+	local class_tag = identity.class_tag
+	local source = identity.class_tag_source
 	if class_tag == "squad_leader" then
 		local preset = context.preset or "balanced"
 		local thresholds_voc = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
@@ -1695,7 +1689,11 @@ local function _evaluate_template_heuristic(
 	local preset = context.preset or "balanced"
 
 	if ability_template_name == "veteran_combat_ability" then
+		local identity = _resolve_combat_identity(ability_template_name, ability_extension)
 		local vet_thresholds = VETERAN_STANCE_THRESHOLDS[preset] or VETERAN_STANCE_THRESHOLDS.balanced
+		if identity.semantic_key == "veteran_combat_ability_shout" then
+			vet_thresholds = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
+		end
 		return _can_activate_veteran_combat_ability(
 			conditions,
 			unit,
@@ -1863,7 +1861,8 @@ local function evaluate_heuristic(template_name, context, opts)
 	context.preset = preset
 
 	if template_name == "veteran_combat_ability" then
-		local tag = _resolve_veteran_class_tag(opts.ability_extension)
+		local identity = _resolve_combat_identity(template_name, opts.ability_extension)
+		local tag = identity.class_tag
 		local threshold_table = (tag == "squad_leader") and VETERAN_VOC_THRESHOLDS or VETERAN_STANCE_THRESHOLDS
 		local thresholds = threshold_table[preset] or threshold_table.balanced
 
@@ -1943,6 +1942,7 @@ return {
 		_resolve_preset = deps.resolve_preset
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
+		_combat_ability_identity = deps.combat_ability_identity
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

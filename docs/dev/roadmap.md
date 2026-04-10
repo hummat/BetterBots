@@ -49,7 +49,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Default class-diverse bot profiles (#45): 4-class loadouts with per-slot settings, Tertium compat, cosmetic overrides.
 - Full talent enrichment (#63): ~30 talents per class from hadrons-blessing builds, including abilities, keystones, and stat nodes. Bot-optimized build selection (Voice of Command veteran, Electro Shriek psyker, Gun-Lugger ogryn).
 - Weapon blessings and perks (#63 phase 2): 2 T4 blessings + 1-2 T4 perks per weapon via synthetic `get_item_instance` overrides. First mod to construct blessed weapons without player backend profiles.
-- Settings control surface (#6): category checkboxes, 4 behavior presets, feature gates, veteran dual-category gate.
+- Settings control surface (#6): category checkboxes, 4 behavior presets, feature gates, veteran semantic stance/shout gate.
 - Heuristic dispatch refactor (#60), grenade fallback logging (#59), toggle safety audit (#57).
 - Log throttle collision fix: 19 per-bot debug log keys were silently dropping multi-bot messages. Convention updated in AGENTS.md + logging.md.
 - 518 unit tests.

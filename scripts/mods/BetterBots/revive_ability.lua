@@ -16,19 +16,7 @@ local _EventLog
 local _Debug
 local _is_combat_template_enabled
 local _action_input_is_bot_queueable
-
-local REVIVE_DEFENSIVE_ABILITIES = {
-	ogryn_taunt_shout = true,
-	psyker_shout = true,
-	adamant_shout = true,
-	adamant_stance = true,
-	zealot_invisibility = true,
-	veteran_stealth_combat_ability = true,
-}
-
-local REVIVE_DEFENSIVE_COMBAT_ABILITY_NAMES = {
-	veteran_combat_ability_shout = true,
-}
+local _combat_ability_identity
 
 local RESCUE_INTERACTION_TYPES = {
 	revive = true,
@@ -57,6 +45,7 @@ function M.init(deps)
 	_perf = deps.perf
 	local shared_rules = deps.shared_rules or {}
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
+	_combat_ability_identity = deps.combat_ability_identity
 end
 
 function M.wire(deps)
@@ -66,25 +55,24 @@ function M.wire(deps)
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 
-local function _combat_ability_name(ability_extension)
-	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
-	local combat_ability = equipped_abilities and equipped_abilities.combat_ability
-	return combat_ability and combat_ability.name or nil
-end
-
 local function _resolve_revive_template(unit, ability_template_name, ability_extension)
-	if REVIVE_DEFENSIVE_ABILITIES[ability_template_name] then
-		return true, ability_template_name
+	local identity = _combat_ability_identity
+			and _combat_ability_identity.resolve(unit, ability_extension, { template_name = ability_template_name })
+		or {
+			template_name = ability_template_name,
+			ability_name = _equipped_combat_ability_name(unit),
+			semantic_key = ability_template_name,
+		}
+	local effective_name = _combat_ability_identity and _combat_ability_identity.effective_name(identity)
+		or identity.semantic_key
+		or identity.ability_name
+		or identity.template_name
+
+	if _combat_ability_identity and _combat_ability_identity.is_revive_defensive(identity) then
+		return true, effective_name
 	end
 
-	if ability_template_name == "veteran_combat_ability" then
-		local combat_ability_name = _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit)
-		if REVIVE_DEFENSIVE_COMBAT_ABILITY_NAMES[combat_ability_name] then
-			return true, combat_ability_name
-		end
-	end
-
-	return false, _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit)
+	return false, effective_name
 end
 
 function M.log_revive_candidate(unit, behavior_component, perception_component)
@@ -299,7 +287,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 			t = fixed_t,
 			event = "revive_ability",
 			bot = bot_slot,
-			ability = _combat_ability_name(ability_extension) or _equipped_combat_ability_name(unit),
+			ability = effective_ability_name or _equipped_combat_ability_name(unit),
 			template = ability_template_name,
 			equipped_ability_name = effective_ability_name,
 			interaction = interaction_type,
@@ -369,8 +357,6 @@ function M.register_hooks()
 	end)
 end
 
--- Exposed for testing
-M.REVIVE_DEFENSIVE_ABILITIES = REVIVE_DEFENSIVE_ABILITIES
 M.RESCUE_INTERACTION_TYPES = RESCUE_INTERACTION_TYPES
 
 return M

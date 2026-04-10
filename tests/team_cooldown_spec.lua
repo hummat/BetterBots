@@ -74,6 +74,23 @@ describe("team_cooldown", function()
 		end)
 	end)
 
+	describe("shared-template semantic identities", function()
+		it("coordinates veteran shout with other area shouts", function()
+			TeamCooldown.record(unit_a, "veteran_combat_ability_shout", 10)
+			local suppressed, reason = TeamCooldown.is_suppressed(unit_b, "psyker_shout", 11)
+
+			assert.is_true(suppressed)
+			assert.equals("team_cd:aoe_shout", reason)
+		end)
+
+		it("does not coordinate veteran stance", function()
+			TeamCooldown.record(unit_a, "veteran_combat_ability_stance", 10)
+			local suppressed = TeamCooldown.is_suppressed(unit_b, "psyker_shout", 11)
+
+			assert.is_false(suppressed)
+		end)
+	end)
+
 	describe("emergency overrides", function()
 		it("bypasses suppression for psyker_shout_high_peril", function()
 			TeamCooldown.record(unit_a, "psyker_shout", 10)

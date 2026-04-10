@@ -88,14 +88,18 @@ talent definitions — they're shared. So they are safe to inject.
 
 ## Ability template dispatch
 
-BetterBots' heuristic system keys on **ability_template_name** (the runtime template
-from `ability_component.template_name`), NOT on talent names.
+BetterBots separates engine template identity from semantic combat-ability identity.
+Engine lookups still use **ability_template_name** from `ability_component.template_name`
+for `AbilityTemplates`, metadata injection, action-input validation, and vanilla queueing.
+Semantic routing uses `combat_ability_identity.lua`, which resolves a tuple of
+`template_name`, equipped `ability_name`, and `semantic_key` for heuristics, settings,
+revive rules, and team cooldown categories.
 
 Multiple talent choices can map to the same ability template:
 
 | Talent(s) | Ability template | BetterBots heuristic |
 |---|---|---|
-| `veteran_combat_ability_stance` (Volley Fire), `veteran_combat_ability_elite_and_special_outlines` (Exec Stance) | `veteran_combat_ability` | `_can_activate_veteran_combat_ability` (special-cased) |
+| `veteran_combat_ability_stance` (Volley Fire), `veteran_combat_ability_elite_and_special_outlines` (Exec Stance), `veteran_combat_ability_shout` (Voice of Command) | `veteran_combat_ability` | `combat_ability_identity.lua` resolves `veteran_combat_ability_stance` vs `veteran_combat_ability_shout`, then `_can_activate_veteran_combat_ability` applies the matching stance/shout rule |
 | `veteran_stealth_combat_ability` (Infiltrate) | `veteran_stealth_combat_ability` | `TEMPLATE_HEURISTICS` |
 | `zealot_dash`, `zealot_targeted_dash*` (Charge variants) | `zealot_dash` / `zealot_targeted_dash*` | `TEMPLATE_HEURISTICS` |
 | `zealot_invisibility` (Shroudfield) | `zealot_invisibility` | `TEMPLATE_HEURISTICS` |
@@ -108,6 +112,9 @@ Multiple talent choices can map to the same ability template:
 The talent → template mapping is defined in `{class}_talents.lua` via the
 `player_ability.ability` field, which references a `PlayerAbilities.*` entry.
 The ability template file lives at `ability_templates/{template_name}.lua`.
+For shared templates, the equipped combat-ability `name` from the ability extension
+disambiguates the semantic ability; Veteran `class_tag` remains a compatibility fallback
+only when the equipped ability name is absent or agrees with it.
 
 ## hadrons-blessing canonical_entity_id mapping
 

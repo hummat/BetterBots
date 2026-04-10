@@ -13,6 +13,7 @@ local CATEGORY_MAP = {
 	adamant_shout = "taunt",
 	-- aoe_shout
 	psyker_shout = "aoe_shout",
+	veteran_combat_ability_shout = "aoe_shout",
 	-- dash
 	zealot_dash = "dash",
 	zealot_targeted_dash = "dash",

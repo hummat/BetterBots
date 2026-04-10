@@ -120,7 +120,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
 | #57 | Toggle safety audit | **Closed** | `is_togglable = false`, singleton mutations not revertible |
-| #6 | Settings control surface | **Closed** | Category gates (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature toggles, veteran dual-category gate |
+| #6 | Settings control surface | **Closed** | Category gates (stances/charges/shouts/stealth/deployables/grenades), 4 behavior presets, feature toggles, veteran semantic stance/shout gate |
 | #45 | Default class profiles | **Closed** | 4-class profiles (Veteran/Zealot/Psyker/Ogryn), hadrons-blessing weapon picks, per-class cosmetics, Tertium compat, `BotSynchronizerHost.add_bot` hook + 5 per-slot dropdowns |
 | #63 | Talent enrichment + weapon blessings | **Closed** | ~30 talents per class, 2 T4 blessings + 1-2 T4 perks per weapon, bot-optimized build selection |
 | #60 | Heuristic dispatch refactor | **Closed** | `fn(context)` signature simplification |

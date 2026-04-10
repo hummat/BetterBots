@@ -250,6 +250,55 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
+	it("reuses human ammo scan for bots on the same side in the same frame", function()
+		local uses_ammo_calls = 0
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.95
+				end,
+				uses_ammo = function()
+					uses_ammo_calls = uses_ammo_calls + 1
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local side = { valid_human_units = { "human1" } }
+		local self_a = {
+			_side = side,
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+		local self_b = {
+			_side = side,
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self_a, "bot1")
+		update_hook(self_b, "bot2")
+
+		assert.equals(1, uses_ammo_calls)
+	end)
+
 	it("allows bot to top off when all humans are above reserve", function()
 		install_module({
 			ammo_module = {

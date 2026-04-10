@@ -3,6 +3,8 @@ local FixedFrame = require("scripts/utilities/fixed_frame")
 local ArmorSettings = require("scripts/settings/damage/armor_settings")
 local LogLevels = mod:io_dofile("BetterBots/scripts/mods/BetterBots/log_levels")
 local SharedRules = mod:io_dofile("BetterBots/scripts/mods/BetterBots/shared_rules")
+local CombatAbilityIdentity = mod:io_dofile("BetterBots/scripts/mods/BetterBots/combat_ability_identity")
+assert(CombatAbilityIdentity, "BetterBots: failed to load combat_ability_identity module")
 local BotTargeting = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_targeting")
 local TeamCooldown = mod:io_dofile("BetterBots/scripts/mods/BetterBots/team_cooldown")
 local DEBUG_SETTING_ID = "enable_debug_logs"
@@ -24,6 +26,7 @@ local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _suppression_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_emitted = false
 local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
@@ -84,34 +87,49 @@ local _SUPPRESSED_STATES = {
 }
 
 local function _is_suppressed(unit)
+	local fixed_t = _fixed_time()
+	local cached = _suppression_cache_by_unit[unit]
+	if cached and cached.fixed_t == fixed_t then
+		return cached.suppressed, cached.reason
+	end
+
+	local function remember(suppressed, reason)
+		_suppression_cache_by_unit[unit] = {
+			fixed_t = fixed_t,
+			suppressed = suppressed,
+			reason = reason,
+		}
+		return suppressed, reason
+	end
+
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
-		return false
+		return remember(false)
 	end
 
 	local movement = unit_data_extension:read_component("movement_state")
 	if movement then
 		if movement.is_dodging then
-			return true, "dodging"
+			return remember(true, "dodging")
 		end
 		if movement.method == "falling" then
-			return true, "falling"
+			return remember(true, "falling")
 		end
 	end
 
 	local lunge = unit_data_extension:read_component("lunge_character_state")
 	if lunge and (lunge.is_lunging or lunge.is_aiming) then
-		return true, "lunging"
+		return remember(true, "lunging")
 	end
 
 	local character_state = unit_data_extension:read_component("character_state")
 	if character_state and _SUPPRESSED_STATES[character_state.state_name] then
-		return true, character_state.state_name
+		return remember(true, character_state.state_name)
 	end
 
 	local locomotion = unit_data_extension:read_component("locomotion")
 	if locomotion and locomotion.parent_unit ~= nil then
-		return true, "moving_platform"
+		return remember(true, "moving_platform")
 	end
 
 	-- #17: daemonhost combat suppression is handled target-specifically in
@@ -119,7 +137,7 @@ local function _is_suppressed(unit)
 	-- Blanket proximity suppression was removed — it blocked abilities in mixed
 	-- encounters where bots fight other enemies near a sleeping daemonhost.
 
-	return false
+	return remember(false)
 end
 
 local function _equipped_combat_ability(unit)
@@ -231,6 +249,7 @@ assert(ReviveAbility, "BetterBots: failed to load revive_ability module")
 -- Init each module with its dependencies
 Settings.init({
 	mod = mod,
+	combat_ability_identity = CombatAbilityIdentity,
 })
 
 BotProfiles.init({
@@ -267,6 +286,7 @@ Heuristics.init({
 	resolve_preset = Settings.resolve_preset,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	combat_ability_identity = CombatAbilityIdentity,
 })
 
 ItemFallback.init({
@@ -454,6 +474,7 @@ ReviveAbility.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	perf = Perf,
 	shared_rules = SharedRules,
+	combat_ability_identity = CombatAbilityIdentity,
 })
 
 GrenadeFallback.init({
@@ -527,6 +548,7 @@ ConditionPatch.wire({
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
 	TeamCooldown = TeamCooldown,
+	combat_ability_identity = CombatAbilityIdentity,
 })
 
 AbilityQueue.wire({
@@ -1083,6 +1105,18 @@ mod:command("bb_perf", "Print BetterBots runtime timing stats from the current r
 	end
 end)
 
+mod:command("bb_reset", "Reset BetterBots settings to defaults", function()
+	for setting_id, default_value in pairs(Settings.DEFAULTS) do
+		mod:set(setting_id, default_value, true)
+	end
+
+	if type(mod.save_unsaved_settings_to_file) == "function" then
+		mod:save_unsaved_settings_to_file()
+	end
+
+	mod:echo("BetterBots: all settings reset to defaults")
+end)
+
 function mod.on_game_state_changed(status, state)
 	if status == "enter" and state == "GameplayStateRun" then
 		_refresh_debug_log_level()
@@ -1094,6 +1128,9 @@ function mod.on_game_state_changed(status, state)
 		end
 		for unit in pairs(_decision_context_cache_by_unit) do
 			_decision_context_cache_by_unit[unit] = nil
+		end
+		for unit in pairs(_suppression_cache_by_unit) do
+			_suppression_cache_by_unit[unit] = nil
 		end
 		for unit in pairs(_grenade_state_by_unit) do
 			_grenade_state_by_unit[unit] = nil
@@ -1128,7 +1165,7 @@ end
 -- All modules are assert-guarded above; if any failed to load we'd have
 -- crashed already.  The count serves as a deployment sanity check in logs.
 -- Bump when adding/removing modules.
-local _MODULE_COUNT = 32
+local _MODULE_COUNT = 33
 mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
 
