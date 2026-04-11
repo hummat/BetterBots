@@ -392,6 +392,8 @@ Per-frame loop:
 
 ### Aiming System
 
+**Target node** (`_aim_position` lines 276-286): Aim point resolves through `target_breed.override_bot_target_node` → `scratchpad.aim_at_node` (from `attack_meta_data.aim_at_node`) → hardcoded `"j_spine"`. Charged shots use the parallel `aim_at_node_charged` chain. The `aim_at_node` field can be a table → randomized per target acquisition. **Only one weapon template in the entire game uses head aim**: `high_bot_lasgun_killshot.lua:738` sets `aim_at_node = { "j_head", "j_spine" }`. Every other vanilla bot weapon — and every player weapon — falls back to `j_spine` (center of mass), so vanilla bots never weakspot-target. Breed `override_bot_target_node` exists only to redirect aim toward bodies on oddly-shaped enemies (dogs, monstrosities), never toward heads. See issue #91 (v0.11.0 MVP — inject head/spine table into `ranged_meta_data.lua` for finesse weapons) and #92 (v1.0.0 follow-up — per-breed weakspot map for Mauler/Crusher/Bulwark).
+
 **Aim speed**: Controlled by `action_data.aim_speed` table indexed by difficulty (challenge level 1-5). Default values: `{10, 10, 12, 20, 20}`. Higher = faster tracking.
 
 **Aim accuracy** (`_aim_good_enough()`):

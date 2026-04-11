@@ -11,6 +11,8 @@ The BT node `activate_grenade_ability` exists at priority 9 with component `gren
 
 **Source directory:** `../Darktide-Source-Code/scripts/settings/equipment/weapon_templates/grenades/`
 
+**Known aim limitation:** `grenade_fallback._set_bot_aim` aims flat-horizontal at the target's `POSITION_LOOKUP` (world origin = feet) with **zero gravity compensation and zero target velocity lead**. All grenade projectiles use `manual_physics` locomotion with `gravity = 12.5` and `speed_initial = 15-30 m/s`, so flat-horizontal throws drop ~6 m short at 25 m horizontal range. The vanilla shoot action already solves this via `Trajectory.angle_to_hit_moving_target` (`bt_bot_shoot_action._wanted_aim_rotation` lines 304-323) but the mod's grenade path doesn't call it. Tracked in issue #93 (v0.11.0). Affects gravity-arced grenades (frag, krak, smoke, shock, ogryn box, stun, etc.); does not affect smite, chain lightning, assail, throwing knives, whistle, or placed mines.
+
 ---
 
 ## Template Inventory
