@@ -166,7 +166,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ### Later batches
 
-- **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 788 tests. Ready to tag.
+- **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 813 tests. Ready to tag.
 - **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS), #87 (sustained fire for flamers / held-fire weapons — couples with #41 for flamer ADS)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials), #86 (Tier 3 revive cover — extends #7)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
