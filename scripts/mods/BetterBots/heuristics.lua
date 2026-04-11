@@ -1829,7 +1829,7 @@ local function _testing_profile_override(context)
 		return true, "testing_profile_ally_aid"
 	end
 
-	if context.target_is_monster then
+	if _is_monster_signal_allowed(context) then
 		return true, "testing_profile_monster"
 	end
 
