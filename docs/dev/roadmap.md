@@ -128,7 +128,6 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 37 | Objective-aware ability activation | Deferred from v0.9.0. Protect interacting allies. Shield/Escort profiles, distance-dependent response, ~8 heuristic threshold adjustments. Phased (P1 thresholds → P2 dash-toward → P3 per-type). |
 | 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
 | 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. |
 | 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
