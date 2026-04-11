@@ -15,12 +15,15 @@ end
 
 return {
 	mod_name = {
-		-- U+E048: Darktide UI font PUA glyph (mastery_points, per
-		-- mastery_view.lua). Defined in the game UI font, not Unicode —
-		-- guaranteed to render. Chosen because no other installed mod
-		-- uses this codepoint and "mastery" fits a smarter-bots theme.
-		-- Alternates: E003 (powersword), E04F (nameplate), E052 (broker).
-		en = "{#color(255,180,30)} Better Bots{#reset()}",
+		-- U+E029: Darktide UI font PUA glyph (Adeptus Mechanicus cog,
+		-- per settings/live_event/mechanicus.lua `icon`). Defined in
+		-- the game UI font, not Unicode — guaranteed to render.
+		-- Chosen for the tech-priest / machine-spirit theme: BetterBots
+		-- is about making the Omnissiah's servitors (bots) function
+		-- as intended.
+		-- Alternates: E051 (Cyber-Mastiff), E048 (mastery_points),
+		-- E004 (party_status), E003 (powersword).
+		en = "{#color(255,180,30)} Better Bots{#reset()}",
 	},
 	mod_description = {
 		en = "Smarter bots with unlocked abilities for Solo Play.",
