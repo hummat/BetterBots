@@ -133,6 +133,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
 | 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch. Settings toggle for grimoire carrying. |
 | 33 | Weapon special actions | Parry, heavy sweep, racking slide. Input mechanism trivial; decision logic (when to parry) is the work. |
+| 86 | Tier 3 revive cover (extends #7) | Extend pre-revive activation to item-based defensives: Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Requires parallel resolution branch through `item_fallback.lua`. 2026-04-11 audit confirmed combat-ability whitelist is complete; Tier 3 is the remaining gap. |
 
 ### Post-1.0 — "Intelligence Architecture"
 
