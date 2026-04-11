@@ -14,14 +14,17 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 ## Highlights
 
 - Bot-optimized class profiles with curated builds (weapons, talents, blessings, perks)
+- Pre-revive defensive abilities: bots pop dash / shout / stealth before reviving downed allies
+- Objective-aware activation: bots protect allies interacting with pickups, scriptures, grimoires
+- Team ability cooldown staggering to prevent simultaneous activations
 - Ammo awareness: bots defer ammo pickups when humans are low
 - Engagement leash: bots stay in combat longer using coherency-based ranges
-- Team ability cooldown staggering to prevent simultaneous activations
 - Healing deferral: bots let humans heal first at health stations and med-crates
+- Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 750 unit tests, 35 modules
+- 813 unit tests, 36 modules
 
 ## What bots can do with this mod
 
@@ -117,7 +120,9 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Distant special chase penalty (configurable range)
 - [x] Coherency-anchored engagement leash
 - [x] Smart blitz targeting (togglable)
-- [ ] Objective-aware activation (awaiting validation)
+- [x] Objective-aware activation (protect interacting allies)
+- [x] Pre-revive defensive ability activation
+- [x] Arbites companion-command smart tag
 - [ ] Weapon/enemy-aware ADS vs hip-fire
 
 **Bot equipment and profiles**
@@ -196,7 +201,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (750 tests) |
+| `make test` | Run busted tests (813 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -247,10 +252,11 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI
-scripts/mods/BetterBots/          # Mod source (35 modules)
+scripts/mods/BetterBots/          # Mod source (36 modules)
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
+  combat_ability_identity.lua     #   Semantic ability identity (shout vs stance, etc.)
   heuristics.lua                  #   18 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
@@ -283,7 +289,7 @@ scripts/mods/BetterBots/          # Mod source (35 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 750 tests)
+tests/                            # Unit tests (busted, 813 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap
