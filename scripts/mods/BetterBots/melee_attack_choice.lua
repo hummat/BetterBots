@@ -9,9 +9,9 @@ local _fixed_time
 local _armored_type
 local _armor
 local _logged_choice_keys = {}
+local _melee_horde_light_bias
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
-local LIGHT_HORDE_BIAS = 4
 local DEFAULT_ATTACK_META_DATA = {
 	light_attack = {
 		arc = 0,
@@ -50,13 +50,15 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 		utility = utility + 8
 	end
 
+	local horde_bias = _melee_horde_light_bias and _melee_horde_light_bias() or 4
 	if
-		outnumbered
+		horde_bias > 0
+		and outnumbered
 		and target_armor ~= armored_type
 		and attack_input == "light_attack"
 		and not attack_meta_data.no_damage
 	then
-		utility = utility + LIGHT_HORDE_BIAS
+		utility = utility + horde_bias
 	end
 
 	return utility
@@ -134,6 +136,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_armored_type = deps.ARMOR_TYPE_ARMORED
 	_is_enabled = deps.is_enabled
+	_melee_horde_light_bias = deps.melee_horde_light_bias
 end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).

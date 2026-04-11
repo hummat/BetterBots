@@ -7,6 +7,7 @@ local _fixed_time
 local _perf
 local _Ammo
 local _Settings
+local _human_ammo_scan_cache = {}
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -29,16 +30,37 @@ local function _all_eligible_humans_above_threshold(human_units, threshold)
 		return true
 	end
 
+	local fixed_t = _fixed_time and _fixed_time() or 0
+	if
+		_human_ammo_scan_cache.fixed_t == fixed_t
+		and _human_ammo_scan_cache.human_units == human_units
+		and _human_ammo_scan_cache.threshold == threshold
+	then
+		return _human_ammo_scan_cache.result
+	end
+
 	for i = 1, #human_units do
 		local human_unit = human_units[i]
 		if human_unit and _Ammo.uses_ammo(human_unit) then
 			local ammo_percentage = _Ammo.current_total_percentage(human_unit)
 			if ammo_percentage <= threshold then
+				_human_ammo_scan_cache = {
+					fixed_t = fixed_t,
+					human_units = human_units,
+					threshold = threshold,
+					result = false,
+				}
 				return false
 			end
 		end
 	end
 
+	_human_ammo_scan_cache = {
+		fixed_t = fixed_t,
+		human_units = human_units,
+		threshold = threshold,
+		result = true,
+	}
 	return true
 end
 
@@ -50,6 +72,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_Ammo = deps.ammo_module or require("scripts/utilities/ammo")
 	_Settings = deps.settings
+	_human_ammo_scan_cache = {}
 end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)

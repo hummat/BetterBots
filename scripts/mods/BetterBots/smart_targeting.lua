@@ -5,6 +5,8 @@ local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _is_enabled
+local _logged_disabled = false
 local _last_logged_target_by_component = setmetatable({}, { __mode = "k" })
 local _resolve_bot_target_unit_fn
 
@@ -28,6 +30,20 @@ local function register_hooks()
 		"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
 		function(SmartTargetingActionModule)
 			_mod:hook(SmartTargetingActionModule, "fixed_update", function(func, self, dt, t)
+				if _is_enabled and not _is_enabled() then
+					if _debug_enabled() and not _logged_disabled then
+						_logged_disabled = true
+						_debug_log(
+							"smart_targeting_disabled",
+							_fixed_time(),
+							"smart blitz targeting disabled by setting",
+							nil,
+							"info"
+						)
+					end
+					return func(self, dt, t)
+				end
+
 				local unit_data_extension = self and self._unit_data_extension
 				if unit_data_extension and unit_data_extension.is_resimulating then
 					return func(self, dt, t)
@@ -84,6 +100,7 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_fixed_time = deps.fixed_time
+		_is_enabled = deps.is_enabled
 		local bot_targeting = deps.bot_targeting
 		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 	end,

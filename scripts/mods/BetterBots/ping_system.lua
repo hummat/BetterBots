@@ -7,6 +7,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
+local _bot_targeting
 
 local PING_FAILURE_BACKOFF_S = 2.0
 local DISTANCE_ESCALATION_RATIO = 0.5
@@ -17,37 +18,34 @@ local _missing_los_method_warned = false
 local _smart_tag_system_warned = false
 local _ping_call_failed_warned = false
 
+-- Fallback; overwritten from bot_targeting.PERCEPTION_SLOTS in init().
+local PING_SLOTS = { "priority_target_enemy", "opportunity_target_enemy", "urgent_target_enemy", "target_enemy" }
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
+	_bot_targeting = deps.bot_targeting
+	if _bot_targeting and _bot_targeting.PERCEPTION_SLOTS then
+		PING_SLOTS = _bot_targeting.PERCEPTION_SLOTS
+	end
 	_smart_tag_system_warned = false
 end
 
 local function _is_elite_special_monster(unit)
+	if _bot_targeting then
+		return _bot_targeting.is_elite_special_monster(unit)
+	end
+	-- Fallback when bot_targeting not wired (e.g., in tests)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	local breed = unit_data_extension and unit_data_extension:breed()
-	if not breed then
+	if not breed or not breed.tags then
 		return false
 	end
-
-	local tags = breed.tags
-	if not tags then
-		return false
-	end
-
-	return not not (tags.elite or tags.special or tags.monster)
+	return not not (breed.tags.elite or breed.tags.special or breed.tags.monster)
 end
-
--- Priority order for ping slots.
-local PING_SLOTS = {
-	"priority_target_enemy",
-	"opportunity_target_enemy",
-	"urgent_target_enemy",
-	"target_enemy",
-}
 
 local function _distance_sq_between_units(unit, target_unit)
 	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
@@ -76,9 +74,11 @@ local function _is_in_any_ping_slot(perception, target_unit)
 end
 
 local function _target_name(target_unit)
+	if _bot_targeting then
+		return _bot_targeting.target_name(target_unit)
+	end
 	local unit_data_ext = target_unit and ScriptUnit.has_extension(target_unit, "unit_data_system")
 	local breed = unit_data_ext and unit_data_ext:breed()
-
 	return breed and breed.name or tostring(target_unit)
 end
 

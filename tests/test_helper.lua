@@ -51,11 +51,17 @@ function M.make_context(overrides)
 		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
+		target_is_dormant_daemonhost = false,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
 		in_hazard = false,
+		ally_interacting = false,
+		ally_interaction_type = nil,
+		ally_interacting_unit = nil,
+		ally_interacting_distance = nil,
+		ally_interaction_profile = nil,
 	}
 
 	if overrides then

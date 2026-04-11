@@ -1,22 +1,66 @@
+-- Settings UI color palette (markers_aio pattern). Tune these two RGB strings
+-- to restyle every group header and subtitle in the BetterBots mod options.
+local colours = {
+	title = "200,140,20", -- Imperial gold: group headers
+	subtitle = "226,199,126", -- citrine: sub-group descriptions
+}
+
+local function title(text)
+	return "{#color(" .. colours.title .. ")}" .. text .. "{#reset()}"
+end
+
+local function subtitle(text)
+	return "{#color(" .. colours.subtitle .. ")}" .. text .. "{#reset()}"
+end
+
 return {
 	mod_name = {
-		en = "Better Bots",
+		-- U+E029: Darktide UI font PUA glyph (Adeptus Mechanicus cog,
+		-- per settings/live_event/mechanicus.lua `icon`). Defined in
+		-- the game UI font, not Unicode — guaranteed to render.
+		-- Chosen for the tech-priest / machine-spirit theme: BetterBots
+		-- is about making the Omnissiah's servitors (bots) function
+		-- as intended.
+		-- Alternates: E051 (Cyber-Mastiff), E048 (mastery_points),
+		-- E004 (party_status), E003 (powersword).
+		en = "{#color(255,180,30)} Better Bots{#reset()}",
 	},
 	mod_description = {
 		en = "Smarter bots with unlocked abilities for Solo Play.",
 	},
 	-- Groups
 	abilities_group = {
-		en = "Abilities",
+		en = title("Abilities"),
 	},
 	bot_behavior_group = {
-		en = "Bot Behavior",
+		en = title("Bot Behavior"),
+	},
+	bot_feature_toggles_group = {
+		en = title("Bot Behavior - Feature Toggles"),
+	},
+	bot_tuning_group = {
+		en = title("Bot Behavior - Tuning"),
+	},
+	healing_deferral_group = {
+		en = title("Healing Deferral"),
 	},
 	bot_profiles_group = {
-		en = "Bot Profiles",
+		en = title("Bot Profiles"),
+	},
+	bot_slots_core_group = {
+		en = title("Bot Slots 1-3"),
+	},
+	bot_slots_core_group_description = {
+		en = subtitle("Core bot slots used by Solo Play."),
+	},
+	bot_slots_tertium_group = {
+		en = title("Bot Slots 4-5 (Tertium)"),
+	},
+	bot_slots_tertium_group_description = {
+		en = subtitle("Only used when Tertium4Or5/6 adds extra bots. Leave as None without a Tertium mod."),
 	},
 	diagnostics_group = {
-		en = "Diagnostics",
+		en = title("Diagnostics"),
 	},
 	-- Ability categories
 	enable_stances = {
@@ -75,23 +119,11 @@ return {
 		en = "Conservative - emergency-only, suited for Auric/Maelstrom",
 	},
 	-- Feature toggles
-	enable_sprint = {
-		en = "Bot sprinting",
-	},
-	enable_sprint_description = {
-		en = "Bots sprint to catch up, during traversal, and for ally rescue",
-	},
 	enable_pinging = {
 		en = "Elite & special pinging",
 	},
 	enable_pinging_description = {
-		en = "Bots ping elites and specials they detect",
-	},
-	enable_special_penalty = {
-		en = "Distant special targeting",
-	},
-	enable_special_penalty_description = {
-		en = "Bots prefer ranged attacks against distant specials instead of charging into melee",
+		en = "Bots ping elites and specials they detect. Also controls Arbites companion (dog) targeting.",
 	},
 	enable_poxburster = {
 		en = "Poxburster safe targeting",
@@ -116,6 +148,46 @@ return {
 	},
 	enable_engagement_leash_description = {
 		en = "Bots stay in combat longer instead of breaking off to follow. Uses coherency-based ranges.",
+	},
+	enable_smart_targeting = {
+		en = "Smart blitz targeting",
+	},
+	enable_smart_targeting_description = {
+		en = "Seed bot blitz targeting from perception. Disabling restores vanilla blitz targeting.",
+	},
+	enable_daemonhost_avoidance = {
+		en = "Daemonhost avoidance",
+	},
+	enable_daemonhost_avoidance_description = {
+		en = "Suppress combat and sprinting near dormant daemonhosts. Disabling lets bots engage freely (advanced).",
+	},
+	sprint_follow_distance = {
+		en = "Sprint catch-up distance",
+	},
+	sprint_follow_distance_description = {
+		en = "Bots sprint to catch up when further than this distance from the group leader. "
+			.. "Also enables traversal and rescue sprinting. Set to 0 to disable all sprinting.",
+	},
+	special_chase_penalty_range = {
+		en = "Special chase penalty range",
+	},
+	special_chase_penalty_range_description = {
+		en = "Bots prefer ranged attacks against specials beyond this distance instead of charging into melee. "
+			.. "Set to 0 to disable the penalty.",
+	},
+	player_tag_bonus = {
+		en = "Player tag response",
+	},
+	player_tag_bonus_description = {
+		en = "How aggressively bots prioritize targets pinged by the human player. "
+			.. "Higher values make bots respond faster. Set to 0 to ignore player pings.",
+	},
+	melee_horde_light_bias = {
+		en = "Melee horde light bias",
+	},
+	melee_horde_light_bias_description = {
+		en = "Bias bots toward light attacks into unarmored hordes for better cleave. "
+			.. "Higher values prefer lights more. Set to 0 for vanilla attack selection.",
 	},
 	bot_ranged_ammo_threshold = {
 		en = "Bot ranged ammo threshold",
@@ -226,7 +298,7 @@ return {
 		en = "High (Damnation)",
 	},
 	bot_weapon_quality_max = {
-		en = "Max (fully empowered god-roll, expertise 500)",
+		en = "Max (fully upgraded)",
 	},
 	-- Diagnostics
 	enable_debug_logs = {

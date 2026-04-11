@@ -49,7 +49,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Default class-diverse bot profiles (#45): 4-class loadouts with per-slot settings, Tertium compat, cosmetic overrides.
 - Full talent enrichment (#63): ~30 talents per class from hadrons-blessing builds, including abilities, keystones, and stat nodes. Bot-optimized build selection (Voice of Command veteran, Electro Shriek psyker, Gun-Lugger ogryn).
 - Weapon blessings and perks (#63 phase 2): 2 T4 blessings + 1-2 T4 perks per weapon via synthetic `get_item_instance` overrides. First mod to construct blessed weapons without player backend profiles.
-- Settings control surface (#6): category checkboxes, 4 behavior presets, feature gates, veteran dual-category gate.
+- Settings control surface (#6): category checkboxes, 4 behavior presets, feature gates, veteran semantic stance/shout gate.
 - Heuristic dispatch refactor (#60), grenade fallback logging (#59), toggle safety audit (#57).
 - Log throttle collision fix: 19 per-bot debug log keys were silently dropping multi-bot messages. Convention updated in AGENTS.md + logging.md.
 - 518 unit tests.
@@ -105,13 +105,12 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 14 | Ability cooldown staggering | Post-activation category cooldown (~100-150 LOC). Emergency overrides for critical abilities. Feasibility analysis complete. |
-| 37 | Objective-aware ability activation (P1) | Shield/Escort interaction profiles in `build_context()`, threshold adjustments for nearby defensive abilities, and close-range mobility suppression. Leave dash-toward / per-type tuning for later phases. |
-| 49 | Arbites companion-command smart tag | Direct mastiff via `enemy_companion_target`, reusing ping-system target priority and dedup/backoff logic. Arbites is testable; no longer validation-gated. |
-| 81 | Expand settings surface | Slider controls for post-v0.8.0 features: player-tag bonus, horde light bias, sprint distance, special chase range (slider-with-zero = off), plus smart targeting and daemonhost avoidance toggles. Replaces `enable_sprint`/`enable_special_penalty` checkboxes. |
-
-Follow-up after `#37` P1:
-- `#7` revive-with-ability narrows to the reviving bot self-casting a defensive ability. The high-value nearby protection slice should already be covered by interaction-aware ally protection, so the remaining BT injection work is smaller and can wait.
+| 14 | Ability cooldown staggering | **Done + validated** in `console-2026-04-11-17.41.41`: textbook timeline at 17:50:09–17:50:18 — vet shout records `aoe_shout` at t0, two psyker shouts suppressed at Δ=2 s and Δ=4 s (`fallback suppressed psyker_shout (team_cd:aoe_shout)`), third psyker attempt at Δ=8 s fires through normally after the 6 s window expires. Two integration bugs found and fixed in `d890695`: variant talent name vs semantic_key in `TeamCooldown.record()`, and missing `is_suppressed` check in `ability_queue.lua` fallback path (the dominant activation path in solo play). Closed. |
+| 37 | Objective-aware ability activation (P1) | **Done + validated** in `console-2026-04-11-16.51`: `veteran_voc_protect_interactor` queued 4× and `ogryn_charge_block_protecting_interactor` held 7× during the same run. Both the activate-defensively and suppress-aggressive sides confirmed. Closed. |
+| 7 | Revive-with-ability (P1) | **Done + validated** in `console-2026-04-11-16.51`: 5 `revive_candidate observed` lines (psyker × 4, vet × 1; both `knocked_down` and `netted` interaction types) plus `revive ability skipped (psyker_shout can_use_ability=false)` proving the full hook → identity → ability check chain executes. Closed. |
+| 49 | Arbites companion-command smart tag | **Done + validated.** 42+ `companion-tagged` events across 2 sessions plus `bot 5 companion-tagged renegade_netgunner (reason: opportunity_target_enemy)` in the latest run, with `already_tagged` dedup firing as expected. Closed. |
+| 81 | Expand settings surface | **Done + validated** in `console-2026-04-11-16.51`: startup log line `settings: preset=balanced, sprint_dist=12, chase_range=18, tag_bonus=3, horde_bias=4, smart_targeting=true, dh_avoidance=true` resolves all 7 spec values. Always-emit-all-values mode landed in `ed9f12b`. Closed. |
+| 83 | Settings UI: reorganize groups, factory functions, visual polish | **Done.** All 8 checklist items complete across `962a384`, `c7c9954`, `5695e1f`, `ed9f12b`. Group split, slot dropdown factory + deep-copy, Testing preset moved last, slider tooltip pattern, "Max" string fix, slot grouping with descriptions, gold/citrine group headers, event_log/perf_timing show_widgets gating. Plus golden mod_name with U+E048 mastery glyph. Closed. |
 
 ### v0.11.0 — "Combat Execution"
 
@@ -121,6 +120,7 @@ Follow-up after `#37` P1:
 |---|-------|-------|
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
 | 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
+| 87 | Sustained fire for flamers and held-fire weapons | Bots tap-fire only — `bt_bot_shoot_action._fire` queues one `shoot_pressed` per frame, `BotUnitInput._input` never sets `action_one_hold`. Flamer `shoot_braced` and purgatus `trigger_charge_flame` need a held signal. Proposed `sustained_fire.lua` hooks `BotUnitInput._update_actions` to inject held input while a streaming state is active. Couples with #41 (ADS needed to enter braced fire on flamer). |
 
 ### v1.0.0 — "Bot Identity"
 
@@ -134,6 +134,7 @@ Follow-up after `#37` P1:
 | 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
 | 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch. Settings toggle for grimoire carrying. |
 | 33 | Weapon special actions | Parry, heavy sweep, racking slide. Input mechanism trivial; decision logic (when to parry) is the work. |
+| 86 | Tier 3 revive cover (extends #7) | Extend pre-revive activation to item-based defensives: Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Requires parallel resolution branch through `item_fallback.lua`. 2026-04-11 audit confirmed combat-ability whitelist is complete; Tier 3 is the remaining gap. |
 
 ### Post-1.0 — "Intelligence Architecture"
 

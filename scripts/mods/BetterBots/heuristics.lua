@@ -4,8 +4,102 @@ local _super_armor_breed_cache
 local _armor_type_super_armor
 local _is_testing_profile
 local _resolve_preset
+local _debug_log
+local _debug_enabled
+local _combat_ability_identity
+local _daemonhost_breed_names
+local _is_daemonhost_avoidance_enabled
 local _overlapping_liquids = {}
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
+local SHIELD_INTERACTION_TYPES = {
+	scanning = true,
+	setup_decoding = true,
+	setup_breach_charge = true,
+	revive = true,
+	rescue = true,
+	pull_up = true,
+	remove_net = true,
+	health_station = true,
+	servo_skull = true,
+	servo_skull_activator = true,
+}
+
+-- Per-frame shared cache of interacting allies on a given side. The
+-- read_component walk over valid_player_units is identical for every bot
+-- sharing a side within a fixed_t tick, so scan once and let each bot pick
+-- its own "nearest" in build_context (distance depends on bot position).
+-- Mirrors the sprint.lua shared daemonhost scan pattern — keyed on
+-- (fixed_t, side) by reference identity.
+local _interacting_units = {}
+local _interacting_profiles = {}
+local _interacting_types = {}
+local _interacting_cache_t = nil
+local _interacting_cache_side = nil
+
+local function _scan_interacting_allies(side, fixed_t)
+	if _interacting_cache_t == fixed_t and _interacting_cache_side == side then
+		return _interacting_units, _interacting_profiles, _interacting_types
+	end
+
+	for i = #_interacting_units, 1, -1 do
+		_interacting_units[i] = nil
+		_interacting_profiles[i] = nil
+		_interacting_types[i] = nil
+	end
+
+	local player_units = side and side.valid_player_units
+	if not player_units then
+		_interacting_cache_t = fixed_t
+		_interacting_cache_side = side
+		return _interacting_units, _interacting_profiles, _interacting_types
+	end
+
+	for i = 1, #player_units do
+		local ally_unit = player_units[i]
+		if (not ALIVE) or ALIVE[ally_unit] then
+			local ally_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
+			if ally_data then
+				local profile = nil
+				local interaction_type = nil
+
+				local char_state = ally_data:read_component("character_state")
+				local state_name = char_state and char_state.state_name
+
+				if state_name == "minigame" then
+					profile = "shield"
+					interaction_type = "minigame"
+				elseif state_name == "interacting" then
+					local interacting_state = ally_data:read_component("interacting_character_state")
+					local template = interacting_state and interacting_state.interaction_template
+					if template and SHIELD_INTERACTION_TYPES[template] then
+						profile = "shield"
+						interaction_type = template
+					end
+				end
+
+				if not profile then
+					local inventory = ally_data:read_component("inventory")
+					if inventory and inventory.wielded_slot == "slot_luggable" then
+						profile = "escort"
+						interaction_type = "luggable"
+					end
+				end
+
+				if profile then
+					local n = #_interacting_units + 1
+					_interacting_units[n] = ally_unit
+					_interacting_profiles[n] = profile
+					_interacting_types[n] = interaction_type
+				end
+			end
+		end
+	end
+
+	_interacting_cache_t = fixed_t
+	_interacting_cache_side = side
+
+	return _interacting_units, _interacting_profiles, _interacting_types
+end
 local HAZARD_TEMPLATE_TOKENS = {
 	fire = true,
 	gas = true,
@@ -148,11 +242,17 @@ local function build_context(unit, blackboard)
 		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
+		target_is_dormant_daemonhost = false,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
 		in_hazard = false,
+		ally_interacting = false,
+		ally_interaction_type = nil,
+		ally_interacting_unit = nil,
+		ally_interacting_distance = nil,
+		ally_interaction_profile = nil,
 	}
 
 	context.preset = _resolve_preset and _resolve_preset() or "balanced"
@@ -277,6 +377,65 @@ local function build_context(unit, blackboard)
 			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
 			context.target_is_monster = _is_tagged(tags, "monster")
 			context.target_is_super_armor = _breed_has_super_armor(target_breed)
+			-- #17: flag dormant daemonhosts so monster-aware heuristics refuse
+			-- to blitz them. Once DH transitions to aggroed (on anyone — a
+			-- triggered daemonhost commits the whole group), dormancy lifts
+			-- and normal combat resumes. Pre-aggro: trash is targeted via
+			-- vanilla target selection even though no combat action should
+			-- ensue — we must refuse at the heuristic layer.
+			if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
+				local target_bb = BLACKBOARDS and BLACKBOARDS[context.target_enemy]
+				local target_perception = target_bb and target_bb.perception
+				local is_aggroed = target_perception and target_perception.aggro_state == "aggroed"
+				context.target_is_dormant_daemonhost = not is_aggroed
+			end
+		end
+	end
+
+	local side_system = Managers
+		and Managers.state
+		and Managers.state.extension
+		and Managers.state.extension:system("side_system")
+	if side_system then
+		local side = side_system.side_by_unit[unit]
+		if side then
+			local interacting_units, interacting_profiles, interacting_types = _scan_interacting_allies(side, fixed_t)
+			local best_distance_sq = math.huge
+			for i = 1, #interacting_units do
+				local ally_unit = interacting_units[i]
+				if ally_unit ~= unit then
+					local ally_position = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
+					local dist_sq = math.huge
+					if unit_position and ally_position and ally_position.x then
+						local dx = ally_position.x - unit_position.x
+						local dy = ally_position.y - unit_position.y
+						local dz = ally_position.z - unit_position.z
+						dist_sq = dx * dx + dy * dy + dz * dz
+					end
+
+					if not context.ally_interacting or dist_sq < best_distance_sq then
+						best_distance_sq = dist_sq
+						context.ally_interacting = true
+						context.ally_interaction_type = interacting_types[i]
+						context.ally_interacting_unit = ally_unit
+						context.ally_interacting_distance = dist_sq < math.huge and math.sqrt(dist_sq) or nil
+						context.ally_interaction_profile = interacting_profiles[i]
+					end
+				end
+			end
+
+			if context.ally_interacting and _debug_enabled and _debug_enabled() then
+				_debug_log(
+					"interaction_scan:" .. tostring(unit),
+					fixed_t,
+					context.ally_interaction_profile
+						.. " ("
+						.. tostring(context.ally_interaction_type)
+						.. ") dist="
+						.. string.format("%.1f", context.ally_interacting_distance or -1),
+					5
+				)
+			end
 		end
 	end
 
@@ -288,25 +447,8 @@ local function build_context(unit, blackboard)
 	return context
 end
 
-local function _resolve_veteran_class_tag(ability_extension)
-	local equipped_abilities = ability_extension and ability_extension._equipped_abilities
-	local combat_ability = equipped_abilities and equipped_abilities.combat_ability
-	local tweak_data = combat_ability and combat_ability.ability_template_tweak_data
-	local class_tag = tweak_data and tweak_data.class_tag
-	local ability_name = combat_ability and combat_ability.name or ""
-
-	if class_tag then
-		return class_tag, "class_tag"
-	end
-
-	if string.find(ability_name, "shout", 1, true) then
-		return "squad_leader", "ability_name"
-	end
-	if string.find(ability_name, "stance", 1, true) then
-		return "ranger", "ability_name"
-	end
-
-	return nil, "unknown"
+local function _resolve_combat_identity(ability_template_name, ability_extension)
+	return _combat_ability_identity.resolve(nil, ability_extension, { template_name = ability_template_name })
 end
 
 -- Per-preset threshold tables: aggressive fires abilities at first sign of pressure
@@ -366,12 +508,16 @@ local function _can_activate_veteran_combat_ability(
 	context,
 	thresholds
 )
-	local class_tag, source = _resolve_veteran_class_tag(ability_extension)
+	local identity = _resolve_combat_identity("veteran_combat_ability", ability_extension)
+	local class_tag = identity.class_tag
+	local source = identity.class_tag_source
 	if class_tag == "squad_leader" then
-		local preset = context.preset or "balanced"
-		local thresholds_voc = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
+		local thresholds_voc = thresholds
 		if context.in_hazard and context.num_nearby >= 1 then
 			return true, "veteran_voc_hazard"
+		end
+		if context.ally_interacting and context.num_nearby >= 1 then
+			return true, "veteran_voc_protect_interactor"
 		end
 		if context.num_nearby >= thresholds_voc.surrounded then
 			return true, "veteran_voc_surrounded"
@@ -510,6 +656,9 @@ local function _can_activate_zealot_dash(context, thresholds)
 	end
 	if target_distance and target_distance < 3 then
 		return false, "zealot_dash_block_target_too_close"
+	end
+	if context.ally_interacting and (context.ally_interacting_distance or math.huge) <= 12 then
+		return false, "zealot_dash_block_protecting_interactor"
 	end
 	if context.target_is_super_armor then
 		return false, "zealot_dash_block_super_armor"
@@ -728,6 +877,9 @@ local function _can_activate_ogryn_charge(context, thresholds)
 	if target_distance and target_distance < 4 then
 		return false, "ogryn_charge_block_target_too_close"
 	end
+	if context.ally_interacting and (context.ally_interacting_distance or math.huge) <= 12 then
+		return false, "ogryn_charge_block_protecting_interactor"
+	end
 	if context.priority_target_enemy and target_distance and target_distance > 4 then
 		return true, "ogryn_charge_priority_target"
 	end
@@ -785,6 +937,9 @@ local OGRYN_TAUNT_THRESHOLDS = {
 local function _can_activate_ogryn_taunt(context, thresholds)
 	if context.toughness_pct < 0.20 and context.health_pct < 0.30 then
 		return false, "ogryn_taunt_block_too_fragile"
+	end
+	if context.ally_interacting and context.num_nearby >= 1 and context.toughness_pct > 0.30 then
+		return true, "ogryn_taunt_protect_interactor"
 	end
 	if context.target_ally_needs_aid and context.num_nearby >= 2 and context.toughness_pct > 0.30 then
 		return true, "ogryn_taunt_ally_aid"
@@ -898,6 +1053,23 @@ local ADAMANT_STANCE_THRESHOLDS = {
 	},
 }
 
+-- #17: once a heuristic would key off target_is_monster, the decision must
+-- first confirm the monster is not a dormant daemonhost. Centralized so every
+-- call site gets the same gate (and respects the avoidance setting toggle).
+local function _is_monster_signal_allowed(context)
+	if not context.target_is_monster then
+		return false
+	end
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false
+	end
+	return true
+end
+
 local function _can_activate_adamant_stance(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if context.toughness_pct < thresholds.low_toughness then
@@ -909,7 +1081,7 @@ local function _can_activate_adamant_stance(context, thresholds)
 	then
 		return true, "adamant_stance_surrounded"
 	end
-	if context.target_is_monster and target_distance and target_distance < 8 then
+	if _is_monster_signal_allowed(context) and target_distance and target_distance < 8 then
 		return true, "adamant_stance_monster_pressure"
 	end
 	if context.elite_count >= thresholds.elite_count and context.toughness_pct < thresholds.elite_toughness then
@@ -935,6 +1107,9 @@ local function _can_activate_adamant_charge(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if target_distance and target_distance < 3 then
 		return false, "adamant_charge_block_target_too_close"
+	end
+	if context.ally_interacting and (context.ally_interacting_distance or math.huge) <= 12 then
+		return false, "adamant_charge_block_protecting_interactor"
 	end
 	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
 		return true, "adamant_charge_ally_aid"
@@ -990,6 +1165,9 @@ local ADAMANT_SHOUT_THRESHOLDS = {
 }
 
 local function _can_activate_adamant_shout(context, thresholds)
+	if context.ally_interacting and context.num_nearby >= 1 then
+		return true, "adamant_shout_protect_interactor"
+	end
 	if context.toughness_pct < thresholds.low_toughness and context.num_nearby >= thresholds.low_toughness_nearby then
 		return true, "adamant_shout_low_toughness"
 	end
@@ -1075,6 +1253,9 @@ local function _can_activate_zealot_relic(context, thresholds)
 	if context.num_nearby >= 5 and context.toughness_pct < 0.30 then
 		return false, "zealot_relic_block_overwhelmed"
 	end
+	if context.ally_interacting and context.allies_in_coherency >= 1 then
+		return true, "zealot_relic_protect_interactor"
+	end
 	if
 		context.avg_ally_toughness_pct < thresholds.team_toughness
 		and context.allies_in_coherency >= 2
@@ -1119,6 +1300,9 @@ local function _can_activate_force_field(context, thresholds)
 	if context.num_nearby == 0 and not context.target_enemy then
 		return false, "force_field_block_no_threats"
 	end
+	if context.ally_interacting and (context.ranged_count >= 1 or context.num_nearby >= 2) then
+		return true, "force_field_protect_interactor"
+	end
 	if context.target_ally_needs_aid then
 		return true, "force_field_ally_aid"
 	end
@@ -1159,13 +1343,17 @@ local function _can_activate_drone(context, thresholds)
 	if context.allies_in_coherency == 0 then
 		return false, "drone_block_no_allies"
 	end
-	if context.target_is_monster and context.allies_in_coherency >= 1 then
+	if _is_monster_signal_allowed(context) and context.allies_in_coherency >= 1 then
 		return true, "drone_monster_fight"
 	end
 	if context.num_nearby <= thresholds.block_low_value_enemies then
 		return false, "drone_block_low_value"
 	end
-	if context.allies_in_coherency >= 2 and context.num_nearby >= thresholds.team_horde_nearby then
+	local team_horde_threshold = thresholds.team_horde_nearby
+	if context.ally_interacting then
+		team_horde_threshold = team_horde_threshold - 1
+	end
+	if context.allies_in_coherency >= 2 and context.num_nearby >= team_horde_threshold then
 		return true, "drone_team_horde"
 	end
 	if
@@ -1180,6 +1368,9 @@ end
 local function _can_activate_stimm_field(context)
 	if context.allies_in_coherency == 0 then
 		return false, "stimm_block_no_allies"
+	end
+	if context.ally_interacting then
+		return true, "stimm_protect_interactor"
 	end
 	if context.max_ally_corruption_pct > 0.30 then
 		return true, "stimm_corruption_heal"
@@ -1300,7 +1491,8 @@ local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, p
 	end
 
 	local t = GRENADE_HORDE_PRESETS[preset] or GRENADE_HORDE_PRESETS.balanced
-	local adj_nearby = min_nearby + t.nearby_offset
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local adj_nearby = min_nearby + t.nearby_offset - interaction_offset
 	local adj_challenge = min_challenge + t.challenge_offset
 	if context.num_nearby >= adj_nearby and context.challenge_rating_sum >= adj_challenge then
 		return true, rule_prefix .. "_horde"
@@ -1311,6 +1503,17 @@ end
 
 local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	opts = opts or {}
+
+	-- #17: refuse any priority-target grenade/blitz against a dormant
+	-- daemonhost. target_is_dormant_daemonhost is only true when avoidance
+	-- is enabled AND the DH has not yet aggroed (aggro lifts globally).
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, rule_prefix .. "_block_dormant_daemonhost"
+	end
 
 	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
 	if blocked then
@@ -1328,7 +1531,7 @@ local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	local target_distance = context.target_enemy_distance or 0
 	local t = GRENADE_PRIORITY_PRESETS[preset] or GRENADE_PRIORITY_PRESETS.balanced
 	local min_distance = (opts.min_distance or 0) + t.distance_offset
-	local has_priority_target = context.target_is_monster
+	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
@@ -1356,15 +1559,18 @@ local function _grenade_defensive(context, rule_prefix, preset)
 	end
 
 	local t = GRENADE_DEFENSIVE_PRESETS[preset] or GRENADE_DEFENSIVE_PRESETS.balanced
+	local interaction_offset = context.ally_interacting and 1 or 0
 	if context.target_ally_needs_aid and context.num_nearby >= 2 then
 		return true, rule_prefix .. "_ally_aid"
 	end
 
-	if context.ranged_count >= (2 + t.count_offset) and context.toughness_pct < (0.50 + t.toughness_offset) then
+	local ranged_threshold = math.max(1, 2 + t.count_offset - interaction_offset)
+	if context.ranged_count >= ranged_threshold and context.toughness_pct < (0.50 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
-	if context.num_nearby >= (4 + t.count_offset) and context.toughness_pct < (0.35 + t.toughness_offset) then
+	local melee_threshold = math.max(2, 4 + t.count_offset - interaction_offset)
+	if context.num_nearby >= melee_threshold and context.toughness_pct < (0.35 + t.toughness_offset) then
 		return true, rule_prefix .. "_pressure"
 	end
 
@@ -1378,11 +1584,12 @@ local function _grenade_mine(context, rule_prefix, preset)
 	end
 
 	local t = GRENADE_MINE_PRESETS[preset] or GRENADE_MINE_PRESETS.balanced
+	local interaction_offset = context.ally_interacting and 1 or 0
 	if context.elite_count >= (3 + t.elite_offset) then
 		return true, rule_prefix .. "_elite_pack"
 	end
 
-	if context.num_nearby >= (5 + t.density_offset) and context.challenge_rating_sum >= 3.0 then
+	if context.num_nearby >= (5 + t.density_offset - interaction_offset) and context.challenge_rating_sum >= 3.0 then
 		return true, rule_prefix .. "_hold_point"
 	end
 
@@ -1426,6 +1633,16 @@ local function _grenade_smite(context)
 end
 
 local function _grenade_assail(context)
+	-- #17: refuse assail against dormant daemonhost — the projectile is
+	-- ballistic, so "aim" is enough to consume a charge on a DH.
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "grenade_assail_block_dormant_daemonhost"
+	end
+
 	if context.peril_pct and context.peril_pct >= 0.85 then
 		return false, "grenade_assail_block_peril"
 	end
@@ -1435,7 +1652,7 @@ local function _grenade_assail(context)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
-	local has_priority_target = context.target_is_monster
+	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
@@ -1470,11 +1687,15 @@ local function _grenade_chain_lightning(context)
 	end
 
 	local t = CHAIN_LIGHTNING_THRESHOLDS[context.preset] or CHAIN_LIGHTNING_THRESHOLDS.balanced
-	if context.num_nearby >= t.crowd then
+	local interaction_offset = context.ally_interacting and 1 or 0
+	if context.num_nearby >= t.crowd - interaction_offset then
 		return true, "grenade_chain_lightning_crowd"
 	end
 
-	if context.num_nearby >= t.mixed_nearby and (context.elite_count + context.special_count) >= 1 then
+	if
+		context.num_nearby >= t.mixed_nearby - interaction_offset
+		and (context.elite_count + context.special_count) >= 1
+	then
 		return true, "grenade_chain_lightning_crowd"
 	end
 
@@ -1558,7 +1779,11 @@ local function _evaluate_template_heuristic(
 	local preset = context.preset or "balanced"
 
 	if ability_template_name == "veteran_combat_ability" then
+		local identity = _resolve_combat_identity(ability_template_name, ability_extension)
 		local vet_thresholds = VETERAN_STANCE_THRESHOLDS[preset] or VETERAN_STANCE_THRESHOLDS.balanced
+		if identity.semantic_key == "veteran_combat_ability_shout" then
+			vet_thresholds = VETERAN_VOC_THRESHOLDS[preset] or VETERAN_VOC_THRESHOLDS.balanced
+		end
 		return _can_activate_veteran_combat_ability(
 			conditions,
 			unit,
@@ -1604,7 +1829,7 @@ local function _testing_profile_override(context)
 		return true, "testing_profile_ally_aid"
 	end
 
-	if context.target_is_monster then
+	if _is_monster_signal_allowed(context) then
 		return true, "testing_profile_monster"
 	end
 
@@ -1726,7 +1951,8 @@ local function evaluate_heuristic(template_name, context, opts)
 	context.preset = preset
 
 	if template_name == "veteran_combat_ability" then
-		local tag = _resolve_veteran_class_tag(opts.ability_extension)
+		local identity = _resolve_combat_identity(template_name, opts.ability_extension)
+		local tag = identity.class_tag
 		local threshold_table = (tag == "squad_leader") and VETERAN_VOC_THRESHOLDS or VETERAN_STANCE_THRESHOLDS
 		local thresholds = threshold_table[preset] or threshold_table.balanced
 
@@ -1782,6 +2008,23 @@ local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 	local saved_preset = context.preset
 	context.preset = preset
 
+	-- Revalidation hysteresis: after the initial "throw" decision passed
+	-- and the bot has already committed to the aim window, allow a single
+	-- enemy's worth of slack on the density-based throw gates so brief
+	-- dips in proximity count don't abort frags/bombs mid-arm. Veteran
+	-- frag is the worst offender in the wild (JSONL shows every queued
+	-- attempt landing on `blocked reason=revalidation`) because
+	-- `_grenade_horde` hard-gates at `num_nearby >= 6` and the proximity
+	-- count fluctuates across the ~0.5-1 s aim window. _grenade_priority_
+	-- target templates (smite/knives/krak) don't gate on density so the
+	-- relaxation is effectively a no-op for them.
+	local relaxed_num_nearby = opts and opts.revalidation and type(context.num_nearby) == "number"
+	local saved_num_nearby
+	if relaxed_num_nearby then
+		saved_num_nearby = context.num_nearby
+		context.num_nearby = saved_num_nearby + 1
+	end
+
 	local fn = GRENADE_HEURISTICS[grenade_template_name]
 	local can_activate, rule
 	if fn then
@@ -1792,18 +2035,41 @@ local function evaluate_grenade_heuristic(grenade_template_name, context, opts)
 		can_activate, rule = false, "grenade_no_enemies"
 	end
 
+	if relaxed_num_nearby then
+		context.num_nearby = saved_num_nearby
+	end
+
 	context.preset = saved_preset
 	return _apply_behavior_profile(can_activate, rule, context, opts)
 end
 
 return {
 	init = function(deps)
+		assert(deps.combat_ability_identity, "heuristics: combat_ability_identity dep required")
 		_fixed_time = deps.fixed_time
 		_decision_context_cache = deps.decision_context_cache
 		_super_armor_breed_cache = deps.super_armor_breed_cache
 		_armor_type_super_armor = deps.ARMOR_TYPE_SUPER_ARMOR
 		_is_testing_profile = deps.is_testing_profile
 		_resolve_preset = deps.resolve_preset
+		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
+		_combat_ability_identity = deps.combat_ability_identity
+		-- #17: daemonhost carve-out deps. Optional so unit tests that set
+		-- context.target_is_dormant_daemonhost directly still work without
+		-- wiring shared_rules or the setting lookup.
+		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
+		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
+			return true
+		end
+
+		_interacting_cache_t = nil
+		_interacting_cache_side = nil
+		for i = #_interacting_units, 1, -1 do
+			_interacting_units[i] = nil
+			_interacting_profiles[i] = nil
+			_interacting_types[i] = nil
+		end
 	end,
 	build_context = build_context,
 	resolve_decision = resolve_decision,

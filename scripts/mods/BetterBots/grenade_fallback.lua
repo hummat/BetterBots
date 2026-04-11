@@ -13,6 +13,7 @@ local _fixed_time
 local _event_log
 local _bot_slot_for_unit
 local _is_suppressed
+local _perf
 
 -- Late-bound cross-module refs (set via wire)
 local _build_context
@@ -600,7 +601,11 @@ local function try_queue(unit, blackboard)
 
 		if fixed_t >= (state.wait_t or 0) then
 			local context = active_context or _build_context(unit, blackboard)
-			local should_throw, rule = _evaluate_grenade_heuristic(state.grenade_name, context)
+			-- Pass `revalidation = true` so density-gated grenades get one
+			-- enemy's worth of hysteresis on the re-check; prevents every
+			-- frag attempt from losing the race when num_nearby dips
+			-- across the aim window (see evaluate_grenade_heuristic).
+			local should_throw, rule = _evaluate_grenade_heuristic(state.grenade_name, context, { revalidation = true })
 			if not should_throw then
 				if _debug_enabled() then
 					_debug_log(
@@ -965,16 +970,31 @@ local function try_queue(unit, blackboard)
 	end
 
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
+	local ctx_t0 = _perf and _perf.begin() or nil
 	local context = _build_context(unit, blackboard)
+	if ctx_t0 and _perf then
+		_perf.finish("grenade_fallback.build_context", ctx_t0, nil, { include_total = false })
+	end
+	local heur_t0 = _perf and _perf.begin() or nil
 	local should_throw, rule = _evaluate_grenade_heuristic(grenade_name, context)
+	if heur_t0 and _perf then
+		_perf.finish("grenade_fallback.heuristic", heur_t0, nil, { include_total = false })
+	end
 	_emit_grenade_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
 	if not should_throw then
+		-- Gate filters zero-signal holds. Non-psyker bots always have
+		-- peril_pct == 0 because the engine zero-initializes the
+		-- warp_charge component on every player unit (see
+		-- player_unit_talent_extension._init_components), so
+		-- `peril_pct ~= nil` on its own lets every frame log for
+		-- veteran/zealot/ogryn. Require >0 so only real psyker peril
+		-- keeps the gate open.
 		if
 			_debug_enabled()
 			and (
 				(context and context.num_nearby and context.num_nearby > 0)
 				or (context and context.target_enemy)
-				or (context and context.peril_pct ~= nil)
+				or (context and context.peril_pct ~= nil and context.peril_pct > 0)
 			)
 		then
 			_debug_log(
@@ -1158,6 +1178,7 @@ return {
 		_is_suppressed = deps.is_suppressed
 		_grenade_state_by_unit = deps.grenade_state_by_unit
 		_last_grenade_charge_event_by_unit = deps.last_grenade_charge_event_by_unit
+		_perf = deps.perf
 	end,
 	wire = function(refs)
 		_build_context = refs.build_context

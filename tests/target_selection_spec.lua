@@ -287,6 +287,87 @@ describe("TargetSelection", function()
 		assert.are.equal(5, score)
 	end)
 
+	-- #81: settings wiring tests
+	describe("settings wiring (#81)", function()
+		it("disables player tag boost when player_tag_bonus=0", function()
+			local target_unit = {}
+			_G.Managers.state.extension.system = function(_self, name)
+				if name == "smart_tag_system" then
+					return make_smart_tag_system(target_unit, true)
+				end
+			end
+
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				player_tag_bonus = function()
+					return 0
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local unit = { has_ammo = true }
+			local breed = { tags = { elite = true }, name = "chaos_hound" }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+			assert.are.equal(5, score) -- no boost when bonus=0
+		end)
+
+		it("disables special chase penalty when special_chase_penalty_range=0", function()
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				special_chase_penalty_range = function()
+					return 0
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local unit = { has_ammo = true }
+			local breed_special = { tags = { special = true } }
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
+			assert.are.equal(5, score) -- no penalty when range=0
+		end)
+
+		it("uses configurable chase range", function()
+			TargetSelection.init({
+				mod = _mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				special_chase_penalty_range = function()
+					return 24
+				end,
+			})
+			TargetSelection.register_hooks()
+
+			local unit = { has_ammo = true }
+			local breed_special = { tags = { special = true } }
+			-- 400 = 20m, which is < 24m threshold (576 sq) — should NOT penalize
+			local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
+			assert.are.equal(5, score)
+
+			-- 625 = 25m, which is > 24m threshold — SHOULD penalize
+			local score2 = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 625, breed_special, nil)
+			assert.are.equal(-95, score2) -- 5 - 100
+		end)
+	end)
+
 	-- #69: friendly mastiff-pinned targets should be de-prioritized, not boosted.
 	describe("friendly companion pin handling (#69)", function()
 		it("penalizes melee slot score for enemy pinned by friendly companion mastiff", function()

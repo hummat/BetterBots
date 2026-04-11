@@ -204,4 +204,62 @@ describe("smart_targeting", function()
 		assert.equals(1, #debug_logs)
 		assert.matches("smart targeting using bot perception target", debug_logs[1].message, 1, true)
 	end)
+
+	-- #81: settings wiring
+	it("passes through to vanilla when is_enabled returns false", function()
+		local SmartTargeting = load_smart_targeting()
+		local hook_handler
+		local stub_mod = {
+			hook_require = function(_, _path, callback)
+				callback({})
+			end,
+			hook = function(_, _, _method_name, handler)
+				hook_handler = handler
+			end,
+		}
+
+		SmartTargeting.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_enabled = function()
+				return false
+			end,
+		})
+		SmartTargeting.register_hooks()
+
+		local targeting_data = { unit = "vanilla_target" }
+		local original_called = false
+		local self = {
+			_unit_data_extension = {
+				read_component = function()
+					return { target_enemy = "bot_target" }
+				end,
+			},
+			_smart_targeting_extension = {
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				targeting_data = function()
+					return targeting_data
+				end,
+			},
+			_component = {},
+		}
+
+		hook_handler(function()
+			original_called = true
+		end, self, 0.1, 99)
+
+		assert.is_true(original_called)
+		-- targeting_data.unit should remain unchanged (vanilla passthrough)
+		assert.equals("vanilla_target", targeting_data.unit)
+	end)
 end)

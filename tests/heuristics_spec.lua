@@ -1,5 +1,7 @@
 local helper = require("test_helper")
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+Heuristics.init({ combat_ability_identity = CombatAbilityIdentity })
 
 local ctx = helper.make_context
 local evaluate = Heuristics.evaluate_heuristic
@@ -1414,6 +1416,251 @@ describe("heuristics", function()
 		end)
 	end)
 
+	-- interaction protection branches (#37 Task 3)
+	describe("interaction protection", function()
+		local eval_item = Heuristics.evaluate_item_heuristic
+
+		describe("ogryn_taunt", function()
+			it("activates with ally interacting and 1 enemy", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						toughness_pct = 0.50,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+
+			it("blocks when too fragile overrides interactor protection", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 2,
+						toughness_pct = 0.15,
+						health_pct = 0.25,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("too_fragile", rule)
+			end)
+
+			it("holds with 0 enemies despite ally interacting", function()
+				local ok, rule = evaluate(
+					"ogryn_taunt_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 0,
+						toughness_pct = 0.50,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("low_value", rule)
+			end)
+		end)
+
+		describe("force_field", function()
+			it("activates with ranged threats during interaction", function()
+				local ok, rule = eval_item(
+					"psyker_force_field",
+					ctx({
+						ally_interacting = true,
+						ranged_count = 1,
+						num_nearby = 0,
+						target_enemy = "unit",
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+
+			it("activates with 2+ melee during interaction", function()
+				local ok, rule = eval_item(
+					"psyker_force_field",
+					ctx({
+						ally_interacting = true,
+						ranged_count = 0,
+						num_nearby = 2,
+						target_enemy = "unit",
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("zealot_relic", function()
+			it("activates with ally interacting and allies in coherency", function()
+				local ok, rule = eval_item(
+					"zealot_relic",
+					ctx({
+						ally_interacting = true,
+						allies_in_coherency = 1,
+						num_nearby = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("drone", function()
+			it("activates at lowered threshold with ally interacting", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+						allies_in_coherency = 2,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("team_horde", rule)
+			end)
+
+			it("holds at 3 enemies without ally interacting", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 3,
+						allies_in_coherency = 2,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("hold", rule)
+			end)
+		end)
+
+		describe("stimm_field", function()
+			it("activates unconditionally with ally interacting", function()
+				local ok, rule = eval_item(
+					"broker_ability_stimm_field",
+					ctx({
+						ally_interacting = true,
+						allies_in_coherency = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("stimm_protect_interactor", rule)
+			end)
+		end)
+
+		describe("adamant_shout", function()
+			it("activates with 1 enemy during interaction", function()
+				local ok, rule = evaluate(
+					"adamant_shout",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("veteran_voc", function()
+			it("activates with 1 enemy during interaction", function()
+				local ok, rule = evaluate(
+					"veteran_combat_ability",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						toughness_pct = 0.90,
+					}),
+					{
+						ability_extension = helper.make_veteran_ability_extension("squad_leader", "veteran_shout"),
+						conditions = helper.make_conditions(false),
+					}
+				)
+				assert.is_true(ok)
+				assert.matches("protect_interactor", rule)
+			end)
+		end)
+
+		describe("charge suppression", function()
+			it("zealot_dash blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+						target_ally_needs_aid = true,
+						target_ally_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("zealot_dash does not block when ally beyond 12m", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 15,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+						target_ally_needs_aid = true,
+						target_ally_distance = 10,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("ally_aid", rule)
+			end)
+
+			it("zealot_dash overrides ally_aid when protecting interactor", function()
+				local ok, rule = evaluate(
+					"zealot_dash",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 6,
+						target_enemy = "enemy",
+						target_enemy_distance = 8,
+						target_ally_needs_aid = true,
+						target_ally_distance = 5,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("ogryn_charge blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"ogryn_charge",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+
+			it("adamant_charge blocks when ally interacting within 12m", function()
+				local ok, rule = evaluate(
+					"adamant_charge",
+					ctx({
+						ally_interacting = true,
+						ally_interacting_distance = 8,
+						target_enemy = "enemy",
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_protecting_interactor", rule)
+			end)
+		end)
+	end)
+
 	-- unknown template
 	describe("unknown template", function()
 		it("returns nil with unhandled rule", function()
@@ -1436,6 +1683,35 @@ describe("heuristics", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
 			assert.is_false(result)
 			assert.matches("hold", rule)
+		end)
+
+		it("revalidation hysteresis relaxes frag horde threshold by one nearby", function()
+			-- Frag needs num_nearby >= 6 on the initial check. At 5 nearby
+			-- the default call should hold, but once the bot has committed
+			-- to an aim window the revalidation check must accept to avoid
+			-- aborting an already-queued throw over a one-enemy dip.
+			local baseline = helper.make_context({ num_nearby = 5, challenge_rating_sum = 3.0 })
+			local baseline_result = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", baseline)
+			assert.is_false(baseline_result)
+
+			local revalidate = helper.make_context({ num_nearby = 5, challenge_rating_sum = 3.0 })
+			local relaxed_result, relaxed_rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", revalidate, { revalidation = true })
+			assert.is_true(relaxed_result)
+			assert.matches("horde", relaxed_rule)
+			-- The relaxation must not mutate the caller's context.
+			assert.equals(5, revalidate.num_nearby)
+		end)
+
+		it("revalidation hysteresis does not rescue truly empty context", function()
+			-- Threshold relaxation is one enemy, not unbounded: 0 nearby
+			-- must still hold even on the revalidation path.
+			local local_ctx = helper.make_context({ num_nearby = 0, challenge_rating_sum = 0 })
+			local result, rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx, { revalidation = true })
+			assert.is_false(result)
+			assert.matches("hold", rule)
+			assert.equals(0, local_ctx.num_nearby)
 		end)
 
 		it("returns false for nil context", function()
@@ -1817,6 +2093,108 @@ describe("heuristics", function()
 				assert.is_false(ok_con)
 			end)
 		end)
+
+		describe("interaction protection - grenade thresholds", function()
+			local evaluate_grenade = Heuristics.evaluate_grenade_heuristic
+
+			it("horde grenade activates at lower threshold with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"veteran_frag_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 5,
+						challenge_rating_sum = 2.5,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("horde", rule)
+			end)
+
+			it("horde grenade holds at normal threshold without ally interacting", function()
+				local ok = evaluate_grenade(
+					"veteran_frag_grenade",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 5,
+						challenge_rating_sum = 2.5,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_false(ok)
+			end)
+
+			it("chain_lightning activates at lower crowd with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"psyker_chain_lightning",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("crowd", rule)
+			end)
+
+			it("chain_lightning holds at normal threshold without ally interacting", function()
+				local ok = evaluate_grenade(
+					"psyker_chain_lightning",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 3,
+					})
+				)
+				assert.is_false(ok)
+			end)
+
+			it("defensive grenade activates at lower count with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"veteran_smoke_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 3,
+						toughness_pct = 0.30,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("pressure", rule)
+			end)
+
+			it("mine activates at lower density with ally interacting", function()
+				local ok, rule = evaluate_grenade(
+					"adamant_shock_mine",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 4,
+						challenge_rating_sum = 3.0,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("hold_point", rule)
+			end)
+
+			it("single-target blitz unchanged with ally interacting", function()
+				local ok_with = evaluate_grenade(
+					"veteran_krak_grenade",
+					ctx({
+						ally_interacting = true,
+						num_nearby = 1,
+						target_enemy_distance = 8,
+					})
+				)
+				local ok_without = evaluate_grenade(
+					"veteran_krak_grenade",
+					ctx({
+						ally_interacting = false,
+						num_nearby = 1,
+						target_enemy_distance = 8,
+					})
+				)
+				assert.equals(ok_with, ok_without)
+			end)
+		end)
 	end)
 
 	describe("build_context", function()
@@ -1825,12 +2203,14 @@ describe("heuristics", function()
 		local saved_script_unit
 		local saved_alive
 		local liquid_results_return_mode
+		local side_system
 		local current_fixed_t
 		local captured_liquid_results
 		local script_unit_extensions
 
 		before_each(function()
 			liquid_results_return_mode = "table"
+			side_system = nil
 			current_fixed_t = 42
 			captured_liquid_results = {}
 			saved_managers = rawget(_G, "Managers")
@@ -1843,27 +2223,35 @@ describe("heuristics", function()
 				state = {
 					extension = {
 						system = function(_, system_name)
-							assert.equals("liquid_area_system", system_name)
-							return {
-								find_liquid_areas_in_position = function(_, position, results)
-									assert.equals("hazard_pos", position)
-									captured_liquid_results[#captured_liquid_results + 1] = results
-									results[1] = {
-										source_side_name = function()
-											return "enemy"
-										end,
-										area_template_name = function()
-											return "cultist_grenadier_gas"
-										end,
-									}
+							if system_name == "liquid_area_system" then
+								return {
+									find_liquid_areas_in_position = function(_, position, results)
+										captured_liquid_results[#captured_liquid_results + 1] = results
 
-									if liquid_results_return_mode == "number" then
-										return 1
-									end
+										if position == "hazard_pos" then
+											results[1] = {
+												source_side_name = function()
+													return "enemy"
+												end,
+												area_template_name = function()
+													return "cultist_grenadier_gas"
+												end,
+											}
 
-									return results
-								end,
-							}
+											if liquid_results_return_mode == "number" then
+												return 1
+											end
+										end
+
+										return results
+									end,
+								}
+							end
+							if system_name == "side_system" then
+								return side_system
+							end
+
+							assert.is_true(false, "unexpected system lookup: " .. tostring(system_name))
 						end,
 					},
 				},
@@ -1892,6 +2280,7 @@ describe("heuristics", function()
 				is_testing_profile = function()
 					return false
 				end,
+				combat_ability_identity = CombatAbilityIdentity,
 			})
 		end)
 
@@ -1976,6 +2365,247 @@ describe("heuristics", function()
 
 			assert.equals(1, context.ranged_count)
 			assert.equals(0, context.melee_count)
+		end)
+
+		it("defaults when no allies are interacting", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot" },
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interacting_distance)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("detects shield interactions via interacting character state", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "interacting" }
+							end
+							if component_name == "interacting_character_state" then
+								return { interaction_template = "scanning" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("scanning", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects shield interactions via minigame character state", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("minigame", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects escort interactions via luggable slot", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "walking" }
+							end
+							if component_name == "inventory" then
+								return { wielded_slot = "slot_luggable" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("luggable", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("escort", context.ally_interaction_profile)
+		end)
+
+		it("skips self when scanning ally interactions", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot" },
+					},
+				},
+			}
+			script_unit_extensions = {
+				hazard_bot = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("ignores non-shield interaction types", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "interacting" }
+							end
+							if component_name == "interacting_character_state" then
+								return { interaction_template = "ammunition" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("ignores dead allies", function()
+			side_system = {
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			}
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_false(context.ally_interacting)
+			assert.is_nil(context.ally_interaction_type)
+			assert.is_nil(context.ally_interacting_unit)
+			assert.is_nil(context.ally_interaction_profile)
+		end)
+
+		it("picks the closest interacting ally", function()
+			side_system = {
+				side_by_unit = {
+					bot_unit = {
+						valid_player_units = { "bot_unit", "far_ally", "close_ally" },
+					},
+				},
+			}
+			_G.ALIVE.far_ally = true
+			_G.ALIVE.close_ally = true
+			_G.POSITION_LOOKUP.bot_unit = { x = 0, y = 0, z = 0 }
+			_G.POSITION_LOOKUP.far_ally = { x = 20, y = 0, z = 0 }
+			_G.POSITION_LOOKUP.close_ally = { x = 5, y = 0, z = 0 }
+			script_unit_extensions = {
+				far_ally = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+				close_ally = {
+					unit_data_system = {
+						read_component = function(_, component_name)
+							if component_name == "character_state" then
+								return { state_name = "minigame" }
+							end
+						end,
+					},
+				},
+			}
+
+			local context = Heuristics.build_context("bot_unit", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("close_ally", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+			assert.is_true(math.abs(context.ally_interacting_distance - 5) < 0.001)
 		end)
 	end)
 
@@ -2142,6 +2772,158 @@ describe("heuristics", function()
 				assert.are.equal(ok_default, ok_balanced)
 				assert.are.equal(rule_default, rule_balanced)
 			end
+		end)
+	end)
+
+	-- Issue #17: Dormant daemonhost must not be treated as a priority target.
+	-- The bot's target_enemy can be a dormant daemonhost (vanilla target
+	-- selection quirk); in that case every monster-aware heuristic must
+	-- refuse to fire. Once the daemonhost aggroes on the bot, normal
+	-- self-defense behavior resumes (ctx.target_is_dormant_daemonhost=false).
+	describe("dormant daemonhost carve-out (#17)", function()
+		-- Every template that uses the _grenade_priority_target dispatch or
+		-- the _grenade_assail monster fast-path. Each must refuse the decision
+		-- when target_is_dormant_daemonhost is true, and resume normal
+		-- self-defense when the DH has aggroed on this bot (flag=false).
+		describe("priority-target grenades/blitzes", function()
+			local priority_grenades = {
+				{ template = "psyker_smite", distance = 12, peril_pct = 0.30 },
+				{ template = "psyker_throwing_knives", distance = 10, peril_pct = 0.30 },
+				{ template = "veteran_krak_grenade", distance = 10 },
+				{ template = "zealot_throwing_knives", distance = 10 },
+				{ template = "ogryn_grenade_friend_rock", distance = 12 },
+				{ template = "broker_missile_launcher", distance = 14 },
+			}
+
+			for _, grenade in ipairs(priority_grenades) do
+				it("refuses " .. grenade.template .. " against dormant daemonhost", function()
+					local result, rule = Heuristics.evaluate_grenade_heuristic(
+						grenade.template,
+						helper.make_context({
+							target_enemy = "daemonhost_unit",
+							target_is_monster = true,
+							target_is_dormant_daemonhost = true,
+							target_enemy_distance = grenade.distance,
+							peril_pct = grenade.peril_pct,
+						})
+					)
+					assert.is_false(result)
+					assert.matches("daemonhost", rule)
+				end)
+
+				it("approves " .. grenade.template .. " when daemonhost aggroed on bot", function()
+					-- target_is_dormant_daemonhost=false means DH is either
+					-- not a DH, or it is aggroed on this specific bot. Either
+					-- way, self-defense behavior must still fire.
+					local result, rule = Heuristics.evaluate_grenade_heuristic(
+						grenade.template,
+						helper.make_context({
+							target_enemy = "daemonhost_unit",
+							target_is_monster = true,
+							target_is_dormant_daemonhost = false,
+							target_enemy_distance = grenade.distance,
+							peril_pct = grenade.peril_pct,
+						})
+					)
+					assert.is_true(result)
+					assert.matches("priority", rule)
+				end)
+			end
+		end)
+
+		describe("adamant_stance monster_pressure", function()
+			it("refuses monster_pressure clause against dormant daemonhost", function()
+				local ok, rule = evaluate(
+					"adamant_stance",
+					ctx({
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+						target_enemy_distance = 5,
+						toughness_pct = 0.80,
+						num_nearby = 0,
+					})
+				)
+				assert.is_false(ok)
+				assert.is_not.matches("monster_pressure", rule or "")
+			end)
+
+			it("keeps monster_pressure clause against aggroed daemonhost", function()
+				local ok, rule = evaluate(
+					"adamant_stance",
+					ctx({
+						target_is_monster = true,
+						target_is_dormant_daemonhost = false,
+						target_enemy_distance = 5,
+						toughness_pct = 0.80,
+						num_nearby = 0,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("monster_pressure", rule)
+			end)
+		end)
+
+		describe("adamant_area_buff_drone monster_fight", function()
+			local eval_item = Heuristics.evaluate_item_heuristic
+
+			it("refuses drone monster_fight against dormant daemonhost", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						num_nearby = 1,
+						allies_in_coherency = 1,
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+					})
+				)
+				assert.is_false(ok)
+				assert.is_not.matches("monster", rule or "")
+			end)
+
+			it("keeps drone monster_fight against aggroed daemonhost", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						num_nearby = 1,
+						allies_in_coherency = 1,
+						target_is_monster = true,
+						target_is_dormant_daemonhost = false,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("monster", rule)
+			end)
+		end)
+
+		describe("daemonhost_avoidance setting toggle", function()
+			after_each(function()
+				-- Restore default (avoidance enabled) for the rest of the suite.
+				Heuristics.init({
+					combat_ability_identity = CombatAbilityIdentity,
+				})
+			end)
+
+			it("does not block dormant DH when avoidance is disabled", function()
+				Heuristics.init({
+					combat_ability_identity = CombatAbilityIdentity,
+					is_daemonhost_avoidance_enabled = function()
+						return false
+					end,
+				})
+
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"psyker_smite",
+					helper.make_context({
+						target_enemy = "daemonhost_unit",
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+						target_enemy_distance = 12,
+						peril_pct = 0.30,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("priority", rule)
+			end)
 		end)
 	end)
 end)

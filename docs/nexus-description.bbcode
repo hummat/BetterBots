@@ -20,14 +20,15 @@ BetterBots picks up where Fatshark left off: we populate the condition tables, i
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
 
-[size=3][b]New in v0.9.1[/b][/size]
+[size=3][b]New in v0.10.0 — Team Coordination[/b][/size]
 
 [list]
-[*][b]Bot-optimized builds:[/b] Overhauled bot profiles with curated builds from hadrons-blessing — Martyrdom Zealot, Indomitable Ogryn, Voidblast Psyker, plus improved Veteran. Full talent trees with blessed weapons and perks.
-[*][b]Ammo policy:[/b] Configurable bot ranged ammo threshold and human ammo reserve guard. Bots fire more freely above threshold and defer ammo pickups when you're low.
-[*][b]Grenade melee gate:[/b] Bots no longer swap to grenades while actively engaged in melee — prevents suicidal grenade throws at point-blank range.
-[*][b]Mastiff targeting fixes:[/b] Whistle gated on mastiff position (#70), friendly mastiff pins de-prioritized in targeting (#69).
-[*][b]Stability fixes:[/b] Consolidated hook_require calls (#67), Tertium None yield guard (#68), hardened VFX suppression and engagement leash edge cases.
+[*][b]Revive with ability (#7):[/b] Bots activate defensive abilities — dash, shout, stealth — before reviving downed allies, so revive attempts survive pressure instead of getting interrupted.
+[*][b]Team cooldown staggering (#14):[/b] Per-ability cooldown windows stop the whole squad from blowing stances and shouts on the same wave. Emergencies (low health, disabled ally) override the stagger.
+[*][b]Objective-aware activation (#37):[/b] Bots now protect allies interacting with pickups, scriptures, grimoires, and mission interactables by triggering stances and shouts when the interactor is threatened.
+[*][b]Arbites companion-command tag (#49):[/b] Smart tag steers the Cyber-Mastiff onto priority targets — disablers, ogryns, specials — instead of drifting onto trash.
+[*][b]Expanded settings surface (#81 + #83):[/b] More slider-with-zero controls, grouped section headers, reliable dropdown labels, a gilded mod entry, and a full startup value dump for diagnosing config issues.
+[*][b]Daemonhost heuristic carve-out (#17):[/b] The first live daemonhost spawn during v0.10.0 testing exposed a gap where grenade and blitz decisions bypassed the behavior-tree wrappers. New global aggro check gates 5 heuristic sites against dormant DH targets.
 [/list]
 
 [size=3][b]What works[/b][/size]
@@ -94,6 +95,7 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz)
 [*][color=green]✓[/color] Ability settings surface (category toggles + 4 behavior presets + feature gates)
 [*][color=green]✓[/color] Bot-optimized class profiles with full talent trees + weapon blessings/perks (redesigned in v0.9.1)
+[*][color=green]✓[/color] Team cooldown staggering (per-ability, emergency override)
 [*]Hive Scum validation (DLC-blocked)
 [/list]
 
@@ -109,6 +111,9 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][color=green]✓[/color] Combat engagement leash (coherency-anchored, post-charge grace)
 [*][color=green]✓[/color] Mastiff-pounce priority
 [*][color=green]✓[/color] Healing deferral (health stations + med-crates)
+[*][color=green]✓[/color] Revive-with-ability (defensive ability before downed-ally revive)
+[*][color=green]✓[/color] Objective-aware ability activation (pickups, scriptures, grimoires, interactables)
+[*][color=green]✓[/color] Arbites Cyber-Mastiff companion-command smart tag
 [/list]
 
 [b]Bot weapon/equipment fixes[/b]
@@ -160,7 +165,8 @@ Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]inject
 
 [b]Vanilla bot limitations being addressed:[/b]
 [list]
-[*][b]Objective-aware abilities[/b] — bots don't yet adjust ability usage to protect allies interacting with objectives. ([url=https://github.com/hummat/BetterBots/issues/37]#37[/url])
+[*][b]Weapon-aware ADS[/b] — bots don't yet switch to hipfire for short-range or flamer weapons. ([url=https://github.com/hummat/BetterBots/issues/41]#41[/url])
+[*][b]Sustained fire[/b] — bots tap-fire held-fire weapons like flamers instead of holding the trigger. ([url=https://github.com/hummat/BetterBots/issues/87]#87[/url])
 [/list]
 
 [b]Other limitations:[/b]

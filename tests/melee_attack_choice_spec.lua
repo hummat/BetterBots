@@ -165,4 +165,35 @@ describe("melee_attack_choice", function()
 		assert.matches("melee choice light_attack vs unarmored target", debug_logs[1].message, 1, true)
 		_G.Armor = nil
 	end)
+
+	-- #81: settings wiring
+	it("disables horde light bias when melee_horde_light_bias=0", function()
+		local MeleeAttackChoice = load_module()
+		MeleeAttackChoice.init({
+			mod = nil,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			melee_horde_light_bias = function()
+				return 0
+			end,
+		})
+
+		-- With bias=0, light should NOT get the extra bias in unarmored hordes.
+		-- Both light (arc=0) and heavy (arc=2,penetrating) compete on base utility only.
+		local weapon_meta_data = {
+			light_attack = attack_meta({ arc = 0, penetrating = false }),
+			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
+		}
+
+		-- With 4 unarmored enemies and bias=0, the heavy's wide arc + penetrating
+		-- should beat the light since the light bias is gone.
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, 1, 4, ARMORED)
+		assert.equals(weapon_meta_data.heavy_attack, chosen)
+	end)
 end)

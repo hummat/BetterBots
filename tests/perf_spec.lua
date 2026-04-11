@@ -79,4 +79,23 @@ describe("perf", function()
 
 		assert.is_nil(Perf.report_and_reset())
 	end)
+
+	it("records breakdown tags without inflating headline totals", function()
+		_setting_enabled = true
+		Perf.enter_run()
+
+		Perf.mark_bot_frame()
+		Perf.finish("grenade_fallback", Perf.begin(), 0.0003)
+		Perf.finish("grenade_fallback.build_context", Perf.begin(), 0.0001, { include_total = false })
+		Perf.finish("grenade_fallback.heuristic", Perf.begin(), 0.00005, { include_total = false })
+
+		local report = Perf.report_and_reset()
+		assert.is_not_nil(report)
+		assert.equals(1, report.bot_frames)
+		assert.equals(1, report.total_calls)
+		assert.equals(300, math.floor(report.total_us_per_bot_frame + 0.5))
+		assert.equals(300, math.floor(report.tags.grenade_fallback.total_us + 0.5))
+		assert.equals(100, math.floor(report.tags["grenade_fallback.build_context"].total_us + 0.5))
+		assert.equals(50, math.floor(report.tags["grenade_fallback.heuristic"].total_us + 0.5))
+	end)
 end)

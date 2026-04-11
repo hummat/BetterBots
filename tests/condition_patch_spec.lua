@@ -58,6 +58,7 @@ end
 rawset(_G, "require", _mock_require)
 
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
+local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local ConditionPatch = dofile("scripts/mods/BetterBots/condition_patch.lua")
 
 -- Restore require
@@ -236,10 +237,25 @@ describe("condition_patch", function()
 			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
 
-		it("returns false when target daemonhost is aggroed", function()
+		it("returns false when target daemonhost is aggroed (any target)", function()
+			-- Once any daemonhost transitions to aggroed, it is fair game
+			-- for every bot in the group. The group must commit — trying to
+			-- run from a triggered DH does not work in Darktide.
 			local target = "dh_aggro"
 			setup_breed(target, "chaos_daemonhost")
 			_blackboards[target] = { perception = { aggro_state = "aggroed" } }
+			local bb = make_blackboard(target)
+			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns false when daemonhost is aggroed regardless of which unit is targeted", function()
+			-- Explicit check that target_unit identity doesn't matter — any
+			-- aggro lifts dormancy for every bot so the group fights together.
+			local target = "dh_aggroed_other"
+			setup_breed(target, "chaos_daemonhost")
+			_blackboards[target] = {
+				perception = { aggro_state = "aggroed", target_unit = "player1" },
+			}
 			local bb = make_blackboard(target)
 			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
@@ -337,11 +353,118 @@ describe("condition_patch", function()
 				end,
 			}
 
-			ConditionPatch._install_condition_patch(conditions, {}, "test")
+			ConditionPatch._install_condition_patch(conditions, {}, "test_aggroed_any")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
 			assert.is_true(result)
 			assert.is_true(orig_called)
+		end)
+
+		it("allows melee when daemonhost is aggroed on a different unit", function()
+			-- The whole group must commit once DH aggroes on anyone — not
+			-- just the bot that drew aggro. No bot-relative gating here.
+			local target = "dh_other_aggro"
+			setup_breed(target, "chaos_daemonhost")
+			_blackboards[target] = {
+				perception = { aggro_state = "aggroed", target_unit = "bot2" },
+			}
+
+			local bb = make_blackboard(target)
+			local orig_called = false
+			local conditions = {
+				bot_in_melee_range = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_other_unit")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_true(result)
+			assert.is_true(orig_called)
+		end)
+
+		it("allows melee against dormant daemonhost when avoidance is disabled", function()
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "none"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+				is_daemonhost_avoidance_enabled = function()
+					return false
+				end,
+			})
+
+			local target = "dh_avoidance_off"
+			setup_breed(target, "chaos_daemonhost")
+
+			local bb = make_blackboard(target)
+			local orig_called = false
+			local conditions = {
+				bot_in_melee_range = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_dh_off")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_true(result) -- not suppressed when avoidance disabled
+			assert.is_true(orig_called) -- original was called
+
+			-- Re-init without the gate for other tests
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function(key, fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return _debug_enabled_result
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "none"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+			})
 		end)
 
 		it("suppresses ranged against dormant daemonhost target", function()
@@ -649,6 +772,132 @@ describe("condition_patch", function()
 
 			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
 			assert.is_false(result)
+		end)
+
+		it("passes the veteran shout semantic key into the team cooldown lookup", function()
+			-- Regression for #14 / c7c9954: team cooldown family lookups must use
+			-- identity.semantic_key (veteran_combat_ability_shout), not the raw
+			-- engine template_name (veteran_combat_ability) — otherwise Veteran
+			-- shout bots never match the aoe_shout category map.
+			local unit = "vet_bot"
+			_extensions[unit] = {
+				unit_data_system = {
+					read_component = function(_self, component_name)
+						assert.equals("combat_ability_action", component_name)
+						return { template_name = "veteran_combat_ability" }
+					end,
+				},
+				ability_system = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+					_equipped_abilities = {
+						combat_ability = {
+							name = "veteran_combat_ability_shout",
+							ability_template_tweak_data = { class_tag = "squad_leader" },
+						},
+					},
+				},
+				action_input_system = {
+					_action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								veteran_combat_ability = {
+									combat_ability_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			local recorded_team_key
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true, "veteran_voc_surrounded", {}
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function(_u, team_key, _t, _rule)
+						recorded_team_key = team_key
+						return false
+					end,
+				},
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+
+			local ability_templates = {
+				veteran_combat_ability = {
+					ability_meta_data = {
+						activation = {
+							action_input = "combat_ability_pressed",
+						},
+					},
+				},
+			}
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				{ behavior = {}, perception = {} },
+				{},
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			-- Restore the module-level base wiring so later tests in this spec
+			-- don't inherit the CombatAbilityIdentity and stub dependencies
+			-- injected above.
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return false
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.equals("veteran_combat_ability_shout", recorded_team_key)
+			assert.is_true(result)
 		end)
 	end)
 end)

@@ -11,35 +11,40 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 
 > **Solo Play only.** Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. It does **not** work in public matchmaking or any other online mode.
 
-## v0.7.0 highlights
+## Highlights
 
-- Grenade/blitz heuristics are now live, including Psyker Assail, Smite, and Chain Lightning support
-- Bots react to player tags, hazards, bosses targeting them, and poxbursters near human players
-- New in-game settings surface: `standard/testing` profile, tier toggles, grenade/blitz toggle, healing deferral controls
-- Tiered logging and optional JSONL/perf diagnostics for post-run validation
+- Bot-optimized class profiles with curated builds (weapons, talents, blessings, perks)
+- Ammo awareness: bots defer ammo pickups when humans are low
+- Engagement leash: bots stay in combat longer using coherency-based ranges
+- Team ability cooldown staggering to prevent simultaneous activations
+- Healing deferral: bots let humans heal first at health stations and med-crates
+- 4 aggression presets (testing / aggressive / balanced / conservative)
+- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
+- Smart targeting, daemonhost avoidance, and poxburster safety toggles
+- 750 unit tests, 35 modules
 
 ## What bots can do with this mod
 
-**Stance abilities (reliable):**
+**Stance abilities:**
 - Veteran: Executioner's Stance / Voice of Command
 - Psyker: Scrier's Gaze
 - Ogryn: Point-Blank Barrage
 - Arbites: Castigator's Stance
-- Hive Scum: Enhanced Desperado / Rampage
+- Hive Scum: Enhanced Desperado / Rampage (DLC-blocked for validation)
 
-**Dash / shout / stealth abilities (reliable):**
+**Dash / shout / stealth abilities:**
 - Veteran: Infiltrate (stealth)
 - Zealot: Fury of the Faithful (dash), Shroudfield (stealth)
 - Ogryn: Bull Rush (charge), Loyal Protector (taunt)
 - Psyker: Venting Shriek (shout)
-- Arbites: Break the Line (charge)
+- Arbites: Break the Line (charge), Arbites Shout
 
-**Item-based abilities (reliable):**
+**Item-based abilities:**
 - Zealot: Bolstering Prayer (relic) — activates when allies need toughness
 - Psyker: Telekine Shield (all 3 variants) — deploys under sustained fire
 - Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
 
-**Grenade / blitz support (reliable):**
+**Grenade / blitz support:**
 - Standard grenades: frag, krak, smoke, fire, shock, cluster, friend rock, flash, tox
 - Zealot: Throwing Knives
 - Arbites: Remote Detonation (whistle), Shock Mine
@@ -47,14 +52,44 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Hive Scum: Missile Launcher (DLC-blocked for validation)
 
 **Smart trigger conditions:**
-Bots use per-ability heuristics to decide when to activate — based on enemy count, threat level, health/toughness, distance, and ally state. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
+Bots use 18 per-ability heuristic functions to decide when to activate — based on enemy count, threat level, health/toughness, distance, ally state, and more. Each ability has specific activate/block conditions tuned per preset.
 
-**In-game settings and diagnostics:**
-- `standard` / `testing` behavior profile
-- Tier 1 / Tier 2 / Tier 3 / grenade-blitz enable toggles
+**Bot combat behavior:**
+- Sprint to catch up, rescue allies, and traverse
+- Daemonhost avoidance (combat + sprint suppression near dormant DH)
+- Elite/special pinging with LOS checks and tag hold logic
+- Arbites companion (dog) targeting via smart tags
+- Boss engagement self-defense exception
+- Poxburster safe targeting (close-range fire suppression)
+- Distant special melee chase penalty (prefer ranged)
+- Melee attack selection (lights into hordes, heavies into armor)
+- Smart blitz targeting from bot perception
+- Pre-revive defensive ability activation
+- Team ability cooldown staggering
+- Coherency-anchored engagement leash
+
+**Bot profiles and equipment:**
+- Per-slot class selection (veteran, zealot, psyker, ogryn)
+- Curated weapon/talent/blessing/perk builds per class
+- Weapon quality scaling (auto scales with difficulty, or manual override)
+- ADS fix for Tertium 5/6 bots
+- Warp charge venting for Psyker staves
+- VFX/SFX bleed suppression
+
+**In-game settings:**
+- Aggression preset: testing / aggressive / balanced / conservative
+- Ability category toggles: stances, charges, shouts, stealth, deployables, grenades
+- Sprint catch-up distance (slider, 0 = disable)
+- Special chase penalty range (slider, 0 = disable)
+- Player tag response strength (slider, 0 = ignore pings)
+- Melee horde light bias (slider, 0 = vanilla attack selection)
+- Smart blitz targeting toggle
+- Daemonhost avoidance toggle
+- Poxburster safe targeting toggle
+- Bot ranged ammo threshold and human ammo reserve threshold
 - Healing deferral mode + thresholds
-- `Info / Debug / Trace` log levels
-- Optional JSONL event log and `/bb_perf` runtime timing
+- Bot profiles: class per slot, weapon quality
+- Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
 
 ## Roadmap
 
@@ -63,34 +98,44 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 **Ability activation**
 - [x] Stance, dash, charge, shout, stealth abilities (all 6 classes)
 - [x] Item-based abilities (relic, force field, drone)
-- [x] Smart per-ability trigger heuristics
+- [x] Smart per-ability trigger heuristics (18 functions)
 - [x] Safety guards (revive protection, suppression, warp peril block)
-- [x] Grenade / blitz support
-- [~] Ability settings surface (partial: profile + tier/grenade toggles shipped; full per-ability toggles still open)
+- [x] Grenade / blitz support (all templates)
+- [x] Settings surface (presets, category toggles, per-feature sliders)
+- [x] Pre-revive defensive ability activation
+- [x] Team ability cooldown staggering
 - [ ] Hive Scum validation (DLC-blocked)
 
 **Bot combat behavior**
 - [x] Charge/dash to rescue disabled allies
-- [x] Bot sprinting
-- [x] Daemonhost avoidance
+- [x] Bot sprinting (configurable distance)
+- [x] Daemonhost avoidance (togglable)
 - [x] Bot pinging of elites/specials
+- [x] Arbites companion (dog) targeting
 - [x] Boss engagement discipline
 - [x] Poxburster targeting
-- [x] Stop chasing distant specials
-
-**Bot weapon/equipment fixes**
-- [x] Fix ADS for Tertium 5/6 bots
-- [x] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
-- [x] Bot warp charge venting
-- [x] Suppress bot VFX/SFX bleed to human player
-- [x] Smart melee attack selection (armor-aware)
-- [x] Tiered logging + event/perf diagnostics
+- [x] Distant special chase penalty (configurable range)
+- [x] Coherency-anchored engagement leash
+- [x] Smart blitz targeting (togglable)
+- [ ] Objective-aware activation (awaiting validation)
 - [ ] Weapon/enemy-aware ADS vs hip-fire
 
+**Bot equipment and profiles**
+- [x] Bot-optimized class profiles with curated builds
+- [x] ADS fix for Tertium 5/6 bots
+- [x] Ranged weapon fixes (plasma gun, staves)
+- [x] Bot warp charge venting
+- [x] VFX/SFX bleed suppression
+- [x] Smart melee attack selection (armor-aware, configurable bias)
+- [x] Ammo awareness (bot + human thresholds)
+- [x] Healing deferral
+
 **Long-term**
-- [ ] Utility-based ability scoring
+- [ ] Talent-aware bot behavior
+- [ ] Human-likeness (jitter, reaction times, difficulty scaling)
 - [ ] Healing item management
 - [ ] Weapon special actions (parry, bayonet)
+- [ ] Utility-based ability scoring
 
 See [Status Snapshot](docs/dev/status.md) and [Validation Tracker](docs/dev/validation-tracker.md) for detailed evidence.
 
@@ -151,7 +196,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (if `tests/` exists) |
+| `make test` | Run busted tests (750 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -201,27 +246,47 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 
 ```text
 BetterBots.mod                    # DMF entry point
-scripts/mods/BetterBots/          # Mod source
-  BetterBots.lua                  #   Orchestrator: init, module loading, update tick
-  condition_patch.lua             #   Ability condition evaluation + vent hysteresis fix
-  ability_queue.lua               #   Fallback combat ability activation loop
-  weapon_action.lua               #   Weapon hooks: overheat bridge, vent, peril guard, _may_fire
-  poxburster.lua                  #   Poxburster targeting + close-range suppression
-  vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
+bb-log                            # Log analysis CLI
+scripts/mods/BetterBots/          # Mod source (35 modules)
+  BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
+  condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
+  ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
   heuristics.lua                  #   18 per-ability trigger functions + context builder
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
+  grenade_fallback.lua            #   Grenade throw state machine (wield/aim/throw/unwield)
+  settings.lua                    #   Presets, category/feature gates, slider readers
+  bot_profiles.lua                #   Bot-optimized class profiles per slot
+  bot_targeting.lua               #   Shared perception target resolver + helpers
+  sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
+  target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
+  melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
+  weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix
+  ping_system.lua                 #   Bot elite/special pinging
+  companion_tag.lua               #   Arbites Cyber-Mastiff companion-command smart tag
+  smart_targeting.lua             #   Precision blitz target seeding from perception
+  poxburster.lua                  #   Poxburster targeting + close-range suppression
+  engagement_leash.lua            #   Coherency-anchored melee engagement range
+  healing_deferral.lua            #   Defer health stations/med-crates to humans
+  ammo_policy.lua                 #   Bot ammo pickup awareness
+  team_cooldown.lua               #   Team-level ability cooldown staggering
+  revive_ability.lua              #   Pre-revive defensive ability activation
+  vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
+  animation_guard.lua             #   Animation crash guard for bot-only item paths
+  airlock_guard.lua               #   Airlock teleport crash guard
   event_log.lua                   #   Structured JSONL event logging
   debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
+  log_levels.lua                  #   Tiered debug log level constants
+  perf.lua                        #   Per-hook runtime recorder + /bb_perf
+  shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted)
-bb-log                            # Log analysis CLI
+tests/                            # Unit tests (busted, 750 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
-docs/                             # Architecture, class refs, status
+docs/                             # Architecture, class refs, status, roadmap
 .github/
   workflows/                      # CI, release, label sync
   ISSUE_TEMPLATE/                 # Bug report, feature request

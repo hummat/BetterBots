@@ -117,6 +117,13 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)
 - `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
+- `suppressed <template> (team_cd:<category>)` (team cooldown staggering — another bot already activated the same category within the suppression window; direct validation signal for `#14`)
+- `shield (<type>) dist=<N>` / `escort (luggable) dist=<N>` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
+- `revive candidate observed: <ability> (template=<template>, need_type=<type>)` (bot selected a rescue destination while carrying a defensive revive ability; this fires before `BtBotInteractAction.enter` and distinguishes selector/path misses from interact-hook misses for `#7`)
+- `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` (bot fired a defensive ability before starting a rescue interaction; for shared veteran template this logs the equipped ability name, e.g. `veteran_combat_ability_shout`)
+- `revive_ability_skip:{no_unit_data,no_ability_ext,no_meta,no_input,no_input_ext,not_queueable}:<unit>` (six skip-reason logs inside `try_pre_revive` after the rescue-interaction gate; identifies which post-commit early return swallowed the attempt — per-bot throttle; direct diagnostic signal for `#7`)
+- `unknown_combat_template:<template_name>` (`combat_ability_identity.resolve` encountered a template not present in any of the three category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
+- `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
 
 ## Intentionally suppressed (noise reduction)
 
@@ -256,3 +263,16 @@ bb-log events holds      # false decision distribution
 bb-log events items      # item sequence success/fail
 bb-log events raw FILTER # passthrough to jq
 ```
+
+### Text-log Consume counter is profile-dependent
+
+`bb-log summary`'s "Consumes by ability" table is built from the text-log `grenade charge consumed` line, which only fires for grenade profiles whose completion signal is auto-unwield (frag, krak, fire, throwing knives, rocks, box, adamant grenades). Profiles whose completion signal is **external action confirmation** — most notably `psyker_smite` via `confirmation_action = "action_use_power"`, plus assail and chain lightning — complete the state machine via the `grenade external action confirmed` path and **never emit a consume line**. Those grenades still fire correctly; they just don't appear in the text-log Consumes table.
+
+**Authoritative counts live in the JSONL event log.** When validating "did this grenade actually fire", use:
+
+```bash
+bb-log events raw | grep '"ability":"psyker_smite"' | \
+  grep -oE '"event":"(queued|complete|blocked)"' | sort | uniq -c
+```
+
+or the equivalent `jq` filter. The `queued` → `complete` ratio tells you whether throws landed or got blocked (usually via `reason=revalidation` when density-gated templates lose the aim-window race).

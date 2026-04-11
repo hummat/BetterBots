@@ -64,6 +64,9 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
+| `shield/escort (<type>) dist=<N>` | Ally detected in objective interaction — profile, interaction type, distance. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
+| `revive candidate observed: <ability> (template=<template>, need_type=<type>)` | Bot selected a rescue destination while carrying a defensive revive ability, before `BtBotInteractAction.enter`. Use this to tell selector/path misses from interact-hook misses. Key: `revive_candidate:<ability>:<unit>` (#7) |
+| `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` | Bot fired a defensive ability before starting a rescue interaction. Key: `revive_ability:<ability>:<unit>` (#7) |
 
 **Preferred: use `bb-log`** (project root):
 ```bash
@@ -130,6 +133,11 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. `/bb_perf`
    - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
+   - `grenade_fallback` has two breakdown-only sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call in `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). They appear as rows in the tag breakdown but do not contribute to the headline `µs/bot/frame` total because the parent `grenade_fallback` timer already includes them.
+5. `/bb_reset`
+   - Resets all BetterBots settings to their code-defined defaults and saves them when the DMF save hook is available.
+   - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
+   - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
 
 ### Practical debug workflow
 

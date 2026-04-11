@@ -213,6 +213,107 @@ describe("sprint", function()
 			assert.equals("enemies_nearby", reason)
 		end)
 
+		it("shares daemonhost scan results across bots in the same frame", function()
+			local bot1 = "bot1"
+			local bot2 = "bot2"
+			local daemonhost = "daemonhost"
+			local breed_calls = 0
+
+			_positions[bot1] = pos(0, 0, 0)
+			_positions[bot2] = pos(10, 0, 0)
+			_positions[daemonhost] = pos(30, 0, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			_extensions[daemonhost].unit_data_system.breed = function()
+				breed_calls = breed_calls + 1
+				return { name = "chaos_daemonhost" }
+			end
+			-- Vanilla Side:relation_side_names returns a stable cached table
+			-- (see side.lua: Side._relation_side_names), so both bots on the
+			-- same team share the same enemy_side_names reference. Mirror that
+			-- here so the cache-by-reference check still collapses to one scan.
+			local shared_enemy_sides = { "enemy" }
+			_mock_side_system = {
+				side_by_unit = {
+					[bot1] = {
+						relation_side_names = function()
+							return shared_enemy_sides
+						end,
+					},
+					[bot2] = {
+						relation_side_names = function()
+							return shared_enemy_sides
+						end,
+					},
+				},
+				get_side_from_name = function()
+					return { ai_target_units = { daemonhost } }
+				end,
+			}
+
+			assert.is_false(Sprint.is_near_daemonhost(bot1))
+			assert.is_false(Sprint.is_near_daemonhost(bot2))
+			assert.equals(1, breed_calls)
+		end)
+
+		it("rescans when enemy_side_names reference changes in the same frame", function()
+			-- Pins the I5 fix: the daemonhost unit-list cache must key on
+			-- enemy_side_names identity, not just (fixed_t, side_system).
+			-- Without the fix, bot2's scan request silently reuses bot1's
+			-- side_a-filtered list and treats dh_a (5m from bot2) as "near",
+			-- even though bot2's real enemy side (side_b) only contains dh_b
+			-- at 30m (outside the 20m safe range).
+			local bot1 = "bot1"
+			local bot2 = "bot2"
+			local dh_a = "dh_side_a"
+			local dh_b = "dh_side_b"
+
+			_positions[bot1] = pos(0, 0, 0)
+			_positions[bot2] = pos(0, 0, 0)
+			_positions[dh_a] = pos(5, 0, 0) -- within 20m of both bots
+			_positions[dh_b] = pos(30, 0, 0) -- outside 20m of both bots
+			_alive[dh_a] = true
+			_alive[dh_b] = true
+			setup_breed(dh_a, "chaos_daemonhost")
+			setup_breed(dh_b, "chaos_daemonhost")
+
+			-- Two bots on two different teams, each with their own
+			-- enemy_side_names table reference. The mock side system returns
+			-- different enemy unit lists depending on the side name queried.
+			local enemy_sides_a = { "side_a" }
+			local enemy_sides_b = { "side_b" }
+			_mock_side_system = {
+				side_by_unit = {
+					[bot1] = {
+						relation_side_names = function()
+							return enemy_sides_a
+						end,
+					},
+					[bot2] = {
+						relation_side_names = function()
+							return enemy_sides_b
+						end,
+					},
+				},
+				get_side_from_name = function(_self, name)
+					if name == "side_a" then
+						return { ai_target_units = { dh_a } }
+					elseif name == "side_b" then
+						return { ai_target_units = { dh_b } }
+					end
+					return nil
+				end,
+			}
+
+			-- bot1 scans side_a, finds dh_a at 5m → near.
+			assert.is_true(Sprint.is_near_daemonhost(bot1))
+			-- bot2 must re-scan side_b (different enemy_side_names reference),
+			-- find only dh_b at 30m → not near. If the cache key ignores
+			-- enemy_side_names, bot2 sees the leaked {dh_a} list and returns
+			-- true instead.
+			assert.is_false(Sprint.is_near_daemonhost(bot2))
+		end)
+
 		it("sprints to catch up when far from follow unit", function()
 			local unit = "bot1"
 			local follow = "player1"
@@ -334,6 +435,143 @@ describe("sprint", function()
 			-- Daemonhost at 25m > 20m safe range, no aggroed enemies -> traversal
 			assert.is_true(ok)
 			assert.equals("traversal", reason)
+		end)
+	end)
+
+	describe("settings wiring (#81)", function()
+		before_each(function()
+			reset()
+		end)
+
+		it("skips catch-up sprint when sprint_follow_distance=0", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 0
+				end,
+			})
+
+			local unit = "bot_disabled"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(50, 0, 0)
+			_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- Catch-up is gated by follow_dist > 0, so falls through to traversal
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			-- Restore default
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
+		end)
+
+		it("uses configurable sprint follow distance", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 25
+				end,
+			})
+
+			local unit = "bot_custom"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(20, 0, 0) -- 20m < 25m threshold
+			_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- 20m < 25m, so no catch-up; falls through to traversal (no enemies)
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
+		end)
+
+		it("allows sprint near daemonhost when avoidance is disabled", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return false
+				end,
+			})
+
+			local unit = "bot_dh_off"
+			local dh = "daemonhost_close"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(10, 0, 0) -- inside 20m safe range
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			setup_perception(unit, {})
+			setup_behavior(unit, {})
+			local self_obj = make_self()
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			-- DH avoidance disabled, so not blocked; traversal (no enemies)
+			assert.is_true(ok)
+			assert.equals("traversal", reason)
+
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+			})
 		end)
 	end)
 
