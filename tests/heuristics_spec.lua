@@ -2774,4 +2774,156 @@ describe("heuristics", function()
 			end
 		end)
 	end)
+
+	-- Issue #17: Dormant daemonhost must not be treated as a priority target.
+	-- The bot's target_enemy can be a dormant daemonhost (vanilla target
+	-- selection quirk); in that case every monster-aware heuristic must
+	-- refuse to fire. Once the daemonhost aggroes on the bot, normal
+	-- self-defense behavior resumes (ctx.target_is_dormant_daemonhost=false).
+	describe("dormant daemonhost carve-out (#17)", function()
+		-- Every template that uses the _grenade_priority_target dispatch or
+		-- the _grenade_assail monster fast-path. Each must refuse the decision
+		-- when target_is_dormant_daemonhost is true, and resume normal
+		-- self-defense when the DH has aggroed on this bot (flag=false).
+		describe("priority-target grenades/blitzes", function()
+			local priority_grenades = {
+				{ template = "psyker_smite", distance = 12, peril_pct = 0.30 },
+				{ template = "psyker_throwing_knives", distance = 10, peril_pct = 0.30 },
+				{ template = "veteran_krak_grenade", distance = 10 },
+				{ template = "zealot_throwing_knives", distance = 10 },
+				{ template = "ogryn_grenade_friend_rock", distance = 12 },
+				{ template = "broker_missile_launcher", distance = 14 },
+			}
+
+			for _, grenade in ipairs(priority_grenades) do
+				it("refuses " .. grenade.template .. " against dormant daemonhost", function()
+					local result, rule = Heuristics.evaluate_grenade_heuristic(
+						grenade.template,
+						helper.make_context({
+							target_enemy = "daemonhost_unit",
+							target_is_monster = true,
+							target_is_dormant_daemonhost = true,
+							target_enemy_distance = grenade.distance,
+							peril_pct = grenade.peril_pct,
+						})
+					)
+					assert.is_false(result)
+					assert.matches("daemonhost", rule)
+				end)
+
+				it("approves " .. grenade.template .. " when daemonhost aggroed on bot", function()
+					-- target_is_dormant_daemonhost=false means DH is either
+					-- not a DH, or it is aggroed on this specific bot. Either
+					-- way, self-defense behavior must still fire.
+					local result, rule = Heuristics.evaluate_grenade_heuristic(
+						grenade.template,
+						helper.make_context({
+							target_enemy = "daemonhost_unit",
+							target_is_monster = true,
+							target_is_dormant_daemonhost = false,
+							target_enemy_distance = grenade.distance,
+							peril_pct = grenade.peril_pct,
+						})
+					)
+					assert.is_true(result)
+					assert.matches("priority", rule)
+				end)
+			end
+		end)
+
+		describe("adamant_stance monster_pressure", function()
+			it("refuses monster_pressure clause against dormant daemonhost", function()
+				local ok, rule = evaluate(
+					"adamant_stance",
+					ctx({
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+						target_enemy_distance = 5,
+						toughness_pct = 0.80,
+						num_nearby = 0,
+					})
+				)
+				assert.is_false(ok)
+				assert.is_not.matches("monster_pressure", rule or "")
+			end)
+
+			it("keeps monster_pressure clause against aggroed daemonhost", function()
+				local ok, rule = evaluate(
+					"adamant_stance",
+					ctx({
+						target_is_monster = true,
+						target_is_dormant_daemonhost = false,
+						target_enemy_distance = 5,
+						toughness_pct = 0.80,
+						num_nearby = 0,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("monster_pressure", rule)
+			end)
+		end)
+
+		describe("adamant_area_buff_drone monster_fight", function()
+			local eval_item = Heuristics.evaluate_item_heuristic
+
+			it("refuses drone monster_fight against dormant daemonhost", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						num_nearby = 1,
+						allies_in_coherency = 1,
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+					})
+				)
+				assert.is_false(ok)
+				assert.is_not.matches("monster", rule or "")
+			end)
+
+			it("keeps drone monster_fight against aggroed daemonhost", function()
+				local ok, rule = eval_item(
+					"adamant_area_buff_drone",
+					ctx({
+						num_nearby = 1,
+						allies_in_coherency = 1,
+						target_is_monster = true,
+						target_is_dormant_daemonhost = false,
+					})
+				)
+				assert.is_true(ok)
+				assert.matches("monster", rule)
+			end)
+		end)
+
+		describe("daemonhost_avoidance setting toggle", function()
+			after_each(function()
+				-- Restore default (avoidance enabled) for the rest of the suite.
+				Heuristics.init({
+					combat_ability_identity = CombatAbilityIdentity,
+				})
+			end)
+
+			it("does not block dormant DH when avoidance is disabled", function()
+				Heuristics.init({
+					combat_ability_identity = CombatAbilityIdentity,
+					is_daemonhost_avoidance_enabled = function()
+						return false
+					end,
+				})
+
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"psyker_smite",
+					helper.make_context({
+						target_enemy = "daemonhost_unit",
+						target_is_monster = true,
+						target_is_dormant_daemonhost = true,
+						target_enemy_distance = 12,
+						peril_pct = 0.30,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("priority", rule)
+			end)
+		end)
+	end)
 end)

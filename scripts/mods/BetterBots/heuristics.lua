@@ -7,6 +7,8 @@ local _resolve_preset
 local _debug_log
 local _debug_enabled
 local _combat_ability_identity
+local _daemonhost_breed_names
+local _is_daemonhost_avoidance_enabled
 local _overlapping_liquids = {}
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
 local SHIELD_INTERACTION_TYPES = {
@@ -240,6 +242,7 @@ local function build_context(unit, blackboard)
 		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
+		target_is_dormant_daemonhost = false,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
@@ -374,6 +377,18 @@ local function build_context(unit, blackboard)
 			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
 			context.target_is_monster = _is_tagged(tags, "monster")
 			context.target_is_super_armor = _breed_has_super_armor(target_breed)
+			-- #17: flag dormant daemonhosts so monster-aware heuristics refuse
+			-- to blitz them. Once DH transitions to aggroed (on anyone — a
+			-- triggered daemonhost commits the whole group), dormancy lifts
+			-- and normal combat resumes. Pre-aggro: trash is targeted via
+			-- vanilla target selection even though no combat action should
+			-- ensue — we must refuse at the heuristic layer.
+			if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
+				local target_bb = BLACKBOARDS and BLACKBOARDS[context.target_enemy]
+				local target_perception = target_bb and target_bb.perception
+				local is_aggroed = target_perception and target_perception.aggro_state == "aggroed"
+				context.target_is_dormant_daemonhost = not is_aggroed
+			end
 		end
 	end
 
@@ -1038,6 +1053,23 @@ local ADAMANT_STANCE_THRESHOLDS = {
 	},
 }
 
+-- #17: once a heuristic would key off target_is_monster, the decision must
+-- first confirm the monster is not a dormant daemonhost. Centralized so every
+-- call site gets the same gate (and respects the avoidance setting toggle).
+local function _is_monster_signal_allowed(context)
+	if not context.target_is_monster then
+		return false
+	end
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false
+	end
+	return true
+end
+
 local function _can_activate_adamant_stance(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if context.toughness_pct < thresholds.low_toughness then
@@ -1049,7 +1081,7 @@ local function _can_activate_adamant_stance(context, thresholds)
 	then
 		return true, "adamant_stance_surrounded"
 	end
-	if context.target_is_monster and target_distance and target_distance < 8 then
+	if _is_monster_signal_allowed(context) and target_distance and target_distance < 8 then
 		return true, "adamant_stance_monster_pressure"
 	end
 	if context.elite_count >= thresholds.elite_count and context.toughness_pct < thresholds.elite_toughness then
@@ -1311,7 +1343,7 @@ local function _can_activate_drone(context, thresholds)
 	if context.allies_in_coherency == 0 then
 		return false, "drone_block_no_allies"
 	end
-	if context.target_is_monster and context.allies_in_coherency >= 1 then
+	if _is_monster_signal_allowed(context) and context.allies_in_coherency >= 1 then
 		return true, "drone_monster_fight"
 	end
 	if context.num_nearby <= thresholds.block_low_value_enemies then
@@ -1472,6 +1504,17 @@ end
 local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	opts = opts or {}
 
+	-- #17: refuse any priority-target grenade/blitz against a dormant
+	-- daemonhost. target_is_dormant_daemonhost is only true when avoidance
+	-- is enabled AND the DH has not yet aggroed (aggro lifts globally).
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, rule_prefix .. "_block_dormant_daemonhost"
+	end
+
 	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
 	if blocked then
 		return false, blocked_rule
@@ -1488,7 +1531,7 @@ local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	local target_distance = context.target_enemy_distance or 0
 	local t = GRENADE_PRIORITY_PRESETS[preset] or GRENADE_PRIORITY_PRESETS.balanced
 	local min_distance = (opts.min_distance or 0) + t.distance_offset
-	local has_priority_target = context.target_is_monster
+	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
@@ -1590,6 +1633,16 @@ local function _grenade_smite(context)
 end
 
 local function _grenade_assail(context)
+	-- #17: refuse assail against dormant daemonhost — the projectile is
+	-- ballistic, so "aim" is enough to consume a charge on a DH.
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "grenade_assail_block_dormant_daemonhost"
+	end
+
 	if context.peril_pct and context.peril_pct >= 0.85 then
 		return false, "grenade_assail_block_peril"
 	end
@@ -1599,7 +1652,7 @@ local function _grenade_assail(context)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
-	local has_priority_target = context.target_is_monster
+	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
@@ -2002,6 +2055,13 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_combat_ability_identity = deps.combat_ability_identity
+		-- #17: daemonhost carve-out deps. Optional so unit tests that set
+		-- context.target_is_dormant_daemonhost directly still work without
+		-- wiring shared_rules or the setting lookup.
+		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
+		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
+			return true
+		end
 
 		_interacting_cache_t = nil
 		_interacting_cache_side = nil

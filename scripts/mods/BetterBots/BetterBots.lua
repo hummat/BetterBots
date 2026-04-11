@@ -293,6 +293,10 @@ Heuristics.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	combat_ability_identity = CombatAbilityIdentity,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 ItemFallback.init({

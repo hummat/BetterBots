@@ -51,6 +51,7 @@ function M.make_context(overrides)
 		target_ally_unit = nil,
 		target_is_elite_special = false,
 		target_is_monster = false,
+		target_is_dormant_daemonhost = false,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,

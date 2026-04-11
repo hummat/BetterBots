@@ -237,10 +237,25 @@ describe("condition_patch", function()
 			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
 
-		it("returns false when target daemonhost is aggroed", function()
+		it("returns false when target daemonhost is aggroed (any target)", function()
+			-- Once any daemonhost transitions to aggroed, it is fair game
+			-- for every bot in the group. The group must commit — trying to
+			-- run from a triggered DH does not work in Darktide.
 			local target = "dh_aggro"
 			setup_breed(target, "chaos_daemonhost")
 			_blackboards[target] = { perception = { aggro_state = "aggroed" } }
+			local bb = make_blackboard(target)
+			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns false when daemonhost is aggroed regardless of which unit is targeted", function()
+			-- Explicit check that target_unit identity doesn't matter — any
+			-- aggro lifts dormancy for every bot so the group fights together.
+			local target = "dh_aggroed_other"
+			setup_breed(target, "chaos_daemonhost")
+			_blackboards[target] = {
+				perception = { aggro_state = "aggroed", target_unit = "player1" },
+			}
 			local bb = make_blackboard(target)
 			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
@@ -338,7 +353,35 @@ describe("condition_patch", function()
 				end,
 			}
 
-			ConditionPatch._install_condition_patch(conditions, {}, "test")
+			ConditionPatch._install_condition_patch(conditions, {}, "test_aggroed_any")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_true(result)
+			assert.is_true(orig_called)
+		end)
+
+		it("allows melee when daemonhost is aggroed on a different unit", function()
+			-- The whole group must commit once DH aggroes on anyone — not
+			-- just the bot that drew aggro. No bot-relative gating here.
+			local target = "dh_other_aggro"
+			setup_breed(target, "chaos_daemonhost")
+			_blackboards[target] = {
+				perception = { aggro_state = "aggroed", target_unit = "bot2" },
+			}
+
+			local bb = make_blackboard(target)
+			local orig_called = false
+			local conditions = {
+				bot_in_melee_range = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_other_unit")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
 			assert.is_true(result)
