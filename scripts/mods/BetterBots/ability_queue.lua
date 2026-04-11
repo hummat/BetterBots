@@ -17,6 +17,8 @@ local _ItemFallback
 local _Debug
 local _EventLog
 local _EngagementLeash
+local _TeamCooldown
+local _CombatAbilityIdentity
 local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
@@ -264,6 +266,29 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
+	-- Team cooldown staggering (#14): suppress this fallback queue if another
+	-- bot in the same ability category fired recently. The BT condition path
+	-- (condition_patch.lua) does the same check, but virtually all solo-play
+	-- activations come through this fallback path, so without this guard the
+	-- staggering never fires in real gameplay.
+	if _TeamCooldown then
+		local identity = _CombatAbilityIdentity
+				and _CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
+			or nil
+		local team_key = (identity and identity.semantic_key) or ability_template_name
+		local team_suppressed, team_reason = _TeamCooldown.is_suppressed(unit, team_key, fixed_t, rule)
+		if team_suppressed then
+			if _debug_enabled() then
+				_debug_log(
+					"team_cd:" .. ability_template_name .. ":" .. tostring(unit),
+					fixed_t,
+					"fallback suppressed " .. ability_template_name .. " (" .. tostring(team_reason) .. ")"
+				)
+			end
+			return
+		end
+	end
+
 	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
 	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
 	if rule and RESCUE_CHARGE_RULES[rule] then
@@ -380,6 +405,8 @@ function M.wire(deps)
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
 	_EngagementLeash = deps.EngagementLeash
+	_TeamCooldown = deps.TeamCooldown
+	_CombatAbilityIdentity = deps.CombatAbilityIdentity
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 

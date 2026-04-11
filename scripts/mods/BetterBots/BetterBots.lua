@@ -565,6 +565,8 @@ AbilityQueue.wire({
 	Debug = Debug,
 	EventLog = EventLog,
 	EngagementLeash = EngagementLeash,
+	TeamCooldown = TeamCooldown,
+	CombatAbilityIdentity = CombatAbilityIdentity,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
 
@@ -859,7 +861,17 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				fixed_t = fixed_t,
 			}
 			if ability_name ~= "unknown" then
-				TeamCooldown.record(unit, ability_name, fixed_t)
+				-- Resolve to the base/semantic template name so variant talent
+				-- names (e.g. psyker_discharge_shout_improved) collapse to the
+				-- key team_cooldown.CATEGORY_MAP uses (psyker_shout). Without
+				-- this, record() is a silent no-op for variant abilities and
+				-- staggering never fires for their category.
+				local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+				local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
+				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+				local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
+				local team_key = (identity and identity.semantic_key) or ability_name
+				TeamCooldown.record(unit, team_key, fixed_t)
 			end
 
 			if EventLog.is_enabled() then
