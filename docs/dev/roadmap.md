@@ -112,37 +112,42 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 81 | Expand settings surface | **Done + validated** in `console-2026-04-11-16.51`: startup log line `settings: preset=balanced, sprint_dist=12, chase_range=18, tag_bonus=3, horde_bias=4, smart_targeting=true, dh_avoidance=true` resolves all 7 spec values. Always-emit-all-values mode landed in `ed9f12b`. Closed. |
 | 83 | Settings UI: reorganize groups, factory functions, visual polish | **Done.** All 8 checklist items complete across `962a384`, `c7c9954`, `5695e1f`, `ed9f12b`. Group split, slot dropdown factory + deep-copy, Testing preset moved last, slider tooltip pattern, "Max" string fix, slot grouping with descriptions, gold/citrine group headers, event_log/perf_timing show_widgets gating. Plus golden mod_name with U+E048 mastery glyph. Closed. |
 
-### v0.11.0 — "Combat Execution"
+### v0.11.0 — "Combat Execution" (final polish batch)
 
-*Theme: improve charge commitment and ranged fire behavior once coordination work lands.*
+*Theme: small, high-ROI polish. Trivial wins and one teammate-feel feature.*
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
-| 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
-| 87 | Sustained fire for flamers and held-fire weapons | Bots tap-fire only — `bt_bot_shoot_action._fire` queues one `shoot_pressed` per frame, `BotUnitInput._input` never sets `action_one_hold`. Flamer `shoot_braced` and purgatus `trigger_charge_flame` need a held signal. Proposed `sustained_fire.lua` hooks `BotUnitInput._update_actions` to inject held input while a streaming state is active. Couples with #41 (ADS needed to enter braced fire on flamer). |
+| 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch. Settings toggle for grimoire carrying. Trivial. |
+| 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. Biggest teammate-feel delta per line of code in the backlog. |
+| 82 | Perf low-hanging fruit audit | Time-boxed sweep of hot-path allocations and redundant per-frame queries. Hard cap at one day — drop if it sprawls. |
+| 87 | Sustained fire for flamers and held-fire weapons | Bots tap-fire only — `bt_bot_shoot_action._fire` queues one `shoot_pressed` per frame, `BotUnitInput._input` never sets `action_one_hold`. Flamer `shoot_braced` and purgatus `trigger_charge_flame` need a held signal. Proposed `sustained_fire.lua` hooks `BotUnitInput._update_actions` to inject held input while a streaming state is active. Couples with #41 for flamer ADS (moved to v1.0.0). |
 
 ### v1.0.0 — "Bot Identity"
 
-*Theme: bots feel like teammates, not automatons. VT2 Bot Improvements parity.*
+*Theme: bots feel like teammates, not automatons. VT2 Bot Improvements parity. Mechanical polish + talent awareness.*
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
-| 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. |
+| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. Moved from v0.11.0 — research-heavy, better paired with weapon-family work. |
 | 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
-| 32 | Mule item pickup | Set `bots_mule_pickup = true` + fix `slot_name` vs `inventory_slot_name` mismatch. Settings toggle for grimoire carrying. |
 | 33 | Weapon special actions | Parry, heavy sweep, racking slide. Input mechanism trivial; decision logic (when to parry) is the work. |
+| 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
+| 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. Moved from v0.11.0 — wide blast radius across ranged code, pairs with weapon-family taxonomy. |
 | 86 | Tier 3 revive cover (extends #7) | Extend pre-revive activation to item-based defensives: Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Requires parallel resolution branch through `item_fallback.lua`. 2026-04-11 audit confirmed combat-ability whitelist is complete; Tier 3 is the remaining gap. |
 
 ### Post-1.0 — "Intelligence Architecture"
 
+*Theme: architectural upgrades and research-track items. Not scoped for a release — each is a mini-project.*
+
 | # | Issue | Notes |
 |---|-------|-------|
 | 22 | Utility-based ability scoring | Replace boolean heuristics with spline-interpolated utility curves. Darktide has native `utility.lua` + `bot_utility_considerations.lua` — framework exists, needs wiring. Architectural upgrade. |
-| 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` (companion command smart tag) and is intentionally narrower than `#22`. |
 | 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
 | 56 | Communication wheel response | React to com wheel commands (battle cry → aggression boost, need help → converge). `Vo.on_demand_vo_event` hook for detection. ForTheEmperor compat. |
+| 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` (companion command smart tag) and is intentionally narrower than `#22`. |
+| 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
+| 85 | Refactor combat ability identity | Separate `template_name` from `ability_name` semantics. Tech debt cleanup, no user-visible value. |
 
 ### Validation-gated — slot into any batch when testable
 
