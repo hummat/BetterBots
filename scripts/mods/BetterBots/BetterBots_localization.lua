@@ -15,7 +15,12 @@ end
 
 return {
 	mod_name = {
-		en = "Better Bots",
+		-- U+E048: Darktide UI font PUA glyph (mastery_points, per
+		-- mastery_view.lua). Defined in the game UI font, not Unicode —
+		-- guaranteed to render. Chosen because no other installed mod
+		-- uses this codepoint and "mastery" fits a smarter-bots theme.
+		-- Alternates: E003 (powersword), E04F (nameplate), E052 (broker).
+		en = "{#color(255,180,30)} Better Bots{#reset()}",
 	},
 	mod_description = {
 		en = "Smarter bots with unlocked abilities for Solo Play.",

@@ -10,12 +10,21 @@ local BOT_PROFILE_OPTIONS = {
 	{ text = "bot_profile_ogryn", value = "ogryn" },
 }
 
+-- DMF mutates option.text in place during localization. Sharing the options
+-- array across multiple dropdowns causes compounding fallback wraps (the
+-- already-localized string fails the second lookup and gets wrapped in <>).
+-- Each dropdown needs its own option tables.
 local function make_slot_dropdown(slot, default_value)
+	local options = {}
+	for i = 1, #BOT_PROFILE_OPTIONS do
+		local src = BOT_PROFILE_OPTIONS[i]
+		options[i] = { text = src.text, value = src.value }
+	end
 	return {
 		setting_id = "bot_slot_" .. tostring(slot) .. "_profile",
 		type = "dropdown",
 		default_value = default_value,
-		options = BOT_PROFILE_OPTIONS,
+		options = options,
 	}
 end
 
@@ -31,7 +40,7 @@ local function make_numeric(setting_id, range, step_size)
 end
 
 return {
-	name = "Better Bots",
+	name = mod:localize("mod_name"),
 	description = mod:localize("mod_description"),
 	is_togglable = false,
 	options = {
