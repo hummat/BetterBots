@@ -1066,6 +1066,86 @@ Conclusion:
 - Tertium None yield fix (#68) already validated in earlier session.
 ```
 
+### Run 2026-04-11-dh-first-spawn
+
+```text
+Run ID: 2026-04-11-dh-first-spawn
+Date (local): 2026-04-11
+Date (UTC): 2026-04-11
+Git commit: 74e0d43 (v0.10.0, pre-fix)
+Log file: console-2026-04-11-16.51.08-7b0e1b12-f7ec-459e-8dd6-2d556581d8d0.log
+JSONL file: betterbots_events_1775926799.jsonl
+Bot lineup / abilities:
+  Psyker: discharge_shout_improved + smite blitz + forcestaff_p2_m1 + forcesword
+  Veteran: combat_ability_shout + krak grenade + lasgun_p3_m2 + combatknife
+  Ogryn: charge_increased_distance + grenade_box_cluster + ogryn_rippergun_p1_m1 + ogryn_combatblade
+  Zealot: invisibility_improved + zealot_throwing_knives + combatknife + flamer_p1_m1
+Map + difficulty: live mission, chaos_daemonhost spawned via monster pacing
+
+#17 Daemonhost avoidance evidence:
+- FAIL (GAP EXPOSED)
+  - DH spawned 17:01:26
+  - 17:02:42.732 bot 5 pinged chaos_daemonhost (reason: target_enemy)
+    — bots were already targeting dormant DH from vanilla selection
+  - 17:02:42.753 "grenade queued wield for psyker_smite (rule=grenade_smite_priority_target)"
+    — psyker_smite approved against dormant DH, no suppression
+  - JSONL line 54953 at t=165.71: psyker_smite decision result=true,
+    ctx.target_enemy=chaos_daemonhost, target_is_monster=true,
+    num_nearby=0, monster_count=0, priority/urgent/opportunity_target_enemy=none
+  - 17:02:44.963 smite landed ("grenade external action confirmed for psyker_smite")
+  - 17:02:43.827 onward "restoring monster weight for boss targeting bot chaos_daemonhost"
+    — post-aggro amplifier (secondary, not the ignition)
+  - ZERO dh_suppress_melee / dh_suppress_ranged log lines in the entire session
+    — the condition_patch wrappers never fired because they sit on BT
+    melee/shoot conditions; grenades and blitzes go through grenade_fallback
+    and can_activate_ability, bypassing those wrappers entirely.
+
+Root cause:
+- heuristics.lua:370-378 build_context set target_is_monster=true for DH
+  (vanilla breed tag) with no daemonhost awareness.
+- heuristics.lua:1491 _grenade_priority_target used target_is_monster as a
+  green-light priority-target signal without a DH carve-out. Fires for
+  smite / psyker knives / vet krak / zealot knives / ogryn rock / broker missile.
+- heuristics.lua:1602 _grenade_assail monster fast-path same issue.
+- heuristics.lua:1052 _can_activate_adamant_stance monster_pressure same.
+- heuristics.lua:1314 _can_activate_drone monster_fight same.
+
+Fix staged (local, not yet pushed, not yet re-validated):
+- 03ce4fd fix(heuristics): refuse dormant daemonhost via target_is_dormant_daemonhost (#17)
+- ffe7c6b test(heuristics): cover build_context DH flag + patch testing_profile gap (#17)
+- Adds ctx.target_is_dormant_daemonhost flag in build_context via global
+  aggro_state check against the target breed's perception blackboard.
+- Global semantics (not bot-relative): once DH enters aggro_state=aggroed
+  on anyone, the whole group commits — trying to run from a triggered DH
+  is not a recoverable tactic.
+- Gates 5 heuristic sites via shared _is_monster_signal_allowed helper.
+- Wires daemonhost_avoidance setting (#81) into Heuristics.init so the
+  toggle actually affects the grenade/blitz path (previously only affected
+  condition_patch and sprint).
+- Tests: 796 → 813 (+17 cases including direct build_context coverage).
+
+Open (deferred, separate issue worth filing):
+- How chaos_daemonhost enters bot target_enemy pre-aggro with zero other
+  enemies in proximity. Vanilla _is_valid_target requires
+  aggroed_minion_target_units[unit]; no code found that writes passive DH
+  into that set. Codex cross-review (session 019d7dc0) couldn't trace the
+  writer. The heuristic carve-out masks the symptom but doesn't address
+  the upstream quirk.
+
+Regression checks:
+- revive/rescue: PASS (5 revive_candidate lines observed in session)
+- navigation/pathing: PASS
+- basic combat loop: PASS (22 veteran shout consumes, 17 psyker shout consumes)
+- Lua errors: no
+
+Conclusion:
+- #17 suppression gap confirmed and patched. Re-validation with the new
+  build is the next gate. Expected shape: *_block_dormant_daemonhost rule
+  hits on a DH spawn, no smite/knife/krak/rock/missile fire on dormant DH,
+  normal combat resuming once DH aggros on any party member.
+- Issue #17 comment posted 2026-04-11 with full evidence.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.

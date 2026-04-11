@@ -69,7 +69,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 | #4 | Blitz: shock mine | **Untested** | Profile in place, no bot equipped with it yet |
 | #4 | Grenade: ogryn cluster | **PASS** | 3 charges consumed with full wield→aim→throw→unwield cycle |
 | #16 | Bot pinging | **PASS** | 4 ping events for elites across multiple bots |
-| #17 | Daemonhost avoidance | **Unverifiable** | No daemonhost spawned in 5 sessions |
+| #17 | Daemonhost avoidance | **Gap found + patched 2026-04-11** | First DH spawn in v0.10.0 validation. Heuristic-path gap exposed: `grenade_fallback` → `_grenade_priority_target` bypassed the `condition_patch` BT wrappers, `psyker_smite` fired on dormant DH at 19m. Fix in commits `03ce4fd` + `ffe7c6b` adds `target_is_dormant_daemonhost` flag with a global aggro check and gates 5 heuristic sites. Re-validation pending. |
 | #19 | Distant special penalty | **PASS** | 30+ penalty events across 6 special breeds |
 | #43 | Staff p1 Voidstrike charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion` (bot=2, forcestaff_p1_m1) |
 | #43 | Staff p2 Purgatus charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_charge_flame` (post-hotreload, charge=4) |
@@ -78,7 +78,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 ## Known Blockers
 
 1. **Hive Scum DLC (broker_ archetype)**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation. Arbites (adamant_ archetype) is available and testable.
-2. **#17 daemonhost avoidance**: Code + tests in place, needs a daemonhost encounter to verify in-game.
+2. **#17 daemonhost avoidance**: v0.6.0 suppression had a heuristic-path gap (grenade_fallback bypassed BT condition wrappers). Found + patched 2026-04-11 in `03ce4fd` + `ffe7c6b`. Re-validation with the new build is the next gate — watch for `*_block_dormant_daemonhost` rule hits on a DH spawn. Secondary open question: how DH enters bot `target_enemy` pre-aggro with zero other enemies in proximity (vanilla target selection quirk, unresolved, masked by the carve-out).
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
 ## v0.7.0 (2026-03-12)
@@ -167,7 +167,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 788 tests. Ready to tag.
-- **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS)
+- **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS), #87 (sustained fire for flamers / held-fire weapons — couples with #41 for flamer ADS)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials), #86 (Tier 3 revive cover — extends #7)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
 - **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #54 (poxburster push), #74 (poxburster push debug keys)

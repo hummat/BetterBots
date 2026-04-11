@@ -120,6 +120,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|-------|-------|
 | 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. |
 | 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. |
+| 87 | Sustained fire for flamers and held-fire weapons | Bots tap-fire only — `bt_bot_shoot_action._fire` queues one `shoot_pressed` per frame, `BotUnitInput._input` never sets `action_one_hold`. Flamer `shoot_braced` and purgatus `trigger_charge_flame` need a held signal. Proposed `sustained_fire.lua` hooks `BotUnitInput._update_actions` to inject held input while a streaming state is active. Couples with #41 (ADS needed to enter braced fire on flamer). |
 
 ### v1.0.0 — "Bot Identity"
 
