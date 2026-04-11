@@ -148,6 +148,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` (companion command smart tag) and is intentionally narrower than `#22`. |
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
 | 85 | Refactor combat ability identity | Separate `template_name` from `ability_name` semantics. Tech debt cleanup, no user-visible value. |
+| 88 | Deployable crate carry + deploy (ammo + medical) | Bots walk past `pocketable` form crates — cannot carry, cannot deploy. Full vanilla use pipeline for *deployed* crates (see `#39`/`#72`), but no detection, carry, or deploy action for carryable form. Shared pocketable-pickup primitive with `#24` stim section. Design work: deploy-location heuristic (coherency anchor, objective markers, ally resource needs). Filed 2026-04-11 after `#32` triage exposed the gap. |
 
 ### Validation-gated — slot into any batch when testable
 
