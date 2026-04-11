@@ -122,6 +122,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 44 | Human-likeness tuning (Tier A) | Activation jitter (0.3-1.5s), opportunity target reaction times (2-5s vs vanilla 10-20s), unlock difficulty-aware engage range (dead code fix). High impact, low effort. Biggest teammate-feel delta per line of code in the backlog. |
 | 82 | Perf low-hanging fruit audit | Time-boxed sweep of hot-path allocations and redundant per-frame queries. Hard cap at one day — drop if it sprawls. |
 | 87 | Sustained fire for flamers and held-fire weapons | Bots tap-fire only — `bt_bot_shoot_action._fire` queues one `shoot_pressed` per frame, `BotUnitInput._input` never sets `action_one_hold`. Flamer `shoot_braced` and purgatus `trigger_charge_flame` need a held signal. Proposed `sustained_fire.lua` hooks `BotUnitInput._update_actions` to inject held input while a streaming state is active. Couples with #41 for flamer ADS (moved to v1.0.0). |
+| 89 | Bot grenade pickup heuristic | Bots ignore `small_grenade` pickups: vanilla scan only routes `pickup_data.group == "ammo"`, but grenade pickups are `group = "ability"`. Recommended path: piggyback `pickup_component.ammo_pickup` from inside `ammo_policy._update_ammo` when no real ammo crate is in range — interact action is type-aware, refill resolves correctly. Mirrors `ammo_policy` heuristic (defer to humans, desperation override, skip cooldown-based psyker blitz). |
 
 ### v1.0.0 — "Bot Identity"
 
