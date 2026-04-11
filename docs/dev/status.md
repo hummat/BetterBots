@@ -161,12 +161,12 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
-- **#14 revalidation run** — `team_cooldown` had 2 integration bugs (record used variant talent name instead of semantic_key, fallback queue path missing the suppression check). Both fixed in `d890695`. Next mission with vet VoC + psyker Venting Shriek lineup should produce `team_cd:` log entries when shouts collide inside the 6 s window.
-- **#49 unit-tested only** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). No remaining DLC blocker for this issue.
+- **v0.10.0 release** — all 6 issues validated and closed. Ready to tag whenever wanted.
+- **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 
 ### Later batches
 
-- **v0.10.0 "Team Coordination"**: 5 of 6 issues closed — #14 (open, fix landed `d890695`, awaiting revalidation), ~~#37~~, ~~#7~~, ~~#49~~, ~~#81~~, ~~#83~~ (settings UI polish). 788 tests. #14 is the only blocker before tagging.
+- **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 788 tests. Ready to tag.
 - **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
