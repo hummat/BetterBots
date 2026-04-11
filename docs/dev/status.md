@@ -133,7 +133,7 @@ All P0/P1 stabilization issues closed. Released as v0.7.1 (2026-03-14).
 | Issue | Feature | Status | Evidence |
 |-------|---------|--------|----------|
 | #65 | **P0: non-veteran profiles CTD on 1.11.0** | **Closed** | Profile overwrite guard: `is_local_profile` + `_bb_resolved` + `set_profile` hook. Validated on 1.11.3. |
-| #54 | Push poxbursters | **Open** | `_should_push` outnumbered gate bypass is shipped, but the original hook was later clobbered by #67. The consolidated hook is now back in place, but a fresh poxburster repro is still needed before reclosing the issue. |
+| #54 | Push poxbursters | **Closed** | Validated 2026-04-11 (run `2026-04-11-poxburster-push`): full chain `suppressed poxburster (too_close_to_bot)` → `poxburster in push range, keeping target` → `defend gate bypassed for poxburster target` → `pushing poxburster (bypassed outnumbered gate)` at 16:33:12.312–16:33:12.531. |
 | #55 | Prioritize mastiff-pounced enemies | **Closed** | Original score boost shipped in v0.9.0. **Follow-up:** friendly mastiff pins are now explicitly de-prioritized on `dev/v0.9.1` (#69). |
 | #53 | Rumbler VFX timing gap | **Closed** | Pre-call hook on loadout init. |
 | #47 | Combat-aware engagement leash | **Closed** | Coherency-anchored leash: stickiness-limit extension, post-charge grace, under-attack/ranged-foray overrides. 700+ override events. |
@@ -170,7 +170,8 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 - **v0.11.0 "Combat Execution"**: #13 (navmesh charges), #41 (weapon-aware ADS), #87 (sustained fire for flamers / held-fire weapons — couples with #41 for flamer ADS)
 - **v1.0.0 "Bot Identity"**: #38 (talent-aware), #44 (human-likeness Tier A), #24 (healing items), #32 (mule pickup), #33 (weapon specials), #86 (Tier 3 revive cover — extends #7)
 - **Post-1.0**: #22 (utility scoring), #28 (profile management), #56 (com wheel response), #80 (grenade/blitz tactical evaluator)
-- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost), #54 (poxburster push), #74 (poxburster push debug keys)
+- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost — heuristic carve-out staged 2026-04-11, re-validation pending)
+- **Closed 2026-04-11**: #54 (poxburster push validated in run `2026-04-11-poxburster-push`), #74 (per-bot throttle discriminator shipped v0.9.1 + exercised in same run)
 
 Planning artifacts for `#80`:
 

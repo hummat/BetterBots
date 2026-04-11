@@ -2,7 +2,7 @@
 
 ## High severity
 
-1. ~~DMF `hook_require` clobbering~~ **Fixed in v0.9.1** (#67). The melee hooks now install through one consolidated `bt_bot_melee_action` hook, restoring both melee light bias and poxburster push behavior. What remains is validation of `#54`/`#74`, not the clobbering regression itself.
+1. ~~DMF `hook_require` clobbering~~ **Fixed in v0.9.1** (#67). The melee hooks now install through one consolidated `bt_bot_melee_action` hook, restoring both melee light bias and poxburster push behavior. `#54` and `#74` validated in the 2026-04-11 live run (full push chain at 16:33:12), so the related follow-ups are also closed.
 
 2. ~~Veteran bots replaced by wrong class~~ **Validated and closed** (#68). Run `0` (`console-2026-04-07-15.36.11-a46f7c58-38a2-401c-aefc-1e4e4dfcc9f5.log`) logged preserved external profiles with real `character_id` values for bot slots 1-4, confirming BetterBots yielded to Tertium/SoloPlay profiles instead of overwriting them.
 

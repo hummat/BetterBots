@@ -149,9 +149,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | # | Issue | Blocker |
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
-| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0. Needs in-game daemonhost encounter to verify. |
-| 54 | Push poxbursters | Consolidated melee hook shipped in v0.9.1. Needs a fresh poxburster repro before reclosing the issue. |
-| 74 | Poxburster push debug log keys | Implemented on `dev/v0.9.1`. Needs one validation run to confirm per-bot discriminator logging in live play. |
+| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. Re-validation on next DH spawn. |
 
 ## Design principles
 

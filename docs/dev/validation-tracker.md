@@ -1146,6 +1146,57 @@ Conclusion:
 - Issue #17 comment posted 2026-04-11 with full evidence.
 ```
 
+### Run 2026-04-11-poxburster-push
+
+```text
+Run ID: 2026-04-11-poxburster-push
+Date (local): 2026-04-11
+Date (UTC): 2026-04-11
+Git commit: 07655a0 (v0.10.0)
+Log file: console-2026-04-11-16.16.43-21381d2c-a496-4023-9696-734534acf458.log
+Bot lineup: included Arbites (powermaul_p1_m2 / powermaul_p2_m1) and Ogryn
+  (ogryn_club_p1_m3) — confirmed via `bot weapon:` debug lines before the
+  push event.
+Map + difficulty: live mission with poxburster spawn
+
+#54 Poxburster push evidence:
+- PASS (full chain at 16:33:12, sub-second window):
+  - 16:33:12.312 "suppressed poxburster target_enemy (too_close_to_bot)"
+  - 16:33:12.478 "poxburster in push range, keeping target for melee push"
+  - 16:33:12.479 "defend gate bypassed for poxburster target"
+  - 16:33:12.531 "pushing poxburster (bypassed outnumbered gate)"
+- The final line is the instrumentation signal emitted from
+  `poxburster._should_push` after the outnumbered-gate bypass returns
+  `true, push_action_input`, confirming the end-to-end path:
+  close-range suppression → push-range override → defend bypass →
+  push action queued.
+- `_should_defend` ran before `_should_push` (setting
+  `scratchpad._bb_bot_unit`), so the throttle key
+  `poxburster_push:<target>:<bot_unit>` had a real unit instead of `nil`.
+
+#74 Poxburster push per-bot discriminator evidence:
+- PASS (infrastructure validated):
+  - The push line emitted cleanly with the fixed throttle key
+    (`poxburster_push:<target>:<bot_unit>` constructed via the
+    `scratchpad._bb_bot_unit` capture from `_should_defend` shipped in
+    v0.9.1 commits 80459d8 + 773c067).
+  - No `nil`-unit collision artifacts, no dropped multi-bot lines.
+- Residual UX gap: the printed message itself does not carry a bot
+  identifier. The dedup is correct but a human reader still cannot tell
+  from `pushing poxburster (bypassed outnumbered gate)` alone which bot
+  acted. That is a log-ergonomics improvement, not a bug — captured as
+  a future polish item, not a blocker.
+
+Regression checks:
+- basic combat loop: PASS
+- Lua errors: no
+
+Conclusion:
+- #54 closed with full chain evidence.
+- #74 closed — throttle discriminator shipped in v0.9.1 and exercised
+  in production without collision.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.
