@@ -14,7 +14,6 @@
 			"HEALTH_ALIVE",
 			"POSITION_LOOKUP",
 			"Quaternion",
-			"Trajectory",
 			"Vector3",
 			"Managers",
 			"Unit"

@@ -11,7 +11,6 @@ read_globals = {
 	"HEALTH_ALIVE",
 	"POSITION_LOOKUP",
 	"Quaternion",
-	"Trajectory",
 	"Unit",
 	"Vector3",
 	"Managers",

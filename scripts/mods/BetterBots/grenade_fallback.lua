@@ -287,7 +287,13 @@ local function _target_velocity(target_unit)
 	return Vector3.zero()
 end
 
+local _Trajectory
+
 local function _default_solve_ballistic_rotation(unit, aim_unit, projectile_data)
+	if not _Trajectory then
+		_Trajectory = require("scripts/utilities/trajectory")
+	end
+
 	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit]
 	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[aim_unit]
 	if not unit_position or not target_position then
@@ -295,7 +301,7 @@ local function _default_solve_ballistic_rotation(unit, aim_unit, projectile_data
 	end
 
 	local target_velocity = _target_velocity(aim_unit)
-	local angle, solved_target_position = Trajectory.angle_to_hit_moving_target(
+	local angle, solved_target_position = _Trajectory.angle_to_hit_moving_target(
 		unit_position,
 		target_position,
 		projectile_data.speed,

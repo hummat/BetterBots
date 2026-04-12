@@ -1059,8 +1059,8 @@ describe("grenade_fallback", function()
 		-- Mock engine math globals so the default solver can run end-to-end.
 		-- Real Vector3 is C userdata with operator overloads; we emulate with metatables.
 		local saved_vector3 = _G.Vector3
-		local saved_trajectory = _G.Trajectory
 		local saved_quaternion = _G.Quaternion
+		local saved_require = require
 
 		local vec_mt = {
 			__sub = function(a, b)
@@ -1095,11 +1095,17 @@ describe("grenade_fallback", function()
 			end,
 		}
 		local mock_rotation = { yaw = 5, pitch = 6 }
-		_G.Trajectory = {
+		local mock_trajectory = {
 			angle_to_hit_moving_target = function()
 				return 0.5, vec(10, 0, 2)
 			end,
 		}
+		rawset(_G, "require", function(path)
+			if path == "scripts/utilities/trajectory" then
+				return mock_trajectory
+			end
+			return saved_require(path)
+		end)
 		_G.Quaternion = setmetatable({
 			look = function()
 				return mock_rotation
@@ -1154,8 +1160,8 @@ describe("grenade_fallback", function()
 		_G.POSITION_LOOKUP[unit] = { x = 0, y = 0, z = 0 }
 		_G.POSITION_LOOKUP.enemy_1 = { x = 10, y = 0, z = 0 }
 		_G.Vector3 = saved_vector3
-		_G.Trajectory = saved_trajectory
 		_G.Quaternion = saved_quaternion
+		rawset(_G, "require", saved_require)
 	end)
 
 	it("clears bot aim when the grenade state resets", function()
