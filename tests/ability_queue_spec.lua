@@ -251,6 +251,169 @@ describe("ability_queue", function()
 			assert.equals(0, decision_calls)
 			assert.equals(0, queued_inputs)
 		end)
+
+		it("injects ability templates once across repeated fallback ticks", function()
+			saved_script_unit = _G.ScriptUnit
+			saved_require = require
+
+			local decision_calls = 0
+			local inject_calls = 0
+			local require_calls = 0
+			local fixed_t = 10
+			local ability_extension = {
+				can_use_ability = function()
+					return true
+				end,
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			}
+			local action_input_extension = {
+				bot_queue_action_input = function() end,
+				_action_input_parsers = {
+					combat_ability_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							psyker_shout = {
+								shout_pressed = {},
+							},
+						},
+					},
+				},
+			}
+			local unit_data_extension = {
+				read_component = function(_, component_name)
+					if component_name == "combat_ability_action" then
+						return { template_name = "psyker_shout" }
+					end
+					return nil
+				end,
+			}
+
+			_G.ScriptUnit = {
+				has_extension = function(_, system_name)
+					if system_name == "unit_data_system" then
+						return unit_data_extension
+					end
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+				extension = function(_, system_name)
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+			}
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					require_calls = require_calls + 1
+					return {
+						psyker_shout = {
+							ability_meta_data = {
+								activation = { action_input = "shout_pressed" },
+							},
+						},
+					}
+				end
+				if path == "scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions" then
+					return {}
+				end
+				return saved_require(path)
+			end)
+
+			AbilityQueue.init({
+				mod = { echo = function() end, dump = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return fixed_t
+				end,
+				equipped_combat_ability = function()
+					return ability_extension, { name = "psyker_shout" }
+				end,
+				equipped_combat_ability_name = function()
+					return "psyker_shout"
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				fallback_state_by_unit = {},
+				fallback_queue_dumped_by_key = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20,
+				shared_rules = SharedRules,
+			})
+			AbilityQueue.wire({
+				Heuristics = {
+					resolve_decision = function()
+						decision_calls = decision_calls + 1
+						return false, "test_rule", { num_nearby = 0 }
+					end,
+				},
+				MetaData = {
+					inject = function()
+						inject_calls = inject_calls + 1
+					end,
+				},
+				ItemFallback = {
+					try_queue_item = function() end,
+					reset_item_sequence_state = function() end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+					context_snapshot = function(context)
+						return context
+					end,
+					fallback_state_snapshot = function(state)
+						return state
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				EngagementLeash = {
+					is_movement_ability = function()
+						return false
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function()
+						return false
+					end,
+				},
+				CombatAbilityIdentity = {
+					resolve = function()
+						return nil
+					end,
+				},
+				HumanLikeness = {
+					should_bypass_ability_jitter = function()
+						return true
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+
+			AbilityQueue.try_queue("bot_unit", {})
+			fixed_t = 11
+			AbilityQueue.try_queue("bot_unit", {})
+
+			assert.equals(2, decision_calls)
+			assert.equals(1, inject_calls)
+			assert.equals(1, require_calls)
+		end)
 	end)
 
 	describe("combat ability jitter", function()

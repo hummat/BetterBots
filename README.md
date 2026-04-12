@@ -26,7 +26,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 861 unit tests, 40 modules
+- 865 unit tests, 40 modules
 
 ## What bots can do with this mod
 
@@ -205,7 +205,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (861 tests) |
+| `make test` | Run busted tests (865 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -297,7 +297,7 @@ scripts/mods/BetterBots/          # Mod source (40 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 861 tests)
+tests/                            # Unit tests (busted, 865 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

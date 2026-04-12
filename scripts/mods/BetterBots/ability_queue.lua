@@ -21,6 +21,8 @@ local _TeamCooldown
 local _CombatAbilityIdentity
 local _HumanLikeness
 local _is_combat_template_enabled
+local _ability_templates
+local _ability_templates_injected
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 
@@ -37,6 +39,19 @@ local function _clear_pending_jitter(state)
 	state.pending_template_name = nil
 	state.pending_action_input = nil
 	state.pending_ready_t = nil
+end
+
+local function _ability_templates_once()
+	if not _ability_templates then
+		_ability_templates = require("scripts/settings/ability/ability_templates/ability_templates")
+	end
+
+	if not _ability_templates_injected then
+		_MetaData.inject(_ability_templates)
+		_ability_templates_injected = true
+	end
+
+	return _ability_templates
 end
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
@@ -107,8 +122,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		_ItemFallback.reset_item_sequence_state(state)
 	end
 
-	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")
-	_MetaData.inject(AbilityTemplates)
+	local AbilityTemplates = _ability_templates_once()
 
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	if not ability_template then
@@ -423,6 +437,8 @@ function M.init(deps)
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_fallback_queue_dumped_by_key = deps.fallback_queue_dumped_by_key
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+	_ability_templates = nil
+	_ability_templates_injected = false
 	local shared_rules = deps.shared_rules or {}
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable

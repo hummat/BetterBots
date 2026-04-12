@@ -194,6 +194,144 @@ describe("TargetSelection", function()
 		assert.are.equal(5, score)
 	end)
 
+	it("reuses smart-tag lookup within one fixed_t and refreshes on next frame", function()
+		local target_unit = {}
+		local smart_tag_calls = 0
+		local fixed_t = 0
+
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return {
+					unit_tag = function(_, unit)
+						if unit == target_unit then
+							smart_tag_calls = smart_tag_calls + 1
+							return {
+								tagger_player = function()
+									return {
+										is_human_controlled = function()
+											return true
+										end,
+									}
+								end,
+							}
+						end
+						return nil
+					end,
+				}
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(1, smart_tag_calls)
+
+		fixed_t = 1
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(2, smart_tag_calls)
+	end)
+
+	it("reuses companion-pin lookup within one fixed_t", function()
+		local target_unit = {}
+		local attacker_unit = {
+			_breed = { breed_type = "companion" },
+		}
+		local fixed_t = 0
+		local extension_calls = 0
+		local saved_script_unit = _G.ScriptUnit
+
+		_G.BLACKBOARDS[target_unit] = {
+			disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+		}
+		_G.ScriptUnit = {
+			has_extension = function(unit, name)
+				if unit == attacker_unit and name == "unit_data_system" then
+					extension_calls = extension_calls + 1
+				end
+				if name == "unit_data_system" and unit and unit._breed then
+					return {
+						breed = function()
+							return unit._breed
+						end,
+					}
+				end
+				return nil
+			end,
+		}
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "renegade_captain" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(1, extension_calls)
+
+		_G.ScriptUnit = saved_script_unit
+	end)
+
+	it("reuses slot ammo lookup within one fixed_t and refreshes on next frame", function()
+		local target_unit = {}
+		local ammo_calls = 0
+		local fixed_t = 0
+
+		package.loaded["scripts/utilities/ammo"].current_slot_percentage = function(unit, _slot)
+			ammo_calls = ammo_calls + 1
+			if unit.has_ammo then
+				return 1.0
+			end
+			return 0.0
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { special = true }, name = "chaos_hound" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		assert.are.equal(1, ammo_calls)
+
+		fixed_t = 1
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		assert.are.equal(2, ammo_calls)
+	end)
+
 	-- #48: player tag boost
 	it("has_human_player_tag returns true for human-tagged unit", function()
 		local target_unit = {}
