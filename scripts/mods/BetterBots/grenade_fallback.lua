@@ -198,7 +198,7 @@ local function _default_resolve_grenade_projectile_data(unit, grenade_name)
 		}
 	end
 
-	local _, grenade_ability = _equipped_grenade_ability and _equipped_grenade_ability(unit)
+	local grenade_ability = _equipped_grenade_ability and select(2, _equipped_grenade_ability(unit))
 	local inventory_item_name = grenade_ability and grenade_ability.inventory_item_name
 	if not inventory_item_name then
 		return {

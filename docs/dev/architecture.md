@@ -87,10 +87,13 @@ This mod targets bot ability activation in three paths:
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
     - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
-21. Ammo policy (#72, via `ammo_policy.lua`):
+21. Ammo and grenade pickup policy (#72 / #89, via `ammo_policy.lua`):
     - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
     - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
+    - `small_grenade` pickup support piggybacks the same vanilla `pickup_component.ammo_pickup` slot because vanilla never routes `group = "ability"` grenade refills into bot pickup awareness
+    - grenade refills only bind for charge-based grenade users at or below the configured bot grenade threshold; cooldown-only blitz users are ignored
+    - grenade refill deferral is human-first with no bot desperation override; when grenade is deferred, existing ammo pickup decisions remain intact
     - explicit ammo pickup orders are preserved
 22. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them

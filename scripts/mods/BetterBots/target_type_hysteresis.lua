@@ -66,7 +66,7 @@ local function _calculate_ranged_score(
 	ranged_gestalt,
 	target_breed,
 	target_distance_sq,
-	threat_units
+	_threat_units
 )
 	local BotTargetSelection = _load_runtime_deps()
 	local score = 0

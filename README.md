@@ -24,7 +24,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 833 unit tests, 38 modules
+- 841 unit tests, 38 modules
 
 ## What bots can do with this mod
 
@@ -202,7 +202,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (833 tests) |
+| `make test` | Run busted tests (841 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -279,7 +279,7 @@ scripts/mods/BetterBots/          # Mod source (38 modules)
   human_likeness.lua              #   Tier A teammate-feel tuning
   engagement_leash.lua            #   Coherency-anchored melee engagement range
   healing_deferral.lua            #   Defer health stations/med-crates to humans
-  ammo_policy.lua                 #   Bot ammo pickup awareness
+  ammo_policy.lua                 #   Bot ammo + grenade pickup policy
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
@@ -292,7 +292,7 @@ scripts/mods/BetterBots/          # Mod source (38 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 833 tests)
+tests/                            # Unit tests (busted, 841 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

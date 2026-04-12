@@ -204,6 +204,20 @@ return {
 		en = "Bots freely pick up ammo when every eligible human ammo user is above this reserve. "
 			.. "When a human is below this reserve, bots defer ammo to humans unless desperate.",
 	},
+	bot_grenade_charges_threshold = {
+		en = "Bot grenade refill threshold",
+	},
+	bot_grenade_charges_threshold_description = {
+		en = "Bots seek nearby grenade refills only at or below this many remaining charges. "
+			.. "Set to 0 to refill only when empty.",
+	},
+	bot_human_grenade_reserve_threshold = {
+		en = "Human grenade reserve threshold",
+	},
+	bot_human_grenade_reserve_threshold_description = {
+		en = "Bots defer grenade refills while any eligible human grenade user is below this reserve. "
+			.. "This does not block bots from still taking ammo instead.",
+	},
 	-- Healing deferral
 	healing_deferral_mode = {
 		en = "Healing deferral mode",

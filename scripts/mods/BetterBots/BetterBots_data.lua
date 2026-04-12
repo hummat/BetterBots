@@ -115,6 +115,8 @@ return {
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
 					make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
 					make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
+					make_numeric("bot_grenade_charges_threshold", { 0, 12 }, 1),
+					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
 				},
 			},
 			{

@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 833 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — 841 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -342,7 +342,7 @@ scripts/mods/BetterBots/
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
-  ammo_policy.lua                           # Bot ammo pickup awareness: defer to humans, configurable thresholds (#72)
+  ammo_policy.lua                           # Bot ammo + grenade pickup policy: defer scarce resources to humans, configurable thresholds (#72/#89)
   bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
   human_likeness.lua                        # Tier A teammate-feel tuning: opportunity reaction times, combat-ability jitter, challenge-pressure leash scaling (#44)
   engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)

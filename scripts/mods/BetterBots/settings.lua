@@ -81,6 +81,10 @@ local DEFAULT_BOT_RANGED_AMMO_THRESHOLD = 0.20
 local DEFAULT_HUMAN_AMMO_RESERVE_THRESHOLD = 0.80
 local BOT_RANGED_AMMO_THRESHOLD_SETTING_ID = "bot_ranged_ammo_threshold"
 local HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID = "bot_human_ammo_reserve_threshold"
+local DEFAULT_BOT_GRENADE_CHARGES_THRESHOLD = 0
+local DEFAULT_HUMAN_GRENADE_RESERVE_THRESHOLD = 1.00
+local BOT_GRENADE_CHARGES_THRESHOLD_SETTING_ID = "bot_grenade_charges_threshold"
+local HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID = "bot_human_grenade_reserve_threshold"
 
 M.DEFAULTS = {
 	enable_stances = true,
@@ -103,6 +107,8 @@ M.DEFAULTS = {
 	melee_horde_light_bias = 4,
 	bot_ranged_ammo_threshold = 20,
 	bot_human_ammo_reserve_threshold = 80,
+	bot_grenade_charges_threshold = 0,
+	bot_human_grenade_reserve_threshold = 100,
 	healing_deferral_mode = "stations_and_deployables",
 	healing_deferral_human_threshold = 90,
 	healing_deferral_emergency_threshold = 25,
@@ -203,6 +209,19 @@ local function _read_numeric_setting(setting_id, default_value, min_value, max_v
 	end
 
 	return numeric_value
+end
+
+function M.bot_grenade_charges_threshold()
+	return _read_numeric_setting(BOT_GRENADE_CHARGES_THRESHOLD_SETTING_ID, DEFAULT_BOT_GRENADE_CHARGES_THRESHOLD, 0, 12)
+end
+
+function M.human_grenade_reserve_threshold()
+	return _read_percent_setting(
+		HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID,
+		DEFAULT_HUMAN_GRENADE_RESERVE_THRESHOLD,
+		0,
+		100
+	)
 end
 
 -- Slider-with-zero migration helper: read the slider setting, but if it's nil
