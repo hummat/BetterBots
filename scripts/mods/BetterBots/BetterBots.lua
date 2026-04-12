@@ -216,6 +216,9 @@ assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
 assert(WeaponAction, "BetterBots: failed to load weapon_action module")
 
+local SustainedFire = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sustained_fire")
+assert(SustainedFire, "BetterBots: failed to load sustained_fire module")
+
 local ConditionPatch = mod:io_dofile("BetterBots/scripts/mods/BetterBots/condition_patch")
 assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
 
@@ -458,6 +461,17 @@ WeaponAction.init({
 	end,
 })
 
+SustainedFire.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
+})
+
 ConditionPatch.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -653,6 +667,7 @@ WeaponAction.register_hooks({
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
 })
+SustainedFire.register_hooks()
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 BotProfiles.register_hooks()

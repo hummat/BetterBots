@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 841 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — 851 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -331,6 +331,7 @@ scripts/mods/BetterBots/
   melee_attack_choice.lua                   # Melee attack-choice hook: bias lights into unarmored hordes while preserving armored heavy preference (#52)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
+  sustained_fire.lua                        # Held-input bridge for sustained-fire ranged weapon paths (#87)
   team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
   target_selection.lua                      # Melee target selection distance penalty for specials
   target_type_hysteresis.lua                # Perception-layer melee/ranged target type stabilization (#90)
@@ -388,6 +389,7 @@ tests/
   perf_spec.lua                             # perf timing recorder
   debug_spec.lua                            # debug command registration
   startup_regressions_spec.lua              # structural regression guards
+  sustained_fire_spec.lua                   # sustained-fire path detection, hold injection, stale clears
   ability_queue_spec.lua                    # combat ability fallback queueing
   ammo_policy_spec.lua                      # ammo policy thresholds + defer logic
   combat_ability_identity_spec.lua          # semantic ability identity routing

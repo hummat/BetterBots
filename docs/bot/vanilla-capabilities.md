@@ -155,6 +155,7 @@ Community claims bots "hip-fire only" — **this is incorrect for vanilla bots**
 | ADS for Tertium 5/6 bots | Custom profiles may lack `bot_gestalts` → fallback to `none` → no ADS | `bot_behavior_extension.lua:91` — falls back to `NO_GESTALTS` when nil |
 | Player weapon compatibility | No player weapon has `attack_meta_data` — bots fall back to hardcoded names | See "Player weapon `attack_meta_data` gap" section below |
 | Warp charge venting | BT vent node sends wrong action_input (`reload` vs `vent`) | Issue #30 |
+| Sustained-fire execution | Vanilla queues the fire action but never mirrors the required raw hold input back through `BotUnitInput`, so stream/full-auto paths collapse into taps. BetterBots `#87` now bridges held inputs for an allowlist of sustained-fire templates without changing path selection policy. | `bot_unit_input.lua`, `player_unit_action_input_extension.lua`, `bt_bot_shoot_action.lua` |
 | Suppressive fire | No concept of suppression output | No suppression scoring |
 | Target leading (projectile) | Ballistic prediction exists but limited | `_ballistic_shoot_angle` only for gravity projectiles |
 | Ammo conservation | Bots pick up ammo they don't need (infinite effective ammo) | `can_loot` checks ammo %, but bot ammo rarely depletes |

@@ -118,6 +118,12 @@ This mod targets bot ability activation in three paths:
 27. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
+28. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
+    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`: observe successful `weapon_action` requests and arm per-unit sustained-fire state for supported held-fire paths
+    - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
+    - hook `BotUnitInput._update_actions`: inject raw hold inputs (`action_one_hold` for most full-auto/stream paths, `action_two_hold` for Purgatus flame charge) while sustained state is fresh
+    - scope is execution-only: it respects the current `attack_meta_data` path choice and does not decide ADS vs hipfire vs brace
+    - supported templates: flamer, Purgatus, recon lasguns, infantry autoguns, braced autoguns, autopistol, dual autopistols, bolter hipfire, Ogryn heavy stubbers, and rippergun braced fire
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted finesse families (lasgun, autogun, bolter, stub revolver) when the template leaves `aim_at_node` unset (#91 MVP)
