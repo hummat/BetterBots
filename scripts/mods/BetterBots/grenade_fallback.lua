@@ -22,10 +22,13 @@ local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
 local _resolve_bot_target_unit_fn
+local _resolve_grenade_projectile_data
+local _solve_ballistic_rotation
 
 -- State tracking (weak-keyed by unit)
 local _grenade_state_by_unit
 local _last_grenade_charge_event_by_unit
+local _weapon_template_by_inventory_item_name
 
 -- Timing constants
 local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
@@ -34,6 +37,8 @@ local DEFAULT_THROW_DELAY_S = 0.3 -- Default hold after aim_hold before releasin
 local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
 -- Same cooldown for success and failure; split if tuning requires it.
 local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
+local BALLISTIC_GRAVITY_EPSILON = 0.5
+local ACCEPTABLE_ACCURACY = 0.1
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
@@ -132,6 +137,158 @@ local ASSAIL_AIMED_PROFILE = {
 	require_charge_confirmation = true,
 }
 
+local EXCLUDED_FLAT_GRENADE_NAMES = {
+	adamant_shock_mine = true,
+	adamant_whistle = true,
+	broker_missile_launcher = true,
+	psyker_chain_lightning = true,
+	psyker_smite = true,
+	psyker_throwing_knives = true,
+}
+
+local function _extract_projectile_template(weapon_template)
+	if not weapon_template then
+		return nil
+	end
+
+	if weapon_template.projectile_template then
+		return weapon_template.projectile_template
+	end
+
+	local actions = weapon_template.actions
+	if not actions then
+		return nil
+	end
+
+	for _, action in pairs(actions) do
+		if action.projectile_template then
+			return action.projectile_template
+		end
+	end
+
+	return nil
+end
+
+local function _weapon_template_by_item_name(inventory_item_name)
+	if not inventory_item_name then
+		return nil
+	end
+
+	if not _weapon_template_by_inventory_item_name then
+		_weapon_template_by_inventory_item_name = {}
+		local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
+
+		for _, weapon_template in pairs(WeaponTemplates) do
+			local projectile_template = _extract_projectile_template(weapon_template)
+			local item_name = projectile_template and projectile_template.item_name
+			if item_name and not _weapon_template_by_inventory_item_name[item_name] then
+				_weapon_template_by_inventory_item_name[item_name] = weapon_template
+			end
+		end
+	end
+
+	return _weapon_template_by_inventory_item_name[inventory_item_name]
+end
+
+local function _default_resolve_grenade_projectile_data(unit, grenade_name)
+	if EXCLUDED_FLAT_GRENADE_NAMES[grenade_name] then
+		return {
+			mode = "flat",
+			reason = "excluded_family",
+		}
+	end
+
+	local _, grenade_ability = _equipped_grenade_ability and _equipped_grenade_ability(unit)
+	local inventory_item_name = grenade_ability and grenade_ability.inventory_item_name
+	if not inventory_item_name then
+		return {
+			mode = "flat",
+			reason = "inventory_item_missing",
+		}
+	end
+
+	local weapon_template = _weapon_template_by_item_name(inventory_item_name)
+	if not weapon_template then
+		return {
+			mode = "flat",
+			reason = "weapon_template_missing",
+		}
+	end
+
+	local projectile_template = _extract_projectile_template(weapon_template)
+	local locomotion_template = projectile_template and projectile_template.locomotion_template
+	local integrator_parameters = locomotion_template and locomotion_template.integrator_parameters
+	local trajectory_parameters = locomotion_template and locomotion_template.trajectory_parameters
+	local throw_parameters = trajectory_parameters and trajectory_parameters.throw
+	local spawn_parameters = locomotion_template and locomotion_template.spawn_projectile_parameters
+	local speed = throw_parameters and (throw_parameters.speed_maximal or throw_parameters.speed_initial)
+		or spawn_parameters and spawn_parameters.initial_speed
+	local gravity = integrator_parameters and integrator_parameters.gravity
+
+	if not speed then
+		return {
+			mode = "flat",
+			reason = "speed_missing",
+		}
+	end
+
+	if not gravity or gravity <= BALLISTIC_GRAVITY_EPSILON then
+		return {
+			mode = "flat",
+			reason = "non_ballistic_projectile",
+		}
+	end
+
+	return {
+		mode = "ballistic",
+		speed = speed,
+		gravity = gravity,
+	}
+end
+
+local function _target_velocity(target_unit)
+	local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+	if unit_data_extension then
+		local locomotion_component = unit_data_extension:read_component("locomotion")
+		if locomotion_component and locomotion_component.velocity_current then
+			return locomotion_component.velocity_current
+		end
+	end
+
+	local locomotion_extension = ScriptUnit.has_extension(target_unit, "locomotion_system")
+	if locomotion_extension and locomotion_extension.current_velocity then
+		return locomotion_extension:current_velocity()
+	end
+
+	return Vector3.zero()
+end
+
+local function _default_solve_ballistic_rotation(unit, aim_unit, projectile_data)
+	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit]
+	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[aim_unit]
+	if not unit_position or not target_position then
+		return nil, "position_lookup_missing"
+	end
+
+	local target_velocity = _target_velocity(aim_unit)
+	local angle, solved_target_position = Trajectory.angle_to_hit_moving_target(
+		unit_position,
+		target_position,
+		projectile_data.speed,
+		target_velocity,
+		projectile_data.gravity,
+		ACCEPTABLE_ACCURACY,
+		false
+	)
+	if not angle then
+		return nil, "trajectory_solver_failed"
+	end
+
+	local flat_direction = Vector3.normalize(Vector3.flat(solved_target_position - unit_position))
+	local look_rotation = Quaternion.look(flat_direction, Vector3.up())
+	return Quaternion.multiply(look_rotation, Quaternion(Vector3.right(), angle))
+end
+
 local function _resolve_template_entry(grenade_name, context, rule)
 	if grenade_name ~= "psyker_throwing_knives" then
 		return SUPPORTED_THROW_TEMPLATES[grenade_name]
@@ -167,30 +324,52 @@ end
 
 -- Aim the bot toward a concrete unit so the grenade/blitz release uses a valid
 -- facing direction instead of the bot's stale movement heading.
-local function _set_bot_aim(unit, aim_unit)
+local function _set_bot_aim(unit, aim_unit, grenade_name)
 	if not aim_unit then
-		return false, "no target unit"
+		return false, nil, "no_target_unit"
 	end
 
 	if not POSITION_LOOKUP then
-		return false, "position lookup unavailable"
-	end
-
-	local aim_position = POSITION_LOOKUP[aim_unit]
-	if not aim_position then
-		return false, "target position missing"
+		return false, nil, "position_lookup_unavailable"
 	end
 
 	local input_extension = ScriptUnit.has_extension(unit, "input_system")
 	local bot_unit_input = input_extension and input_extension.bot_unit_input and input_extension:bot_unit_input()
 	if not bot_unit_input then
-		return false, "bot input missing"
+		return false, nil, "bot_input_missing"
+	end
+
+	local projectile_data = _resolve_grenade_projectile_data and _resolve_grenade_projectile_data(unit, grenade_name)
+		or nil
+	if projectile_data and projectile_data.mode == "ballistic" then
+		local wanted_rotation, reason = _solve_ballistic_rotation(unit, aim_unit, projectile_data)
+		if wanted_rotation then
+			bot_unit_input:set_aiming(true, false, true)
+			bot_unit_input:set_aim_rotation(wanted_rotation)
+
+			return true, "ballistic", nil
+		end
+
+		local aim_position = POSITION_LOOKUP[aim_unit]
+		if not aim_position then
+			return false, nil, "target_position_missing"
+		end
+
+		bot_unit_input:set_aiming(true, false, false)
+		bot_unit_input:set_aim_position(aim_position)
+
+		return true, "flat", reason
+	end
+
+	local aim_position = POSITION_LOOKUP[aim_unit]
+	if not aim_position then
+		return false, nil, "target_position_missing"
 	end
 
 	bot_unit_input:set_aiming(true, false, false)
 	bot_unit_input:set_aim_position(aim_position)
 
-	return true
+	return true, "flat", projectile_data and projectile_data.reason or "projectile_data_unavailable"
 end
 
 -- Release explicit bot aim state on reset so grenade sequences do not leave the
@@ -224,12 +403,30 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 		return false
 	end
 
-	local aim_ok, aim_reason = _set_bot_aim(unit, state.aim_unit)
+	local aim_ok, aim_mode, aim_reason = _set_bot_aim(unit, state.aim_unit, state.grenade_name)
 	if aim_ok then
+		if _debug_enabled() then
+			if aim_mode == "ballistic" then
+				_debug_log("grenade_aim_ballistic:" .. tostring(unit), fixed_t, "grenade aim ballistic")
+			else
+				_debug_log(
+					"grenade_aim_flat_fallback:" .. tostring(unit),
+					fixed_t,
+					"grenade aim flat fallback (" .. tostring(aim_reason) .. ")"
+				)
+			end
+		end
 		return true
 	end
 
 	if _debug_enabled() then
+		if aim_reason == "trajectory_solver_failed" or aim_reason == "position_lookup_missing" then
+			_debug_log(
+				"grenade_aim_solver_fail:" .. tostring(unit),
+				fixed_t,
+				"grenade aim solver fallback (" .. tostring(aim_reason) .. ")"
+			)
+		end
 		_debug_log(
 			"grenade_aim_unavailable:" .. tostring(unit),
 			fixed_t,
@@ -1186,6 +1383,9 @@ return {
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
+		_resolve_grenade_projectile_data = refs.resolve_grenade_projectile_data
+			or _default_resolve_grenade_projectile_data
+		_solve_ballistic_rotation = refs.solve_ballistic_rotation or _default_solve_ballistic_rotation
 		local bot_targeting = refs.bot_targeting
 		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 	end,

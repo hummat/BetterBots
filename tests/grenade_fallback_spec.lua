@@ -45,6 +45,12 @@ local mock_bot_unit_input = {
 			use_rotation = use_rotation,
 		}
 	end,
+	set_aim_rotation = function(_self, rotation)
+		_aim_calls[#_aim_calls + 1] = {
+			method = "set_aim_rotation",
+			rotation = rotation,
+		}
+	end,
 	set_aim_position = function(_self, position)
 		_aim_calls[#_aim_calls + 1] = {
 			method = "set_aim_position",
@@ -146,6 +152,7 @@ local function reset()
 	}
 
 	_G.POSITION_LOOKUP = {
+		[unit] = { x = 0, y = 0, z = 0 },
 		enemy_1 = { x = 10, y = 0, z = 0 },
 	}
 
@@ -757,6 +764,211 @@ describe("grenade_fallback", function()
 		assert.is_false(_aim_calls[1].use_rotation)
 		assert.equals("set_aim_position", _aim_calls[2].method)
 		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("uses aim rotation for supported ballistic projectiles", function()
+		local mock_rotation = { yaw = 1, pitch = 2 }
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return mock_rotation
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("uses ballistic aim for zealot throwing knives during auto-fire wield", function()
+		local mock_rotation = { yaw = 3, pitch = 4 }
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 15 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_knives_pressure"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "zealot_throwing_knives" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 75,
+					gravity = 17.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return mock_rotation
+			end,
+		})
+
+		GrenadeFallback.try_queue(unit, blackboard)
+		_wielded_slot = "slot_grenade_ability"
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("falls back to flat aim for excluded projectile families", function()
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_missile_launcher"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "broker_missile_launcher" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "flat",
+					reason = "excluded_family",
+				}
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_false(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_position", _aim_calls[2].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("falls back to flat aim when ballistic solver fails", function()
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 75,
+					gravity = 17.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return nil, "trajectory_solver_failed"
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_false(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_position", _aim_calls[2].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("logs ballistic aim path when debug is enabled", function()
+		_debug_enabled_result = true
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return { yaw = 1, pitch = 2 }
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_debug_logs = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.truthy(find_debug_log("grenade aim ballistic"))
 	end)
 
 	it("clears bot aim when the grenade state resets", function()
