@@ -59,6 +59,35 @@ describe("sustained_fire", function()
 		assert.is_true(input.action_one_hold)
 	end)
 
+	it("refreshes sustained state while hold bridge stays active", function()
+		local t = 10
+		local unit = {}
+		local input = {}
+
+		SustainedFire.init({
+			fixed_time = function()
+				return t
+			end,
+		})
+
+		SustainedFire.arm(unit, {
+			template_name = "lasgun_p3_m1",
+			action_input = "shoot",
+			hold_inputs = {
+				action_one_hold = true,
+			},
+		})
+
+		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+		t = t + 0.2
+		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+		t = t + 0.2
+		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+
+		assert.is_not_nil(SustainedFire.active_state(unit))
+		assert.is_true(input.action_one_hold)
+	end)
+
 	it("clears sustained state on reload", function()
 		local unit = {}
 		SustainedFire.arm(unit, {

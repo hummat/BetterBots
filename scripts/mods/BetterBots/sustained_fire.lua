@@ -292,6 +292,11 @@ function M.update_actions(unit, input, current_template_name)
 		return
 	end
 
+	-- Refresh liveness while the hold bridge is still actively asserting inputs.
+	-- Without this, long-hold weapons expire after STALE_WINDOW_S even though
+	-- the bot is still intentionally sustaining the fire path.
+	state.last_seen_t = now
+
 	for hold_input, value in pairs(state.hold_inputs) do
 		input[hold_input] = value
 	end

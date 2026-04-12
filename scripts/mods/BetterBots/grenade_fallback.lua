@@ -29,6 +29,7 @@ local _solve_ballistic_rotation
 local _grenade_state_by_unit
 local _last_grenade_charge_event_by_unit
 local _weapon_template_by_inventory_item_name
+local _projectile_template_by_inventory_item_name
 
 -- Timing constants
 local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
@@ -190,6 +191,26 @@ local function _weapon_template_by_item_name(inventory_item_name)
 	return _weapon_template_by_inventory_item_name[inventory_item_name]
 end
 
+local function _projectile_template_by_item_name(inventory_item_name)
+	if not inventory_item_name then
+		return nil
+	end
+
+	if not _projectile_template_by_inventory_item_name then
+		_projectile_template_by_inventory_item_name = {}
+		local ProjectileTemplates = require("scripts/settings/projectile/projectile_templates")
+
+		for _, projectile_template in pairs(ProjectileTemplates) do
+			local item_name = projectile_template and projectile_template.item_name
+			if item_name and not _projectile_template_by_inventory_item_name[item_name] then
+				_projectile_template_by_inventory_item_name[item_name] = projectile_template
+			end
+		end
+	end
+
+	return _projectile_template_by_inventory_item_name[inventory_item_name]
+end
+
 local function _default_resolve_grenade_projectile_data(unit, grenade_name)
 	if EXCLUDED_FLAT_GRENADE_NAMES[grenade_name] then
 		return {
@@ -208,14 +229,15 @@ local function _default_resolve_grenade_projectile_data(unit, grenade_name)
 	end
 
 	local weapon_template = _weapon_template_by_item_name(inventory_item_name)
-	if not weapon_template then
+	local projectile_template = weapon_template and _extract_projectile_template(weapon_template)
+		or _projectile_template_by_item_name(inventory_item_name)
+	if not projectile_template then
 		return {
 			mode = "flat",
-			reason = "weapon_template_missing",
+			reason = "projectile_template_missing",
 		}
 	end
 
-	local projectile_template = _extract_projectile_template(weapon_template)
 	local locomotion_template = projectile_template and projectile_template.locomotion_template
 	local integrator_parameters = locomotion_template and locomotion_template.integrator_parameters
 	local trajectory_parameters = locomotion_template and locomotion_template.trajectory_parameters
@@ -1376,6 +1398,8 @@ return {
 		_grenade_state_by_unit = deps.grenade_state_by_unit
 		_last_grenade_charge_event_by_unit = deps.last_grenade_charge_event_by_unit
 		_perf = deps.perf
+		_weapon_template_by_inventory_item_name = nil
+		_projectile_template_by_inventory_item_name = nil
 	end,
 	wire = function(refs)
 		_build_context = refs.build_context

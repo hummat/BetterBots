@@ -2,6 +2,7 @@
 
 -- Controllable mock time
 local _mock_time = 0
+local _original_require = require
 
 -- Mock extensions per unit
 local _extensions = {}
@@ -121,6 +122,7 @@ end
 
 local function reset()
 	_mock_time = 10.0
+	_G.require = _original_require
 	_can_use_grenade = true
 	_wielded_slot = "slot_secondary"
 	_heuristic_result = true
@@ -793,6 +795,75 @@ describe("grenade_fallback", function()
 				}
 			end,
 			solve_ballistic_rotation = function()
+				return mock_rotation
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("resolves standard grenade ballistics from projectile templates", function()
+		local mock_rotation = { yaw = 5, pitch = 6 }
+
+		_G.require = function(path)
+			if path == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+				return {}
+			end
+
+			if path == "scripts/settings/projectile/projectile_templates" then
+				return {
+					veteran_frag_grenade = {
+						item_name = "content/items/weapons/player/grenade_frag",
+						locomotion_template = {
+							integrator_parameters = {
+								gravity = 12.5,
+							},
+							trajectory_parameters = {
+								throw = {
+									speed_maximal = 30,
+								},
+							},
+						},
+					},
+				}
+			end
+
+			return _original_require(path)
+		end
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension,
+					{
+						name = "veteran_frag_grenade",
+						inventory_item_name = "content/items/weapons/player/grenade_frag",
+					}
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			solve_ballistic_rotation = function(_unit, _aim_unit, projectile_data)
+				assert.equals("ballistic", projectile_data.mode)
+				assert.equals(30, projectile_data.speed)
+				assert.equals(12.5, projectile_data.gravity)
 				return mock_rotation
 			end,
 		})
