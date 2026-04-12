@@ -164,7 +164,7 @@ local function has_keyword(weapon_template, keyword)
 	return false
 end
 
-local WEAKSPOT_AIM_NODES = {
+local WEAKSPOT_AIM_NODES = { -- (#91)
 	"j_head",
 	"j_spine",
 }

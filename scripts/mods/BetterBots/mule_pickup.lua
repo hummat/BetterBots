@@ -35,7 +35,10 @@ local function _get_pickup_data(pickup_name)
 end
 
 local function _grimoire_enabled()
-	return _is_grimoire_pickup_enabled and _is_grimoire_pickup_enabled() == true or false
+	if not _is_grimoire_pickup_enabled then
+		return false
+	end
+	return _is_grimoire_pickup_enabled() == true
 end
 
 local function _patch_pickup(pickup_name, mule_enabled)

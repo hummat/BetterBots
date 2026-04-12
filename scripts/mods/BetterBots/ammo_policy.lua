@@ -86,27 +86,21 @@ end
 local function _grenade_charge_state(unit)
 	local ability_extension = _ability_extension and _ability_extension(unit, "ability_system")
 	if not ability_extension then
-		return nil
+		return nil, nil
 	end
 
 	local max_charges = ability_extension:max_ability_charges("grenade_ability")
 	if max_charges <= 0 then
-		return {
-			current = 0,
-			max = 0,
-		}
+		return 0, 0
 	end
 
-	return {
-		current = ability_extension:remaining_ability_charges("grenade_ability"),
-		max = max_charges,
-	}
+	return ability_extension:remaining_ability_charges("grenade_ability"), max_charges
 end
 
 local function _eligible_for_grenade_pickup(unit)
-	local state = _grenade_charge_state(unit)
+	local current, max = _grenade_charge_state(unit)
 
-	return state ~= nil and state.max > 0, state
+	return max ~= nil and max > 0, current, max
 end
 
 local function _all_eligible_humans_above_grenade_threshold(human_units, threshold)
@@ -125,9 +119,9 @@ local function _all_eligible_humans_above_grenade_threshold(human_units, thresho
 
 	for i = 1, #human_units do
 		local human_unit = human_units[i]
-		local eligible, state = _eligible_for_grenade_pickup(human_unit)
-		if eligible and state then
-			local charge_fraction = state.current / state.max
+		local eligible, current, max = _eligible_for_grenade_pickup(human_unit)
+		if eligible then
+			local charge_fraction = current / max
 			if charge_fraction < threshold then
 				_human_grenade_scan_cache = {
 					fixed_t = fixed_t,
@@ -189,7 +183,7 @@ local function _best_nearby_grenade_pickup(bot_group, unit)
 					local candidate_distance = distance - sticky_distance
 					if not best_distance or candidate_distance < best_distance then
 						best_pickup = pickup_unit
-						best_distance = distance
+						best_distance = candidate_distance
 					end
 				end
 			end
@@ -264,8 +258,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			end
 		end
 
-		local grenade_eligible, grenade_state = _eligible_for_grenade_pickup(unit)
-		if grenade_eligible and grenade_state and grenade_state.current <= _bot_grenade_threshold() then
+		local grenade_eligible, grenade_current, grenade_max = _eligible_for_grenade_pickup(unit)
+		if grenade_eligible and grenade_current <= _bot_grenade_threshold() then
 			local grenade_pickup, grenade_distance = _best_nearby_grenade_pickup(bot_group, unit)
 			if grenade_pickup then
 				local humans_ok_for_grenade = _all_eligible_humans_above_grenade_threshold(
@@ -287,7 +281,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 					_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
 				end
 			end
-		elseif grenade_state and grenade_state.max <= 0 then
+		elseif grenade_max ~= nil and grenade_max <= 0 then
 			_log("grenade_pickup_skip_ineligible:" .. tostring(unit), "grenade pickup skipped: cooldown-based blitz")
 		end
 

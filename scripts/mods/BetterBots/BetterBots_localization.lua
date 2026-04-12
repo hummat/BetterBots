@@ -161,6 +161,20 @@ return {
 	enable_daemonhost_avoidance_description = {
 		en = "Suppress combat and sprinting near dormant daemonhosts. Disabling lets bots engage freely (advanced).",
 	},
+	enable_target_type_hysteresis = {
+		en = "Target type stabilization",
+	},
+	enable_target_type_hysteresis_description = {
+		en = "Stabilize melee/ranged target type selection to reduce weapon-swap thrash. "
+			.. "Adds momentum and margin-based hysteresis to the targeting system.",
+	},
+	enable_human_likeness = {
+		en = "Human-like behavior tuning",
+	},
+	enable_human_likeness_description = {
+		en = "Add subtle delays and variation to bot ability use and engagement to make bots feel more like human teammates. "
+			.. "Includes reaction time tuning, ability jitter, and challenge-pressure engagement scaling.",
+	},
 	enable_bot_grimoire_pickup = {
 		en = "Bot grimoire pickup",
 	},

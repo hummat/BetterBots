@@ -276,13 +276,22 @@ BotProfiles.init({
 	debug_enabled = _debug_enabled,
 })
 
-HumanLikeness.init({})
+HumanLikeness.init({
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	is_enabled = function()
+		return Settings.is_feature_enabled("human_likeness")
+	end,
+})
 
 TargetTypeHysteresis.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	is_enabled = function()
+		return Settings.is_feature_enabled("target_type_hysteresis")
+	end,
 })
 
 EngagementLeash.init({
@@ -1267,7 +1276,7 @@ end
 -- All modules are assert-guarded above; if any failed to load we'd have
 -- crashed already.  The count serves as a deployment sanity check in logs.
 -- Bump when adding/removing modules.
-local _MODULE_COUNT = 34
+local _MODULE_COUNT = 37
 mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
 

@@ -38,8 +38,8 @@ local DEFAULT_THROW_DELAY_S = 0.3 -- Default hold after aim_hold before releasin
 local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
 -- Same cooldown for success and failure; split if tuning requires it.
 local RETRY_COOLDOWN_S = 2.0 -- Minimum gap between throw attempts
-local BALLISTIC_GRAVITY_EPSILON = 0.5
-local ACCEPTABLE_ACCURACY = 0.1
+local BALLISTIC_GRAVITY_EPSILON = 0.5 -- Gravity below this treated as non-ballistic (flat aim)
+local ACCEPTABLE_ACCURACY = 0.1 -- Trajectory solver convergence tolerance (radians)
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
@@ -306,7 +306,11 @@ local function _default_solve_ballistic_rotation(unit, aim_unit, projectile_data
 		return nil, "trajectory_solver_failed"
 	end
 
-	local flat_direction = Vector3.normalize(Vector3.flat(solved_target_position - unit_position))
+	local delta_flat = Vector3.flat(solved_target_position - unit_position)
+	if Vector3.length_squared(delta_flat) < 0.001 then
+		return nil, "degenerate_direction"
+	end
+	local flat_direction = Vector3.normalize(delta_flat)
 	local look_rotation = Quaternion.look(flat_direction, Vector3.up())
 	return Quaternion.multiply(look_rotation, Quaternion(Vector3.right(), angle))
 end
@@ -344,8 +348,9 @@ local function _resolve_aim_unit(context)
 		or context.urgent_target_enemy
 end
 
--- Aim the bot toward a concrete unit so the grenade/blitz release uses a valid
--- facing direction instead of the bot's stale movement heading.
+-- Aim the bot toward a target unit for grenade/blitz release. For ballistic grenades,
+-- solves a trajectory arc; falls back to flat aim when the solver fails or projectile
+-- data is unavailable. Returns (success, aim_mode, reason).
 local function _set_bot_aim(unit, aim_unit, grenade_name)
 	if not aim_unit then
 		return false, nil, "no_target_unit"
@@ -442,13 +447,6 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 	end
 
 	if _debug_enabled() then
-		if aim_reason == "trajectory_solver_failed" or aim_reason == "position_lookup_missing" then
-			_debug_log(
-				"grenade_aim_solver_fail:" .. tostring(unit),
-				fixed_t,
-				"grenade aim solver fallback (" .. tostring(aim_reason) .. ")"
-			)
-		end
 		_debug_log(
 			"grenade_aim_unavailable:" .. tostring(unit),
 			fixed_t,

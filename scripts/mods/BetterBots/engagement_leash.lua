@@ -127,7 +127,8 @@ function M.compute_effective_leash(unit, target_unit, target_breed, already_enga
 		effective = _HumanLikeness.scale_engage_leash(effective, pressure)
 	end
 
-	return effective, "base"
+	local reason = (effective < math.min(base, cap)) and "pressure_scaled" or "base"
+	return effective, reason
 end
 
 function M.should_extend_approach(unit, target_unit, target_breed, already_engaged, t)

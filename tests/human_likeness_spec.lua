@@ -21,6 +21,7 @@ describe("human_likeness", function()
 		assert.is_true(HumanLikeness.should_bypass_ability_jitter("ogryn_charge_ally_aid"))
 		assert.is_true(HumanLikeness.should_bypass_ability_jitter("zealot_relic_panic"))
 		assert.is_true(HumanLikeness.should_bypass_ability_jitter("psyker_shout_hazard"))
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("ogryn_taunt_last_stand"))
 		assert.is_false(HumanLikeness.should_bypass_ability_jitter("veteran_shout_mixed_pack"))
 	end)
 
@@ -30,5 +31,25 @@ describe("human_likeness", function()
 		assert.equals(20, HumanLikeness.scale_engage_leash(20, 0))
 		assert.is_true(HumanLikeness.scale_engage_leash(20, 20) < 20)
 		assert.equals(10, HumanLikeness.scale_engage_leash(20, 30))
+	end)
+
+	it("clamps leash to MIN_LEASH_FLOOR when base leash is small", function()
+		HumanLikeness.init({})
+
+		-- At max pressure (30), leash = max(6, 10*0.5) = 6 (floor wins)
+		assert.equals(6, HumanLikeness.scale_engage_leash(10, 30))
+		-- At max pressure (30), leash = max(6, 8*0.5) = 6 (floor wins over 4)
+		assert.equals(6, HumanLikeness.scale_engage_leash(8, 30))
+	end)
+
+	it("bypasses jitter and leash scaling when disabled", function()
+		HumanLikeness.init({
+			is_enabled = function()
+				return false
+			end,
+		})
+
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("psyker_shout_mixed_pack"))
+		assert.equals(20, HumanLikeness.scale_engage_leash(20, 30))
 	end)
 end)

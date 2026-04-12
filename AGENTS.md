@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 867 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — 872 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -52,6 +52,25 @@ See `docs/dev/logging.md` for the full logging architecture, output channels, lo
 - Hot-reload: `Ctrl+Shift+R` (requires DMF Developer Mode)
 - Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/dev/debugging.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
 - **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
+
+## Settings surface
+
+Every BetterBots addition must be adjustable or toggleable via the mod settings UI, with one exception: vanilla bug fixes (guards against engine crashes, nil-safety patches, etc.) that restore correct behavior may be unconditionally active.
+
+**What "adjustable" means per feature type:**
+- **New behavior** (ability activation, targeting changes, pickup policies): a boolean toggle under the appropriate settings category, defaulting to `true` (on)
+- **Tuning parameters** (distances, thresholds, timers): a numeric slider or dropdown with sensible defaults and min/max bounds
+- **Risky or opinionated behavior** (grimoire pickup, aggressive presets): default to `false` (off) — opt-in, not opt-out
+
+**Implementation checklist for new settings:**
+1. Add default to `M.DEFAULTS` in `settings.lua`
+2. Add `FEATURE_GATES` entry (for boolean toggles) or accessor function (for numeric values)
+3. Add widget definition in `BetterBots_data.lua`
+4. Add localized label + description in `BetterBots_localization.lua`
+5. Wire `is_enabled` / getter through the module's `init()` deps
+6. Gate the module's hooks/behavior behind the setting at runtime
+
+**Why:** Solo Play users have wildly different preferences and hardware. A feature that helps one player may annoy another. Settings cost almost nothing to add but are impossible to retrofit without breaking saved configs. The mod's value proposition is "bots that actually use abilities" — not "bots that behave exactly how the developer thinks they should."
 
 ## Local static checks
 

@@ -104,6 +104,16 @@ return {
 						default_value = DEFAULTS.enable_daemonhost_avoidance,
 					},
 					{
+						setting_id = "enable_target_type_hysteresis",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_target_type_hysteresis,
+					},
+					{
+						setting_id = "enable_human_likeness",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_human_likeness,
+					},
+					{
 						setting_id = "enable_bot_grimoire_pickup",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_bot_grimoire_pickup,

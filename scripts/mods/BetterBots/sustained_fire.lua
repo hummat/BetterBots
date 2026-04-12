@@ -25,6 +25,15 @@ local CLEAR_ACTION_INPUTS = {
 	charge_release = true,
 }
 
+local SHOOT_AND_ZOOM_HOLD = {
+	shoot = { action_one_hold = true },
+	zoom_shoot = { action_one_hold = true },
+}
+
+local ZOOM_ONLY_HOLD = {
+	zoom_shoot = { action_one_hold = true },
+}
+
 local SUSTAINED_TEMPLATE_ACTIONS = {
 	flamer_p1_m1 = {
 		shoot_braced = { action_one_hold = true },
@@ -32,83 +41,28 @@ local SUSTAINED_TEMPLATE_ACTIONS = {
 	forcestaff_p2_m1 = {
 		trigger_charge_flame = { action_two_hold = true },
 	},
-	lasgun_p3_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	lasgun_p3_m2 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	lasgun_p3_m3 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p1_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p1_m2 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p1_m3 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p2_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p2_m2 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autogun_p2_m3 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	autopistol_p1_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	dual_autopistols_p1_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
+	lasgun_p3_m1 = SHOOT_AND_ZOOM_HOLD,
+	lasgun_p3_m2 = SHOOT_AND_ZOOM_HOLD,
+	lasgun_p3_m3 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p1_m1 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p1_m2 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p1_m3 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p2_m1 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p2_m2 = SHOOT_AND_ZOOM_HOLD,
+	autogun_p2_m3 = SHOOT_AND_ZOOM_HOLD,
+	autopistol_p1_m1 = SHOOT_AND_ZOOM_HOLD,
+	dual_autopistols_p1_m1 = SHOOT_AND_ZOOM_HOLD,
 	bolter_p1_m2 = {
 		shoot_pressed = { action_one_hold = true },
 	},
-	ogryn_heavystubber_p1_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_heavystubber_p1_m2 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_heavystubber_p1_m3 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_heavystubber_p2_m1 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_heavystubber_p2_m2 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_heavystubber_p2_m3 = {
-		shoot = { action_one_hold = true },
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_rippergun_p1_m1 = {
-		zoom_shoot = { action_one_hold = true },
-	},
-	ogryn_rippergun_p1_m2 = {
-		zoom_shoot = { action_one_hold = true },
-	},
+	ogryn_heavystubber_p1_m1 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_heavystubber_p1_m2 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_heavystubber_p1_m3 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_heavystubber_p2_m1 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_heavystubber_p2_m2 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_heavystubber_p2_m3 = SHOOT_AND_ZOOM_HOLD,
+	ogryn_rippergun_p1_m1 = ZOOM_ONLY_HOLD,
+	ogryn_rippergun_p1_m2 = ZOOM_ONLY_HOLD,
 }
 
 local M = {}
@@ -201,6 +155,7 @@ function M.init(deps)
 	end
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_is_enabled = deps.is_enabled
+	_active_state_by_unit = setmetatable({}, { __mode = "k" })
 end
 
 function M.resolve_state(unit, template_name, action_input)
@@ -339,7 +294,14 @@ function M.register_hooks()
 				return
 			end
 
-			M.update_actions(self._betterbots_player_unit, input)
+			local ok, err = pcall(M.update_actions, self._betterbots_player_unit, input)
+			if not ok and _debug_enabled and _debug_enabled() then
+				_debug_log(
+					"sustained_fire_error:" .. tostring(self._betterbots_player_unit),
+					_fixed_time(),
+					tostring(err)
+				)
+			end
 		end)
 	end)
 end
