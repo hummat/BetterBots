@@ -269,8 +269,10 @@ local function _default_resolve_grenade_projectile_data(unit, grenade_name)
 end
 
 local function _target_velocity(target_unit)
+	-- Player units use PlayerUnitDataExtension (has read_component); minions use
+	-- MinionUnitDataExtension (has breed/faction only). Guard the component path.
 	local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
-	if unit_data_extension then
+	if unit_data_extension and unit_data_extension.read_component then
 		local locomotion_component = unit_data_extension:read_component("locomotion")
 		if locomotion_component and locomotion_component.velocity_current then
 			return locomotion_component.velocity_current

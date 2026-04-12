@@ -1042,6 +1042,122 @@ describe("grenade_fallback", function()
 		assert.truthy(find_debug_log("grenade aim ballistic"))
 	end)
 
+	it("does not crash when target has minion-style unit_data (no read_component)", function()
+		-- MinionUnitDataExtension has breed() but no read_component.
+		-- _target_velocity must guard read_component before calling it.
+		-- Regression: without the guard this crashes with
+		-- "attempt to call method 'read_component' (a nil value)".
+		local minion_extension = {
+			breed = function()
+				return { name = "chaos_poxwalker" }
+			end,
+		}
+		_extensions.enemy_1 = {
+			unit_data_system = minion_extension,
+		}
+
+		-- Mock engine math globals so the default solver can run end-to-end.
+		-- Real Vector3 is C userdata with operator overloads; we emulate with metatables.
+		local saved_vector3 = _G.Vector3
+		local saved_trajectory = _G.Trajectory
+		local saved_quaternion = _G.Quaternion
+
+		local vec_mt = {
+			__sub = function(a, b)
+				return { x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }
+			end,
+		}
+		local function vec(x, y, z)
+			return setmetatable({ x = x, y = y, z = z }, vec_mt)
+		end
+
+		_G.POSITION_LOOKUP[unit] = vec(0, 0, 0)
+		_G.POSITION_LOOKUP.enemy_1 = vec(10, 0, 0)
+
+		_G.Vector3 = {
+			zero = function()
+				return vec(0, 0, 0)
+			end,
+			flat = function(v)
+				return vec(v.x, 0, v.z)
+			end,
+			normalize = function(v)
+				return v
+			end,
+			up = function()
+				return vec(0, 1, 0)
+			end,
+			right = function()
+				return vec(1, 0, 0)
+			end,
+			length_squared = function(_v)
+				return 100
+			end,
+		}
+		local mock_rotation = { yaw = 5, pitch = 6 }
+		_G.Trajectory = {
+			angle_to_hit_moving_target = function()
+				return 0.5, vec(10, 0, 2)
+			end,
+		}
+		_G.Quaternion = setmetatable({
+			look = function()
+				return mock_rotation
+			end,
+			multiply = function()
+				return mock_rotation
+			end,
+		}, {
+			__call = function()
+				return mock_rotation
+			end,
+		})
+
+		-- Do NOT inject solve_ballistic_rotation — exercise the default solver
+		-- which calls _target_velocity internally.
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+
+		_extensions.enemy_1 = nil
+		_G.POSITION_LOOKUP[unit] = { x = 0, y = 0, z = 0 }
+		_G.POSITION_LOOKUP.enemy_1 = { x = 10, y = 0, z = 0 }
+		_G.Vector3 = saved_vector3
+		_G.Trajectory = saved_trajectory
+		_G.Quaternion = saved_quaternion
+	end)
+
 	it("clears bot aim when the grenade state resets", function()
 		advance_to_stage("wait_aim")
 		_aim_calls = {}
