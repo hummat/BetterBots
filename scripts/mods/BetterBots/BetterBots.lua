@@ -243,6 +243,9 @@ assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 local HumanLikeness = mod:io_dofile("BetterBots/scripts/mods/BetterBots/human_likeness")
 assert(HumanLikeness, "BetterBots: failed to load human_likeness module")
 
+local TargetTypeHysteresis = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_type_hysteresis")
+assert(TargetTypeHysteresis, "BetterBots: failed to load target_type_hysteresis module")
+
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
 
@@ -268,6 +271,13 @@ BotProfiles.init({
 })
 
 HumanLikeness.init({})
+
+TargetTypeHysteresis.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+})
 
 EngagementLeash.init({
 	mod = mod,
@@ -631,6 +641,7 @@ end
 
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
+TargetTypeHysteresis.register_hooks()
 Poxburster.register_hooks()
 MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()

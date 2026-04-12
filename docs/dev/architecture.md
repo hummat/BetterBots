@@ -119,31 +119,36 @@ This mod targets bot ability activation in three paths:
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
-28. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
+28. Target-type hysteresis (#90, via `target_type_hysteresis.lua`):
+    - wraps `bot_target_selection_template.bot_default` after vanilla scoring, leaving BT and weapon actions untouched
+    - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
+    - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
+    - logs only actual stabilized type flips (`target_type_flip:<unit>`) for in-game verification
+29. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - patches `BotSettings.opportunity_target_reaction_times.normal` from `10-20` down to `2-5`
     - adds `0.3-1.5s` combat-ability activation jitter in `ability_queue.lua` for non-emergency fallback casts
     - bypasses jitter for rescue/panic/hazard style rules so obvious emergency abilities still fire immediately
     - restores challenge-pressure melee conservatism by shrinking BetterBots' effective engagement leash under high `challenge_rating_sum` pressure instead of leaving vanilla's dead `challenge_rating = 0` path inert
-29. Runtime perf measurement (`perf.lua`):
+30. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
-29. Tiered debug log levels (#40, via `log_levels.lua`):
+31. Tiered debug log levels (#40, via `log_levels.lua`):
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
     - backward-compatible: nil `call_level` defaults to `"debug"`
-30. Shared rule tables (`shared_rules.lua`):
+32. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
-31. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
+33. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
     - hook `BotSynchronizerHost.add_bot`: resolve per-slot class setting → swap archetype, weapons, talents, cosmetics, blessings/perks
     - hook `BotPlayer.set_profile` (#65): block lossy network-sync overwrite for BetterBots-resolved profiles (`_bb_resolved` sentinel). Tags profiles with `is_local_profile = true` to bypass 1.11+ `validate_talent_layouts` in `unit_templates.lua`
-32. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
+34. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
     - hook `BtBotMeleeAction._allow_engage`: dynamically inflate `override_engage_range_to_follow_position` based on combat context (already engaged → 20m stickiness, post-charge grace → 20m for 4s, under melee attack → 20m, ranged foray → 20m when ranged enemy targets bot)
     - hook `BtBotMeleeAction._is_in_engage_range`: extend approach range from 6m to 10m when engagement extension conditions hold
     - coherency-scaled base leash: `max(12m, coherency_radius + 4m)` via `UnitCoherencyExtension:current_radius()`, hard cap 25m (30m with always-in-coherency talent)
     - per-bot state in weak-keyed table with 1s coherency cache refresh
-33. Team-level ability cooldown staggering (#14, via `team_cooldown.lua`):
+35. Team-level ability cooldown staggering (#14, via `team_cooldown.lua`):
     - pure state tracker: records activations per ability category, suppresses same-category activations from other bots within a time window
     - 3 categories: `taunt` (8s window), `aoe_shout` (6s), `dash` (4s) — roughly half the ability cooldown
     - stances and grenades excluded: stances are self-buffs (independent benefit), grenades are consumable charges (no regeneration)

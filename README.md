@@ -24,7 +24,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 822 unit tests, 37 modules
+- 828 unit tests, 38 modules
 
 ## What bots can do with this mod
 
@@ -65,6 +65,7 @@ Bots use 18 per-ability heuristic functions to decide when to activate — based
 - Boss engagement self-defense exception
 - Poxburster safe targeting (close-range fire suppression)
 - Distant special melee chase penalty (prefer ranged)
+- Target-type hysteresis (reduces melee/ranged swap thrash on close scores)
 - Melee attack selection (lights into hordes, heavies into armor)
 - Smart blitz targeting from bot perception
 - Pre-revive defensive ability activation
@@ -201,7 +202,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (822 tests) |
+| `make test` | Run busted tests (828 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -252,7 +253,7 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI
-scripts/mods/BetterBots/          # Mod source (37 modules)
+scripts/mods/BetterBots/          # Mod source (38 modules)
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
@@ -266,6 +267,7 @@ scripts/mods/BetterBots/          # Mod source (37 modules)
   bot_targeting.lua               #   Shared perception target resolver + helpers
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
+  target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
@@ -290,7 +292,7 @@ scripts/mods/BetterBots/          # Mod source (37 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 822 tests)
+tests/                            # Unit tests (busted, 828 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

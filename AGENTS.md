@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 822 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — 828 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -333,6 +333,7 @@ scripts/mods/BetterBots/
   weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
   team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
   target_selection.lua                      # Melee target selection distance penalty for specials
+  target_type_hysteresis.lua                # Perception-layer melee/ranged target type stabilization (#90)
   ping_system.lua                           # Bot elite/special pinging system
   companion_tag.lua                         # Arbites Cyber-Mastiff companion-command smart tag (#49)
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
@@ -379,6 +380,7 @@ tests/
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
   human_likeness_spec.lua                   # reaction-time patch, jitter bypass, challenge-pressure leash scaling
   engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
+  target_type_hysteresis_spec.lua           # momentum + margin stabilization for melee/ranged target type flips
   revive_ability_spec.lua                   # revive-with-ability hook + guards
   team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle

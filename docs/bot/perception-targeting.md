@@ -112,6 +112,8 @@ The bot picks whichever mode has the higher final score. The `target_enemy_type`
 
 Key implication: melee scoring heavily favors close targets (up to 3.0 distance weight) while ranged only gets 1.0 for distance, so **close enemies almost always trigger melee preference**. Ranged wins when targets are at medium distance with LoS and the gestalt doesn't penalize them.
 
+**BetterBots note (#90):** vanilla uses a hard winner-take-all comparison every `0.3s`, which can thrash between `"melee"` and `"ranged"` on close scores. BetterBots' `target_type_hysteresis.lua` keeps vanilla scoring but adds a small current-type momentum bonus plus a score margin before flipping `target_enemy_type`.
+
 ### Target Classification Flags
 
 During scoring, targets are also classified:
