@@ -240,6 +240,9 @@ assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
 assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 
+local MulePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/mule_pickup")
+assert(MulePickup, "BetterBots: failed to load mule_pickup module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
@@ -566,6 +569,15 @@ AmmoPolicy.init({
 	settings = Settings,
 })
 
+MulePickup.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	is_grimoire_pickup_enabled = function()
+		return Settings.is_bot_grimoire_pickup_enabled()
+	end,
+})
+
 -- Wire cross-module references (late-bound to avoid circular deps)
 ItemFallback.wire({
 	build_context = Heuristics.build_context,
@@ -670,6 +682,7 @@ WeaponAction.register_hooks({
 SustainedFire.register_hooks()
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
+MulePickup.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()
@@ -1006,6 +1019,10 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	if not ok then
 		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
 	end
+	ok, err = pcall(MulePickup.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: mule_pickup behavior hook install failed: " .. tostring(err))
+	end
 	ok, err = pcall(ReviveAbility.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
 		mod:echo("BetterBots: revive_ability behavior hook install failed: " .. tostring(err))
@@ -1250,7 +1267,7 @@ end
 -- All modules are assert-guarded above; if any failed to load we'd have
 -- crashed already.  The count serves as a deployment sanity check in logs.
 -- Bump when adding/removing modules.
-local _MODULE_COUNT = 33
+local _MODULE_COUNT = 34
 mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
 

@@ -20,12 +20,13 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Ammo awareness: bots defer ammo pickups when humans are low
 - Engagement leash: bots stay in combat longer using coherency-based ranges
 - Healing deferral: bots let humans heal first at health stations and med-crates
+- Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 851 unit tests, 39 modules
+- 861 unit tests, 40 modules
 
 ## What bots can do with this mod
 
@@ -93,6 +94,7 @@ Bots use 18 per-ability heuristic functions to decide when to activate — based
 - Poxburster safe targeting toggle
 - Bot ranged ammo threshold and human ammo reserve threshold
 - Healing deferral mode + thresholds
+- Bot grimoire pickup toggle
 - Bot profiles: class per slot, weapon quality
 - Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
 
@@ -203,7 +205,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (851 tests) |
+| `make test` | Run busted tests (861 tests) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -254,7 +256,7 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI
-scripts/mods/BetterBots/          # Mod source (39 modules)
+scripts/mods/BetterBots/          # Mod source (40 modules)
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
@@ -282,6 +284,7 @@ scripts/mods/BetterBots/          # Mod source (39 modules)
   engagement_leash.lua            #   Coherency-anchored melee engagement range
   healing_deferral.lua            #   Defer health stations/med-crates to humans
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
+  mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
@@ -294,7 +297,7 @@ scripts/mods/BetterBots/          # Mod source (39 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 851 tests)
+tests/                            # Unit tests (busted, 861 tests)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

@@ -103,6 +103,11 @@ return {
 						type = "checkbox",
 						default_value = DEFAULTS.enable_daemonhost_avoidance,
 					},
+					{
+						setting_id = "enable_bot_grimoire_pickup",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_bot_grimoire_pickup,
+					},
 				},
 			},
 			{

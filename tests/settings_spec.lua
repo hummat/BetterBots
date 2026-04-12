@@ -167,6 +167,22 @@ describe("settings", function()
 		end)
 	end)
 
+	describe("mule pickup settings", function()
+		it("disables bot grimoire pickup by default", function()
+			Settings.init(mock_mod({}))
+
+			assert.is_false(Settings.is_bot_grimoire_pickup_enabled())
+		end)
+
+		it("enables bot grimoire pickup when setting is on", function()
+			Settings.init(mock_mod({
+				enable_bot_grimoire_pickup = true,
+			}))
+
+			assert.is_true(Settings.is_bot_grimoire_pickup_enabled())
+		end)
+	end)
+
 	describe("category gates", function()
 		it("disables stance templates when enable_stances is off", function()
 			Settings.init(mock_mod({ enable_stances = false }))

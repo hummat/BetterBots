@@ -101,6 +101,7 @@ M.DEFAULTS = {
 	enable_engagement_leash = true,
 	enable_smart_targeting = true,
 	enable_daemonhost_avoidance = true,
+	enable_bot_grimoire_pickup = false,
 	sprint_follow_distance = 12,
 	special_chase_penalty_range = 18,
 	player_tag_bonus = 3,
@@ -281,6 +282,19 @@ end
 
 function M.is_grenade_enabled(_grenade_name)
 	return _setting_enabled("enable_grenades")
+end
+
+function M.is_bot_grimoire_pickup_enabled()
+	if not _mod then
+		return M.DEFAULTS.enable_bot_grimoire_pickup
+	end
+
+	local value = _mod:get("enable_bot_grimoire_pickup")
+	if value == nil then
+		return M.DEFAULTS.enable_bot_grimoire_pickup
+	end
+
+	return value == true
 end
 
 -- Feature gates are mod-internal constants (unlike template names, which come from

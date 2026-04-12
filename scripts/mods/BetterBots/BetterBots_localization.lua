@@ -161,6 +161,12 @@ return {
 	enable_daemonhost_avoidance_description = {
 		en = "Suppress combat and sprinting near dormant daemonhosts. Disabling lets bots engage freely (advanced).",
 	},
+	enable_bot_grimoire_pickup = {
+		en = "Bot grimoire pickup",
+	},
+	enable_bot_grimoire_pickup_description = {
+		en = "Allow bots to carry grimoires. Off by default because grimoires are high-risk permanent-corruption pickups.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint catch-up distance",
 	},

@@ -87,7 +87,7 @@ This mod targets bot ability activation in three paths:
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
     - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
-21. Ammo and grenade pickup policy (#72 / #89, via `ammo_policy.lua`):
+21. Ammo, grenade, and mule pickup policy (#72 / #89 / #32, via `ammo_policy.lua` + `mule_pickup.lua`):
     - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
     - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
@@ -95,6 +95,9 @@ This mod targets bot ability activation in three paths:
     - grenade refills only bind for charge-based grenade users at or below the configured bot grenade threshold; cooldown-only blitz users are ignored
     - grenade refill deferral is human-first with no bot desperation override; when grenade is deferred, existing ammo pickup decisions remain intact
     - explicit ammo pickup orders are preserved
+    - `mule_pickup.lua` activates vanilla side-mission book carry by mutating pickup template metadata in place: mirror `inventory_slot_name -> slot_name`, set `bots_mule_pickup = true` for tome/scripture, and gate grimoire carrying behind a BetterBots toggle
+    - hook `BotBehaviorExtension._refresh_destination` (post-process): clears stale live grimoire mule targets when the grimoire toggle is off
+    - hook `BotOrder.pickup`: rejects grimoire pickup orders while the grimoire toggle is off, but leaves tome/scripture orders intact
 22. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
