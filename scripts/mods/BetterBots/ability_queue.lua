@@ -19,6 +19,7 @@ local _EventLog
 local _EngagementLeash
 local _TeamCooldown
 local _CombatAbilityIdentity
+local _HumanLikeness
 local _is_combat_template_enabled
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
@@ -30,6 +31,13 @@ local RESCUE_CHARGE_RULES = {
 }
 
 local _action_input_is_bot_queueable
+
+local function _clear_pending_jitter(state)
+	state.pending_rule = nil
+	state.pending_template_name = nil
+	state.pending_action_input = nil
+	state.pending_ready_t = nil
+end
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
@@ -250,6 +258,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	if not can_activate then
+		_clear_pending_jitter(state)
 		if context.num_nearby > 0 and _debug_enabled() then
 			_debug_log(
 				"fallback_decision_block:" .. ability_template_name .. ":" .. tostring(unit),
@@ -278,6 +287,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		local team_key = (identity and identity.semantic_key) or ability_template_name
 		local team_suppressed, team_reason = _TeamCooldown.is_suppressed(unit, team_key, fixed_t, rule)
 		if team_suppressed then
+			_clear_pending_jitter(state)
 			if _debug_enabled() then
 				_debug_log(
 					"team_cd:" .. ability_template_name .. ":" .. tostring(unit),
@@ -285,6 +295,25 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 					"fallback suppressed " .. ability_template_name .. " (" .. tostring(team_reason) .. ")"
 				)
 			end
+			return
+		end
+	end
+
+	local bypass_jitter = _HumanLikeness and _HumanLikeness.should_bypass_ability_jitter(rule)
+	if _HumanLikeness and not bypass_jitter then
+		local pending_matches = state.pending_rule == rule
+			and state.pending_template_name == ability_template_name
+			and state.pending_action_input == action_input
+
+		if not pending_matches then
+			state.pending_rule = rule
+			state.pending_template_name = ability_template_name
+			state.pending_action_input = action_input
+			state.pending_ready_t = fixed_t + _HumanLikeness.random_ability_jitter_delay()
+			return
+		end
+
+		if fixed_t < state.pending_ready_t then
 			return
 		end
 	end
@@ -314,6 +343,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		end
 	end
 
+	_clear_pending_jitter(state)
 	action_input_extension:bot_queue_action_input(ability_component_name, action_input, nil)
 
 	if _EngagementLeash and _EngagementLeash.is_movement_ability(ability_template_name) then
@@ -407,6 +437,7 @@ function M.wire(deps)
 	_EngagementLeash = deps.EngagementLeash
 	_TeamCooldown = deps.TeamCooldown
 	_CombatAbilityIdentity = deps.CombatAbilityIdentity
+	_HumanLikeness = deps.HumanLikeness
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 

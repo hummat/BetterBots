@@ -15,6 +15,8 @@ local _debug_enabled
 local _fixed_time
 local _perf
 local _is_enabled
+local _HumanLikeness
+local _Heuristics
 
 -- Coherency-derived constants
 local BASE_LEASH = 12
@@ -117,7 +119,15 @@ function M.compute_effective_leash(unit, target_unit, target_breed, already_enga
 		end
 	end
 
-	return math.min(base, cap), "base"
+	local effective = math.min(base, cap)
+	if _HumanLikeness and _Heuristics then
+		local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+		local context = blackboard and _Heuristics.build_context(unit, blackboard)
+		local pressure = context and context.challenge_rating_sum or 0
+		effective = _HumanLikeness.scale_engage_leash(effective, pressure)
+	end
+
+	return effective, "base"
 end
 
 function M.should_extend_approach(unit, target_unit, target_breed, already_engaged, t)
@@ -151,6 +161,8 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
 	_is_enabled = deps.is_enabled
+	_HumanLikeness = deps.HumanLikeness
+	_Heuristics = deps.Heuristics
 end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).

@@ -119,7 +119,12 @@ This mod targets bot ability activation in three paths:
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
-28. Runtime perf measurement (`perf.lua`):
+28. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
+    - patches `BotSettings.opportunity_target_reaction_times.normal` from `10-20` down to `2-5`
+    - adds `0.3-1.5s` combat-ability activation jitter in `ability_queue.lua` for non-emergency fallback casts
+    - bypasses jitter for rescue/panic/hazard style rules so obvious emergency abilities still fire immediately
+    - restores challenge-pressure melee conservatism by shrinking BetterBots' effective engagement leash under high `challenge_rating_sum` pressure instead of leaving vanilla's dead `challenge_rating = 0` path inert
+29. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state

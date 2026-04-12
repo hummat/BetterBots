@@ -240,6 +240,9 @@ assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
+local HumanLikeness = mod:io_dofile("BetterBots/scripts/mods/BetterBots/human_likeness")
+assert(HumanLikeness, "BetterBots: failed to load human_likeness module")
+
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
 
@@ -264,6 +267,8 @@ BotProfiles.init({
 	debug_enabled = _debug_enabled,
 })
 
+HumanLikeness.init({})
+
 EngagementLeash.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -273,6 +278,8 @@ EngagementLeash.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("engagement_leash")
 	end,
+	HumanLikeness = HumanLikeness,
+	Heuristics = Heuristics,
 })
 
 MetaData.init({
@@ -571,8 +578,13 @@ AbilityQueue.wire({
 	EngagementLeash = EngagementLeash,
 	TeamCooldown = TeamCooldown,
 	CombatAbilityIdentity = CombatAbilityIdentity,
+	HumanLikeness = HumanLikeness,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
 })
+
+mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+	HumanLikeness.patch_bot_settings(BotSettings)
+end)
 
 ReviveAbility.wire({
 	MetaData = MetaData,

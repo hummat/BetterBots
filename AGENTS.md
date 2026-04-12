@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 817 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — 822 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -343,6 +343,7 @@ scripts/mods/BetterBots/
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
   ammo_policy.lua                           # Bot ammo pickup awareness: defer to humans, configurable thresholds (#72)
   bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
+  human_likeness.lua                        # Tier A teammate-feel tuning: opportunity reaction times, combat-ability jitter, challenge-pressure leash scaling (#44)
   engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
   revive_ability.lua                        # Pre-revive defensive ability activation (#7)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
@@ -376,6 +377,7 @@ tests/
   airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
+  human_likeness_spec.lua                   # reaction-time patch, jitter bypass, challenge-pressure leash scaling
   engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
   revive_ability_spec.lua                   # revive-with-ability hook + guards
   team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides

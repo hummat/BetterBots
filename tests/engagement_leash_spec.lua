@@ -248,6 +248,52 @@ describe("engagement_leash", function()
 		end)
 	end)
 
+	describe("challenge pressure scaling", function()
+		it("shrinks leash under higher challenge pressure", function()
+			local unit = make_unit("bot-pressure")
+			local target = make_unit("enemy-pressure")
+			POSITION_LOOKUP_STUB[unit] = make_pos(0, 0, 0)
+			POSITION_LOOKUP_STUB[target] = make_pos(10, 0, 0)
+			BLACKBOARDS_STUB[unit] = {}
+
+			local HumanLikeness = {
+				scale_engage_leash = function(leash, pressure)
+					if pressure >= 30 then
+						return leash * 0.5
+					end
+					return leash
+				end,
+			}
+
+			EngagementLeash.init({
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				perf = nil,
+				is_enabled = function()
+					return true
+				end,
+				HumanLikeness = HumanLikeness,
+				Heuristics = {
+					build_context = function()
+						return { challenge_rating_sum = 30 }
+					end,
+				},
+			})
+
+			local leash, _ = EngagementLeash.compute_effective_leash(unit, target, make_breed(), false, 0)
+			assert.equals(6, leash)
+
+			BLACKBOARDS_STUB[unit] = nil
+			POSITION_LOOKUP_STUB[unit] = nil
+			POSITION_LOOKUP_STUB[target] = nil
+		end)
+	end)
+
 	describe("is_movement_ability", function()
 		it("recognizes base charge/dash templates", function()
 			assert.is_true(EngagementLeash.is_movement_ability("zealot_dash"))
