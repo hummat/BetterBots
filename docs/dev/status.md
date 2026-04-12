@@ -167,7 +167,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 813 tests. **Released 2026-04-11.**
-- **v0.11.0 "Combat Execution" (final polish batch)**: #32 (mule pickup), #44 (human-likeness Tier A), #82 (perf audit, hard-capped), #87 (sustained fire for flamers), #89 (bot grenade pickup heuristic), #90 (melee/ranged target type hysteresis), #91 (weakspot aim MVP), #93 (grenade ballistic arc fix)
+- **v0.11.0 "Combat Execution" (final polish batch)**: #32 (mule pickup), #44 (human-likeness Tier A), #82 (perf audit, hard-capped), #87 (sustained fire for flamers), #89 (bot grenade pickup heuristic), #90 (melee/ranged target type hysteresis), #91 (weakspot aim MVP — implemented on branch: allowlisted finesse families now get vanilla-style head/spine aim metadata injection), #93 (grenade ballistic arc fix)
 - **v1.0.0 "Bot Identity"**: #13 (navmesh charges), #24 (healing items), #33 (weapon specials), #38 (talent-aware Martyrdom PoC), #41 (weapon-aware ADS), #86 (Tier 3 revive cover), #92 (per-breed weakspot map)
 - **Post-1.0 "Intelligence Architecture"**: #22 (utility scoring), #28 (profile management), #56 (com wheel), #80 (grenade tactical evaluator), #84 (user-authored profiles), #85 (ability identity refactor), #88 (deployable crate carry + deploy — filed 2026-04-11)
 - **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost — heuristic carve-out staged 2026-04-11, re-validation pending)

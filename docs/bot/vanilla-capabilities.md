@@ -158,7 +158,7 @@ Community claims bots "hip-fire only" — **this is incorrect for vanilla bots**
 | Suppressive fire | No concept of suppression output | No suppression scoring |
 | Target leading (projectile) | Ballistic prediction exists but limited | `_ballistic_shoot_angle` only for gravity projectiles |
 | Ammo conservation | Bots pick up ammo they don't need (infinite effective ammo) | `can_loot` checks ammo %, but bot ammo rarely depletes |
-| Weakspot / headshot aim | Bots aim `j_spine` (chest) for every shot — finesse stats and weakspot blessings/perks/talents are wasted | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 (MVP, v0.11.0), #92 (per-breed map, v1.0.0) |
+| Weakspot / headshot aim | Vanilla bots aim `j_spine` (chest) for every shot, so finesse stats and weakspot blessings/perks/talents are wasted. BetterBots `#91` partially overrides this for lasguns, autoguns, bolters, and stub revolvers by injecting `{ "j_head", "j_spine" }` into `attack_meta_data.aim_at_node` when unset. | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 (MVP shipped in mod), #92 (per-breed map, v1.0.0) |
 
 **Note on "infinite ammo":** Community claims bots have infinite ammo. **Verified false.** Bots consume ammo per shot through the identical `ActionShoot._spend_ammunition()` path as players (`action_shoot.lua:469-553`). No `is_human_controlled` exemption exists anywhere in the ammo deduction chain. The only infinite ammo flag (`infinite_ammo_reserve`) is exclusive to prologue missions (`prologue_mission_templates.lua:18`). Bots appear to have infinite ammo because: (a) conservative firing behavior with accuracy gating, (b) ammo pickup priority when below threshold, (c) high reserve on bot weapons.
 

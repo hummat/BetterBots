@@ -164,8 +164,33 @@ local function has_keyword(weapon_template, keyword)
 	return false
 end
 
+local WEAKSPOT_AIM_NODES = {
+	"j_head",
+	"j_spine",
+}
+
+local function has_any_keyword(weapon_template, keywords)
+	for _, keyword in ipairs(keywords) do
+		if has_keyword(weapon_template, keyword) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function should_inject_weakspot_aim(weapon_template)
+	return has_any_keyword(weapon_template, {
+		"lasgun",
+		"autogun",
+		"bolter",
+		"stub_pistol",
+	})
+end
+
 local function build_meta_data(weapon_template)
 	local fallback = resolve_vanilla_fallback(weapon_template)
+	local attack_meta_data = weapon_template.attack_meta_data or {}
 	local meta = {}
 	local changed = false
 
@@ -194,6 +219,11 @@ local function build_meta_data(weapon_template)
 		and is_valid_input(weapon_template, effective_fire)
 	then
 		meta.aim_fire_action_input = effective_fire
+		changed = true
+	end
+
+	if should_inject_weakspot_aim(weapon_template) and attack_meta_data.aim_at_node == nil then
+		meta.aim_at_node = WEAKSPOT_AIM_NODES
 		changed = true
 	end
 
@@ -317,4 +347,5 @@ return {
 	_find_aim_input = find_aim_input,
 	_find_aim_fire_input = find_aim_fire_input,
 	_find_aim_action_for_fire = find_aim_action_for_fire,
+	_should_inject_weakspot_aim = should_inject_weakspot_aim,
 }

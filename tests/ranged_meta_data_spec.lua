@@ -460,9 +460,10 @@ describe("ranged_meta_data", function()
 			assert.is_nil(meta.aim_action_input)
 		end)
 
-		it("skips weapons where vanilla fallback is valid", function()
+		it("skips non-allowlisted weapons where vanilla fallback is valid", function()
 			local templates = {
-				lasgun = make_ranged_template({
+				autopistol = make_ranged_template({
+					keywords = { "ranged", "autopistol", "p1" },
 					action_inputs = {
 						shoot_pressed = {
 							input_sequence = {
@@ -488,7 +489,116 @@ describe("ranged_meta_data", function()
 
 			RangedMetaData.inject(templates)
 
-			assert.is_nil(templates.lasgun.attack_meta_data)
+			assert.is_nil(templates.autopistol.attack_meta_data)
+		end)
+
+		it("injects weakspot aim nodes for allowlisted ranged families", function()
+			local templates = {
+				lasgun = make_ranged_template({
+					keywords = { "ranged", "lasgun", "p1" },
+					action_inputs = {
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+						zoom = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						zoom_shoot = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { start_input = "shoot_pressed" },
+						action_zoom = { start_input = "zoom" },
+						action_shoot_zoomed = { start_input = "zoom_shoot" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.same({ "j_head", "j_spine" }, templates.lasgun.attack_meta_data.aim_at_node)
+		end)
+
+		it("merges weakspot aim nodes into existing attack_meta_data", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "autogun", "p2" },
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+					zoom = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					zoom_shoot = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_zoom = { start_input = "zoom" },
+					action_shoot_zoomed = { start_input = "zoom_shoot" },
+				},
+			})
+			template.attack_meta_data = { aim_data = { min_distance = 5 } }
+
+			RangedMetaData.inject({ autogun = template })
+
+			assert.equals(5, template.attack_meta_data.aim_data.min_distance)
+			assert.same({ "j_head", "j_spine" }, template.attack_meta_data.aim_at_node)
+		end)
+
+		it("preserves existing aim_at_node values", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "bolter", "p1" },
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+				},
+			})
+			template.attack_meta_data = { aim_at_node = "j_neck" }
+
+			RangedMetaData.inject({ bolter = template })
+
+			assert.equals("j_neck", template.attack_meta_data.aim_at_node)
+		end)
+
+		it("combines fire-input correction with weakspot aim injection", function()
+			local templates = {
+				stubrevolver = make_ranged_template({
+					keywords = { "ranged", "stub_pistol", "p1" },
+					action_inputs = {
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { kind = "shoot_hit_scan" },
+						action_charge_direct = { start_input = "shoot_charge" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("shoot_charge", templates.stubrevolver.attack_meta_data.fire_action_input)
+			assert.same({ "j_head", "j_spine" }, templates.stubrevolver.attack_meta_data.aim_at_node)
 		end)
 
 		it("skips non-ranged weapons", function()
