@@ -8,6 +8,28 @@ local _total_calls = 0
 local _bot_frames = 0
 local _tag_stats = {}
 
+local function _sorted_rows(tags)
+	local rows = {}
+	for tag, stats in pairs(tags or {}) do
+		rows[#rows + 1] = {
+			tag = tag,
+			total_us = stats.total_us,
+			calls = stats.calls,
+			avg_us_per_call = stats.avg_us_per_call,
+		}
+	end
+
+	table.sort(rows, function(a, b)
+		if a.total_us == b.total_us then
+			return a.tag < b.tag
+		end
+
+		return a.total_us > b.total_us
+	end)
+
+	return rows
+end
+
 local function _reset_counters()
 	_total_s = 0
 	_total_calls = 0
@@ -117,6 +139,39 @@ function M.report_and_reset()
 	_reset_counters()
 
 	return report
+end
+
+function M.format_report_lines(report, prefix)
+	if not report then
+		return nil
+	end
+
+	local resolved_prefix = prefix or "bb-perf:"
+	local lines = {
+		string.format(
+			"%s %.1f µs/bot/frame total (%d bot frames, %d calls, %.3f ms total)",
+			resolved_prefix,
+			report.total_us_per_bot_frame or 0,
+			report.bot_frames,
+			report.total_calls,
+			report.total_us / 1000
+		),
+	}
+
+	local rows = _sorted_rows(report.tags)
+	for i = 1, #rows do
+		local row = rows[i]
+		lines[#lines + 1] = string.format(
+			"%s %s %.3f ms total (%d calls, %.1f µs/call)",
+			resolved_prefix,
+			row.tag,
+			row.total_us / 1000,
+			row.calls,
+			row.avg_us_per_call
+		)
+	end
+
+	return lines
 end
 
 return M

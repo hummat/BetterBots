@@ -17,6 +17,7 @@ local _event_emissions = {}
 local _aim_calls = {}
 local _grenade_state_by_unit = {}
 local _last_grenade_charge_event_by_unit = {}
+local _perf_calls = {}
 local unit
 
 -- Mock ability_extension
@@ -132,6 +133,7 @@ local function reset()
 	_aim_calls = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
+	_perf_calls = {}
 	_component_state_by_name = {}
 	_component_state_by_name.weapon_action = {
 		template_name = "autogun_p1_m1",
@@ -206,6 +208,17 @@ local function reset()
 		end,
 		grenade_state_by_unit = _grenade_state_by_unit,
 		last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+		perf = {
+			begin = function()
+				return {}
+			end,
+			finish = function(tag, _start_clock, _elapsed_s, opts)
+				_perf_calls[#_perf_calls + 1] = {
+					tag = tag,
+					include_total = not (opts and opts.include_total == false),
+				}
+			end,
+		},
 	})
 
 	GrenadeFallback.wire({
@@ -252,6 +265,15 @@ local function advance_to_stage(target_stage)
 	-- now in wait_unwield
 end
 
+local function perf_tags()
+	local tags = {}
+	for i = 1, #_perf_calls do
+		local call = _perf_calls[i]
+		tags[#tags + 1] = call.tag .. ":" .. tostring(call.include_total)
+	end
+	return tags
+end
+
 describe("grenade_fallback", function()
 	it("test helper exposes engine-accurate player/minion extension builders", function()
 		local player_ext = test_helper.make_player_unit_data_extension({
@@ -272,6 +294,32 @@ describe("grenade_fallback", function()
 
 	before_each(function()
 		reset()
+	end)
+
+	describe("perf breakdowns", function()
+		it("records idle-path profile resolution and launch buckets", function()
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.same({
+				"grenade_fallback.build_context:false",
+				"grenade_fallback.heuristic:false",
+				"grenade_fallback.profile_resolution:false",
+				"grenade_fallback.launch:false",
+			}, perf_tags())
+		end)
+
+		it("records a stage-machine bucket while advancing an active sequence", function()
+			GrenadeFallback.try_queue(unit, blackboard)
+			_perf_calls = {}
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.same({
+				"grenade_fallback.stage_machine:false",
+			}, perf_tags())
+		end)
 	end)
 
 	describe("should_block_wield_input", function()

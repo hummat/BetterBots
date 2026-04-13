@@ -38,6 +38,7 @@ When comparing in-game events with system time, convert to UTC or account for th
 3. Toggling a DMF setting only affects runtime after reload.
 4. `Ctrl+Shift+R` hot reload requires DMF dev mode enabled.
 5. If `DEBUG_FORCE_ENABLED = true` in `BetterBots.lua`, debug lines appear regardless mod setting.
+6. When `enable_perf_timing` is on, leaving `GameplayStateRun` auto-emits a `bb-perf:auto:` summary and per-tag breakdown to the console log.
 
 ## Useful commands
 
@@ -63,6 +64,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (startup debug/info confirmation that the shared melee hook callback installed)
 - `installed BtBotInteractAction.enter hook` (startup debug/info confirmation for the defensive pre-revive hook)
 - `entered GameplayStateRun`
+- `bb-perf:auto: ...` (automatic mission-end / quit perf dump; same payload as `/bb_perf` but tagged separately for grepability)
 - `blocked lossy network-sync profile overwrite` (issue `#65` guard fired; the first lossy `BotPlayer.set_profile` sync was dropped on purpose)
 - `allowed profile update (no _bb_resolved sentinel)` (the `BotPlayer.set_profile` hook passed through because the one-shot sentinel was absent or already consumed)
 - `preserving external profile for bot slot <N> (character_id=<id>)` (BetterBots yielded to a real Tertium/SoloPlay profile instead of overwriting it; direct validation signal for `#68`)

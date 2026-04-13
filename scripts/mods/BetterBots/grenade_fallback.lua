@@ -370,6 +370,12 @@ local function _prepare_grenade_context(unit, context)
 	return context
 end
 
+local function _finish_child_perf(tag, start_clock)
+	if start_clock and _perf then
+		_perf.finish(tag, start_clock, nil, { include_total = false })
+	end
+end
+
 -- Aim the bot toward a target unit for grenade/blitz release. For ballistic grenades,
 -- solves a trajectory arc; falls back to flat aim when the solver fails or projectile
 -- data is unavailable. Returns (success, aim_mode, reason).
@@ -727,10 +733,12 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
+	local stage_t0 = state.stage and _perf and _perf.begin() or nil
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 
 	-- If unit_data_extension is gone mid-sequence, abort cleanly.
 	if not unit_data_extension and state.stage then
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"grenade_no_unit_data:" .. tostring(unit),
@@ -750,6 +758,7 @@ local function try_queue(unit, blackboard)
 		active_context = _build_context(unit, blackboard)
 		active_context = _prepare_grenade_context(unit, active_context)
 		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "aim_lost" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			return
@@ -781,6 +790,7 @@ local function try_queue(unit, blackboard)
 				_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "auto_fire" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -811,6 +821,7 @@ local function try_queue(unit, blackboard)
 					)
 				end
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -826,11 +837,13 @@ local function try_queue(unit, blackboard)
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		return
 	end
 
 	if state.stage == "wait_aim" then
 		if not state.component and wielded_slot ~= "slot_grenade_ability" then
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			if _debug_enabled() then
 				_debug_log(
 					"grenade_aim_lost_wield:" .. tostring(unit),
@@ -891,11 +904,13 @@ local function try_queue(unit, blackboard)
 			end
 		end
 
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		return
 	end
 
 	if state.stage == "wait_followup" then
 		if not state.component and wielded_slot ~= "slot_grenade_ability" then
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			if _debug_enabled() then
 				_debug_log(
 					"grenade_followup_lost_wield:" .. tostring(unit),
@@ -933,11 +948,13 @@ local function try_queue(unit, blackboard)
 			end
 		end
 
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		return
 	end
 
 	if state.stage == "wait_throw" then
 		if not state.component and wielded_slot ~= "slot_grenade_ability" then
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			if _debug_enabled() then
 				_debug_log(
 					"grenade_throw_lost_wield:" .. tostring(unit),
@@ -976,6 +993,7 @@ local function try_queue(unit, blackboard)
 			end
 		end
 
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		return
 	end
 
@@ -1004,6 +1022,7 @@ local function try_queue(unit, blackboard)
 				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -1021,6 +1040,7 @@ local function try_queue(unit, blackboard)
 				end
 				_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "slot_changed" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+				_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 				return
 			end
 
@@ -1065,6 +1085,7 @@ local function try_queue(unit, blackboard)
 					{ reason = "action_confirmed" }
 				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+				_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 				return
 			end
 
@@ -1085,6 +1106,7 @@ local function try_queue(unit, blackboard)
 					{ reason = "charge_confirmed" }
 				)
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+				_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 				return
 			end
 
@@ -1099,6 +1121,7 @@ local function try_queue(unit, blackboard)
 				_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "timeout" })
 				_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -1112,6 +1135,7 @@ local function try_queue(unit, blackboard)
 			end
 			_emit_grenade_event("complete", unit, state.grenade_name, state, fixed_t, { reason = "slot_returned" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -1127,6 +1151,7 @@ local function try_queue(unit, blackboard)
 					"grenade forced unwield_to_previous (no auto-unwield)"
 				)
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -1140,6 +1165,7 @@ local function try_queue(unit, blackboard)
 					"grenade queued unwield_to_previous after charge confirmation"
 				)
 			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			return
 		end
 
@@ -1156,11 +1182,13 @@ local function try_queue(unit, blackboard)
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 		end
 
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		return
 	end
 
 	-- Unknown stage — log and reset rather than falling through to idle.
 	if state.stage ~= nil then
+		_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"grenade_unknown_stage:" .. tostring(unit),
@@ -1259,8 +1287,10 @@ local function try_queue(unit, blackboard)
 		return
 	end
 
+	local profile_t0 = _perf and _perf.begin() or nil
 	local template_entry = _resolve_template_entry(grenade_name, context, rule)
 	if not template_entry then
+		_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"grenade_unsupported:" .. grenade_name .. ":" .. tostring(unit),
@@ -1295,15 +1325,19 @@ local function try_queue(unit, blackboard)
 	if aim_input then
 		local aim_unit = _resolve_aim_unit(context)
 		if not aim_unit then
+			_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
 			return
 		end
 	end
 
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
 	if not action_input_extension then
+		_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
 		return
 	end
+	_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
 
+	local launch_t0 = _perf and _perf.begin() or nil
 	state.throw_delay = throw_delay
 	state.grenade_name = grenade_name
 	state.aim_input = aim_input
@@ -1401,6 +1435,7 @@ local function try_queue(unit, blackboard)
 			)
 		end
 	end
+	_finish_child_perf("grenade_fallback.launch", launch_t0)
 end
 
 -- Called from BetterBots.lua use_ability_charge hook for grenade_ability.

@@ -98,4 +98,24 @@ describe("perf", function()
 		assert.equals(100, math.floor(report.tags["grenade_fallback.build_context"].total_us + 0.5))
 		assert.equals(50, math.floor(report.tags["grenade_fallback.heuristic"].total_us + 0.5))
 	end)
+
+	it("formats report lines with sorted tags and custom prefixes", function()
+		_setting_enabled = true
+		Perf.enter_run()
+
+		Perf.mark_bot_frame()
+		Perf.finish("zeta", Perf.begin(), 0.0001)
+		Perf.finish("alpha", Perf.begin(), 0.0001)
+		Perf.finish("beta", Perf.begin(), 0.0003)
+
+		local report = Perf.report_and_reset()
+		local lines = Perf.format_report_lines(report, "bb-perf:auto:")
+
+		assert.same({
+			"bb-perf:auto: 500.0 µs/bot/frame total (1 bot frames, 3 calls, 0.500 ms total)",
+			"bb-perf:auto: beta 0.300 ms total (1 calls, 300.0 µs/call)",
+			"bb-perf:auto: alpha 0.100 ms total (1 calls, 100.0 µs/call)",
+			"bb-perf:auto: zeta 0.100 ms total (1 calls, 100.0 µs/call)",
+		}, lines)
+	end)
 end)

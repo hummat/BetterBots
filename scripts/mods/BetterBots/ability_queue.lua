@@ -20,6 +20,7 @@ local _EngagementLeash
 local _TeamCooldown
 local _CombatAbilityIdentity
 local _HumanLikeness
+local _perf
 local _is_team_cooldown_enabled
 local _is_combat_template_enabled
 local _ability_templates
@@ -53,6 +54,12 @@ local function _ability_templates_once()
 	end
 
 	return _ability_templates
+end
+
+local function _finish_child_perf(tag, start_clock)
+	if start_clock and _perf then
+		_perf.finish(tag, start_clock, nil, { include_total = false })
+	end
 end
 
 local function _fallback_try_queue_combat_ability(unit, blackboard)
@@ -93,6 +100,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 		local ability_extension, combat_ability = _equipped_combat_ability(unit)
 		if ability_extension then
+			local item_t0 = _perf and _perf.begin() or nil
 			_ItemFallback.try_queue_item(
 				unit,
 				unit_data_extension,
@@ -102,6 +110,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 				combat_ability,
 				blackboard
 			)
+			_finish_child_perf("ability_queue.item_fallback", item_t0)
 		end
 
 		return
@@ -123,10 +132,12 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		_ItemFallback.reset_item_sequence_state(state)
 	end
 
+	local setup_t0 = _perf and _perf.begin() or nil
 	local AbilityTemplates = _ability_templates_once()
 
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	if not ability_template then
+		_finish_child_perf("ability_queue.template_setup", setup_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_missing_template:" .. ability_template_name .. ":" .. tostring(unit),
@@ -139,6 +150,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local ability_meta_data = ability_template and ability_template.ability_meta_data
 	if not ability_meta_data then
+		_finish_child_perf("ability_queue.template_setup", setup_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_missing_meta:" .. ability_template_name .. ":" .. tostring(unit),
@@ -151,6 +163,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local activation_data = ability_meta_data and ability_meta_data.activation
 	if not activation_data then
+		_finish_child_perf("ability_queue.template_setup", setup_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_missing_activation:" .. ability_template_name .. ":" .. tostring(unit),
@@ -163,6 +176,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local action_input = activation_data and activation_data.action_input
 	if not action_input then
+		_finish_child_perf("ability_queue.template_setup", setup_t0)
 		if _debug_enabled() then
 			_debug_log(
 				"fallback_missing_action_input:" .. ability_template_name .. ":" .. tostring(unit),
@@ -172,6 +186,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		end
 		return
 	end
+	_finish_child_perf("ability_queue.template_setup", setup_t0)
 
 	if state.active then
 		if fixed_t >= state.hold_until then
@@ -220,6 +235,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
 	local used_input = activation_data.used_input
+	local validation_t0 = _perf and _perf.begin() or nil
 	local action_input_is_valid = _action_input_is_bot_queueable(
 		action_input_extension,
 		ability_extension,
@@ -229,6 +245,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		used_input,
 		fixed_t
 	)
+	_finish_child_perf("ability_queue.input_validation", validation_t0)
 
 	if not action_input_is_valid then
 		if _debug_enabled() then
@@ -245,6 +262,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
+	local decision_t0 = _perf and _perf.begin() or nil
 	local conditions = require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions")
 	local can_activate, rule, context = _Heuristics.resolve_decision(
 		ability_template_name,
@@ -271,6 +289,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			context
 		)
 	end
+	_finish_child_perf("ability_queue.decision", decision_t0)
 
 	if not can_activate then
 		_clear_pending_jitter(state)
@@ -290,6 +309,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
+	local queue_t0 = _perf and _perf.begin() or nil
 	-- Team cooldown staggering (#14): suppress this fallback queue if another
 	-- bot in the same ability category fired recently. The BT condition path
 	-- (condition_patch.lua) does the same check, but virtually all solo-play
@@ -310,6 +330,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 					"fallback suppressed " .. ability_template_name .. " (" .. tostring(team_reason) .. ")"
 				)
 			end
+			_finish_child_perf("ability_queue.queue", queue_t0)
 			return
 		end
 	end
@@ -325,10 +346,12 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			state.pending_template_name = ability_template_name
 			state.pending_action_input = action_input
 			state.pending_ready_t = fixed_t + _HumanLikeness.random_ability_jitter_delay(rule)
+			_finish_child_perf("ability_queue.queue", queue_t0)
 			return
 		end
 
 		if fixed_t < state.pending_ready_t then
+			_finish_child_perf("ability_queue.queue", queue_t0)
 			return
 		end
 	end
@@ -423,6 +446,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			fallback_state = _Debug.fallback_state_snapshot(state, fixed_t),
 		}, "betterbots_" .. _sanitize(dump_key), 3)
 	end
+	_finish_child_perf("ability_queue.queue", queue_t0)
 end
 
 local M = {}
@@ -438,6 +462,7 @@ function M.init(deps)
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_fallback_queue_dumped_by_key = deps.fallback_queue_dumped_by_key
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
+	_perf = deps.perf
 	_ability_templates = nil
 	_ability_templates_injected = false
 	local shared_rules = deps.shared_rules or {}
