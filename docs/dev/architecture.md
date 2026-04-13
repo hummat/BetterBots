@@ -49,7 +49,7 @@ This mod targets bot ability activation in three paths:
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
     - **Semantic combat-ability gate**: shared templates resolve through `combat_ability_identity.lua`; Veteran shout routes to `enable_shouts`, Veteran stance/base/unknown falls back to `enable_stances` for settings compatibility, while engine metadata/input validation remains keyed by template name
-    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
+    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
@@ -118,9 +118,11 @@ This mod targets bot ability activation in three paths:
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - feeds the BetterBots `_choose_attack` replacement with weapon-specific arc/penetration data instead of leaving bots on the vanilla light-only fallback
+    - syncs with `enable_melee_improvements`: disabling the setting removes BetterBots-injected melee metadata from the live weapon templates so bots truly fall back to vanilla behavior
 27. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
+    - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
 28. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
     - hook `PlayerUnitActionInputExtension.bot_queue_action_input`: observe successful `weapon_action` requests and arm per-unit sustained-fire state for supported held-fire paths
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
@@ -169,7 +171,7 @@ This mod targets bot ability activation in three paths:
     - 3 categories: `taunt` (8s window), `aoe_shout` (6s), `dash` (4s) — roughly half the ability cooldown
     - stances and grenades excluded: stances are self-buffs (independent benefit), grenades are consumable charges (no regeneration)
     - emergency overrides bypass suppression: `psyker_shout_high_peril`, `zealot_stealth_emergency`, `ogryn_charge_escape`, any `_ally_aid` rule
-    - recording in `use_ability_charge` hook, suppression gate in `condition_patch._can_activate_ability`
+    - gated by `enable_team_cooldown`; recording happens in the `use_ability_charge` hook and suppression runs in both `condition_patch._can_activate_ability` and `ability_queue.lua`
     - reset on game state change (hot-reload safe)
 
 ## DMF module loading pattern

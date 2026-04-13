@@ -20,6 +20,7 @@ local _EngagementLeash
 local _TeamCooldown
 local _CombatAbilityIdentity
 local _HumanLikeness
+local _is_team_cooldown_enabled
 local _is_combat_template_enabled
 local _ability_templates
 local _ability_templates_injected
@@ -294,7 +295,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	-- (condition_patch.lua) does the same check, but virtually all solo-play
 	-- activations come through this fallback path, so without this guard the
 	-- staggering never fires in real gameplay.
-	if _TeamCooldown then
+	if _TeamCooldown and (not _is_team_cooldown_enabled or _is_team_cooldown_enabled()) then
 		local identity = _CombatAbilityIdentity
 				and _CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
 			or nil
@@ -454,6 +455,7 @@ function M.wire(deps)
 	_TeamCooldown = deps.TeamCooldown
 	_CombatAbilityIdentity = deps.CombatAbilityIdentity
 	_HumanLikeness = deps.HumanLikeness
+	_is_team_cooldown_enabled = deps.is_team_cooldown_enabled
 	_is_combat_template_enabled = deps.is_combat_template_enabled
 end
 

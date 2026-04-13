@@ -18,6 +18,7 @@ local _is_combat_template_enabled
 local _perf
 local _TeamCooldown
 local _combat_ability_identity
+local _is_team_cooldown_enabled
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -275,7 +276,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		end
 	end
 
-	if can_activate and _TeamCooldown then
+	if can_activate and _TeamCooldown and (not _is_team_cooldown_enabled or _is_team_cooldown_enabled()) then
 		local identity = _combat_ability_identity
 				and _combat_ability_identity.resolve(unit, ability_extension, { template_name = ability_template_name })
 			or nil
@@ -462,6 +463,7 @@ function M.wire(deps)
 	_bot_ranged_ammo_threshold = deps.bot_ranged_ammo_threshold
 	_TeamCooldown = deps.TeamCooldown
 	_combat_ability_identity = deps.combat_ability_identity
+	_is_team_cooldown_enabled = deps.is_team_cooldown_enabled
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)

@@ -388,6 +388,11 @@ describe("settings", function()
 			Settings.init(mock_mod({ enable_human_likeness = false }))
 			assert.is_false(Settings.is_feature_enabled("human_likeness"))
 		end)
+
+		it("gates team_cooldown feature correctly", function()
+			Settings.init(mock_mod({ enable_team_cooldown = false }))
+			assert.is_false(Settings.is_feature_enabled("team_cooldown"))
+		end)
 	end)
 
 	describe("slider settings", function()
@@ -582,6 +587,31 @@ describe("settings", function()
 						tostring(result),
 						tostring(rule)
 					)
+				)
+			end
+		end)
+	end)
+
+	describe("settings surface parity", function()
+		it("every defaulted setting has a widget and localization entry", function()
+			local data_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
+			local data_source = assert(data_handle:read("*a"))
+			data_handle:close()
+
+			local localization_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
+			local localization_source = assert(localization_handle:read("*a"))
+			localization_handle:close()
+
+			for setting_id in pairs(Settings.DEFAULTS) do
+				local has_widget = data_source:find('"' .. setting_id .. '"', 1, true)
+				if not has_widget and setting_id:match("^bot_slot_%d+_profile$") then
+					has_widget = data_source:find("make_slot_dropdown(", 1, true)
+				end
+
+				assert.is_truthy(has_widget, "missing widget for setting " .. setting_id)
+				assert.is_truthy(
+					localization_source:find(setting_id .. " = {", 1, true),
+					"missing localization for setting " .. setting_id
 				)
 			end
 		end)

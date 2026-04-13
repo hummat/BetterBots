@@ -12,13 +12,19 @@ local function make_ranged_template(opts)
 end
 
 describe("ranged_meta_data", function()
+	local enabled
+
 	before_each(function()
+		enabled = true
 		RangedMetaData.init({
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
 			debug_log = noop_debug_log,
 			debug_enabled = function()
 				return false
+			end,
+			is_enabled = function()
+				return enabled
 			end,
 		})
 	end)
@@ -353,6 +359,95 @@ describe("ranged_meta_data", function()
 	end)
 
 	describe("inject", function()
+		it("does not inject when ranged improvements are disabled", function()
+			enabled = false
+			local templates = {
+				forcestaff = make_ranged_template({
+					keywords = { "ranged", "force_staff" },
+					actions = {
+						action_shoot = {},
+						action_charge = { start_input = "charge" },
+						action_shoot_charged = { start_input = "trigger_explosion" },
+					},
+					action_inputs = {
+						shoot_charge = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.is_nil(templates.forcestaff.attack_meta_data)
+		end)
+
+		it("reverts injected ranged attack_meta_data when setting is disabled at runtime", function()
+			local templates = {
+				staff = make_ranged_template({
+					keywords = { "ranged", "force_staff" },
+					actions = {
+						action_shoot = {},
+						action_shoot_charged = { start_input = "shoot_charge" },
+					},
+					action_inputs = {
+						shoot_charge = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+			assert.is_table(templates.staff.attack_meta_data)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.is_nil(templates.staff.attack_meta_data)
+		end)
+
+		it("restores original attack_meta_data fields when disabling ranged improvements", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "force_staff" },
+				actions = {
+					action_shoot = {},
+					action_charge = {
+						start_input = "charge",
+						allowed_chain_actions = {
+							trigger_explosion = { action_name = "action_explode" },
+						},
+					},
+					action_explode = {
+						stop_input = "charge_release",
+					},
+				},
+				action_inputs = {
+					charge = { input_sequence = { { input = "action_two_hold", value = true } } },
+					trigger_explosion = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+					charge_release = { input_sequence = { { input = "action_two_hold", value = false } } },
+				},
+			})
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				aim_fire_action_input = "zoom_shoot",
+			}
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+			assert.equals("trigger_explosion", template.attack_meta_data.aim_fire_action_input)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+			assert.equals("zoom_shoot", template.attack_meta_data.aim_fire_action_input)
+			assert.is_nil(template.attack_meta_data.aim_action_input)
+			assert.is_nil(template.attack_meta_data.aim_action_name)
+			assert.is_nil(template.attack_meta_data.unaim_action_input)
+			assert.is_nil(template.attack_meta_data.unaim_action_name)
+		end)
+
 		it("injects attack_meta_data for weapon with broken fire input", function()
 			local templates = {
 				forcestaff = make_ranged_template({

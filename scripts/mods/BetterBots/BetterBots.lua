@@ -389,6 +389,9 @@ MeleeMetaData.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	is_enabled = function()
+		return Settings.is_feature_enabled("melee_improvements")
+	end,
 })
 
 MeleeAttackChoice.init({
@@ -408,6 +411,9 @@ RangedMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
 })
 
 TargetSelection.init({
@@ -613,6 +619,9 @@ ConditionPatch.wire({
 	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
 	TeamCooldown = TeamCooldown,
 	combat_ability_identity = CombatAbilityIdentity,
+	is_team_cooldown_enabled = function()
+		return Settings.is_feature_enabled("team_cooldown")
+	end,
 })
 
 AbilityQueue.wire({
@@ -626,6 +635,9 @@ AbilityQueue.wire({
 	CombatAbilityIdentity = CombatAbilityIdentity,
 	HumanLikeness = HumanLikeness,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
+	is_team_cooldown_enabled = function()
+		return Settings.is_feature_enabled("team_cooldown")
+	end,
 })
 
 mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
@@ -932,12 +944,14 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				-- key team_cooldown.CATEGORY_MAP uses (psyker_shout). Without
 				-- this, record() is a silent no-op for variant abilities and
 				-- staggering never fires for their category.
-				local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
-				local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
-				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
-				local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
-				local team_key = (identity and identity.semantic_key) or ability_name
-				TeamCooldown.record(unit, team_key, fixed_t)
+				if Settings.is_feature_enabled("team_cooldown") then
+					local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+					local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
+					local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+					local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
+					local team_key = (identity and identity.semantic_key) or ability_name
+					TeamCooldown.record(unit, team_key, fixed_t)
+				end
 			end
 
 			if EventLog.is_enabled() then
@@ -1269,6 +1283,18 @@ function mod.on_setting_changed(setting_id)
 
 	if setting_id == "enable_human_likeness" then
 		HumanLikeness.patch_bot_settings(_bot_settings)
+	end
+
+	if setting_id == "enable_melee_improvements" then
+		MeleeMetaData.sync_all()
+	end
+
+	if setting_id == "enable_ranged_improvements" then
+		RangedMetaData.sync_all()
+	end
+
+	if setting_id == "enable_team_cooldown" then
+		TeamCooldown.reset()
 	end
 end
 

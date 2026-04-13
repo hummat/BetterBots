@@ -143,6 +143,13 @@ return {
 	enable_ranged_improvements_description = {
 		en = "Bots aim down sights, use charged staff fire, and vent warp heat. Disabling reverts to vanilla.",
 	},
+	enable_team_cooldown = {
+		en = "Team ability staggering",
+	},
+	enable_team_cooldown_description = {
+		en = "Prevent multiple bots from dumping the same shout, taunt, or dash at once. "
+			.. "Disabling removes team-level staggering.",
+	},
 	enable_engagement_leash = {
 		en = "Combat engagement leash",
 	},

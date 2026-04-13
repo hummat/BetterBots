@@ -89,6 +89,11 @@ return {
 						default_value = DEFAULTS.enable_ranged_improvements,
 					},
 					{
+						setting_id = "enable_team_cooldown",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_team_cooldown,
+					},
+					{
 						setting_id = "enable_engagement_leash",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_engagement_leash,

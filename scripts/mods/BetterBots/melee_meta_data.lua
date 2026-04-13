@@ -3,6 +3,7 @@ local _patched_set
 local _debug_log
 local _debug_enabled
 local _armored_type
+local _is_enabled
 
 local DEFAULT_MELEE_RANGE = 2.5
 local CLEAVE_ARC_1_THRESHOLD = 2
@@ -119,7 +120,25 @@ local function has_keyword(weapon_template, keyword)
 end
 
 local function inject(WeaponTemplates)
-	if _patched_set[WeaponTemplates] then
+	local state = _patched_set[WeaponTemplates]
+	if not state then
+		state = {
+			applied = false,
+			injected = {},
+		}
+		_patched_set[WeaponTemplates] = state
+	end
+
+	if _is_enabled and not _is_enabled() then
+		if state.applied then
+			for template, injected_meta in pairs(state.injected) do
+				if template.attack_meta_data == injected_meta then
+					template.attack_meta_data = nil
+				end
+			end
+			state.injected = {}
+			state.applied = false
+		end
 		return
 	end
 
@@ -128,19 +147,25 @@ local function inject(WeaponTemplates)
 
 	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
 		if type(template) == "table" and has_keyword(template, "melee") then
-			if template.attack_meta_data then
+			if state.injected[template] then
+				if template.attack_meta_data == nil then
+					template.attack_meta_data = state.injected[template]
+				end
+				skipped = skipped + 1
+			elseif template.attack_meta_data then
 				skipped = skipped + 1
 			else
 				local meta = build_meta_data(template, _armored_type)
 				if meta then
 					template.attack_meta_data = meta
+					state.injected[template] = meta
 					injected = injected + 1
 				end
 			end
 		end
 	end
 
-	_patched_set[WeaponTemplates] = true
+	state.applied = true
 	if _debug_enabled() then
 		_debug_log(
 			"melee_meta_injection:" .. tostring(WeaponTemplates),
@@ -159,8 +184,14 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_armored_type = deps.ARMOR_TYPE_ARMORED
+		_is_enabled = deps.is_enabled
 	end,
 	inject = inject,
+	sync_all = function()
+		for WeaponTemplates in pairs(_patched_set) do
+			inject(WeaponTemplates)
+		end
+	end,
 	_classify_arc = classify_arc,
 	_classify_penetrating = classify_penetrating,
 }

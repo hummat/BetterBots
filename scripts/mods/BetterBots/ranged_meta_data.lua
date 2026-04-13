@@ -2,6 +2,8 @@ local _mod -- luacheck: ignore 231
 local _patched_set
 local _debug_log
 local _debug_enabled
+local _is_enabled
+local ABSENT = {}
 
 local function resolve_vanilla_fallback(weapon_template)
 	local actions = weapon_template.actions or {}
@@ -231,13 +233,67 @@ local function build_meta_data(weapon_template)
 end
 
 local function inject(WeaponTemplates)
-	if _patched_set[WeaponTemplates] then
+	local state = _patched_set[WeaponTemplates]
+	if not state then
+		state = {
+			applied = false,
+			changes = {},
+		}
+		_patched_set[WeaponTemplates] = state
+	end
+
+	if _is_enabled and not _is_enabled() then
+		if state.applied then
+			for template, change in pairs(state.changes) do
+				if change.mode == "replace" then
+					if template.attack_meta_data == change.injected_table then
+						template.attack_meta_data = nil
+					end
+				elseif change.mode == "fields" and template.attack_meta_data then
+					for key, original_value in pairs(change.original_fields or {}) do
+						if original_value == ABSENT then
+							template.attack_meta_data[key] = nil
+						else
+							template.attack_meta_data[key] = original_value
+						end
+					end
+				end
+			end
+			state.changes = {}
+			state.applied = false
+		end
 		return
 	end
 
 	local injected = 0
 	local patched = 0
 	local skipped = 0
+
+	local function ensure_change(template, mode)
+		local change = state.changes[template]
+		if not change then
+			change = { mode = mode }
+			state.changes[template] = change
+		end
+		if mode == "fields" and change.mode ~= "replace" then
+			change.mode = "fields"
+			change.original_fields = change.original_fields or {}
+		end
+		return change
+	end
+
+	local function record_original_field(change, meta, key)
+		local original_fields = change.original_fields
+		if original_fields[key] ~= nil then
+			return
+		end
+
+		if meta[key] == nil then
+			original_fields[key] = ABSENT
+		else
+			original_fields[key] = meta[key]
+		end
+	end
 
 	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
 		if type(template) == "table" and has_keyword(template, "ranged") then
@@ -247,6 +303,8 @@ local function inject(WeaponTemplates)
 					local merged = 0
 					for k, v in pairs(corrections) do
 						if template.attack_meta_data[k] == nil then
+							local change = ensure_change(template, "fields")
+							record_original_field(change, template.attack_meta_data, k)
 							template.attack_meta_data[k] = v
 							merged = merged + 1
 						end
@@ -258,6 +316,7 @@ local function inject(WeaponTemplates)
 					end
 				else
 					template.attack_meta_data = corrections
+					ensure_change(template, "replace").injected_table = corrections
 					injected = injected + 1
 				end
 			else
@@ -277,31 +336,38 @@ local function inject(WeaponTemplates)
 			local aim_fire_input, aim_fire_action = find_aim_fire_input(template)
 			if aim_fire_input and not is_valid_input(template, fallback.aim_fire_action_input) then
 				local changed = false
+				local change = ensure_change(template, "fields")
 				local aim_input, aim_action, unaim_input, unaim_action =
 					find_aim_action_for_fire(template, aim_fire_input)
 
 				if template.attack_meta_data.aim_fire_action_input ~= aim_fire_input then
+					record_original_field(change, template.attack_meta_data, "aim_fire_action_input")
+					record_original_field(change, template.attack_meta_data, "aim_fire_action_name")
 					template.attack_meta_data.aim_fire_action_input = aim_fire_input
 					template.attack_meta_data.aim_fire_action_name = aim_fire_action
 					changed = true
 				end
 
 				if aim_input and template.attack_meta_data.aim_action_input ~= aim_input then
+					record_original_field(change, template.attack_meta_data, "aim_action_input")
 					template.attack_meta_data.aim_action_input = aim_input
 					changed = true
 				end
 
 				if aim_action and template.attack_meta_data.aim_action_name ~= aim_action then
+					record_original_field(change, template.attack_meta_data, "aim_action_name")
 					template.attack_meta_data.aim_action_name = aim_action
 					changed = true
 				end
 
 				if unaim_input and template.attack_meta_data.unaim_action_input ~= unaim_input then
+					record_original_field(change, template.attack_meta_data, "unaim_action_input")
 					template.attack_meta_data.unaim_action_input = unaim_input
 					changed = true
 				end
 
 				if unaim_action and template.attack_meta_data.unaim_action_name ~= unaim_action then
+					record_original_field(change, template.attack_meta_data, "unaim_action_name")
 					template.attack_meta_data.unaim_action_name = unaim_action
 					changed = true
 				end
@@ -313,7 +379,7 @@ local function inject(WeaponTemplates)
 		end
 	end
 
-	_patched_set[WeaponTemplates] = true
+	state.applied = true
 	if _debug_enabled() then
 		_debug_log(
 			"ranged_meta_injection:" .. tostring(WeaponTemplates),
@@ -339,8 +405,14 @@ return {
 		_patched_set = deps.patched_weapon_templates
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
+		_is_enabled = deps.is_enabled
 	end,
 	inject = inject,
+	sync_all = function()
+		for WeaponTemplates in pairs(_patched_set) do
+			inject(WeaponTemplates)
+		end
+	end,
 	_resolve_vanilla_fallback = resolve_vanilla_fallback,
 	_needs_injection = needs_injection,
 	_find_fire_input = find_fire_input,
