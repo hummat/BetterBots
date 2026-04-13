@@ -64,6 +64,11 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `stream action queued for` | Direct confirmation that a stream-specific queue input (`shoot_braced`, `trigger_charge_flame`, etc.) actually reached `bot_queue_action_input` successfully (#87) |
+| `patched opportunity reaction times` | Human-likeness timing patch applied live (#44) |
+| `leash scaled` | Human-likeness pressure leash scaling fired in combat (#44) |
+| `type flip ` | Target-type hysteresis allowed a real melee/ranged transition (#90) |
+| `type hold ` | Target-type hysteresis actively suppressed a raw type flip (#90) |
+| `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
@@ -106,7 +111,9 @@ rg "fallback held" "$LATEST" | grep -v "nearby=0)"
 rg "Script Error|Lua Stack" "$LATEST"
 ```
 
-**Common mistake:** Do NOT grep for `"decision:"` — that pattern doesn't exist in the log. The `"-> true"` pattern does appear in debug decision lines (e.g. `decision veteran_combat_ability -> true (rule=...)`). For activation evidence, prefer `"fallback queued"` / `"charge consumed"` which are unambiguous.
+**Common mistakes:**
+- Do **not** grep `_debug_log` throttle keys like `target_type_flip:<unit>` or `human_likeness_patch`. `_debug_log` prints only the human-readable message, not the key.
+- Do **not** grep for `"decision:"` — that pattern doesn't exist in the log. The `"-> true"` pattern does appear in debug decision lines (e.g. `decision veteran_combat_ability -> true (rule=...)`). For activation evidence, prefer `"fallback queued"` / `"charge consumed"` which are unambiguous.
 
 ## Current BetterBots debug pattern
 

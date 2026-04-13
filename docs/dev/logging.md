@@ -108,6 +108,11 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
 - `stream action queued for <template> via <input> (phase=<phase>, bot=<slot>)` (`#87` validation; direct confirmation that a flamer/Purgatus stream-specific queue input actually reached `bot_queue_action_input` successfully)
+- `patched opportunity reaction times (min=<N>, max=<N>)` (`#44` validation; startup/runtime confirmation that `BotSettings.opportunity_target_reaction_times.normal` was patched from the selected human-likeness timing profile)
+- `leash scaled <base> -> <effective> (pressure=<N>)` (`#44` validation; direct confirmation that pressure-based engagement leash scaling fired in combat)
+- `type flip <old> -> <new>` (`#90` validation; hysteresis allowed a real melee/ranged type transition after the opposite mode cleared the margin)
+- `type hold <current> over raw <candidate> (melee=<N>, ranged=<N>)` (`#90` validation; hysteresis actively suppressed a raw flip and kept the current type)
+- `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active and selected an actual runtime node)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
@@ -182,9 +187,9 @@ Poxburster suppression confirmations are logged at `Debug`, not `Trace`, so norm
    - **Weak-keyed set** for object-keyed dedup (scratchpad, unit): `local _logged = setmetatable({}, { __mode = "k" })`. Entries auto-clear when the key is GC'd (e.g. scratchpad recycled between missions).
    - **String-keyed set** for combo dedup: `local _logged_combos = {}`. Build a key like `bot_slot .. ":" .. template .. ":" .. action` and skip if already seen. Use this when the discriminator is a value, not an object reference.
 
-3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg, interval, level)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This enables `rg "may_fire_swap"` filtering in `bb-log` output.
+3. **Throttle key convention**. The first argument to `_debug_log(key, t, msg, interval, level)` is `"feature_tag:" .. discriminator` — e.g. `"may_fire_swap:shoot_charged"`, `"grenade_state:wait_aim"`, `"peril_block:shoot_pressed"`. This key is an internal throttle/dedup identifier only. `_debug_log` prints **only the message**, not the key, so console-log filtering must grep the human-readable message text (for example `_may_fire swap: ...`), not the key string.
 
-   **Per-bot keys are mandatory in per-bot code paths.** `_debug_log` throttles by key — if multiple bots fire the same key in the same frame (same `fixed_t`), only the first bot's message appears. All others are silently dropped. Any `_debug_log` call inside a hook or function that runs per-bot (condition evaluation, ability queue, grenade fallback, etc.) **must** include `.. ":" .. tostring(unit)` in the key. Logs that fire once globally (init patches, startup messages) don't need this.
+   **Per-bot keys are mandatory in per-bot code paths.** `_debug_log` throttles by key — if multiple bots fire the same key in the same frame (same `fixed_t`), only the first bot's message appears. All others are silently dropped. Any `_debug_log` call inside a hook or function that runs per-bot (condition evaluation, ability queue, grenade fallback, etc.) **must** include `.. ":" .. tostring(unit)` in the key. Logs that fire once globally (init patches, startup messages) don't need this. Keep the **message prefix** stable and grep-friendly too, because that is what actually lands in the console log.
 
 4. **Log the confirmation signal**. Each feature should log the event that proves it fired correctly:
    - State machine transition → log the new state and trigger

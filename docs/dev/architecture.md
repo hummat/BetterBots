@@ -143,7 +143,7 @@ This mod targets bot ability activation in three paths:
     - wraps `bot_target_selection_template.bot_default` after vanilla scoring, leaving BT and weapon actions untouched
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
-    - logs only actual stabilized type flips (`target_type_flip:<unit>`) for in-game verification
+    - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`off` / `light` / `medium` / `strong` / `custom`)
     - patches `BotSettings.opportunity_target_reaction_times.normal` from vanilla `10-20` to the selected timing profile (default medium = `2-4`), restoring the original values when timing is off

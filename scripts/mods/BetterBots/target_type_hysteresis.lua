@@ -185,14 +185,19 @@ local function _collect_stabilized_choice(
 			return nil
 		end
 
-		local chosen_type =
-			M.choose_target_type(perception_component.target_enemy_type, best_melee_score, best_ranged_score)
+		local analysis =
+			M.analyze_target_type_choice(perception_component.target_enemy_type, best_melee_score, best_ranged_score)
+		local chosen_type = analysis.chosen_type
 
 		if chosen_type == "melee" then
 			return {
 				target_enemy = best_melee_target,
 				target_enemy_distance = math.sqrt(best_melee_target_distance_sq),
 				target_enemy_type = "melee",
+				raw_target_enemy_type = analysis.raw_target_enemy_type,
+				suppressed_raw_flip = analysis.suppressed_raw_flip,
+				melee_score = best_melee_score,
+				ranged_score = best_ranged_score,
 			}
 		end
 
@@ -200,6 +205,10 @@ local function _collect_stabilized_choice(
 			target_enemy = best_ranged_target,
 			target_enemy_distance = math.sqrt(best_ranged_target_distance_sq),
 			target_enemy_type = "ranged",
+			raw_target_enemy_type = analysis.raw_target_enemy_type,
+			suppressed_raw_flip = analysis.suppressed_raw_flip,
+			melee_score = best_melee_score,
+			ranged_score = best_ranged_score,
 		}
 	end
 
@@ -232,12 +241,17 @@ local function _collect_stabilized_choice(
 			target_ally,
 			threat_units
 		)
-		local chosen_type = M.choose_target_type(perception_component.target_enemy_type, melee_score, ranged_score)
+		local analysis = M.analyze_target_type_choice(perception_component.target_enemy_type, melee_score, ranged_score)
+		local chosen_type = analysis.chosen_type
 
 		return {
 			target_enemy = current_target_enemy,
 			target_enemy_distance = math.sqrt(target_distance_sq),
 			target_enemy_type = chosen_type,
+			raw_target_enemy_type = analysis.raw_target_enemy_type,
+			suppressed_raw_flip = analysis.suppressed_raw_flip,
+			melee_score = melee_score,
+			ranged_score = ranged_score,
 		}
 	end
 
@@ -252,10 +266,15 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
-function M.choose_target_type(current_type, melee_score, ranged_score)
+function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
 	local raw_choice = _choose_raw_target_type(melee_score, ranged_score)
+	local analysis = {
+		chosen_type = raw_choice,
+		raw_target_enemy_type = raw_choice,
+		suppressed_raw_flip = false,
+	}
 	if current_type ~= "melee" and current_type ~= "ranged" then
-		return raw_choice
+		return analysis
 	end
 
 	local stabilized_scale = _max3(_abs(melee_score), _abs(ranged_score), 1)
@@ -272,16 +291,26 @@ function M.choose_target_type(current_type, melee_score, ranged_score)
 	local margin = stabilized_scale * MARGIN_FACTOR
 	local candidate = _choose_raw_target_type(melee_stabilized, ranged_stabilized)
 	if candidate == current_type then
-		return current_type
+		analysis.chosen_type = current_type
+		analysis.suppressed_raw_flip = raw_choice ~= current_type
+		return analysis
 	end
 
 	local winner = candidate == "melee" and melee_stabilized or ranged_stabilized
 	local loser = candidate == "melee" and ranged_stabilized or melee_stabilized
 	if winner - loser > margin then
-		return candidate
+		analysis.chosen_type = candidate
+		return analysis
 	end
 
-	return current_type
+	analysis.chosen_type = current_type
+	analysis.suppressed_raw_flip = raw_choice ~= current_type
+
+	return analysis
+end
+
+function M.choose_target_type(current_type, melee_score, ranged_score)
+	return M.analyze_target_type_choice(current_type, melee_score, ranged_score).chosen_type
 end
 
 function M.register_hooks()
@@ -362,6 +391,27 @@ function M.register_hooks()
 								.. tostring(previous_target_type)
 								.. " -> "
 								.. tostring(stabilized.target_enemy_type),
+							nil,
+							"debug"
+						)
+					elseif
+						stabilized.suppressed_raw_flip
+						and previous_target_type
+						and _debug_enabled
+						and _debug_enabled()
+					then
+						_debug_log(
+							"target_type_hold:" .. tostring(unit),
+							_fixed_time and _fixed_time() or t or 0,
+							"type hold "
+								.. tostring(previous_target_type)
+								.. " over raw "
+								.. tostring(stabilized.raw_target_enemy_type)
+								.. " (melee="
+								.. string.format("%.2f", stabilized.melee_score or 0)
+								.. ", ranged="
+								.. string.format("%.2f", stabilized.ranged_score or 0)
+								.. ")",
 							nil,
 							"debug"
 						)

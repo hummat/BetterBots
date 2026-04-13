@@ -30,4 +30,20 @@ describe("target_type_hysteresis", function()
 		local chosen = Hysteresis.choose_target_type("ranged", 100, 108)
 		assert.equals("ranged", chosen)
 	end)
+
+	it("reports when hysteresis suppresses a raw flip", function()
+		local analysis = Hysteresis.analyze_target_type_choice("melee", 10, 10.4)
+
+		assert.equals("ranged", analysis.raw_target_enemy_type)
+		assert.equals("melee", analysis.chosen_type)
+		assert.is_true(analysis.suppressed_raw_flip)
+	end)
+
+	it("does not report a suppressed raw flip when the winner clears the margin", function()
+		local analysis = Hysteresis.analyze_target_type_choice("ranged", 14, 10)
+
+		assert.equals("melee", analysis.raw_target_enemy_type)
+		assert.equals("melee", analysis.chosen_type)
+		assert.is_false(analysis.suppressed_raw_flip)
+	end)
 end)

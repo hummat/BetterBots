@@ -18,6 +18,7 @@ local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 -- per load. Mirrors the ability_queue.lua context dump pattern.
 local _weapon_logged_combos = {}
 local _stream_action_logged_combos = {}
+local _weakspot_aim_logged_scratchpads = setmetatable({}, { __mode = "k" })
 
 local STREAM_CONFIRM_ACTIONS = {
 	flamer_p1_m1 = {
@@ -40,6 +41,26 @@ local function _find_action_for_start_input(actions, input_name)
 	end
 
 	return nil, nil
+end
+
+local function _is_head_spine_aim_table(aim_at_node)
+	if type(aim_at_node) ~= "table" then
+		return false
+	end
+
+	local has_head = false
+	local has_spine = false
+
+	for i = 1, #aim_at_node do
+		local node_name = aim_at_node[i]
+		if node_name == "j_head" then
+			has_head = true
+		elseif node_name == "j_spine" then
+			has_spine = true
+		end
+	end
+
+	return has_head and has_spine
 end
 
 local function _find_unaim_action_for_action(weapon_template, action)
@@ -142,6 +163,59 @@ function M.log_stream_action(bot_slot, template_name, action_input)
 			.. tostring(phase)
 			.. ", bot="
 			.. tostring(bot_slot)
+			.. ")"
+	)
+
+	return true
+end
+
+function M.weakspot_aim_selection_context(unit, weapon_template, scratchpad)
+	if not unit or not weapon_template or not scratchpad or not scratchpad.aim_at_node then
+		return nil
+	end
+
+	local attack_meta_data = weapon_template.attack_meta_data or {}
+	if not _is_head_spine_aim_table(attack_meta_data.aim_at_node) then
+		return nil
+	end
+
+	if scratchpad.aim_at_node ~= "j_head" and scratchpad.aim_at_node ~= "j_spine" then
+		return nil
+	end
+
+	local bot_slot, _, weapon_template_name = _weapon_log_context(unit)
+
+	return {
+		bot_slot = bot_slot,
+		weapon_template_name = weapon_template_name,
+		selected_node = scratchpad.aim_at_node,
+	}
+end
+
+function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+	if not (_debug_enabled and _debug_enabled()) then
+		return false
+	end
+
+	if _weakspot_aim_logged_scratchpads[scratchpad] then
+		return true
+	end
+
+	local context = M.weakspot_aim_selection_context(unit, weapon_template, scratchpad)
+	if not context then
+		return false
+	end
+
+	_weakspot_aim_logged_scratchpads[scratchpad] = true
+	_debug_log(
+		"weakspot_aim:" .. tostring(unit),
+		_fixed_time(),
+		"weakspot aim selected "
+			.. tostring(context.selected_node)
+			.. " (weapon="
+			.. tostring(context.weapon_template_name)
+			.. ", bot="
+			.. tostring(context.bot_slot)
 			.. ")"
 	)
 
@@ -352,6 +426,8 @@ function M.register_hooks(deps)
 							.. ")"
 					)
 				end
+
+				M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 			end)
 
 			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)

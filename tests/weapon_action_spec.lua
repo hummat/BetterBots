@@ -229,6 +229,31 @@ describe("weapon_action", function()
 		assert.is_truthy(find_debug_log("stream action queued for forcestaff_p2_m1 via trigger_charge_flame"))
 	end)
 
+	it("logs weakspot aim selections when the head/spine table is active", function()
+		local unit = "bot_1"
+		local weapon_template = {
+			attack_meta_data = {
+				aim_at_node = { "j_head", "j_spine" },
+			},
+		}
+		local scratchpad = {
+			aim_at_node = "j_head",
+		}
+
+		_extensions[unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "lasgun_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+		}
+
+		local logged = WeaponAction.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+
+		assert.is_true(logged)
+		assert.is_truthy(find_debug_log("weakspot aim selected j_head (weapon=lasgun_p1_m1, bot=3)"))
+	end)
+
 	it("forwards queued stream actions to the observer hook", function()
 		local observed_unit, observed_action_input
 		local PlayerUnitActionInputExtension = {
