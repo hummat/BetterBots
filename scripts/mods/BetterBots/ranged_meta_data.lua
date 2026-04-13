@@ -101,6 +101,28 @@ local function find_chain_target_action(weapon_template, input_name)
 	return nil
 end
 
+local function has_braced_chain_action(weapon_template, input_name)
+	local action_inputs = weapon_template.action_inputs or {}
+
+	for _, action in pairs(weapon_template.actions or {}) do
+		local start_input = action.start_input
+		local start_def = start_input and action_inputs[start_input]
+		local seq = start_def and start_def.input_sequence
+		local first = seq and seq[1]
+
+		if
+			first
+			and first.input == "action_two_hold"
+			and first.value == true
+			and (action.allowed_chain_actions or {})[input_name]
+		then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function find_aim_fire_input(weapon_template)
 	local action_inputs = weapon_template.action_inputs or {}
 
@@ -116,6 +138,20 @@ local function find_aim_fire_input(weapon_template)
 				local action_name = find_action_for_input(weapon_template, input_name)
 					or find_chain_target_action(weapon_template, input_name)
 				if action_name then
+					return input_name, action_name
+				end
+			end
+		end
+	end
+
+	for input_name, input_def in pairs(action_inputs) do
+		local seq = input_def.input_sequence
+		if seq and #seq > 0 then
+			local first = seq[1]
+			if first.input == "action_one_hold" and first.value == true then
+				local action_name = find_action_for_input(weapon_template, input_name)
+					or find_chain_target_action(weapon_template, input_name)
+				if action_name and has_braced_chain_action(weapon_template, input_name) then
 					return input_name, action_name
 				end
 			end

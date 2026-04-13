@@ -210,6 +210,65 @@ local function _breed_has_super_armor(breed)
 	return has_super_armor
 end
 
+local function _copy_context(context)
+	local copy = {}
+	for key, value in pairs(context) do
+		copy[key] = value
+	end
+	return copy
+end
+
+local function normalize_grenade_context(unit, context, target_unit)
+	if not context or not target_unit or context.target_enemy == target_unit then
+		return context
+	end
+
+	local normalized = _copy_context(context)
+	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
+	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
+
+	normalized.target_enemy = target_unit
+	normalized.target_enemy_position = target_position
+	normalized.target_enemy_distance = nil
+	normalized.target_enemy_type = nil
+	normalized.target_is_elite_special = false
+	normalized.target_is_monster = false
+	normalized.target_is_dormant_daemonhost = false
+	normalized.target_is_super_armor = false
+
+	if unit_position and target_position and unit_position.x and target_position.x then
+		local dx = target_position.x - unit_position.x
+		local dy = target_position.y - unit_position.y
+		local dz = target_position.z - unit_position.z
+		normalized.target_enemy_distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+	end
+
+	local target_breed = _enemy_breed(target_unit)
+	if not target_breed then
+		return normalized
+	end
+
+	local tags = target_breed.tags
+	normalized.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
+	normalized.target_is_monster = _is_tagged(tags, "monster")
+	normalized.target_is_super_armor = _breed_has_super_armor(target_breed)
+
+	if target_breed.ranged or target_breed.game_object_type == "minion_ranged" then
+		normalized.target_enemy_type = "ranged"
+	else
+		normalized.target_enemy_type = "melee"
+	end
+
+	if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
+		local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+		local target_perception = target_bb and target_bb.perception
+		local is_aggroed = target_perception and target_perception.aggro_state == "aggroed"
+		normalized.target_is_dormant_daemonhost = not is_aggroed
+	end
+
+	return normalized
+end
+
 local function build_context(unit, blackboard)
 	local fixed_t = _fixed_time()
 	local cached_entry = _decision_context_cache[unit]
@@ -2072,6 +2131,7 @@ return {
 		end
 	end,
 	build_context = build_context,
+	normalize_grenade_context = normalize_grenade_context,
 	resolve_decision = resolve_decision,
 	evaluate_heuristic = evaluate_heuristic,
 	evaluate_item_heuristic = evaluate_item_heuristic,

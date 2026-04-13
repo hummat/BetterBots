@@ -21,6 +21,7 @@ local _evaluate_grenade_heuristic
 local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
+local _normalize_grenade_context
 local _resolve_bot_target_unit_fn
 local _resolve_grenade_projectile_data
 local _solve_ballistic_rotation
@@ -354,6 +355,19 @@ local function _resolve_aim_unit(context)
 		or context.priority_target_enemy
 		or context.opportunity_target_enemy
 		or context.urgent_target_enemy
+end
+
+local function _prepare_grenade_context(unit, context)
+	if not context then
+		return nil
+	end
+
+	local aim_unit = _resolve_aim_unit(context)
+	if _normalize_grenade_context then
+		context = _normalize_grenade_context(unit, context, aim_unit)
+	end
+
+	return context
 end
 
 -- Aim the bot toward a target unit for grenade/blitz release. For ballistic grenades,
@@ -730,6 +744,7 @@ local function try_queue(unit, blackboard)
 	local active_context
 	if state.stage and state.stage ~= "wait_unwield" then
 		active_context = _build_context(unit, blackboard)
+		active_context = _prepare_grenade_context(unit, active_context)
 		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
 			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "aim_lost" })
 			_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
@@ -825,7 +840,7 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			local context = active_context or _build_context(unit, blackboard)
+			local context = active_context or _prepare_grenade_context(unit, _build_context(unit, blackboard))
 			-- Pass `revalidation = true` so density-gated grenades get one
 			-- enemy's worth of hysteresis on the re-check; prevents every
 			-- frag attempt from losing the race when num_nearby dips
@@ -1197,6 +1212,7 @@ local function try_queue(unit, blackboard)
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
 	local ctx_t0 = _perf and _perf.begin() or nil
 	local context = _build_context(unit, blackboard)
+	context = _prepare_grenade_context(unit, context)
 	if ctx_t0 and _perf then
 		_perf.finish("grenade_fallback.build_context", ctx_t0, nil, { include_total = false })
 	end
@@ -1413,6 +1429,7 @@ return {
 		_equipped_grenade_ability = refs.equipped_grenade_ability
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
+		_normalize_grenade_context = refs.normalize_grenade_context
 		_resolve_grenade_projectile_data = refs.resolve_grenade_projectile_data
 			or _default_resolve_grenade_projectile_data
 		_solve_ballistic_rotation = refs.solve_ballistic_rotation or _default_solve_ballistic_rotation

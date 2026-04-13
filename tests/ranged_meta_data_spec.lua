@@ -913,6 +913,54 @@ describe("ranged_meta_data", function()
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
 		end)
 
+		it("overrides aim metadata for braced stream weapons (#87 flamer)", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					brace_pressed = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					brace_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_hold", value = true },
+					} },
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_brace = {
+						start_input = "brace_pressed",
+						stop_input = "brace_release",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				fire_action_name = "action_shoot",
+				aim_fire_action_input = "shoot_pressed",
+				aim_fire_action_name = "action_shoot",
+			}
+			local templates = { flamer = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("shoot_braced", template.attack_meta_data.aim_fire_action_input)
+			assert.equals("action_shoot_braced", template.attack_meta_data.aim_fire_action_name)
+			assert.equals("brace_pressed", template.attack_meta_data.aim_action_input)
+			assert.equals("action_brace", template.attack_meta_data.aim_action_name)
+			assert.equals("brace_release", template.attack_meta_data.unaim_action_input)
+			assert.equals("action_unbrace", template.attack_meta_data.unaim_action_name)
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+		end)
+
 		it("does not override aim_fire when it already matches hold_input input", function()
 			local templates = {
 				lasgun = make_ranged_template({

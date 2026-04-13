@@ -436,6 +436,68 @@ describe("grenade_fallback", function()
 			assert.equals(0, #_recorded_inputs)
 		end)
 
+		it("normalizes priority-only targets before evaluating and selecting Assail profile", function()
+			local seen_context
+			local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
+			local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+			local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+			Heuristics.init({
+				combat_ability_identity = CombatAbilityIdentity,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = "super_armor",
+			})
+			_extensions.enemy_1 = {
+				unit_data_system = test_helper.make_player_unit_data_extension(nil, {
+					breed = function()
+						return {
+							name = "chaos_traitor_gunner",
+							tags = { special = true },
+							ranged = true,
+							game_object_type = "minion_ranged",
+						}
+					end,
+				}),
+			}
+
+			GrenadeFallback.wire({
+				build_context = function()
+					return {
+						num_nearby = 1,
+						target_enemy = nil,
+						target_enemy_distance = nil,
+						priority_target_enemy = "enemy_1",
+					}
+				end,
+				evaluate_grenade_heuristic = function(_, context)
+					seen_context = context
+					return true, "grenade_assail_priority_target"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+				bot_targeting = BotTargeting,
+				normalize_grenade_context = Heuristics.normalize_grenade_context,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals("enemy_1", seen_context.target_enemy)
+			assert.equals(10, seen_context.target_enemy_distance)
+			assert.equals("ranged", seen_context.target_enemy_type)
+			assert.is_true(seen_context.target_is_elite_special)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("weapon_action", _recorded_inputs[1].component)
+			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("zoom", _grenade_state_by_unit[unit].aim_input)
+		end)
+
 		it("allows the expected Smite followup input", function()
 			GrenadeFallback.wire({
 				build_context = function()
