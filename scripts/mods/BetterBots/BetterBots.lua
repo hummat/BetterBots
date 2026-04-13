@@ -552,6 +552,7 @@ AbilityQueue.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+	perf = Perf,
 	shared_rules = SharedRules,
 })
 
