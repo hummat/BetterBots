@@ -233,14 +233,10 @@ describe("resolve_decision", function()
 			-- returns a chaos_daemonhost breed with monster tag.
 			_G.ScriptUnit.has_extension = function(unit, system_name)
 				if unit == "dh_unit" and system_name == "unit_data_system" then
-					return {
-						breed = function()
-							return {
-								name = "chaos_daemonhost",
-								tags = { monster = true, witch = true },
-							}
-						end,
-					}
+					return helper.make_minion_unit_data_extension({
+						name = "chaos_daemonhost",
+						tags = { monster = true, witch = true },
+					})
 				end
 				return nil
 			end
@@ -302,14 +298,10 @@ describe("resolve_decision", function()
 		it("leaves flag false for non-daemonhost monster breeds", function()
 			_G.ScriptUnit.has_extension = function(unit, system_name)
 				if unit == "beast_unit" and system_name == "unit_data_system" then
-					return {
-						breed = function()
-							return {
-								name = "chaos_beast_of_nurgle",
-								tags = { monster = true },
-							}
-						end,
-					}
+					return helper.make_minion_unit_data_extension({
+						name = "chaos_beast_of_nurgle",
+						tags = { monster = true },
+					})
 				end
 				return nil
 			end

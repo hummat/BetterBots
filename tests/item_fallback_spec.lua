@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local ItemFallback = dofile("scripts/mods/BetterBots/item_fallback.lua")
 
 local _mock_time = 10
@@ -101,7 +103,9 @@ local function reset()
 
 	_extensions[unit] = {
 		action_input_system = mock_action_input_extension,
-		unit_data_system = mock_unit_data_extension,
+		unit_data_system = test_helper.make_player_unit_data_extension(nil, {
+			read_component = mock_unit_data_extension.read_component,
+		}),
 	}
 
 	ItemFallback.init({

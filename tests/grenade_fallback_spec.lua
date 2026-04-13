@@ -1,5 +1,7 @@
 -- grenade_fallback_spec.lua — tests for grenade throw state machine (#4)
 
+local test_helper = require("tests.test_helper")
+
 -- Controllable mock time
 local _mock_time = 0
 local _original_require = require
@@ -66,18 +68,9 @@ local mock_input_extension = {
 	end,
 }
 
--- Mock unit_data_extension
+-- Mock unit_data component state
 local _wielded_slot = "slot_secondary"
 local _component_state_by_name = {}
-
-local mock_unit_data_extension = {
-	read_component = function(_self, component_name)
-		if component_name == "inventory" then
-			return { wielded_slot = _wielded_slot }
-		end
-		return _component_state_by_name[component_name]
-	end,
-}
 
 -- Mock ScriptUnit
 _G.ScriptUnit = {
@@ -150,7 +143,17 @@ local function reset()
 		ability_system = mock_ability_extension,
 		action_input_system = mock_action_input_extension,
 		input_system = mock_input_extension,
-		unit_data_system = mock_unit_data_extension,
+		unit_data_system = test_helper.make_player_unit_data_extension({
+			inventory = { wielded_slot = _wielded_slot },
+			weapon_action = _component_state_by_name.weapon_action,
+		}, {
+			read_component = function(_self, component_name)
+				if component_name == "inventory" then
+					return { wielded_slot = _wielded_slot }
+				end
+				return _component_state_by_name[component_name]
+			end,
+		}),
 	}
 
 	_G.POSITION_LOOKUP = {
@@ -250,6 +253,23 @@ local function advance_to_stage(target_stage)
 end
 
 describe("grenade_fallback", function()
+	it("test helper exposes engine-accurate player/minion extension builders", function()
+		local player_ext = test_helper.make_player_unit_data_extension({
+			locomotion = { velocity_current = { x = 1, y = 2, z = 3 } },
+		})
+		local minion_ext = test_helper.make_minion_unit_data_extension({
+			name = "chaos_poxwalker",
+			tags = {},
+		})
+		local minion_locomotion = test_helper.make_minion_locomotion_extension({ x = 4, y = 5, z = 6 })
+
+		assert.is_function(player_ext.read_component)
+		assert.is_nil(player_ext.breed)
+		assert.is_function(minion_ext.breed)
+		assert.is_nil(minion_ext.read_component)
+		assert.is_function(minion_locomotion.current_velocity)
+	end)
+
 	before_each(function()
 		reset()
 	end)
@@ -1047,13 +1067,8 @@ describe("grenade_fallback", function()
 		-- _target_velocity must guard read_component before calling it.
 		-- Regression: without the guard this crashes with
 		-- "attempt to call method 'read_component' (a nil value)".
-		local minion_extension = {
-			breed = function()
-				return { name = "chaos_poxwalker" }
-			end,
-		}
 		_extensions.enemy_1 = {
-			unit_data_system = minion_extension,
+			unit_data_system = test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker" }),
 		}
 
 		-- Mock engine math globals so the default solver can run end-to-end.

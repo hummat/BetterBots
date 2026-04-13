@@ -94,4 +94,109 @@ function M.make_conditions(vanilla_result)
 	}
 end
 
+local function _copy_table(source)
+	local result = {}
+	if source then
+		for k, v in pairs(source) do
+			result[k] = v
+		end
+	end
+	return result
+end
+
+function M.make_player_unit_data_extension(components, overrides)
+	local ext = {
+		read_component = function(_, component_name)
+			return components and components[component_name] or nil
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_minion_unit_data_extension(breed, overrides)
+	local resolved_breed = breed or {}
+	local ext = {
+		breed = function()
+			return resolved_breed
+		end,
+		faction_name = function()
+			return resolved_breed.faction_name
+		end,
+		is_companion = function()
+			return resolved_breed.is_companion == true
+		end,
+		breed_name = function()
+			return resolved_breed.name
+		end,
+		breed_size_variation = function()
+			return resolved_breed.breed_size_variation
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_player_locomotion_extension(overrides)
+	local velocity = overrides and overrides.current_velocity or nil
+	local ext = {
+		current_velocity = function()
+			return velocity
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_minion_locomotion_extension(current_velocity, overrides)
+	local ext = {
+		current_velocity = function()
+			return current_velocity
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_script_unit_mock(extension_map)
+	return {
+		has_extension = function(unit, system_name)
+			local exts = extension_map[unit]
+			return exts and exts[system_name] or nil
+		end,
+		extension = function(unit, system_name)
+			local exts = extension_map[unit]
+			return exts and exts[system_name] or nil
+		end,
+	}
+end
+
+function M.copy_table(source)
+	return _copy_table(source)
+end
+
 return M

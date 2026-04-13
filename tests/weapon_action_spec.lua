@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _blackboards = {}
 local _debug_logs = {}
@@ -77,27 +79,14 @@ describe("weapon_action", function()
 		local target = "poxwalker_1"
 
 		_extensions[unit] = {
-			unit_data_system = {
-				read_component = function(_, component_name)
-					if component_name == "inventory" then
-						return { wielded_slot = "slot_secondary" }
-					end
-					if component_name == "weapon_action" then
-						return { template_name = "bolter_p1_m1" }
-					end
-					if component_name == "weapon_tweak_templates" then
-						return { warp_charge_template_name = "none" }
-					end
-					return nil
-				end,
-			},
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "bolter_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
 		}
 		_extensions[target] = {
-			unit_data_system = {
-				breed = function()
-					return { name = "chaos_poxwalker", tags = {} }
-				end,
-			},
+			unit_data_system = test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker", tags = {} }),
 		}
 		_blackboards[unit] = {
 			perception = {
@@ -118,27 +107,17 @@ describe("weapon_action", function()
 		local target = "gunner_1"
 
 		_extensions[unit] = {
-			unit_data_system = {
-				read_component = function(_, component_name)
-					if component_name == "inventory" then
-						return { wielded_slot = "slot_secondary" }
-					end
-					if component_name == "weapon_action" then
-						return { template_name = "bolter_p1_m1" }
-					end
-					if component_name == "weapon_tweak_templates" then
-						return { warp_charge_template_name = "none" }
-					end
-					return nil
-				end,
-			},
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "bolter_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
 		}
 		_extensions[target] = {
-			unit_data_system = {
-				breed = function()
-					return { name = "renegade_gunner", tags = { elite = true } }
-				end,
-			},
+			unit_data_system = test_helper.make_minion_unit_data_extension({
+				name = "renegade_gunner",
+				tags = { elite = true },
+			}),
 		}
 		_blackboards[unit] = {
 			perception = {
@@ -154,27 +133,14 @@ describe("weapon_action", function()
 		local target = "poxwalker_1"
 
 		_extensions[unit] = {
-			unit_data_system = {
-				read_component = function(_, component_name)
-					if component_name == "inventory" then
-						return { wielded_slot = "slot_secondary" }
-					end
-					if component_name == "weapon_action" then
-						return { template_name = "bolter_p1_m1" }
-					end
-					if component_name == "weapon_tweak_templates" then
-						return { warp_charge_template_name = "none" }
-					end
-					return nil
-				end,
-			},
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "bolter_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
 		}
 		_extensions[target] = {
-			unit_data_system = {
-				breed = function()
-					return { name = "chaos_poxwalker", tags = {} }
-				end,
-			},
+			unit_data_system = test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker", tags = {} }),
 		}
 		_blackboards[unit] = {
 			perception = {

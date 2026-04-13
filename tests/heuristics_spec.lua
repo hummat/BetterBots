@@ -2353,11 +2353,7 @@ describe("heuristics", function()
 					},
 				},
 				grenadier_unit = {
-					unit_data_system = {
-						breed = function()
-							return grenadier_breed
-						end,
-					},
+					unit_data_system = helper.make_minion_unit_data_extension(grenadier_breed),
 				},
 			}
 
@@ -2396,16 +2392,10 @@ describe("heuristics", function()
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "interacting" }
-							end
-							if component_name == "interacting_character_state" then
-								return { interaction_template = "scanning" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "interacting" },
+						interacting_character_state = { interaction_template = "scanning" },
+					}),
 				},
 			}
 
@@ -2428,13 +2418,9 @@ describe("heuristics", function()
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "minigame" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "minigame" },
+					}),
 				},
 			}
 
@@ -2457,16 +2443,10 @@ describe("heuristics", function()
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "walking" }
-							end
-							if component_name == "inventory" then
-								return { wielded_slot = "slot_luggable" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "walking" },
+						inventory = { wielded_slot = "slot_luggable" },
+					}),
 				},
 			}
 
@@ -2488,13 +2468,9 @@ describe("heuristics", function()
 			}
 			script_unit_extensions = {
 				hazard_bot = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "minigame" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "minigame" },
+					}),
 				},
 			}
 
@@ -2517,16 +2493,10 @@ describe("heuristics", function()
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "interacting" }
-							end
-							if component_name == "interacting_character_state" then
-								return { interaction_template = "ammunition" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "interacting" },
+						interacting_character_state = { interaction_template = "ammunition" },
+					}),
 				},
 			}
 
@@ -2548,13 +2518,9 @@ describe("heuristics", function()
 			}
 			script_unit_extensions = {
 				ally_unit = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "minigame" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "minigame" },
+					}),
 				},
 			}
 
@@ -2581,22 +2547,14 @@ describe("heuristics", function()
 			_G.POSITION_LOOKUP.close_ally = { x = 5, y = 0, z = 0 }
 			script_unit_extensions = {
 				far_ally = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "minigame" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "minigame" },
+					}),
 				},
 				close_ally = {
-					unit_data_system = {
-						read_component = function(_, component_name)
-							if component_name == "character_state" then
-								return { state_name = "minigame" }
-							end
-						end,
-					},
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "minigame" },
+					}),
 				},
 			}
 

@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 describe("TargetSelection", function()
 	local TargetSelection
 	local _mod
@@ -29,11 +31,7 @@ describe("TargetSelection", function()
 		_G.ScriptUnit = {
 			has_extension = function(unit, name)
 				if name == "unit_data_system" and unit and unit._breed then
-					return {
-						breed = function()
-							return unit._breed
-						end,
-					}
+					return test_helper.make_minion_unit_data_extension(unit._breed)
 				end
 				return nil
 			end,
@@ -263,11 +261,7 @@ describe("TargetSelection", function()
 					extension_calls = extension_calls + 1
 				end
 				if name == "unit_data_system" and unit and unit._breed then
-					return {
-						breed = function()
-							return unit._breed
-						end,
-					}
+					return test_helper.make_minion_unit_data_extension(unit._breed)
 				end
 				return nil
 			end,

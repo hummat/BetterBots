@@ -208,6 +208,24 @@ Tests are enforced by CI — `make check` depends on `test`, and CI installs bus
 
 Phase 1 tests need no engine stubs for the pure heuristic functions. The `resolve_decision` tests use a minimal `ScriptUnit` stub (returns nil for all extensions, so `build_context` produces default zeros). See `test_helper.setup_engine_stubs()`.
 
+### Mock fidelity rule
+
+`ScriptUnit.has_extension()` / `ScriptUnit.extension()` test doubles must match the real engine extension class for the unit type under test. Do not give minion/enemy units player-only methods just because the code path is convenient to test.
+
+Verified from decompiled source:
+
+| Extension system | Player API used by BetterBots | Minion API used by BetterBots | Gotcha |
+|---|---|---|---|
+| `unit_data_system` | `PlayerUnitDataExtension:read_component()` | `MinionUnitDataExtension:breed()`, `faction_name()`, `is_companion()`, `breed_name()`, `breed_size_variation()` | Minions do **not** have `read_component()` |
+| `locomotion_system` | `PlayerUnitLocomotionExtension` (player movement internals) | `MinionLocomotionExtension:current_velocity()` | Prefer the exact method the production code calls; do not invent shared component access |
+
+Practical rule:
+
+- Player/bot self units: use player-style `unit_data_system` mocks with `read_component()`.
+- Enemy/minion targets: use minion-style `unit_data_system` mocks with `breed()` and no `read_component()`.
+- If a code path can handle both, test both paths explicitly.
+- Prefer shared builders in `tests/test_helper.lua` over ad-hoc extension tables so impossible method combinations stay impossible in tests too.
+
 ## What CANNOT be tested outside the game
 
 - Ability actually firing (engine input queue → ActionInputParser → ability system)

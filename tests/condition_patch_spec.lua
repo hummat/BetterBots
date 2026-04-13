@@ -1,6 +1,8 @@
 -- Tests for condition_patch.lua daemonhost combat suppression wrappers (#17).
 -- Verifies that melee/ranged combat is suppressed only when the bot's
 -- current target IS a dormant daemonhost, not when any DH is nearby.
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _blackboards = {}
 local _debug_logs = {}
@@ -119,11 +121,7 @@ local function setup_breed(unit, breed_name)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
 	end
-	_extensions[unit].unit_data_system = {
-		breed = function()
-			return { name = breed_name }
-		end,
-	}
+	_extensions[unit].unit_data_system = test_helper.make_minion_unit_data_extension({ name = breed_name })
 	_alive[unit] = true
 end
 
@@ -688,12 +686,9 @@ describe("condition_patch", function()
 		it("blocks ability activation when team cooldown suppression is active", function()
 			local unit = "bot1"
 			_extensions[unit] = {
-				unit_data_system = {
-					read_component = function(_self, component_name)
-						assert.equals("combat_ability_action", component_name)
-						return { template_name = "ogryn_taunt_shout" }
-					end,
-				},
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "ogryn_taunt_shout" },
+				}),
 				ability_system = {
 					action_input_is_currently_valid = function()
 						return true
@@ -781,12 +776,9 @@ describe("condition_patch", function()
 			-- shout bots never match the aoe_shout category map.
 			local unit = "vet_bot"
 			_extensions[unit] = {
-				unit_data_system = {
-					read_component = function(_self, component_name)
-						assert.equals("combat_ability_action", component_name)
-						return { template_name = "veteran_combat_ability" }
-					end,
-				},
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "veteran_combat_ability" },
+				}),
 				ability_system = {
 					action_input_is_currently_valid = function()
 						return true

@@ -79,11 +79,7 @@ describe("ping_system", function()
 		-- Setup valid elite target
 		_G.ScriptUnit.has_extension = function(_unit, ext)
 			if ext == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -125,11 +121,7 @@ describe("ping_system", function()
 			elseif extension_name == "perception_system" then
 				return { has_line_of_sight = has_los_mock }
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -176,11 +168,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -230,11 +218,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -290,11 +274,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -354,11 +334,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -410,11 +386,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -448,11 +420,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
 			return nil
 		end
@@ -479,11 +447,7 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return {} -- breed present but tags field absent
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({})
 			elseif extension_name == "smart_tag_system" then
 				return {
 					tag_id = function()
@@ -524,11 +488,7 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { tags = { horde = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({ tags = { horde = true } })
 			end
 			return nil
 		end
@@ -562,11 +522,10 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_grenadier", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_grenadier",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end
@@ -606,11 +565,10 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "cultist_flamer", tags = { special = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "cultist_flamer",
+					tags = { special = true },
+				})
 			end
 			return nil
 		end
@@ -656,14 +614,10 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return {
-							name = unit == priority_target and "renegade_grenadier" or "cultist_flamer",
-							tags = { elite = true },
-						}
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = unit == priority_target and "renegade_grenadier" or "cultist_flamer",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end
@@ -715,11 +669,10 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_grenadier", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_grenadier",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end
@@ -766,11 +719,10 @@ describe("ping_system", function()
 					end,
 				}
 			elseif extension_name == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_grenadier", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_grenadier",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end

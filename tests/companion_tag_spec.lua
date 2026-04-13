@@ -108,11 +108,7 @@ describe("companion_tag", function()
 			if ext == "unit_data_system" then
 				local breed = opts.breeds and opts.breeds[unit]
 				if breed then
-					return {
-						breed = function()
-							return breed
-						end,
-					}
+					return test_helper.make_minion_unit_data_extension(breed)
 				end
 				return nil
 			end
@@ -444,11 +440,10 @@ describe("companion_tag", function()
 				}
 			end
 			if ext == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_captain", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end
@@ -500,11 +495,10 @@ describe("companion_tag", function()
 				}
 			end
 			if ext == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_captain", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
 			end
 			if ext == "smart_tag_system" then
 				return {

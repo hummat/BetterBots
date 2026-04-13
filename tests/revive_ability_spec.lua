@@ -1,4 +1,6 @@
 -- tests/revive_ability_spec.lua
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _debug_logs = {}
 local _debug_on = false
@@ -91,14 +93,9 @@ local function make_ability_ext(can_use, charges, opts)
 end
 
 local function make_unit_data_ext(template_name)
-	return {
-		read_component = function(_, component_name)
-			if component_name == "combat_ability_action" then
-				return { template_name = template_name or "none" }
-			end
-			return nil
-		end,
-	}
+	return test_helper.make_player_unit_data_extension({
+		combat_ability_action = { template_name = template_name or "none" },
+	})
 end
 
 local _perception_enemy_count = 3
