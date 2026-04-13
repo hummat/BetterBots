@@ -174,11 +174,107 @@ return {
 	enable_target_type_hysteresis_description = {
 		en = "Bots are less likely to keep flipping between melee and ranged when both choices are close.",
 	},
-	enable_human_likeness = {
-		en = "Less robotic timing",
+	human_timing_profile = {
+		en = "Timing profile",
 	},
-	enable_human_likeness_description = {
-		en = "Adds small delays, less perfect timing, and a little more caution under pressure so bots feel less robotic.",
+	human_timing_profile_description = {
+		en = "Controls how much hesitation and reaction delay bots add before using abilities.",
+	},
+	human_timing_profile_off = {
+		en = "Off",
+	},
+	human_timing_profile_fast = {
+		en = "Fast",
+	},
+	human_timing_profile_medium = {
+		en = "Medium",
+	},
+	human_timing_profile_slow = {
+		en = "Slow",
+	},
+	human_timing_profile_custom = {
+		en = "Custom",
+	},
+	human_timing_reaction_min = {
+		en = "Minimum reaction delay",
+	},
+	human_timing_reaction_min_description = {
+		en = "Lowest random reaction delay roll before the bot can respond.",
+	},
+	human_timing_reaction_max = {
+		en = "Maximum reaction delay",
+	},
+	human_timing_reaction_max_description = {
+		en = "Highest random reaction delay roll before the bot can respond.",
+	},
+	human_timing_defensive_jitter_min_ms = {
+		en = "Minimum defensive jitter",
+	},
+	human_timing_defensive_jitter_min_ms_description = {
+		en = "Shortest defensive hesitation in milliseconds, used for reactive self-preservation.",
+	},
+	human_timing_defensive_jitter_max_ms = {
+		en = "Maximum defensive jitter",
+	},
+	human_timing_defensive_jitter_max_ms_description = {
+		en = "Longest defensive hesitation in milliseconds, used for reactive self-preservation.",
+	},
+	human_timing_opportunistic_jitter_min_ms = {
+		en = "Minimum opportunistic jitter",
+	},
+	human_timing_opportunistic_jitter_min_ms_description = {
+		en = "Shortest opportunistic hesitation in milliseconds, used when an ability can wait.",
+	},
+	human_timing_opportunistic_jitter_max_ms = {
+		en = "Maximum opportunistic jitter",
+	},
+	human_timing_opportunistic_jitter_max_ms_description = {
+		en = "Longest opportunistic hesitation in milliseconds, used when an ability can wait.",
+	},
+	pressure_leash_profile = {
+		en = "Pressure leash profile",
+	},
+	pressure_leash_profile_description = {
+		en = "Controls how much bots tighten their melee leash as combat pressure rises.",
+	},
+	pressure_leash_profile_off = {
+		en = "Off",
+	},
+	pressure_leash_profile_light = {
+		en = "Light",
+	},
+	pressure_leash_profile_medium = {
+		en = "Medium",
+	},
+	pressure_leash_profile_strong = {
+		en = "Strong",
+	},
+	pressure_leash_profile_custom = {
+		en = "Custom",
+	},
+	pressure_leash_start_rating = {
+		en = "Start tightening at challenge rating",
+	},
+	pressure_leash_start_rating_description = {
+		en = "Challenge-pressure total where leash tightening starts.",
+	},
+	pressure_leash_full_rating = {
+		en = "Full tightening at challenge rating",
+	},
+	pressure_leash_full_rating_description = {
+		en = "Challenge-pressure total where leash tightening reaches full strength.",
+	},
+	pressure_leash_scale_percent = {
+		en = "Leash strength at full pressure",
+	},
+	pressure_leash_scale_percent_description = {
+		en = "Percentage of the base leash to keep when combat pressure is maxed out.",
+	},
+	pressure_leash_floor_m = {
+		en = "Minimum leash floor",
+	},
+	pressure_leash_floor_m_description = {
+		en = "Smallest melee engagement leash allowed under pressure, in meters.",
 	},
 	enable_bot_grimoire_pickup = {
 		en = "Bot grimoire pickup",

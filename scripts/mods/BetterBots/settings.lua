@@ -68,7 +68,6 @@ local FEATURE_GATES = {
 	smart_targeting = "enable_smart_targeting",
 	daemonhost_avoidance = "enable_daemonhost_avoidance",
 	target_type_hysteresis = "enable_target_type_hysteresis",
-	human_likeness = "enable_human_likeness",
 }
 
 -- Preset system
@@ -105,7 +104,6 @@ M.DEFAULTS = {
 	enable_smart_targeting = true,
 	enable_daemonhost_avoidance = true,
 	enable_target_type_hysteresis = true,
-	enable_human_likeness = true,
 	human_timing_profile = "medium",
 	pressure_leash_profile = "medium",
 	human_timing_reaction_min = 2,

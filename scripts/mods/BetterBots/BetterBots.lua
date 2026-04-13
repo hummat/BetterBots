@@ -34,6 +34,15 @@ local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
 local _bot_settings
 local PERF_SETTING_ID = "enable_perf_timing"
+local TIMING_SETTING_IDS = {
+	human_timing_profile = true,
+	human_timing_reaction_min = true,
+	human_timing_reaction_max = true,
+	human_timing_defensive_jitter_min_ms = true,
+	human_timing_defensive_jitter_max_ms = true,
+	human_timing_opportunistic_jitter_min_ms = true,
+	human_timing_opportunistic_jitter_max_ms = true,
+}
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
@@ -280,9 +289,8 @@ BotProfiles.init({
 HumanLikeness.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
-	is_enabled = function()
-		return Settings.is_feature_enabled("human_likeness")
-	end,
+	get_timing_config = Settings.resolve_human_timing_config,
+	get_pressure_leash_config = Settings.resolve_pressure_leash_config,
 })
 
 TargetTypeHysteresis.init({
@@ -1292,7 +1300,7 @@ function mod.on_setting_changed(setting_id)
 		_refresh_debug_log_level()
 	end
 
-	if setting_id == "enable_human_likeness" then
+	if TIMING_SETTING_IDS[setting_id] then
 		HumanLikeness.patch_bot_settings(_bot_settings)
 	end
 

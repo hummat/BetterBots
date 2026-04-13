@@ -5,6 +5,14 @@ local AbilityQueue = dofile("scripts/mods/BetterBots/ability_queue.lua")
 AbilityQueue.init({ shared_rules = SharedRules })
 
 describe("ability_queue", function()
+	local saved_script_unit = _G.ScriptUnit
+	local saved_require = require
+
+	after_each(function()
+		_G.ScriptUnit = saved_script_unit
+		rawset(_G, "require", saved_require)
+	end)
+
 	describe("_action_input_is_bot_queueable", function()
 		it("accepts parser-level stance inputs even when action validation rejects them", function()
 			local action_input_extension = test_helper.make_player_action_input_extension({
@@ -102,14 +110,6 @@ describe("ability_queue", function()
 	end)
 
 	describe("template fallback fast paths", function()
-		local saved_script_unit
-		local saved_require
-
-		after_each(function()
-			_G.ScriptUnit = saved_script_unit
-			rawset(_G, "require", saved_require)
-		end)
-
 		it("skips heuristic dispatch while combat ability is not usable", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require
@@ -409,14 +409,6 @@ describe("ability_queue", function()
 	end)
 
 	describe("combat ability jitter", function()
-		local saved_script_unit
-		local saved_require
-
-		after_each(function()
-			_G.ScriptUnit = saved_script_unit
-			rawset(_G, "require", saved_require)
-		end)
-
 		it("schedules delayed queueing for non-emergency rules", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require
@@ -747,6 +739,164 @@ describe("ability_queue", function()
 			local new_pending_ready_t = state_by_unit.bot_unit.pending_ready_t
 			assert.is_not_nil(new_pending_ready_t)
 			assert.are_not.equals(first_pending_ready_t, new_pending_ready_t)
+		end)
+	end)
+
+	describe("human-likeness jitter buckets", function()
+		local function run_pending_jitter_rule(rule, delay)
+			saved_script_unit = _G.ScriptUnit
+			saved_require = require
+
+			local fixed_t = 10
+			local state_by_unit = {}
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				bot_queue_action_input = function() end,
+				action_input_parsers = {
+					combat_ability_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							psyker_shout = {
+								shout_pressed = {},
+							},
+						},
+					},
+				},
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
+				can_use_ability = function()
+					return true
+				end,
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "psyker_shout" },
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(_, system_name)
+					if system_name == "unit_data_system" then
+						return unit_data_extension
+					end
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+				end,
+				extension = function(_, system_name)
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+				end,
+			}
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return {
+						psyker_shout = {
+							ability_meta_data = {
+								activation = { action_input = "shout_pressed" },
+							},
+						},
+					}
+				end
+				if path == "scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions" then
+					return {}
+				end
+				return saved_require(path)
+			end)
+
+			AbilityQueue.init({
+				mod = { echo = function() end, dump = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return fixed_t
+				end,
+				equipped_combat_ability = function()
+					return ability_extension, { name = "psyker_shout" }
+				end,
+				equipped_combat_ability_name = function()
+					return "psyker_shout"
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				fallback_state_by_unit = state_by_unit,
+				fallback_queue_dumped_by_key = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20,
+				shared_rules = SharedRules,
+			})
+			AbilityQueue.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true, rule, {}
+					end,
+				},
+				MetaData = { inject = function() end },
+				ItemFallback = {
+					try_queue_item = function() end,
+					reset_item_sequence_state = function() end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+					context_snapshot = function(context)
+						return context
+					end,
+					fallback_state_snapshot = function(state)
+						return state
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+					emit_decision = function() end,
+				},
+				EngagementLeash = {
+					is_movement_ability = function()
+						return false
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function()
+						return false
+					end,
+				},
+				CombatAbilityIdentity = {
+					resolve = function()
+						return nil
+					end,
+				},
+				HumanLikeness = {
+					should_bypass_ability_jitter = function()
+						return false
+					end,
+					random_ability_jitter_delay = function(asked_rule)
+						assert.equals(rule, asked_rule)
+						return delay
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+
+			AbilityQueue.try_queue("bot_unit", {})
+			return state_by_unit.bot_unit.pending_ready_t
+		end
+
+		it("uses defensive jitter for defensive rules", function()
+			assert.equals(10.2, run_pending_jitter_rule("veteran_voc_critical_toughness", 0.2))
+		end)
+
+		it("uses opportunistic jitter for opportunistic rules", function()
+			assert.equals(10.8, run_pending_jitter_rule("ogryn_charge_priority_target", 0.8))
 		end)
 	end)
 end)

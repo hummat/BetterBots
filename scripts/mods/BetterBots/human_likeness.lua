@@ -1,19 +1,30 @@
 local M = {}
 
-local OPPORTUNITY_REACTION_MIN = 2 -- Seconds before reacting to opportunity targets (min)
-local OPPORTUNITY_REACTION_MAX = 5 -- Seconds before reacting to opportunity targets (max)
-local ABILITY_JITTER_MIN_S = 0.3 -- Random delay before ability activation (min)
-local ABILITY_JITTER_MAX_S = 1.5 -- Random delay before ability activation (max)
-local START_CHALLENGE_VALUE = 10 -- Challenge rating sum where leash scaling begins
-local MAX_CHALLENGE_VALUE = 30 -- Challenge rating sum where leash is fully tightened
-local MIN_LEASH_FLOOR = 6 -- Minimum effective leash distance (meters)
-
 local _original_bot_settings = setmetatable({}, { __mode = "k" })
 local _patched_bot_settings = setmetatable({}, { __mode = "k" })
 
 local _debug_log
 local _debug_enabled
-local _is_enabled
+local _get_timing_config
+local _get_pressure_leash_config
+
+local DEFAULT_TIMING_CONFIG = {
+	enabled = true,
+	reaction_min = 2,
+	reaction_max = 4,
+	defensive_jitter_min_s = 0.10,
+	defensive_jitter_max_s = 0.25,
+	opportunistic_jitter_min_s = 0.25,
+	opportunistic_jitter_max_s = 0.70,
+}
+
+local DEFAULT_PRESSURE_LEASH_CONFIG = {
+	enabled = true,
+	start_rating = 12,
+	full_rating = 30,
+	scale_multiplier = 0.65,
+	floor_m = 7,
+}
 
 local function _contains(haystack, needle)
 	return haystack and string.find(haystack, needle, 1, true) ~= nil
@@ -26,7 +37,24 @@ end
 function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
-	_is_enabled = deps.is_enabled
+	_get_timing_config = deps.get_timing_config
+	_get_pressure_leash_config = deps.get_pressure_leash_config
+end
+
+local function _timing_config()
+	if _get_timing_config then
+		return _get_timing_config()
+	end
+
+	return DEFAULT_TIMING_CONFIG
+end
+
+local function _pressure_leash_config()
+	if _get_pressure_leash_config then
+		return _get_pressure_leash_config()
+	end
+
+	return DEFAULT_PRESSURE_LEASH_CONFIG
 end
 
 local function _restore_original_bot_settings(bot_settings, normal)
@@ -60,27 +88,25 @@ function M.patch_bot_settings(bot_settings)
 		}
 	end
 
-	if _is_enabled and not _is_enabled() then
+	local config = _timing_config()
+	if not config.enabled then
+		local original = _original_bot_settings[bot_settings]
 		if _restore_original_bot_settings(bot_settings, normal) and _debug_enabled and _debug_enabled() then
 			_debug_log(
 				"human_likeness_restore",
 				0,
 				"restored opportunity reaction times (min="
-					.. tostring(_original_bot_settings[bot_settings].min)
+					.. tostring(original.min)
 					.. ", max="
-					.. tostring(_original_bot_settings[bot_settings].max)
+					.. tostring(original.max)
 					.. ")"
 			)
 		end
 		return
 	end
 
-	if _patched_bot_settings[bot_settings] then
-		return
-	end
-
-	normal.min = OPPORTUNITY_REACTION_MIN
-	normal.max = OPPORTUNITY_REACTION_MAX
+	normal.min = config.reaction_min
+	normal.max = config.reaction_max
 	_patched_bot_settings[bot_settings] = true
 
 	if _debug_enabled and _debug_enabled() then
@@ -88,48 +114,88 @@ function M.patch_bot_settings(bot_settings)
 			"human_likeness_patch",
 			0,
 			"patched opportunity reaction times (min="
-				.. OPPORTUNITY_REACTION_MIN
+				.. tostring(config.reaction_min)
 				.. ", max="
-				.. OPPORTUNITY_REACTION_MAX
+				.. tostring(config.reaction_max)
 				.. ")"
 		)
 	end
 end
 
-function M.should_bypass_ability_jitter(rule)
-	if _is_enabled and not _is_enabled() then
-		return true
-	end
-
+function M.jitter_bucket_for_rule(rule)
 	if not rule then
-		return false
+		return "opportunistic"
 	end
 
-	return _contains(rule, "ally_aid")
+	if
+		_contains(rule, "ally_aid")
 		or _contains(rule, "panic")
 		or _contains(rule, "last_stand")
 		or _contains(rule, "hazard")
 		or _contains(rule, "emergency")
 		or _contains(rule, "escape")
 		or _contains(rule, "high_peril")
+	then
+		return "immediate"
+	end
+
+	if
+		_contains(rule, "protect_interactor")
+		or _contains(rule, "critical")
+		or _contains(rule, "low_health")
+		or _contains(rule, "self_critical")
+		or _contains(rule, "low_toughness")
+		or _contains(rule, "surrounded")
+		or _contains(rule, "overwhelmed")
+		or _contains(rule, "pressure")
+		or _contains(rule, "high_threat")
+		or _contains(rule, "ally_reposition")
+	then
+		return "defensive"
+	end
+
+	return "opportunistic"
 end
 
-function M.random_ability_jitter_delay()
-	return _lerp(ABILITY_JITTER_MIN_S, ABILITY_JITTER_MAX_S, math.random())
+function M.should_bypass_ability_jitter(rule)
+	local config = _timing_config()
+	if not config.enabled then
+		return true
+	end
+
+	return M.jitter_bucket_for_rule(rule) == "immediate"
+end
+
+function M.random_ability_jitter_delay(rule)
+	local config = _timing_config()
+	local bucket = M.jitter_bucket_for_rule(rule)
+	local min_s
+	local max_s
+
+	if bucket == "defensive" then
+		min_s = config.defensive_jitter_min_s
+		max_s = config.defensive_jitter_max_s
+	else
+		min_s = config.opportunistic_jitter_min_s
+		max_s = config.opportunistic_jitter_max_s
+	end
+
+	return _lerp(min_s, max_s, math.random())
 end
 
 function M.scale_engage_leash(effective_leash, challenge_rating_sum)
-	if _is_enabled and not _is_enabled() then
+	local config = _pressure_leash_config()
+	if not config.enabled then
 		return effective_leash
 	end
 
-	local lerp_t = (challenge_rating_sum - START_CHALLENGE_VALUE) / (MAX_CHALLENGE_VALUE - START_CHALLENGE_VALUE)
+	local lerp_t = (challenge_rating_sum - config.start_rating) / (config.full_rating - config.start_rating)
 
 	if lerp_t <= 0 then
 		return effective_leash
 	end
 
-	local challenge_leash = math.max(MIN_LEASH_FLOOR, effective_leash * 0.5)
+	local challenge_leash = math.max(config.floor_m, effective_leash * config.scale_multiplier)
 	local result
 	if lerp_t >= 1 then
 		result = challenge_leash

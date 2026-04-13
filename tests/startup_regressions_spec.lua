@@ -227,8 +227,12 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_truthy(source:find("function mod%.on_setting_changed%(setting_id%)", 1))
-		assert.is_truthy(source:find('if setting_id == "enable_human_likeness" then', 1, true))
+		assert.is_truthy(source:find("local TIMING_SETTING_IDS = {", 1, true))
+		assert.is_truthy(source:find("human_timing_profile = true", 1, true))
+		assert.is_truthy(source:find("human_timing_opportunistic_jitter_max_ms = true", 1, true))
+		assert.is_truthy(source:find("if TIMING_SETTING_IDS%[setting_id%] then", 1))
 		assert.is_truthy(source:find("HumanLikeness%.patch_bot_settings%(", 1))
+		assert.is_nil(source:find('if setting_id == "enable_human_likeness" then', 1, true))
 	end)
 
 	it("eagerly patches BotSettings in case bot_settings was already required", function()
@@ -410,25 +414,48 @@ describe("startup regressions", function()
 			return source
 		end
 
+		it("surfaces the new human-likeness profile widgets and localization keys", function()
+			local data_source = read_file("scripts/mods/BetterBots/BetterBots_data.lua")
+			local localization_source = read_file("scripts/mods/BetterBots/BetterBots_localization.lua")
+
+			assert.is_truthy(data_source:find('setting_id = "human_timing_profile"', 1, true))
+			assert.is_truthy(data_source:find('setting_id = "pressure_leash_profile"', 1, true))
+			assert.is_nil(data_source:find('setting_id = "enable_human_likeness"', 1, true))
+			assert.is_truthy(data_source:find("show_widgets = { 1, 2, 3, 4, 5, 6 }", 1, true))
+			assert.is_truthy(data_source:find("show_widgets = { 1, 2, 3, 4 }", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_fast = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_slow = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_reaction_min_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_reaction_max_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_defensive_jitter_min_ms_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_defensive_jitter_max_ms_description = {", 1, true))
+			assert.is_truthy(
+				localization_source:find("human_timing_opportunistic_jitter_min_ms_description = {", 1, true)
+			)
+			assert.is_truthy(
+				localization_source:find("human_timing_opportunistic_jitter_max_ms_description = {", 1, true)
+			)
+			assert.is_truthy(localization_source:find("pressure_leash_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_light = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_strong = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_start_rating_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_full_rating_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_scale_percent_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_floor_m_description = {", 1, true))
+		end)
+
 		it("every widget setting_id has a matching Settings.DEFAULTS entry and vice versa", function()
 			local Settings = dofile("scripts/mods/BetterBots/settings.lua")
 			local data_source = read_file("scripts/mods/BetterBots/BetterBots_data.lua")
-			local pending_surface_settings = {
-				human_timing_profile = true,
-				pressure_leash_profile = true,
-				human_timing_reaction_min = true,
-				human_timing_reaction_max = true,
-				human_timing_defensive_jitter_min_ms = true,
-				human_timing_defensive_jitter_max_ms = true,
-				human_timing_opportunistic_jitter_min_ms = true,
-				human_timing_opportunistic_jitter_max_ms = true,
-				pressure_leash_start_rating = true,
-				pressure_leash_full_rating = true,
-				pressure_leash_scale_percent = true,
-				pressure_leash_floor_m = true,
-			}
-			local legacy_human_likeness_widget_present =
-				data_source:find('setting_id = "enable_human_likeness"', 1, true)
 
 			-- Extract all setting_id string literals from the widget definitions.
 			-- Skip fragment strings that are part of Lua concatenations (..) used by
@@ -467,18 +494,11 @@ describe("startup regressions", function()
 
 			-- Inverse: every DEFAULTS key must have a matching widget
 			for id in pairs(Settings.DEFAULTS) do
-				if not pending_surface_settings[id] then
-					assert.is_true(
-						widget_ids[id] == true,
-						"Settings.DEFAULTS['" .. id .. "'] has no matching widget in BetterBots_data.lua"
-					)
-				end
+				assert.is_true(
+					widget_ids[id] == true,
+					"Settings.DEFAULTS['" .. id .. "'] has no matching widget in BetterBots_data.lua"
+				)
 			end
-
-			assert.is_true(
-				legacy_human_likeness_widget_present ~= nil,
-				"pending human-likeness surface allowlist must be removed once the legacy widget is deleted"
-			)
 		end)
 	end)
 

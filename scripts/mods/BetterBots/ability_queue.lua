@@ -324,7 +324,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			state.pending_rule = rule
 			state.pending_template_name = ability_template_name
 			state.pending_action_input = action_input
-			state.pending_ready_t = fixed_t + _HumanLikeness.random_ability_jitter_delay()
+			state.pending_ready_t = fixed_t + _HumanLikeness.random_ability_jitter_delay(rule)
 			return
 		end
 

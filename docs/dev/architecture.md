@@ -144,10 +144,10 @@ This mod targets bot ability activation in three paths:
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - logs only actual stabilized type flips (`target_type_flip:<unit>`) for in-game verification
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
-    - patches `BotSettings.opportunity_target_reaction_times.normal` from `10-20` down to `2-5`
-    - adds `0.3-1.5s` combat-ability activation jitter in `ability_queue.lua` for non-emergency fallback casts
-    - bypasses jitter for rescue, hazard, panic, and explicit emergency/escape/high-peril rules so high-risk defensive casts still fire immediately
-    - restores challenge-pressure melee conservatism by shrinking BetterBots' effective engagement leash under high `challenge_rating_sum` pressure instead of leaving vanilla's dead `challenge_rating = 0` path inert
+    - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`off` / `light` / `medium` / `strong` / `custom`)
+    - patches `BotSettings.opportunity_target_reaction_times.normal` from vanilla `10-20` to the selected timing profile (default medium = `2-4`), restoring the original values when timing is off
+    - classifies fallback ability rules into `immediate`, `defensive`, and `opportunistic` jitter buckets; emergency/rescue/hazard rules still bypass jitter, defensive rules use the smaller defensive range, and opportunistic rules use the larger opportunistic range
+    - scales BetterBots' effective melee engagement leash from the selected pressure profile (default medium = start at `12`, full at `30`, scale to `65%`, floor `7m`) instead of the old fixed half-leash model
 31. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets

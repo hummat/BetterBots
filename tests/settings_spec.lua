@@ -568,7 +568,6 @@ describe("settings", function()
 			assert.is_true(Settings.is_feature_enabled("smart_targeting"))
 			assert.is_true(Settings.is_feature_enabled("daemonhost_avoidance"))
 			assert.is_true(Settings.is_feature_enabled("target_type_hysteresis"))
-			assert.is_true(Settings.is_feature_enabled("human_likeness"))
 		end)
 
 		it("returns true for unknown feature names", function()
@@ -611,11 +610,6 @@ describe("settings", function()
 		it("gates target_type_hysteresis feature correctly", function()
 			Settings.init(mock_mod({ enable_target_type_hysteresis = false }))
 			assert.is_false(Settings.is_feature_enabled("target_type_hysteresis"))
-		end)
-
-		it("gates human_likeness feature correctly", function()
-			Settings.init(mock_mod({ enable_human_likeness = false }))
-			assert.is_false(Settings.is_feature_enabled("human_likeness"))
 		end)
 
 		it("gates team_cooldown feature correctly", function()
@@ -830,43 +824,34 @@ describe("settings", function()
 			local localization_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
 			local localization_source = assert(localization_handle:read("*a"))
 			localization_handle:close()
-
-			local pending_surface_settings = {
-				human_timing_profile = true,
-				pressure_leash_profile = true,
-				human_timing_reaction_min = true,
-				human_timing_reaction_max = true,
-				human_timing_defensive_jitter_min_ms = true,
-				human_timing_defensive_jitter_max_ms = true,
-				human_timing_opportunistic_jitter_min_ms = true,
-				human_timing_opportunistic_jitter_max_ms = true,
-				pressure_leash_start_rating = true,
-				pressure_leash_full_rating = true,
-				pressure_leash_scale_percent = true,
-				pressure_leash_floor_m = true,
-			}
-			local legacy_human_likeness_widget_present =
-				data_source:find('setting_id = "enable_human_likeness"', 1, true)
+			assert.is_truthy(data_source:find('setting_id = "human_timing_profile"', 1, true))
+			assert.is_truthy(data_source:find('setting_id = "pressure_leash_profile"', 1, true))
+			assert.is_nil(data_source:find('setting_id = "enable_human_likeness"', 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_fast = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_slow = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_light = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_strong = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_custom = {", 1, true))
 
 			for setting_id in pairs(Settings.DEFAULTS) do
-				if not pending_surface_settings[setting_id] then
-					local has_widget = data_source:find('"' .. setting_id .. '"', 1, true)
-					if not has_widget and setting_id:match("^bot_slot_%d+_profile$") then
-						has_widget = data_source:find("make_slot_dropdown(", 1, true)
-					end
-
-					assert.is_truthy(has_widget, "missing widget for setting " .. setting_id)
-					assert.is_truthy(
-						localization_source:find(setting_id .. " = {", 1, true),
-						"missing localization for setting " .. setting_id
-					)
+				local has_widget = data_source:find('"' .. setting_id .. '"', 1, true)
+				if not has_widget and setting_id:match("^bot_slot_%d+_profile$") then
+					has_widget = data_source:find("make_slot_dropdown(", 1, true)
 				end
-			end
 
-			assert.is_truthy(
-				legacy_human_likeness_widget_present,
-				"pending human-likeness surface allowlist must be removed once the legacy widget is deleted"
-			)
+				assert.is_truthy(has_widget, "missing widget for setting " .. setting_id)
+				assert.is_truthy(
+					localization_source:find(setting_id .. " = {", 1, true),
+					"missing localization for setting " .. setting_id
+				)
+			end
 		end)
 	end)
 end)
