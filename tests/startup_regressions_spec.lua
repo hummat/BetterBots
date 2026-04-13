@@ -231,6 +231,25 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("HumanLikeness%.patch_bot_settings%(", 1))
 	end)
 
+	it("eagerly patches BotSettings in case bot_settings was already required", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:hook_require%("scripts/settings/bot/bot_settings"', 1))
+		assert.is_truthy(source:find('pcall%(require, "scripts/settings/bot/bot_settings"%)', 1))
+	end)
+
+	it("refreshes live mule pickup state when the grimoire setting changes", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('if setting_id == "enable_bot_grimoire_pickup" then', 1, true))
+		assert.is_truthy(source:find("MulePickup%.patch_pickups%(", 1))
+		assert.is_truthy(source:find("MulePickup%.sync_live_bot_groups%(", 1))
+	end)
+
 	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))

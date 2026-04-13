@@ -20,6 +20,7 @@ describe("mule_pickup", function()
 	local enabled
 	local debug_logs
 	local fake_mod
+	local live_bot_groups
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -39,6 +40,7 @@ describe("mule_pickup", function()
 		pickups = make_pickups()
 		enabled = false
 		debug_logs = {}
+		live_bot_groups = nil
 		fake_mod = {
 			hook_require = function(_, _, callback)
 				callback({
@@ -83,6 +85,9 @@ describe("mule_pickup", function()
 			end,
 			is_grimoire_pickup_enabled = function()
 				return enabled
+			end,
+			get_live_bot_groups = function()
+				return live_bot_groups
 			end,
 			pickups = pickups,
 			unit_get_data = function(unit, key)
@@ -138,6 +143,56 @@ describe("mule_pickup", function()
 		assert.is_false(changed)
 		assert.equals("tome", pickup_component.mule_pickup.pickup_type)
 		assert.equals(4, pickup_component.mule_pickup_distance)
+	end)
+
+	it("clears live grimoire reservations and orders when setting is off", function()
+		local grim_unit = { pickup_type = "grimoire" }
+		local tome_unit = { pickup_type = "tome" }
+		local pickup_component = {
+			mule_pickup = grim_unit,
+			mule_pickup_distance = 4,
+		}
+		local behavior_component = {
+			interaction_unit = grim_unit,
+			forced_pickup_unit = grim_unit,
+		}
+		local bot_data = {
+			bot_1 = {
+				pickup_component = pickup_component,
+				pickup_orders = {
+					slot_pocketable = {
+						unit = grim_unit,
+						pickup_name = "grimoire",
+					},
+				},
+				behavior_component = behavior_component,
+			},
+		}
+
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[grim_unit] = 20,
+						[tome_unit] = 20,
+					},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.is_nil(live_bot_groups.side_a._available_mule_pickups.slot_pocketable[grim_unit])
+		assert.equals(20, live_bot_groups.side_a._available_mule_pickups.slot_pocketable[tome_unit])
+		assert.is_nil(pickup_component.mule_pickup)
+		assert.equals(math.huge, pickup_component.mule_pickup_distance)
+		assert.is_nil(bot_data.bot_1.pickup_orders.slot_pocketable)
+		assert.is_nil(behavior_component.interaction_unit)
+		assert.is_nil(behavior_component.forced_pickup_unit)
 	end)
 
 	it("blocks grimoire pickup orders when setting is off", function()

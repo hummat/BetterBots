@@ -640,10 +640,21 @@ AbilityQueue.wire({
 	end,
 })
 
-mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+local function _patch_human_likeness_bot_settings(BotSettings)
 	_bot_settings = BotSettings
 	HumanLikeness.patch_bot_settings(BotSettings)
+end
+
+mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+	_patch_human_likeness_bot_settings(BotSettings)
 end)
+
+do
+	local ok, BotSettings = pcall(require, "scripts/settings/bot/bot_settings")
+	if ok and BotSettings then
+		_patch_human_likeness_bot_settings(BotSettings)
+	end
+end
 
 ReviveAbility.wire({
 	MetaData = MetaData,
@@ -1283,6 +1294,11 @@ function mod.on_setting_changed(setting_id)
 
 	if setting_id == "enable_human_likeness" then
 		HumanLikeness.patch_bot_settings(_bot_settings)
+	end
+
+	if setting_id == "enable_bot_grimoire_pickup" then
+		MulePickup.patch_pickups()
+		MulePickup.sync_live_bot_groups()
 	end
 
 	if setting_id == "enable_melee_improvements" then

@@ -97,6 +97,7 @@ This mod targets bot ability activation in three paths:
     - explicit ammo pickup orders are preserved
     - `mule_pickup.lua` activates vanilla side-mission book carry by mutating pickup template metadata in place: mirror `inventory_slot_name -> slot_name`, set `bots_mule_pickup = true` for tome/scripture, and gate grimoire carrying behind a BetterBots toggle
     - hook `BotBehaviorExtension._refresh_destination` (post-process): clears stale live grimoire mule targets when the grimoire toggle is off
+    - hook `BotGroup._update_mule_pickups` plus setting-change sync: prunes cached grimoire reservations and explicit `slot_pocketable` pickup orders immediately when grimoire carry is disabled, so bots can fall through to tomes without waiting for the vanilla cache to expire
     - hook `BotOrder.pickup`: rejects grimoire pickup orders while the grimoire toggle is off, but leaves tome/scripture orders intact
 22. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
@@ -145,7 +146,7 @@ This mod targets bot ability activation in three paths:
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - patches `BotSettings.opportunity_target_reaction_times.normal` from `10-20` down to `2-5`
     - adds `0.3-1.5s` combat-ability activation jitter in `ability_queue.lua` for non-emergency fallback casts
-    - bypasses jitter for rescue/panic/hazard style rules so obvious emergency abilities still fire immediately
+    - bypasses jitter for rescue, hazard, panic, and explicit emergency/escape/high-peril rules so high-risk defensive casts still fire immediately
     - restores challenge-pressure melee conservatism by shrinking BetterBots' effective engagement leash under high `challenge_rating_sum` pressure instead of leaving vanilla's dead `challenge_rating = 0` path inert
 31. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting

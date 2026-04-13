@@ -109,6 +109,9 @@ function M.should_bypass_ability_jitter(rule)
 		or _contains(rule, "panic")
 		or _contains(rule, "last_stand")
 		or _contains(rule, "hazard")
+		or _contains(rule, "emergency")
+		or _contains(rule, "escape")
+		or _contains(rule, "high_peril")
 end
 
 function M.random_ability_jitter_delay()

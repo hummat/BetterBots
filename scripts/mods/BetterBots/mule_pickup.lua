@@ -5,12 +5,14 @@ local _debug_log
 local _debug_enabled
 local _is_grimoire_pickup_enabled
 local _pickups
+local _get_live_bot_groups
 local _unit_get_data
 local _tome_patch_logged = false
 local _last_grimoire_patch_enabled
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
+local POCKETABLE_SLOT_NAME = "slot_pocketable"
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -26,6 +28,20 @@ local function _pickups_registry()
 	end
 
 	return require("scripts/settings/pickup/pickups")
+end
+
+local function _default_get_live_bot_groups()
+	local extension_manager = Managers and Managers.state and Managers.state.extension
+	if not extension_manager or type(extension_manager.system) ~= "function" then
+		return nil
+	end
+
+	local ok, group_system = pcall(extension_manager.system, extension_manager, "group_system")
+	if not ok or not group_system then
+		return nil
+	end
+
+	return group_system._bot_groups
 end
 
 local function _get_pickup_data(pickup_name)
@@ -60,11 +76,13 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_is_grimoire_pickup_enabled = deps.is_grimoire_pickup_enabled
 	_pickups = deps.pickups
+	_get_live_bot_groups = deps.get_live_bot_groups or _default_get_live_bot_groups
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
 	_tome_patch_logged = false
 	_last_grimoire_patch_enabled = nil
 
 	M.patch_pickups()
+	M.sync_live_bot_groups()
 end
 
 function M.patch_pickups()
@@ -113,6 +131,106 @@ function M.sanitize_mule_pickup(pickup_component, unit)
 	return true
 end
 
+local function _clear_behavior_targets(behavior_component)
+	if not behavior_component then
+		return false
+	end
+
+	local changed = false
+	if M.is_grimoire_pickup_unit(behavior_component.interaction_unit) then
+		behavior_component.interaction_unit = nil
+		changed = true
+	end
+	if M.is_grimoire_pickup_unit(behavior_component.forced_pickup_unit) then
+		behavior_component.forced_pickup_unit = nil
+		changed = true
+	end
+
+	return changed
+end
+
+local function _clear_grimoire_pickup_order(pickup_orders)
+	local order = pickup_orders and pickup_orders[POCKETABLE_SLOT_NAME]
+	if not (order and M.is_grimoire_pickup_unit(order.unit)) then
+		return false
+	end
+
+	pickup_orders[POCKETABLE_SLOT_NAME] = nil
+
+	return true
+end
+
+local function _clear_cached_grimoire_pickups(bot_group)
+	local available_mule_pickups = bot_group and bot_group._available_mule_pickups
+	local available_pickups = available_mule_pickups and available_mule_pickups[POCKETABLE_SLOT_NAME]
+	if not available_pickups then
+		return false
+	end
+
+	local changed = false
+	for pickup_unit in pairs(available_pickups) do
+		if M.is_grimoire_pickup_unit(pickup_unit) then
+			available_pickups[pickup_unit] = nil
+			changed = true
+		end
+	end
+
+	return changed
+end
+
+function M.sync_live_bot_group(bot_group)
+	M.patch_pickups()
+
+	if _grimoire_enabled() or not bot_group then
+		return false
+	end
+
+	local changed = _clear_cached_grimoire_pickups(bot_group)
+	local bot_data = (bot_group.data and bot_group:data()) or bot_group._bot_data
+	if not bot_data then
+		return changed
+	end
+
+	for unit, data in pairs(bot_data) do
+		if _clear_grimoire_pickup_order(data.pickup_orders) then
+			changed = true
+			_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
+		end
+
+		if M.sanitize_mule_pickup(data.pickup_component, unit) then
+			changed = true
+		end
+
+		if _clear_behavior_targets(data.behavior_component) then
+			changed = true
+		end
+	end
+
+	return changed
+end
+
+function M.sync_live_bot_groups()
+	M.patch_pickups()
+
+	if _grimoire_enabled() or not _get_live_bot_groups then
+		return false
+	end
+
+	local bot_groups = _get_live_bot_groups()
+	if not bot_groups then
+		return false
+	end
+
+	local changed = false
+	for _, bot_group in pairs(bot_groups) do
+		if M.sync_live_bot_group(bot_group) then
+			changed = true
+		end
+	end
+
+	return changed
+end
+
 function M.should_block_pickup_order(pickup_unit)
 	M.patch_pickups()
 
@@ -121,12 +239,22 @@ end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	_mod:hook_safe(BotBehaviorExtension, "_refresh_destination", function(self)
-		M.sanitize_mule_pickup(self._pickup_component, self._unit)
+		local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit)
+		if changed then
+			_clear_behavior_targets(self._behavior_component)
+		end
 	end)
 end
 
 function M.register_hooks()
 	M.patch_pickups()
+	M.sync_live_bot_groups()
+
+	_mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+		_mod:hook_safe(BotGroup, "_update_mule_pickups", function(self)
+			M.sync_live_bot_group(self)
+		end)
+	end)
 
 	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)

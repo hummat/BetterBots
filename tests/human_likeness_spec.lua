@@ -65,6 +65,14 @@ describe("human_likeness", function()
 		assert.is_false(HumanLikeness.should_bypass_ability_jitter("veteran_shout_mixed_pack"))
 	end)
 
+	it("treats emergency escape rules as jitter bypass", function()
+		HumanLikeness.init({})
+
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("zealot_stealth_emergency"))
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("psyker_shout_high_peril"))
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("ogryn_charge_escape"))
+	end)
+
 	it("shrinks leash only when challenge pressure rises", function()
 		HumanLikeness.init({})
 
