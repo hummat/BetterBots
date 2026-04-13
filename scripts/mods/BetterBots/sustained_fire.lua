@@ -275,9 +275,7 @@ function M.install_bot_unit_input_hooks(BotUnitInput)
 end
 
 function M.register_hooks()
-	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-		M.install_bot_unit_input_hooks(BotUnitInput)
-	end)
+	error("BetterBots: SustainedFire.register_hooks is obsolete; install through BetterBots.lua")
 end
 
 return M

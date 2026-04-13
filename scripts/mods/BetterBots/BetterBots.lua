@@ -56,6 +56,29 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
+local _original_hook_require = mod.hook_require
+local _hook_require_callsite_by_path = {}
+
+function mod:hook_require(path, callback)
+	local caller = debug.getinfo(2, "Sl")
+	local callsite = string.format("%s:%s", caller and caller.short_src or "?", caller and caller.currentline or 0)
+	local first_callsite = _hook_require_callsite_by_path[path]
+
+	if first_callsite then
+		error(
+			string.format(
+				"BetterBots duplicate hook_require for %s at %s (first registered at %s)",
+				tostring(path),
+				callsite,
+				first_callsite
+			)
+		)
+	end
+
+	_hook_require_callsite_by_path[path] = callsite
+
+	return _original_hook_require(self, path, callback)
+end
 
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
@@ -780,6 +803,14 @@ mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotU
 	Sprint.install_bot_unit_input_hooks(BotUnitInput)
 end)
 
+-- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
+-- same mod on the same path silently clobber each other. Install all BotGroup
+-- hooks through one callback so healing deferral and mule pickup both survive.
+mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+	HealingDeferral.install_bot_group_hooks(BotGroup)
+	MulePickup.install_bot_group_hooks(BotGroup)
+end)
+
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
 mod:hook_require(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
@@ -1203,43 +1234,23 @@ mod:command("bb_perf", "Show and clear BetterBots timing stats for the current s
 		return
 	end
 
-	mod:echo(
-		string.format(
-			"bb-perf: %.1f µs/bot/frame total (%d bot frames, %d calls, %.3f ms total)",
-			report.total_us_per_bot_frame or 0,
-			report.bot_frames,
-			report.total_calls,
-			report.total_us / 1000
-		)
-	)
-
-	local rows = {}
-	for tag, stats in pairs(report.tags) do
-		rows[#rows + 1] = {
-			tag = tag,
-			total_us = stats.total_us,
-			calls = stats.calls,
-			avg_us_per_call = stats.avg_us_per_call,
-		}
-	end
-
-	table.sort(rows, function(a, b)
-		return a.total_us > b.total_us
-	end)
-
-	for i = 1, #rows do
-		local row = rows[i]
-		mod:echo(
-			string.format(
-				"bb-perf: %s %.3f ms total (%d calls, %.1f µs/call)",
-				row.tag,
-				row.total_us / 1000,
-				row.calls,
-				row.avg_us_per_call
-			)
-		)
+	local lines = Perf.format_report_lines(report, "bb-perf:")
+	for i = 1, #lines do
+		mod:echo(lines[i])
 	end
 end)
+
+local function _auto_dump_perf_report()
+	local report = Perf.report_and_reset()
+	if not report then
+		return
+	end
+
+	local lines = Perf.format_report_lines(report, "bb-perf:auto:")
+	for i = 1, #lines do
+		mod:echo(lines[i])
+	end
+end
 
 mod:command("bb_reset", "Reset all BetterBots settings to their default values", function()
 	local failures = {}
@@ -1300,6 +1311,7 @@ function mod.on_game_state_changed(status, state)
 	end
 
 	if status == "exit" and state == "GameplayStateRun" then
+		_auto_dump_perf_report()
 		EventLog.end_session()
 	end
 end

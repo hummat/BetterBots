@@ -128,6 +128,7 @@ This mod targets bot ability activation in three paths:
     - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to `SustainedFire.observe_queued_weapon_action(...)`
     - this avoids same-method hook clobbering between runtime weapon-action translation/protection and sustained-fire queue observation
     - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
+    - `BetterBots.lua` also owns the shared `hook_require("...group/bot_group")` callback for healing deferral + mule pickup and wraps `mod:hook_require` with a duplicate-path guard so same-path registrations fail loudly instead of silently clobbering each other
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
     - hook `BotUnitInput._update_actions`: inject raw hold inputs (`action_one_hold` for most full-auto/stream paths, `action_two_hold` for Purgatus flame charge) while sustained state is fresh
     - scope is execution-only: it respects the current `attack_meta_data` path choice and does not decide ADS vs hipfire vs brace
@@ -243,6 +244,8 @@ The mod piggybacks on data the engine already computes. There are no new per-fra
 
 **Instrumented perf buckets:**
 - `ability_queue`, `grenade_fallback`, `ping_system`, `event_log_flush`, `event_log_snapshot`, `event_log_session_start`
+- Breakdown-only child tags: `ability_queue.item_fallback`, `ability_queue.template_setup`, `ability_queue.input_validation`, `ability_queue.decision`, `ability_queue.queue`
+- Breakdown-only child tags: `grenade_fallback.build_context`, `grenade_fallback.heuristic`, `grenade_fallback.profile_resolution`, `grenade_fallback.launch`, `grenade_fallback.stage_machine`
 - `condition_patch.can_activate_ability`
 - `sprint.update_movement`
 - `target_selection.slot_weight`, `target_selection.monster_weight`

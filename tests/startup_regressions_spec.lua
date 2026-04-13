@@ -30,6 +30,13 @@ local function each_mod_source_file(callback)
 	handle:close()
 end
 
+local function read_file(path)
+	local handle = assert(io.open(path, "r"))
+	local source = assert(handle:read("*a"))
+	handle:close()
+	return source
+end
+
 describe("startup regressions", function()
 	it("escapes percent signs in localized setting labels", function()
 		for key, entry in pairs(Localization) do
@@ -126,9 +133,7 @@ describe("startup regressions", function()
 	end)
 
 	it("initializes and registers extracted runtime modules", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 
 		assert.is_truthy(source:find("AnimationGuard%.init%(", 1))
 		assert.is_truthy(source:find("AnimationGuard%.register_hooks%(", 1))
@@ -144,10 +149,60 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/input/bot_unit_input"', 1))
 		assert.is_truthy(source:find("SustainedFire%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find("Sprint%.install_bot_unit_input_hooks%(", 1))
+		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/group/bot_group"', 1))
+		assert.is_truthy(source:find("HealingDeferral%.install_bot_group_hooks%(", 1))
+		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.init%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.update%(", 1))
+	end)
+
+	it("rejects duplicate hook_require targets across BetterBots source files", function()
+		local owners_by_target = {}
+		local duplicates = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+
+			for target in source:gmatch('hook_require%(%s*"([^"]+)"') do
+				local owners = owners_by_target[target]
+				if not owners then
+					owners = {}
+					owners_by_target[target] = owners
+				end
+
+				local already_listed = false
+				for i = 1, #owners do
+					if owners[i] == path then
+						already_listed = true
+						break
+					end
+				end
+
+				if not already_listed then
+					owners[#owners + 1] = path
+				end
+			end
+		end)
+
+		for target, owners in pairs(owners_by_target) do
+			if #owners > 1 then
+				table.sort(owners)
+				duplicates[#duplicates + 1] = target .. " => " .. table.concat(owners, ", ")
+			end
+		end
+
+		table.sort(duplicates)
+		assert.same({}, duplicates)
+	end)
+
+	it("guards hook_require registration against same-path clobbers at runtime", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		assert.is_truthy(source:find("local _original_hook_require = mod%.hook_require", 1))
+		assert.is_truthy(source:find("local _hook_require_callsite_by_path = {}", 1, true))
+		assert.is_truthy(source:find("BetterBots duplicate hook_require for %%s", 1))
 	end)
 
 	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()
@@ -197,13 +252,8 @@ describe("startup regressions", function()
 	end)
 
 	it("keeps BotBehaviorExtension hook_require consolidated in BetterBots.lua", function()
-		local main_handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local main_source = assert(main_handle:read("*a"))
-		main_handle:close()
-
-		local revive_handle = assert(io.open("scripts/mods/BetterBots/revive_ability.lua", "r"))
-		local revive_source = assert(revive_handle:read("*a"))
-		revive_handle:close()
+		local main_source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local revive_source = read_file("scripts/mods/BetterBots/revive_ability.lua")
 
 		local hook_pattern = 'hook_require%("scripts/extension_systems/behavior/bot_behavior_extension"'
 		local main_count = 0
@@ -333,13 +383,6 @@ describe("startup regressions", function()
 	end)
 
 	describe("cross-module category drift guard", function()
-		local function read_file(path)
-			local handle = assert(io.open(path, "r"))
-			local source = assert(handle:read("*a"))
-			handle:close()
-			return source
-		end
-
 		local function extract_table_keys(source, table_name)
 			local block = source:match("local%s+" .. table_name .. "%s*=%s*(%b{})")
 			assert.is_not_nil(block, "could not find '" .. table_name .. "' in source")
@@ -426,13 +469,6 @@ describe("startup regressions", function()
 	end)
 
 	describe("widget parity guard", function()
-		local function read_file(path)
-			local handle = assert(io.open(path, "r"))
-			local source = assert(handle:read("*a"))
-			handle:close()
-			return source
-		end
-
 		it("surfaces the new human-likeness profile widgets and localization keys", function()
 			local data_source = read_file("scripts/mods/BetterBots/BetterBots_data.lua")
 			local localization_source = read_file("scripts/mods/BetterBots/BetterBots_localization.lua")

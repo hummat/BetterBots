@@ -307,9 +307,7 @@ Sprint.install_bot_unit_input_hooks = function(BotUnitInput)
 end
 
 Sprint.register_hook = function()
-	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-		Sprint.install_bot_unit_input_hooks(BotUnitInput)
-	end)
+	error("BetterBots: Sprint.register_hook is obsolete; install through BetterBots.lua")
 end
 
 Sprint.should_sprint = _should_sprint

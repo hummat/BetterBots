@@ -336,15 +336,15 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	end)
 end
 
+function M.install_bot_group_hooks(BotGroup)
+	_mod:hook_safe(BotGroup, "_update_mule_pickups", function(self)
+		M.sync_live_bot_group(self)
+	end)
+end
+
 function M.register_hooks()
 	M.patch_pickups()
 	M.sync_live_bot_groups()
-
-	_mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
-		_mod:hook_safe(BotGroup, "_update_mule_pickups", function(self)
-			M.sync_live_bot_group(self)
-		end)
-	end)
 
 	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
