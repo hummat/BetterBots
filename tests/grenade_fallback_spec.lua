@@ -358,6 +358,13 @@ describe("grenade_fallback", function()
 			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
 		end)
 
+		it("allows the initial grenade wield input during item-based grenade wield stage", function()
+			advance_to_stage("wield")
+
+			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "grenade_ability"))
+			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "zoom"))
+		end)
+
 		it("blocks foreign weapon actions during Assail cleanup", function()
 			GrenadeFallback.wire({
 				build_context = function()

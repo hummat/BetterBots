@@ -605,6 +605,10 @@ local function _expected_weapon_action_input(state)
 		return state.aim_input
 	end
 
+	if state.stage == "wield" and not state.component then
+		return "grenade_ability"
+	end
+
 	if state.stage == "wait_followup" then
 		return state.followup_input
 	end
