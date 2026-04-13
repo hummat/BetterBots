@@ -724,7 +724,6 @@ WeaponAction.register_hooks({
 	should_block_weapon_action_input = _should_block_weapon_action_input,
 	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
 })
-SustainedFire.register_hooks()
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 AmmoPolicy.register_hooks()
@@ -773,7 +772,13 @@ mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates",
 	RangedMetaData.inject(WeaponTemplates)
 end)
 
-Sprint.register_hook()
+-- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
+-- same mod on the same path silently clobber each other. Install all
+-- BotUnitInput hooks through one callback so sprint and sustained-fire coexist.
+mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
+	SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
+	Sprint.install_bot_unit_input_hooks(BotUnitInput)
+end)
 
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
 mod:hook_require(

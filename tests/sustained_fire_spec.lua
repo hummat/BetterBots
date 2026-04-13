@@ -1,4 +1,25 @@
+local test_helper = require("tests.test_helper")
 local SustainedFire = dofile("scripts/mods/BetterBots/sustained_fire.lua")
+local Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
+local _extensions = setmetatable({}, { __mode = "k" })
+
+_G.ScriptUnit = _G.ScriptUnit or {}
+_G.ScriptUnit.has_extension = function(unit, system_name)
+	local exts = _extensions[unit]
+	return exts and exts[system_name] or nil
+end
+
+local function make_hooking_mod()
+	return {
+		hook_require = function() end,
+		hook = function(_, target, method_name, handler)
+			local original = target[method_name]
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end,
+	}
+end
 
 describe("sustained_fire", function()
 	it("arms held-primary sustained state for recon lasgun fire", function()
@@ -137,5 +158,78 @@ describe("sustained_fire", function()
 
 		assert.is_nil(SustainedFire.active_state(unit))
 		assert.is_nil(input.action_one_hold)
+	end)
+
+	it("coexists with sprint on BotUnitInput without losing sustained-fire injection", function()
+		local BotUnitInput = {
+			update = function(self, unit)
+				self.updated_unit = unit
+			end,
+			_update_actions = function(_self, input)
+				input.base_action = true
+			end,
+			_update_movement = function(self, unit, input)
+				self.movement_unit = unit
+				input.base_movement = true
+			end,
+		}
+		local original_update = BotUnitInput.update
+		local original_update_actions = BotUnitInput._update_actions
+		local original_update_movement = BotUnitInput._update_movement
+		local mod = make_hooking_mod()
+		local unit = {}
+		local self = {
+			_move = { x = 0, y = 1 },
+		}
+		_extensions[unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "flamer_p1_m1" },
+			}),
+		}
+
+		SustainedFire.init({
+			mod = mod,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 5
+			end,
+		})
+		Sprint.init({
+			mod = mod,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 5
+			end,
+			sprint_follow_distance = function()
+				return 0
+			end,
+		})
+
+		SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
+		Sprint.install_bot_unit_input_hooks(BotUnitInput)
+
+		assert.not_equals(original_update, BotUnitInput.update)
+		assert.not_equals(original_update_actions, BotUnitInput._update_actions)
+		assert.not_equals(original_update_movement, BotUnitInput._update_movement)
+
+		BotUnitInput.update(self, unit, 0, 0)
+		SustainedFire.arm(unit, SustainedFire.resolve_state(unit, "flamer_p1_m1", "shoot_braced"))
+
+		local input = {}
+		BotUnitInput._update_actions(self, input)
+
+		assert.equals(unit, self.updated_unit)
+		assert.is_true(input.base_action)
+		assert.is_true(input.action_one_hold)
+
+		local movement_input = {}
+		BotUnitInput._update_movement(self, unit, movement_input, 0, 0)
+
+		assert.equals(unit, self.movement_unit)
+		assert.is_true(movement_input.base_movement)
 	end)
 end)

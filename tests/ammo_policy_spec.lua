@@ -604,6 +604,167 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
+	it("binds nearby grenade pickup when all eligible humans are full even if bot exceeds threshold", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 3
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 2
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				bot_grenade_charges_threshold = function()
+					return 0
+				end,
+				human_grenade_reserve_threshold = function()
+					return 0.5
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.equals("small_grenade_pickup", self._pickup_component.ammo_pickup)
+		assert.equals(2, self._pickup_component.ammo_pickup_distance)
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("does not bind grenade pickup when humans are only above reserve and bot exceeds threshold", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 3
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 2
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				bot_grenade_charges_threshold = function()
+					return 1
+				end,
+				human_grenade_reserve_threshold = function()
+					return 0.5
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
+		assert.equals(-math.huge, self._pickup_component.ammo_pickup_valid_until)
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
 	it("does not bind grenade pickup when bot is already full even if threshold exceeds max charges", function()
 		install_module({
 			ammo_module = {

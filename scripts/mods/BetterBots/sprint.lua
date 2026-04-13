@@ -302,9 +302,13 @@ Sprint.init = function(deps)
 	end
 end
 
+Sprint.install_bot_unit_input_hooks = function(BotUnitInput)
+	_mod:hook(BotUnitInput, "_update_movement", on_update_movement)
+end
+
 Sprint.register_hook = function()
 	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-		_mod:hook(BotUnitInput, "_update_movement", on_update_movement)
+		Sprint.install_bot_unit_input_hooks(BotUnitInput)
 	end)
 end
 

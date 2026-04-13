@@ -127,6 +127,7 @@ This mod targets bot ability activation in three paths:
 28. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
     - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to `SustainedFire.observe_queued_weapon_action(...)`
     - this avoids same-method hook clobbering between runtime weapon-action translation/protection and sustained-fire queue observation
+    - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
     - hook `BotUnitInput._update_actions`: inject raw hold inputs (`action_one_hold` for most full-auto/stream paths, `action_two_hold` for Purgatus flame charge) while sustained state is fresh
     - scope is execution-only: it respects the current `attack_meta_data` path choice and does not decide ADS vs hipfire vs brace

@@ -254,29 +254,29 @@ function M.update_actions(unit, input, current_template_name)
 	_log_hold(unit, state)
 end
 
+function M.install_bot_unit_input_hooks(BotUnitInput)
+	_mod:hook(BotUnitInput, "update", function(func, self, unit, dt, t)
+		self._betterbots_player_unit = unit
+		return func(self, unit, dt, t)
+	end)
+
+	_mod:hook(BotUnitInput, "_update_actions", function(func, self, input)
+		func(self, input)
+
+		if _is_enabled and not _is_enabled() then
+			return
+		end
+
+		local ok, err = pcall(M.update_actions, self._betterbots_player_unit, input)
+		if not ok and _debug_enabled and _debug_enabled() then
+			_debug_log("sustained_fire_error:" .. tostring(self._betterbots_player_unit), _fixed_time(), tostring(err))
+		end
+	end)
+end
+
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-		_mod:hook(BotUnitInput, "update", function(func, self, unit, dt, t)
-			self._betterbots_player_unit = unit
-			return func(self, unit, dt, t)
-		end)
-
-		_mod:hook(BotUnitInput, "_update_actions", function(func, self, input)
-			func(self, input)
-
-			if _is_enabled and not _is_enabled() then
-				return
-			end
-
-			local ok, err = pcall(M.update_actions, self._betterbots_player_unit, input)
-			if not ok and _debug_enabled and _debug_enabled() then
-				_debug_log(
-					"sustained_fire_error:" .. tostring(self._betterbots_player_unit),
-					_fixed_time(),
-					tostring(err)
-				)
-			end
-		end)
+		M.install_bot_unit_input_hooks(BotUnitInput)
 	end)
 end
 
