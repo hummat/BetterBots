@@ -36,10 +36,6 @@ local function _human_threshold()
 	return (_Settings and _Settings.human_ammo_reserve_threshold and _Settings.human_ammo_reserve_threshold()) or 0.80
 end
 
-local function _bot_grenade_threshold()
-	return (_Settings and _Settings.bot_grenade_charges_threshold and _Settings.bot_grenade_charges_threshold()) or 0
-end
-
 local function _human_grenade_threshold()
 	return (_Settings and _Settings.human_grenade_reserve_threshold and _Settings.human_grenade_reserve_threshold())
 		or 1
@@ -373,23 +369,18 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			local grenade_pickup, grenade_distance = _best_nearby_grenade_pickup(bot_group, unit)
 			if grenade_pickup then
 				local human_units = self._side and self._side.valid_human_units
-				local bot_within_grenade_threshold = grenade_current <= _bot_grenade_threshold()
 				local humans_ok_for_grenade =
 					_all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
-				local humans_full_for_grenade = false
-				if humans_ok_for_grenade and not bot_within_grenade_threshold then
-					humans_full_for_grenade = _all_eligible_humans_above_grenade_threshold(human_units, 1)
-				end
-
-				if humans_ok_for_grenade and (bot_within_grenade_threshold or humans_full_for_grenade) then
+				if humans_ok_for_grenade then
 					pickup_component.ammo_pickup = grenade_pickup
 					pickup_component.ammo_pickup_distance = grenade_distance or 0
 					pickup_component.ammo_pickup_valid_until = (_fixed_time and _fixed_time() or 0)
 						+ PICKUP_VALID_DURATION
 					pickup_component.needs_ammo = true
-					local allow_reason = humans_full_for_grenade and "all eligible humans full"
-						or "all eligible humans above reserve"
-					_log("grenade_pickup_allow:" .. tostring(unit), "grenade pickup permitted: " .. allow_reason)
+					_log(
+						"grenade_pickup_allow:" .. tostring(unit),
+						"grenade pickup permitted: all eligible humans above reserve"
+					)
 					_log("grenade_pickup_bind:" .. tostring(unit), "grenade pickup bound into ammo slot")
 				else
 					if _clear_reserved_grenade_pickup(pickup_component, grenade_pickup) then

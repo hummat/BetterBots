@@ -306,13 +306,6 @@ return {
 	bot_human_ammo_reserve_threshold_description = {
 		en = "If any player with a gun is below this, bots leave ammo for players unless they are desperate.",
 	},
-	bot_grenade_charges_threshold = {
-		en = "Bot grenade pickup threshold (charges)",
-	},
-	bot_grenade_charges_threshold_description = {
-		en = "Bots seek nearby grenade refills only at or below this many remaining charges. "
-			.. "Set to 0 to refill only when empty.",
-	},
 	bot_human_grenade_reserve_threshold = {
 		en = "Save grenade refills for players below (%%)",
 	},

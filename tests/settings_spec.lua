@@ -129,40 +129,33 @@ describe("settings", function()
 	end)
 
 	describe("grenade pickup settings", function()
-		it("returns default grenade thresholds when mod returns nil", function()
+		it("returns default human grenade reserve threshold when mod returns nil", function()
 			Settings.init(mock_mod({}))
 
-			assert.are.equal(0, Settings.bot_grenade_charges_threshold())
 			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
 		end)
 
-		it("reads numeric grenade slider values", function()
+		it("reads numeric human grenade reserve slider values", function()
 			Settings.init(mock_mod({
-				bot_grenade_charges_threshold = 2,
 				bot_human_grenade_reserve_threshold = 75,
 			}))
 
-			assert.are.equal(2, Settings.bot_grenade_charges_threshold())
 			assert.are.equal(0.75, Settings.human_grenade_reserve_threshold())
 		end)
 
-		it("accepts stringified grenade slider values from DMF", function()
+		it("accepts stringified human grenade reserve slider values from DMF", function()
 			Settings.init(mock_mod({
-				bot_grenade_charges_threshold = "1",
 				bot_human_grenade_reserve_threshold = "100",
 			}))
 
-			assert.are.equal(1, Settings.bot_grenade_charges_threshold())
 			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
 		end)
 
-		it("falls back to defaults for invalid grenade slider values", function()
+		it("falls back to defaults for invalid human grenade reserve slider values", function()
 			Settings.init(mock_mod({
-				bot_grenade_charges_threshold = "bad",
 				bot_human_grenade_reserve_threshold = 101,
 			}))
 
-			assert.are.equal(0, Settings.bot_grenade_charges_threshold())
 			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
 		end)
 	end)

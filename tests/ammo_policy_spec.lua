@@ -572,9 +572,6 @@ describe("ammo_policy", function()
 				human_ammo_reserve_threshold = function()
 					return 0.80
 				end,
-				bot_grenade_charges_threshold = function()
-					return 0
-				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0
 				end,
@@ -604,7 +601,7 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
-	it("binds nearby grenade pickup when all eligible humans are full even if bot exceeds threshold", function()
+	it("binds nearby grenade pickup when humans are above reserve and bot is not full", function()
 		install_module({
 			ammo_module = {
 				current_total_percentage = function()
@@ -651,9 +648,6 @@ describe("ammo_policy", function()
 				end,
 				human_ammo_reserve_threshold = function()
 					return 0.80
-				end,
-				bot_grenade_charges_threshold = function()
-					return 0
 				end,
 				human_grenade_reserve_threshold = function()
 					return 0.5
@@ -684,7 +678,7 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
-	it("does not bind grenade pickup when humans are only above reserve and bot exceeds threshold", function()
+	it("binds nearby grenade pickup when humans are above reserve and bot has spare charges", function()
 		install_module({
 			ammo_module = {
 				current_total_percentage = function()
@@ -731,9 +725,6 @@ describe("ammo_policy", function()
 				end,
 				human_ammo_reserve_threshold = function()
 					return 0.80
-				end,
-				bot_grenade_charges_threshold = function()
-					return 1
 				end,
 				human_grenade_reserve_threshold = function()
 					return 0.5
@@ -759,13 +750,12 @@ describe("ammo_policy", function()
 
 		update_hook(self, "bot1")
 
-		assert.is_nil(self._pickup_component.ammo_pickup)
-		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
-		assert.equals(-math.huge, self._pickup_component.ammo_pickup_valid_until)
+		assert.equals("small_grenade_pickup", self._pickup_component.ammo_pickup)
+		assert.equals(2, self._pickup_component.ammo_pickup_distance)
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
-	it("does not bind grenade pickup when bot is already full even if threshold exceeds max charges", function()
+	it("does not bind grenade pickup when bot is already full", function()
 		install_module({
 			ammo_module = {
 				current_total_percentage = function()
@@ -812,9 +802,6 @@ describe("ammo_policy", function()
 				end,
 				human_ammo_reserve_threshold = function()
 					return 0.80
-				end,
-				bot_grenade_charges_threshold = function()
-					return 12
 				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0
@@ -889,9 +876,6 @@ describe("ammo_policy", function()
 				human_ammo_reserve_threshold = function()
 					return 0.80
 				end,
-				bot_grenade_charges_threshold = function()
-					return 0
-				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0
 				end,
@@ -964,9 +948,6 @@ describe("ammo_policy", function()
 				human_ammo_reserve_threshold = function()
 					return 0.80
 				end,
-				bot_grenade_charges_threshold = function()
-					return 0
-				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0
 				end,
@@ -1029,9 +1010,6 @@ describe("ammo_policy", function()
 				human_ammo_reserve_threshold = function()
 					return 0.80
 				end,
-				bot_grenade_charges_threshold = function()
-					return 0
-				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0
 				end,
@@ -1091,9 +1069,6 @@ describe("ammo_policy", function()
 				end,
 				human_ammo_reserve_threshold = function()
 					return 0.80
-				end,
-				bot_grenade_charges_threshold = function()
-					return 0
 				end,
 				human_grenade_reserve_threshold = function()
 					return 1.0

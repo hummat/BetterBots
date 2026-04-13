@@ -54,7 +54,7 @@ A bot is eligible to seek grenade refills only when:
 
 - it has an ability extension
 - `max_ability_charges("grenade_ability") > 0`
-- its current grenade charges are at or below the configured bot grenade threshold
+- its current grenade charges are below max
 
 This excludes cooldown-only blitz users such as Psyker blitzes with `max_charges == 0`.
 
@@ -80,19 +80,17 @@ This matches the intended behavior:
 
 ## Settings
 
-Add grenade-specific settings parallel to ammo policy:
+Add a grenade-specific human-reserve setting parallel to ammo policy:
 
-- `bot_grenade_charges_threshold`
 - `bot_human_grenade_reserve_threshold`
 
 Recommended defaults for v0.11.0:
 
-- bot grenade threshold: `0` charges
 - human grenade reserve threshold: `100%`
 
 Effect of defaults:
 
-- bots only seek grenade refills when empty
+- bots seek grenade refills whenever they are not full and every eligible human is at or above the configured reserve
 - any eligible human missing even one grenade charge gets priority
 
 This is intentionally conservative because grenade pickups are rarer and more valuable than ammo pickups.

@@ -73,7 +73,6 @@ it("binds nearby grenade pickup when bot empty and humans stocked", function()
 	AmmoPolicy.init(make_deps({
 		fixed_time = function() return 10 end,
 		settings = make_settings({
-			bot_grenade_charges_threshold = function() return 0 end,
 			human_grenade_reserve_threshold = function() return 1.0 end,
 		}),
 		ability_extension = function(unit)
@@ -156,13 +155,9 @@ Extend `M.init(deps)` with injectable refs:
 	_human_grenade_scan_cache = {}
 ```
 
-Add threshold helpers:
+Add threshold helper:
 
 ```lua
-local function _bot_grenade_threshold()
-	return (_Settings and _Settings.bot_grenade_charges_threshold and _Settings.bot_grenade_charges_threshold()) or 0
-end
-
 local function _human_grenade_threshold()
 	return (_Settings and _Settings.human_grenade_reserve_threshold and _Settings.human_grenade_reserve_threshold()) or 1
 end
@@ -359,24 +354,18 @@ git commit -m "feat(v0.11.0): add grenade pickup policy"
 Add setting IDs/defaults near existing ammo policy settings:
 
 ```lua
-local BOT_GRENADE_THRESHOLD_SETTING_ID = "bot_grenade_charges_threshold"
 local HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID = "bot_human_grenade_reserve_threshold"
 ```
 
 Add defaults:
 
 ```lua
-	bot_grenade_charges_threshold = 0,
 	bot_human_grenade_reserve_threshold = 100,
 ```
 
-Add getters:
+Add getter:
 
 ```lua
-function M.bot_grenade_charges_threshold()
-	return _number_setting(BOT_GRENADE_THRESHOLD_SETTING_ID, DEFAULTS.bot_grenade_charges_threshold) / 1
-end
-
 function M.human_grenade_reserve_threshold()
 	return _number_setting(HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID, DEFAULTS.bot_human_grenade_reserve_threshold) / 100
 end
@@ -386,10 +375,9 @@ Use project’s actual helper naming/style if `_number_setting` already differs.
 
 - [ ] **Step 2: Expose settings in `BetterBots_data.lua`**
 
-Add two numeric widgets in pickup settings block beside ammo settings:
+Add one numeric widget in pickup settings block beside ammo settings:
 
 ```lua
-					make_numeric("bot_grenade_charges_threshold", { 0, 4 }, 1),
 					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
 ```
 
@@ -400,16 +388,13 @@ If existing labels/localization are required, add matching localization entries 
 Add focused assertions in `tests/settings_spec.lua`:
 
 ```lua
-it("returns grenade pickup thresholds from settings", function()
+it("returns human grenade reserve threshold from settings", function()
 	mod:get = function(_, id)
-		if id == "bot_grenade_charges_threshold" then
-			return 0
-		elseif id == "bot_human_grenade_reserve_threshold" then
+		if id == "bot_human_grenade_reserve_threshold" then
 			return 100
 		end
 	end
 
-	assert.equals(0, Settings.bot_grenade_charges_threshold())
 	assert.equals(1.0, Settings.human_grenade_reserve_threshold())
 end)
 ```
@@ -426,7 +411,7 @@ Expected: PASS.
 
 ```bash
 git add scripts/mods/BetterBots/settings.lua scripts/mods/BetterBots/BetterBots_data.lua tests/settings_spec.lua
-if rg -n "bot_grenade_charges_threshold|bot_human_grenade_reserve_threshold" scripts/mods/BetterBots/BetterBots_localization.lua >/dev/null; then
+if rg -n "bot_human_grenade_reserve_threshold" scripts/mods/BetterBots/BetterBots_localization.lua >/dev/null; then
   git add scripts/mods/BetterBots/BetterBots_localization.lua
 fi
 git commit -m "feat(v0.11.0): add grenade pickup settings"

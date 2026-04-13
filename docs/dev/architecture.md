@@ -92,7 +92,7 @@ This mod targets bot ability activation in three paths:
     - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
     - `small_grenade` pickup support piggybacks the same vanilla `pickup_component.ammo_pickup` slot because vanilla never routes `group = "ability"` grenade refills into bot pickup awareness
-    - grenade refills only bind for charge-based grenade users at or below the configured bot grenade threshold; cooldown-only blitz users are ignored
+    - grenade refills bind for charge-based grenade users whenever every eligible human is above the configured reserve threshold; cooldown-only blitz users are ignored
     - grenade refill deferral is human-first with no bot desperation override; when grenade is deferred, existing ammo pickup decisions remain intact
     - explicit ammo pickup orders are preserved
     - `mule_pickup.lua` activates vanilla side-mission book carry by mutating pickup template metadata in place: mirror `inventory_slot_name -> slot_name`, set `bots_mule_pickup = true` for tome/scripture, and gate grimoire carrying behind a BetterBots toggle
@@ -154,6 +154,7 @@ This mod targets bot ability activation in three paths:
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
+    - `GameplayStateRun` exit auto-dumps the same report to the console log with `bb-perf:auto:` prefixes so mission-end and quit paths leave a perf snapshot even when `/bb_perf` is forgotten
 32. Tiered debug log levels (#40, via `log_levels.lua`):
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
@@ -227,7 +228,7 @@ Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/de
 
 The mod piggybacks on data the engine already computes. There are no new per-frame scans, raycasts, or pathfinding queries.
 
-`/bb_perf` reports the sum of top-level instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Some rows are breakdown-only child tags for diagnosis; these appear in the per-tag table but are excluded from the headline total when their parent hook already includes the same work. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters.
+`/bb_perf` reports the sum of top-level instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Some rows are breakdown-only child tags for diagnosis; these appear in the per-tag table but are excluded from the headline total when their parent hook already includes the same work. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters. The same formatter is also emitted automatically on `GameplayStateRun` exit with the `bb-perf:auto:` prefix.
 
 **Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
 
