@@ -51,3 +51,4 @@ Current status:
 - Add new shared builders to `tests/test_helper.lua` before spreading a new extension family across specs.
 - If production code reads a private engine field, the audit must record the exact file and line where that field exists.
 - If decompiled source does not prove a method/field exists, do not mock it. Get an in-game dump first.
+- `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above. Extend that check when a new audited family is added.

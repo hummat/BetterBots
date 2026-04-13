@@ -256,15 +256,14 @@ function M.make_minion_perception_extension(opts)
 	opts = opts or {}
 	local has_line_of_sight = opts.has_line_of_sight
 	local ext = {
-		has_line_of_sight = opts.has_line_of_sight_fn or function(self, target_unit)
-			if type(has_line_of_sight) == "function" then
-				return has_line_of_sight(self, target_unit)
-			end
-			if has_line_of_sight ~= nil then
-				return has_line_of_sight
-			end
-			return true
-		end,
+		has_line_of_sight = opts.has_line_of_sight_fn
+			or (type(has_line_of_sight) == "function" and has_line_of_sight)
+			or function()
+				if has_line_of_sight ~= nil then
+					return has_line_of_sight
+				end
+				return true
+			end,
 	}
 
 	if opts.overrides then
@@ -291,7 +290,7 @@ end
 
 function M.make_smart_tag_extension(tag_id, overrides)
 	local ext = {
-		tag_id = function()
+		tag_id = type(tag_id) == "function" and tag_id or function()
 			return tag_id
 		end,
 	}

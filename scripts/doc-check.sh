@@ -162,7 +162,36 @@ else
   echo " info: busted not available — skipping test count parity"
 fi
 
-# ── 5. Summary ───────────────────────────────────────────────────────────────
+# ── 5. Audited mock helper enforcement ───────────────────────────────────────
+
+# Current hard enforcement is scoped to audited ScriptUnit extension families.
+# Specs must route these through tests/test_helper.lua builders rather than
+# ad-hoc table literals. This catches regressions where impossible engine APIs
+# get reintroduced into the suite.
+
+audited_extension_regex='unit_data_system|ability_system|action_input_system|perception_system|smart_tag_system|companion_spawner_system|coherency_system|talent_system'
+
+direct_assignment_matches=$(rg -nP "\b(${audited_extension_regex})\s*=\s*\{" tests/*_spec.lua 2>/dev/null || true)
+if [[ -n "$direct_assignment_matches" ]]; then
+  err "audited ScriptUnit extension mocks must use tests/test_helper.lua builders, found ad-hoc table literals:
+$direct_assignment_matches"
+fi
+
+direct_return_matches=$(rg -nUP "has_extension\\s*=\\s*function[\\s\\S]{0,220}\"(${audited_extension_regex})\"[^\\n]*then\\s*\\n\\s*return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+if [[ -n "$direct_return_matches" ]]; then
+  err "audited ScriptUnit.has_extension mocks must not return raw table literals for audited systems:
+$direct_return_matches"
+fi
+
+extension_return_matches=$(rg -nUP "extension\\s*=\\s*function[\\s\\S]{0,220}\"(${audited_extension_regex})\"[^\\n]*then\\s*\\n\\s*return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+if [[ -n "$extension_return_matches" ]]; then
+  err "audited ScriptUnit.extension mocks must not return raw table literals for audited systems:
+$extension_return_matches"
+fi
+
+ok "audited ScriptUnit extension mocks route through shared builders"
+
+# ── 6. Summary ───────────────────────────────────────────────────────────────
 
 echo ""
 if ((errors > 0)); then
