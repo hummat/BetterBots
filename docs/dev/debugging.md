@@ -154,6 +154,21 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 5. If still unclear, run `/bb_brain` once and inspect the dump.
 6. Correlate with log lines (`fallback held/queued`, `charge consumed`, `invalid action_input`).
 
+### Grenade regression shortcut
+
+For item-based grenade regressions, check the grenade state-machine phases before blaming aim, gravity, or heuristics:
+
+1. `grenade queued wield for <grenade>` appears:
+   - sequence started, but nothing is proven yet.
+2. `grenade_wield_ok` appears:
+   - grenade slot swap succeeded; only **after this** is it reasonable to suspect aim/ballistic logic.
+3. `grenade queued <aim_input>` / `grenade releasing toward ...` appears:
+   - aim/release phase actually ran.
+4. `grenade charge consumed for <grenade>` appears:
+   - authoritative success for item-based grenades.
+
+If you instead see repeated `grenade queued wield for <grenade>` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade_wield_ok`, the blocker is killing the initial `grenade_ability` queue during the grenade `wield` stage. That is a sequence-allowlist bug, not an aim bug.
+
 ### Reading context dumps (deep verification)
 
 When debug logging is enabled, BetterBots emits a **one-shot context dump** the first time each ability template is activated in a session. These are written via `mod:dump()` (table → log) and contain the full decision context at the moment of activation.

@@ -154,6 +154,10 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
+- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade_wield_ok`, `grenade queued <aim_input>`, `grenade releasing toward ...`, or `grenade charge consumed`:
+  - the grenade weapon-action blocker is swallowing the **initial** item-grenade `grenade_ability` input during `state.stage == "wield"`.
+  - this is an allowlist/sequence bug in `grenade_fallback._expected_weapon_action_input()`, not a ballistic/gravity-aim failure.
+  - do not blame the gravity-aware aim path unless the log first reaches `grenade_wield_ok` and then starts emitting `grenade aim ballistic` / `grenade aim flat fallback`.
 
 ## Writing debug logging for new features
 
