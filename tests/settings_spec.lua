@@ -2,6 +2,7 @@ local Settings = dofile("scripts/mods/BetterBots/settings.lua")
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local helper = require("tests.test_helper")
+local _saved_managers = rawget(_G, "Managers")
 
 local function mock_mod(overrides)
 	return {
@@ -14,7 +15,31 @@ local function mock_mod(overrides)
 	}
 end
 
+local function set_challenge(challenge)
+	_G.Managers = {
+		state = {
+			difficulty = {
+				get_challenge = function()
+					return challenge
+				end,
+			},
+		},
+	}
+end
+
+local function restore_managers()
+	_G.Managers = _saved_managers
+end
+
 describe("settings", function()
+	before_each(function()
+		restore_managers()
+	end)
+
+	after_each(function()
+		restore_managers()
+	end)
+
 	describe("resolve_preset", function()
 		it("defaults to balanced when mod returns nil", function()
 			Settings.init(mock_mod({}))
@@ -177,13 +202,13 @@ describe("settings", function()
 	end)
 
 	describe("human-likeness profiles", function()
-		it("defaults split profiles and custom defaults to medium", function()
+		it("defaults split profiles and custom defaults to auto", function()
 			Settings.init(mock_mod({}))
 
-			assert.equals("medium", Settings.human_timing_profile())
-			assert.equals("medium", Settings.pressure_leash_profile())
-			assert.equals("medium", Settings.DEFAULTS.human_timing_profile)
-			assert.equals("medium", Settings.DEFAULTS.pressure_leash_profile)
+			assert.equals("auto", Settings.human_timing_profile())
+			assert.equals("auto", Settings.pressure_leash_profile())
+			assert.equals("auto", Settings.DEFAULTS.human_timing_profile)
+			assert.equals("auto", Settings.DEFAULTS.pressure_leash_profile)
 			assert.equals(2, Settings.DEFAULTS.human_timing_reaction_min)
 			assert.equals(4, Settings.DEFAULTS.human_timing_reaction_max)
 			assert.equals(100, Settings.DEFAULTS.human_timing_defensive_jitter_min_ms)
@@ -205,14 +230,28 @@ describe("settings", function()
 			assert.equals("off", Settings.pressure_leash_profile())
 		end)
 
-		it("defaults unset profiles to medium when only one axis is explicitly set", function()
+		it("defaults unset sibling profiles to auto when only one axis is explicitly set", function()
 			Settings.init(mock_mod({
 				enable_human_likeness = false,
 				human_timing_profile = "fast",
 			}))
 
 			assert.equals("fast", Settings.human_timing_profile())
-			assert.equals("medium", Settings.pressure_leash_profile())
+			assert.equals("auto", Settings.pressure_leash_profile())
+		end)
+
+		it("resolves auto timing config to medium when no difficulty manager exists", function()
+			Settings.init(mock_mod({ human_timing_profile = "auto" }))
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 2,
+				reaction_max = 4,
+				defensive_jitter_min_s = 0.10,
+				defensive_jitter_max_s = 0.25,
+				opportunistic_jitter_min_s = 0.25,
+				opportunistic_jitter_max_s = 0.70,
+			}, Settings.resolve_human_timing_config())
 		end)
 
 		it("prefers explicit profiles over the legacy checkbox", function()
@@ -224,6 +263,66 @@ describe("settings", function()
 
 			assert.equals("fast", Settings.human_timing_profile())
 			assert.equals("strong", Settings.pressure_leash_profile())
+		end)
+
+		it("resolves auto timing config by mission difficulty", function()
+			local cases = {
+				{
+					challenge = 1,
+					expected = {
+						enabled = true,
+						reaction_min = 3,
+						reaction_max = 6,
+						defensive_jitter_min_s = 0.15,
+						defensive_jitter_max_s = 0.35,
+						opportunistic_jitter_min_s = 0.40,
+						opportunistic_jitter_max_s = 1.00,
+					},
+				},
+				{
+					challenge = 3,
+					expected = {
+						enabled = true,
+						reaction_min = 2,
+						reaction_max = 4,
+						defensive_jitter_min_s = 0.10,
+						defensive_jitter_max_s = 0.25,
+						opportunistic_jitter_min_s = 0.25,
+						opportunistic_jitter_max_s = 0.70,
+					},
+				},
+				{
+					challenge = 4,
+					expected = {
+						enabled = true,
+						reaction_min = 1,
+						reaction_max = 3,
+						defensive_jitter_min_s = 0.05,
+						defensive_jitter_max_s = 0.15,
+						opportunistic_jitter_min_s = 0.15,
+						opportunistic_jitter_max_s = 0.45,
+					},
+				},
+				{
+					challenge = 5,
+					expected = {
+						enabled = true,
+						reaction_min = 1,
+						reaction_max = 3,
+						defensive_jitter_min_s = 0.05,
+						defensive_jitter_max_s = 0.15,
+						opportunistic_jitter_min_s = 0.15,
+						opportunistic_jitter_max_s = 0.45,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				set_challenge(case.challenge)
+				Settings.init(mock_mod({ human_timing_profile = "auto" }))
+
+				assert.are.same(case.expected, Settings.resolve_human_timing_config())
+			end
 		end)
 
 		it("resolves medium timing config", function()
@@ -342,6 +441,58 @@ describe("settings", function()
 				scale_multiplier = 0.50,
 				floor_m = 6,
 			}, config)
+		end)
+
+		it("resolves auto pressure leash config by mission difficulty", function()
+			local cases = {
+				{
+					challenge = 1,
+					expected = {
+						enabled = true,
+						start_rating = 16,
+						full_rating = 36,
+						scale_multiplier = 0.80,
+						floor_m = 8,
+					},
+				},
+				{
+					challenge = 3,
+					expected = {
+						enabled = true,
+						start_rating = 12,
+						full_rating = 30,
+						scale_multiplier = 0.65,
+						floor_m = 7,
+					},
+				},
+				{
+					challenge = 4,
+					expected = {
+						enabled = true,
+						start_rating = 12,
+						full_rating = 30,
+						scale_multiplier = 0.65,
+						floor_m = 7,
+					},
+				},
+				{
+					challenge = 5,
+					expected = {
+						enabled = true,
+						start_rating = 8,
+						full_rating = 24,
+						scale_multiplier = 0.50,
+						floor_m = 6,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				set_challenge(case.challenge)
+				Settings.init(mock_mod({ pressure_leash_profile = "auto" }))
+
+				assert.are.same(case.expected, Settings.resolve_pressure_leash_config())
+			end
 		end)
 
 		it("uses medium pressure config when custom sliders are invalid", function()
@@ -806,6 +957,18 @@ describe("settings", function()
 				)
 			end
 		end)
+
+		it("resolves auto pressure leash config to medium when no difficulty manager exists", function()
+			Settings.init(mock_mod({ pressure_leash_profile = "auto" }))
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 12,
+				full_rating = 30,
+				scale_multiplier = 0.65,
+				floor_m = 7,
+			}, Settings.resolve_pressure_leash_config())
+		end)
 	end)
 
 	describe("settings surface parity", function()
@@ -819,14 +982,18 @@ describe("settings", function()
 			localization_handle:close()
 			assert.is_truthy(data_source:find('setting_id = "human_timing_profile"', 1, true))
 			assert.is_truthy(data_source:find('setting_id = "pressure_leash_profile"', 1, true))
+			assert.is_truthy(data_source:find('text = "human_timing_profile_auto", value = "auto"', 1, true))
+			assert.is_truthy(data_source:find('text = "pressure_leash_profile_auto", value = "auto"', 1, true))
 			assert.is_nil(data_source:find('setting_id = "enable_human_likeness"', 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile = {", 1, true))
 			assert.is_truthy(localization_source:find("pressure_leash_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_auto = {", 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile_off = {", 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile_fast = {", 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile_medium = {", 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile_slow = {", 1, true))
 			assert.is_truthy(localization_source:find("human_timing_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_auto = {", 1, true))
 			assert.is_truthy(localization_source:find("pressure_leash_profile_off = {", 1, true))
 			assert.is_truthy(localization_source:find("pressure_leash_profile_light = {", 1, true))
 			assert.is_truthy(localization_source:find("pressure_leash_profile_medium = {", 1, true))

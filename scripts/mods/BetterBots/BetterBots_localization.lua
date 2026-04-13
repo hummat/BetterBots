@@ -158,7 +158,11 @@ return {
 		en = "Timing profile",
 	},
 	human_timing_profile_description = {
-		en = "Controls how quickly bots react to opportunities and how much they hesitate before non-urgent ability casts.",
+		en = "Controls how quickly bots react to opportunities and how much they hesitate "
+			.. "before non-urgent ability casts. Auto scales with mission difficulty.",
+	},
+	human_timing_profile_auto = {
+		en = "Auto (scales with difficulty)",
 	},
 	human_timing_profile_off = {
 		en = "Off",
@@ -216,7 +220,11 @@ return {
 	},
 	pressure_leash_profile_description = {
 		en = "Controls how much bots tighten their melee leash as combat pressure rises. "
-			.. "Combat pressure is the summed challenge rating of nearby threats.",
+			.. "Combat pressure is the summed challenge rating of nearby threats. "
+			.. "Auto scales with mission difficulty.",
+	},
+	pressure_leash_profile_auto = {
+		en = "Auto (scales with difficulty)",
 	},
 	pressure_leash_profile_off = {
 		en = "Off",

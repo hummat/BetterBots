@@ -147,7 +147,8 @@ This mod targets bot ability activation in three paths:
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
-    - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`off` / `light` / `medium` / `strong` / `custom`)
+    - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`auto` / `off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`auto` / `off` / `light` / `medium` / `strong` / `custom`)
+    - `auto` resolves independently from current mission difficulty: Sedition/Uprising → `slow`/`light`, Malice → `medium`/`medium`, Heresy → `fast`/`medium`, Damnation/Havoc → `fast`/`strong`
     - patches `BotSettings.opportunity_target_reaction_times.normal` from vanilla `10-20` to the selected timing profile (default medium = `2-4`), restoring the original values when timing is off
     - classifies fallback ability rules into `immediate`, `defensive`, and `opportunistic` jitter buckets; emergency/rescue/hazard rules still bypass jitter, defensive rules use the smaller defensive range, and opportunistic rules use the larger opportunistic range
     - scales BetterBots' effective melee engagement leash from the selected pressure profile (default medium = start at `12`, full at `30`, scale to `65%`, floor `7m`) instead of the old fixed half-leash model

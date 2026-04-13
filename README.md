@@ -23,6 +23,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
+- Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
@@ -93,6 +94,7 @@ Bots use 18 per-ability heuristic functions to decide when to activate — based
 - Daemonhost avoidance toggle
 - Poxburster safe targeting toggle
 - Bot ranged ammo threshold and human ammo reserve threshold
+- Human-likeness timing and pressure-leash profiles (auto / manual / custom)
 - Healing deferral mode + thresholds
 - Bot grimoire pickup toggle
 - Bot profiles: class per slot, weapon quality

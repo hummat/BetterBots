@@ -102,8 +102,8 @@ M.DEFAULTS = {
 	enable_smart_targeting = true,
 	enable_daemonhost_avoidance = true,
 	enable_target_type_hysteresis = true,
-	human_timing_profile = "medium",
-	pressure_leash_profile = "medium",
+	human_timing_profile = "auto",
+	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,
 	human_timing_reaction_max = 4,
 	human_timing_defensive_jitter_min_ms = 100,
@@ -294,7 +294,24 @@ local PRESSURE_LEASH_PROFILES = {
 	},
 }
 
+local AUTO_HUMAN_TIMING_PROFILE_BY_CHALLENGE = {
+	[1] = "slow",
+	[2] = "slow",
+	[3] = "medium",
+	[4] = "fast",
+	[5] = "fast",
+}
+
+local AUTO_PRESSURE_LEASH_PROFILE_BY_CHALLENGE = {
+	[1] = "light",
+	[2] = "light",
+	[3] = "medium",
+	[4] = "medium",
+	[5] = "strong",
+}
+
 local HUMAN_TIMING_PROFILE_OPTIONS = {
+	auto = true,
 	off = true,
 	fast = true,
 	medium = true,
@@ -303,6 +320,7 @@ local HUMAN_TIMING_PROFILE_OPTIONS = {
 }
 
 local PRESSURE_LEASH_PROFILE_OPTIONS = {
+	auto = true,
 	off = true,
 	light = true,
 	medium = true,
@@ -336,6 +354,22 @@ local function _resolve_profile(setting_id, sibling_setting_id, legacy_id, valid
 	end
 
 	return default_value
+end
+
+local function _current_challenge()
+	local difficulty_manager = Managers and Managers.state and Managers.state.difficulty
+	return difficulty_manager and difficulty_manager:get_challenge() or 3
+end
+
+local function _resolve_auto_profile(auto_profiles_by_challenge, fallback_profile)
+	local challenge = _current_challenge()
+	local profile = auto_profiles_by_challenge[challenge]
+
+	if profile then
+		return profile
+	end
+
+	return auto_profiles_by_challenge[3] or fallback_profile
 end
 
 local function _read_custom_numeric_setting(setting_id, min_value, max_value)
@@ -408,7 +442,7 @@ function M.human_timing_profile()
 		"pressure_leash_profile",
 		"enable_human_likeness",
 		HUMAN_TIMING_PROFILE_OPTIONS,
-		"medium"
+		"auto"
 	)
 end
 
@@ -418,12 +452,15 @@ function M.pressure_leash_profile()
 		"human_timing_profile",
 		"enable_human_likeness",
 		PRESSURE_LEASH_PROFILE_OPTIONS,
-		"medium"
+		"auto"
 	)
 end
 
 function M.resolve_human_timing_config()
 	local profile = M.human_timing_profile()
+	if profile == "auto" then
+		profile = _resolve_auto_profile(AUTO_HUMAN_TIMING_PROFILE_BY_CHALLENGE, "medium")
+	end
 	if profile ~= "custom" then
 		return _copy_config(HUMAN_TIMING_PROFILES[profile] or HUMAN_TIMING_PROFILES.medium)
 	end
@@ -463,6 +500,9 @@ end
 
 function M.resolve_pressure_leash_config()
 	local profile = M.pressure_leash_profile()
+	if profile == "auto" then
+		profile = _resolve_auto_profile(AUTO_PRESSURE_LEASH_PROFILE_BY_CHALLENGE, "medium")
+	end
 	if profile ~= "custom" then
 		return _copy_config(PRESSURE_LEASH_PROFILES[profile] or PRESSURE_LEASH_PROFILES.medium)
 	end

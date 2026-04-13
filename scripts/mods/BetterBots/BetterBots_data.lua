@@ -119,6 +119,7 @@ return {
 						default_value = DEFAULTS.human_timing_profile,
 						tooltip = "human_timing_profile_description",
 						options = {
+							{ text = "human_timing_profile_auto", value = "auto" },
 							{ text = "human_timing_profile_off", value = "off" },
 							{ text = "human_timing_profile_fast", value = "fast" },
 							{ text = "human_timing_profile_medium", value = "medium" },
@@ -144,6 +145,7 @@ return {
 						default_value = DEFAULTS.pressure_leash_profile,
 						tooltip = "pressure_leash_profile_description",
 						options = {
+							{ text = "pressure_leash_profile_auto", value = "auto" },
 							{ text = "pressure_leash_profile_off", value = "off" },
 							{ text = "pressure_leash_profile_light", value = "light" },
 							{ text = "pressure_leash_profile_medium", value = "medium" },
