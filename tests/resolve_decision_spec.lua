@@ -136,11 +136,9 @@ describe("resolve_decision", function()
 			_saved_has_extension = _G.ScriptUnit.has_extension
 			_G.ScriptUnit.has_extension = function(_unit, system_name)
 				if system_name == "perception_system" then
-					return {
-						enemies_in_proximity = function()
-							return {}, _num_enemies or 0
-						end,
-					}
+					return helper.make_bot_perception_extension({
+						num_enemies = _num_enemies or 0,
+					})
 				end
 
 				return nil

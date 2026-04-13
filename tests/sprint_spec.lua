@@ -1,4 +1,6 @@
 -- Mock engine globals before loading the sprint module
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _positions = {}
 local _alive = {}
@@ -91,11 +93,9 @@ local function setup_perception(unit, enemies)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
 	end
-	_extensions[unit].perception_system = {
-		enemies_in_proximity = function()
-			return enemy_list, #enemy_list
-		end,
-	}
+	_extensions[unit].perception_system = test_helper.make_bot_perception_extension({
+		enemies = enemy_list,
+	})
 end
 
 -- Helper: set up behavior extension with blackboard
@@ -117,11 +117,7 @@ local function setup_breed(unit, breed_name)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
 	end
-	_extensions[unit].unit_data_system = {
-		breed = function()
-			return { name = breed_name }
-		end,
-	}
+	_extensions[unit].unit_data_system = test_helper.make_minion_unit_data_extension({ name = breed_name })
 end
 
 -- Helper: set up group extension with follow unit
@@ -224,10 +220,15 @@ describe("sprint", function()
 			_positions[daemonhost] = pos(30, 0, 0)
 			_alive[daemonhost] = true
 			setup_breed(daemonhost, "chaos_daemonhost")
-			_extensions[daemonhost].unit_data_system.breed = function()
-				breed_calls = breed_calls + 1
-				return { name = "chaos_daemonhost" }
-			end
+			_extensions[daemonhost].unit_data_system = test_helper.make_minion_unit_data_extension(
+				{ name = "chaos_daemonhost" },
+				{
+					breed = function()
+						breed_calls = breed_calls + 1
+						return { name = "chaos_daemonhost" }
+					end,
+				}
+			)
 			-- Vanilla Side:relation_side_names returns a stable cached table
 			-- (see side.lua: Side._relation_side_names), so both bots on the
 			-- same team share the same enemy_side_names reference. Mirror that

@@ -182,6 +182,100 @@ function M.make_minion_locomotion_extension(current_velocity, overrides)
 	return ext
 end
 
+function M.make_player_ability_extension(opts)
+	opts = opts or {}
+	local equipped_abilities = opts.equipped_abilities or opts._equipped_abilities or {}
+	local ext = {
+		can_use_ability = opts.can_use_ability or function(_, ability_type)
+			if opts.can_use_by_type then
+				return opts.can_use_by_type(ability_type)
+			end
+			if opts.can_use_ability_result ~= nil then
+				return opts.can_use_ability_result
+			end
+			return true
+		end,
+		action_input_is_currently_valid = opts.action_input_is_currently_valid
+			or function(_, _component_name, _action_input, _used_input, _current_fixed_t)
+				if opts.action_input_is_currently_valid_result ~= nil then
+					return opts.action_input_is_currently_valid_result
+				end
+				return true
+			end,
+		remaining_ability_charges = opts.remaining_ability_charges or function(_, _ability_type)
+			return opts.remaining_ability_charges_value or 1
+		end,
+		_equipped_abilities = equipped_abilities,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_player_action_input_extension(opts)
+	opts = opts or {}
+	local ext = {
+		_action_input_parsers = opts.action_input_parsers or {},
+		bot_queue_action_input = opts.bot_queue_action_input or function() end,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_bot_perception_extension(opts)
+	opts = opts or {}
+	local enemies = opts.enemies or {}
+	local num_enemies = opts.num_enemies
+	local ext = {
+		enemies_in_proximity = opts.enemies_in_proximity or function()
+			return enemies, num_enemies or #enemies
+		end,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_minion_perception_extension(opts)
+	opts = opts or {}
+	local has_line_of_sight = opts.has_line_of_sight
+	local ext = {
+		has_line_of_sight = opts.has_line_of_sight_fn or function(self, target_unit)
+			if type(has_line_of_sight) == "function" then
+				return has_line_of_sight(self, target_unit)
+			end
+			if has_line_of_sight ~= nil then
+				return has_line_of_sight
+			end
+			return true
+		end,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
 function M.make_script_unit_mock(extension_map)
 	return {
 		has_extension = function(unit, system_name)
@@ -193,6 +287,85 @@ function M.make_script_unit_mock(extension_map)
 			return exts and exts[system_name] or nil
 		end,
 	}
+end
+
+function M.make_smart_tag_extension(tag_id, overrides)
+	local ext = {
+		tag_id = function()
+			return tag_id
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_coherency_extension(current_radius, overrides)
+	local ext = {
+		current_radius = function()
+			return current_radius
+		end,
+	}
+
+	if overrides then
+		for k, v in pairs(overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_player_talent_extension(opts)
+	opts = opts or {}
+	local special_rules = opts.special_rules or {}
+	local ext = {
+		has_special_rule = opts.has_special_rule or function(_, rule_name)
+			if special_rules[rule_name] ~= nil then
+				return special_rules[rule_name]
+			end
+			return false
+		end,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
+end
+
+function M.make_companion_spawner_extension(opts)
+	opts = opts or {}
+	local companion_units = opts.companion_units
+	local should_have = opts.should_have_companion
+
+	local ext = {
+		should_have_companion = function()
+			if should_have ~= nil then
+				return should_have
+			end
+			return companion_units ~= nil and #companion_units > 0 or false
+		end,
+		companion_units = function()
+			return companion_units
+		end,
+	}
+
+	if opts.overrides then
+		for k, v in pairs(opts.overrides) do
+			ext[k] = v
+		end
+	end
+
+	return ext
 end
 
 function M.copy_table(source)

@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local AbilityQueue = dofile("scripts/mods/BetterBots/ability_queue.lua")
 AbilityQueue.init({ shared_rules = SharedRules })
@@ -5,8 +7,8 @@ AbilityQueue.init({ shared_rules = SharedRules })
 describe("ability_queue", function()
 	describe("_action_input_is_bot_queueable", function()
 		it("accepts parser-level stance inputs even when action validation rejects them", function()
-			local action_input_extension = {
-				_action_input_parsers = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							veteran_combat_ability = {
@@ -17,12 +19,12 @@ describe("ability_queue", function()
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				action_input_is_currently_valid = function()
 					return false
 				end,
-			}
+			})
 
 			assert.is_true(
 				AbilityQueue._action_input_is_bot_queueable(
@@ -38,23 +40,23 @@ describe("ability_queue", function()
 		end)
 
 		it("falls back to action validation for direct action inputs", function()
-			local action_input_extension = {
-				_action_input_parsers = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							zealot_dash = {},
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				action_input_is_currently_valid = function(_, component_name, action_input, used_input, fixed_t)
 					return component_name == "combat_ability_action"
 						and action_input == "aim_pressed"
 						and used_input == nil
 						and fixed_t == 0
 				end,
-			}
+			})
 
 			assert.is_true(
 				AbilityQueue._action_input_is_bot_queueable(
@@ -70,20 +72,20 @@ describe("ability_queue", function()
 		end)
 
 		it("rejects inputs that are unknown to both parser and action validation", function()
-			local action_input_extension = {
-				_action_input_parsers = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							psyker_shout = {},
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				action_input_is_currently_valid = function()
 					return false
 				end,
-			}
+			})
 
 			assert.is_false(
 				AbilityQueue._action_input_is_bot_queueable(
@@ -114,19 +116,19 @@ describe("ability_queue", function()
 
 			local decision_calls = 0
 			local queued_inputs = 0
-			local ability_extension = {
+			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function(_, ability_type)
 					return ability_type ~= "combat_ability"
 				end,
 				action_input_is_currently_valid = function()
 					return true
 				end,
-			}
-			local action_input_extension = {
+			})
+			local action_input_extension = test_helper.make_player_action_input_extension({
 				bot_queue_action_input = function()
 					queued_inputs = queued_inputs + 1
 				end,
-				_action_input_parsers = {
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							psyker_shout = {
@@ -135,15 +137,10 @@ describe("ability_queue", function()
 						},
 					},
 				},
-			}
-			local unit_data_extension = {
-				read_component = function(_, component_name)
-					if component_name == "combat_ability_action" then
-						return { template_name = "psyker_shout" }
-					end
-					return nil
-				end,
-			}
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "psyker_shout" },
+			})
 
 			_G.ScriptUnit = {
 				has_extension = function(_, system_name)
@@ -260,17 +257,17 @@ describe("ability_queue", function()
 			local inject_calls = 0
 			local require_calls = 0
 			local fixed_t = 10
-			local ability_extension = {
+			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function()
 					return true
 				end,
 				action_input_is_currently_valid = function()
 					return true
 				end,
-			}
-			local action_input_extension = {
+			})
+			local action_input_extension = test_helper.make_player_action_input_extension({
 				bot_queue_action_input = function() end,
-				_action_input_parsers = {
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							psyker_shout = {
@@ -279,15 +276,10 @@ describe("ability_queue", function()
 						},
 					},
 				},
-			}
-			local unit_data_extension = {
-				read_component = function(_, component_name)
-					if component_name == "combat_ability_action" then
-						return { template_name = "psyker_shout" }
-					end
-					return nil
-				end,
-			}
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "psyker_shout" },
+			})
 
 			_G.ScriptUnit = {
 				has_extension = function(_, system_name)
@@ -432,11 +424,11 @@ describe("ability_queue", function()
 			local queued_inputs = 0
 			local fixed_t = 10
 			local state_by_unit = {}
-			local action_input_extension = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
 				bot_queue_action_input = function()
 					queued_inputs = queued_inputs + 1
 				end,
-				_action_input_parsers = {
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							psyker_shout = {
@@ -445,22 +437,18 @@ describe("ability_queue", function()
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function()
 					return true
 				end,
 				action_input_is_currently_valid = function()
 					return true
 				end,
-			}
-			local unit_data_extension = {
-				read_component = function(_, component_name)
-					if component_name == "combat_ability_action" then
-						return { template_name = "psyker_shout" }
-					end
-				end,
-			}
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "psyker_shout" },
+			})
 
 			_G.ScriptUnit = {
 				has_extension = function(_, system_name)
@@ -591,11 +579,11 @@ describe("ability_queue", function()
 			local fixed_t = 10
 			local state_by_unit = {}
 			local heuristics_approve = true
-			local action_input_extension = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
 				bot_queue_action_input = function()
 					queued_inputs = queued_inputs + 1
 				end,
-				_action_input_parsers = {
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							psyker_shout = {
@@ -604,22 +592,18 @@ describe("ability_queue", function()
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function()
 					return true
 				end,
 				action_input_is_currently_valid = function()
 					return true
 				end,
-			}
-			local unit_data_extension = {
-				read_component = function(_, component_name)
-					if component_name == "combat_ability_action" then
-						return { template_name = "psyker_shout" }
-					end
-				end,
-			}
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "psyker_shout" },
+			})
 
 			_G.ScriptUnit = {
 				has_extension = function(_, system_name)

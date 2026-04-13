@@ -2319,11 +2319,9 @@ describe("heuristics", function()
 		it("captures the live companion unit and positions in context", function()
 			script_unit_extensions = {
 				hazard_bot = {
-					companion_spawner_system = {
-						companion_units = function()
-							return { "mastiff" }
-						end,
-					},
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
 				},
 			}
 
@@ -2346,11 +2344,9 @@ describe("heuristics", function()
 			}
 			script_unit_extensions = {
 				hazard_bot = {
-					perception_system = {
-						enemies_in_proximity = function()
-							return { "grenadier_unit" }, 1
-						end,
-					},
+					perception_system = helper.make_bot_perception_extension({
+						enemies = { "grenadier_unit" },
+					}),
 				},
 				grenadier_unit = {
 					unit_data_system = helper.make_minion_unit_data_extension(grenadier_breed),

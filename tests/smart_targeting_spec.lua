@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local function load_smart_targeting()
 	local ok, smart_targeting = pcall(dofile, "scripts/mods/BetterBots/smart_targeting.lua")
 	assert.is_true(ok, "smart_targeting.lua should load")
@@ -63,15 +65,13 @@ describe("smart_targeting", function()
 		local self = {
 			_unit = "bot_unit",
 			_component = component,
-			_unit_data_extension = {
+			_unit_data_extension = test_helper.make_player_unit_data_extension({
+				perception = {
+					target_enemy = "bot_target",
+				},
+			}, {
 				is_resimulating = false,
-				read_component = function(_, component_name)
-					assert.equals("perception", component_name)
-					return {
-						target_enemy = "bot_target",
-					}
-				end,
-			},
+			}),
 			_smart_targeting_extension = {
 				_player = {
 					is_human_controlled = function()
@@ -178,15 +178,13 @@ describe("smart_targeting", function()
 		local targeting_data = { unit = "bot_target" }
 		local self = {
 			_component = {},
-			_unit_data_extension = {
+			_unit_data_extension = test_helper.make_player_unit_data_extension({
+				perception = {
+					target_enemy = "bot_target",
+				},
+			}, {
 				is_resimulating = false,
-				read_component = function(_, component_name)
-					assert.equals("perception", component_name)
-					return {
-						target_enemy = "bot_target",
-					}
-				end,
-			},
+			}),
 			_smart_targeting_extension = {
 				_player = {
 					is_human_controlled = function()
@@ -236,11 +234,9 @@ describe("smart_targeting", function()
 		local targeting_data = { unit = "vanilla_target" }
 		local original_called = false
 		local self = {
-			_unit_data_extension = {
-				read_component = function()
-					return { target_enemy = "bot_target" }
-				end,
-			},
+			_unit_data_extension = test_helper.make_player_unit_data_extension({
+				perception = { target_enemy = "bot_target" },
+			}),
 			_smart_targeting_extension = {
 				_player = {
 					is_human_controlled = function()

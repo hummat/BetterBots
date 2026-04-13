@@ -19,17 +19,17 @@ local _aim_calls = {}
 -- Mock ability_extension
 local _can_use_grenade = true
 
-local mock_ability_extension = {
+local mock_ability_extension = test_helper.make_player_ability_extension({
 	can_use_ability = function(_self, ability_name)
 		if ability_name == "grenade_ability" then
 			return _can_use_grenade
 		end
 		return false
 	end,
-}
+})
 
 -- Mock action_input_extension
-local mock_action_input_extension = {
+local mock_action_input_extension = test_helper.make_player_action_input_extension({
 	bot_queue_action_input = function(_self, component, input_name, extra)
 		_recorded_inputs[#_recorded_inputs + 1] = {
 			component = component,
@@ -37,7 +37,7 @@ local mock_action_input_extension = {
 			extra = extra,
 		}
 	end,
-}
+})
 
 local mock_bot_unit_input = {
 	set_aiming = function(_self, aiming, soft, use_rotation)

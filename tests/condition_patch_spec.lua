@@ -179,8 +179,8 @@ describe("condition_patch", function()
 
 	describe("_action_input_is_bot_queueable", function()
 		it("accepts parser-level ability inputs even when action validation rejects them", function()
-			local action_input_extension = {
-				_action_input_parsers = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							veteran_combat_ability = {
@@ -191,12 +191,12 @@ describe("condition_patch", function()
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				action_input_is_currently_valid = function()
 					return false
 				end,
-			}
+			})
 
 			assert.is_true(
 				ConditionPatch._action_input_is_bot_queueable(
@@ -689,13 +689,13 @@ describe("condition_patch", function()
 				unit_data_system = test_helper.make_player_unit_data_extension({
 					combat_ability_action = { template_name = "ogryn_taunt_shout" },
 				}),
-				ability_system = {
+				ability_system = test_helper.make_player_ability_extension({
 					action_input_is_currently_valid = function()
 						return true
 					end,
-				},
-				action_input_system = {
-					_action_input_parsers = {
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
 						combat_ability_action = {
 							_ACTION_INPUT_SEQUENCE_CONFIGS = {
 								ogryn_taunt_shout = {
@@ -706,7 +706,7 @@ describe("condition_patch", function()
 							},
 						},
 					},
-				},
+				}),
 			}
 
 			ConditionPatch.wire({
@@ -779,7 +779,7 @@ describe("condition_patch", function()
 				unit_data_system = test_helper.make_player_unit_data_extension({
 					combat_ability_action = { template_name = "veteran_combat_ability" },
 				}),
-				ability_system = {
+				ability_system = test_helper.make_player_ability_extension({
 					action_input_is_currently_valid = function()
 						return true
 					end,
@@ -789,9 +789,9 @@ describe("condition_patch", function()
 							ability_template_tweak_data = { class_tag = "squad_leader" },
 						},
 					},
-				},
-				action_input_system = {
-					_action_input_parsers = {
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
 						combat_ability_action = {
 							_ACTION_INPUT_SEQUENCE_CONFIGS = {
 								veteran_combat_ability = {
@@ -802,7 +802,7 @@ describe("condition_patch", function()
 							},
 						},
 					},
-				},
+				}),
 			}
 
 			local recorded_team_key

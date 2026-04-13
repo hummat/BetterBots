@@ -225,6 +225,7 @@ Practical rule:
 - Enemy/minion targets: use minion-style `unit_data_system` mocks with `breed()` and no `read_component()`.
 - If a code path can handle both, test both paths explicitly.
 - Prefer shared builders in `tests/test_helper.lua` over ad-hoc extension tables so impossible method combinations stay impossible in tests too.
+- Full audited surface and source-line evidence live in `docs/dev/mock-api-audit.md`.
 
 ## What CANNOT be tested outside the game
 

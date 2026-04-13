@@ -30,7 +30,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
-**Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95.
+**Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95. Current audited surface + source-line evidence: `docs/dev/mock-api-audit.md`.
 
 ## Debugging
 

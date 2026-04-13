@@ -19,6 +19,28 @@ describe("ping_system", function()
 		})
 	end
 
+	local function make_target_tag_extension(tag_id_or_fn)
+		if type(tag_id_or_fn) == "function" then
+			return {
+				tag_id = tag_id_or_fn,
+			}
+		end
+
+		return test_helper.make_smart_tag_extension(tag_id_or_fn)
+	end
+
+	local function make_target_perception_extension(has_los_or_fn)
+		if type(has_los_or_fn) == "function" then
+			return {
+				has_line_of_sight = has_los_or_fn,
+			}
+		end
+
+		return test_helper.make_minion_perception_extension({
+			has_line_of_sight = has_los_or_fn,
+		})
+	end
+
 	before_each(function()
 		current_time = 0
 		bot_unit = { name = "bot_unit" }
@@ -105,21 +127,24 @@ describe("ping_system", function()
 			},
 		}
 
-		local has_los_mock = spy.new(function()
+		local has_los_calls = {}
+		local has_los_mock = function(self, seen_unit)
+			has_los_calls[#has_los_calls + 1] = {
+				self = self,
+				unit = seen_unit,
+			}
 			return true
-		end)
-		local tag_id_mock = spy.new(function()
+		end
+		local tag_id_mock = function()
 			return nil
-		end)
+		end
 		local set_contextual_unit_tag_mock = spy.new(function() end)
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = tag_id_mock,
-				}
+				return make_target_tag_extension(tag_id_mock)
 			elseif extension_name == "perception_system" then
-				return { has_line_of_sight = has_los_mock }
+				return make_target_perception_extension(has_los_mock)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -135,7 +160,9 @@ describe("ping_system", function()
 
 		PingSystem.update(bot_unit, blackboard)
 
-		assert.spy(has_los_mock).was_called_with(match.is_table(), match.is_ref(bot_unit))
+		assert.equals(1, #has_los_calls)
+		assert.is_table(has_los_calls[1].self)
+		assert.equals(bot_unit, has_los_calls[1].unit)
 		assert
 			.spy(set_contextual_unit_tag_mock)
 			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
@@ -156,17 +183,11 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return unit == priority_target and 123 or nil
-					end,
-				}
+				return make_target_tag_extension(function()
+					return unit == priority_target and 123 or nil
+				end)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -206,17 +227,11 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return tag_state[unit]
-					end,
-				}
+				return make_target_tag_extension(function()
+					return tag_state[unit]
+				end)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -262,17 +277,11 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return tag_state[unit]
-					end,
-				}
+				return make_target_tag_extension(function()
+					return tag_state[unit]
+				end)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -322,17 +331,11 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return tag_state[unit]
-					end,
-				}
+				return make_target_tag_extension(function()
+					return tag_state[unit]
+				end)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -374,17 +377,9 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return false
-					end,
-				}
+				return make_target_perception_extension(false)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -414,11 +409,7 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { elite = true } })
 			end
@@ -449,11 +440,7 @@ describe("ping_system", function()
 			if extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({})
 			elseif extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			end
 			return nil
 		end
@@ -476,17 +463,9 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({ tags = { horde = true } })
 			end
@@ -516,11 +495,7 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return 123
-					end,
-				}
+				return make_target_tag_extension(123)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
 					name = "renegade_grenadier",
@@ -553,17 +528,9 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return false
-					end,
-				}
+				return make_target_perception_extension(false)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
 					name = "cultist_flamer",
@@ -602,17 +569,11 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return tag_state[unit]
-					end,
-				}
+				return make_target_tag_extension(function()
+					return tag_state[unit]
+				end)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
 					name = unit == priority_target and "renegade_grenadier" or "cultist_flamer",
@@ -657,17 +618,9 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
 					name = "renegade_grenadier",
@@ -707,17 +660,9 @@ describe("ping_system", function()
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
 			if extension_name == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return make_target_tag_extension(nil)
 			elseif extension_name == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return make_target_perception_extension(true)
 			elseif extension_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
 					name = "renegade_grenadier",

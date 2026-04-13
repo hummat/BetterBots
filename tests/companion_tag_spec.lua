@@ -70,21 +70,15 @@ describe("companion_tag", function()
 
 	-- Helper: set up a bot with companion_spawner_extension
 	local function setup_arbites_bot(has_companion)
-		local companion_unit = has_companion and { name = "cyber_mastiff" } or nil
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return has_companion
-					end,
-					companion_unit = function()
-						return companion_unit
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = has_companion,
+					companion_units = has_companion and { { name = "cyber_mastiff" } } or nil,
+				})
 			end
 			return nil
 		end
-		return companion_unit
 	end
 
 	-- Helper: set up full environment with targets and smart_tag_system
@@ -96,14 +90,10 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return companion_unit
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { companion_unit },
+				})
 			end
 			if ext == "unit_data_system" then
 				local breed = opts.breeds and opts.breeds[unit]
@@ -113,19 +103,12 @@ describe("companion_tag", function()
 				return nil
 			end
 			if ext == "smart_tag_system" then
-				return {
-					tag_id = function()
-						-- Return a tag_id if this target has a companion tag
-						return existing_companion_tags[unit] or nil
-					end,
-				}
+				return test_helper.make_smart_tag_extension(existing_companion_tags[unit] or nil)
 			end
 			if ext == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return opts.has_los ~= false
-					end,
-				}
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = opts.has_los ~= false,
+				})
 			end
 			return nil
 		end
@@ -430,14 +413,10 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return { name = "dog" }
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "dog" } },
+				})
 			end
 			if ext == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
@@ -485,14 +464,10 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return { name = "dog" }
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "dog" } },
+				})
 			end
 			if ext == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension({
@@ -501,18 +476,12 @@ describe("companion_tag", function()
 				})
 			end
 			if ext == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return test_helper.make_smart_tag_extension(nil)
 			end
 			if ext == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
 			end
 			return nil
 		end

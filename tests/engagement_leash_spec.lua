@@ -1,4 +1,6 @@
 -- Stub globals that engagement_leash.lua needs
+local test_helper = require("tests.test_helper")
+
 local BLACKBOARDS_STUB = {}
 local POSITION_LOOKUP_STUB = {}
 
@@ -105,11 +107,7 @@ describe("engagement_leash", function()
 			_G.ScriptUnit = {
 				has_extension = function(_, ext_name)
 					if ext_name == "coherency_system" then
-						return {
-							current_radius = function()
-								return 14
-							end,
-						}
+						return test_helper.make_coherency_extension(14)
 					end
 					return nil
 				end,
@@ -200,11 +198,11 @@ describe("engagement_leash", function()
 			_G.ScriptUnit = {
 				has_extension = function(_, ext_name)
 					if ext_name == "talent_system" then
-						return {
+						return test_helper.make_player_talent_extension({
 							has_special_rule = function(_, rule_name)
 								return rule_name == "zealot_always_at_least_one_coherency"
 							end,
-						}
+						})
 					end
 					return nil
 				end,
