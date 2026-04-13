@@ -176,6 +176,16 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
 	end)
 
+	it("keeps the startup banner free of hardcoded module counts", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:echo%("BetterBots loaded"%)', 1))
+		assert.is_nil(source:find('mod:echo%("BetterBots loaded %(', 1))
+		assert.is_nil(source:find("local _MODULE_COUNT =", 1, true))
+	end)
+
 	it("emits an install log for the consolidated bt_bot_melee_action hook", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))

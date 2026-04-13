@@ -21,6 +21,8 @@ describe("mule_pickup", function()
 	local debug_logs
 	local fake_mod
 	local live_bot_groups
+	local saved_blackboard_preload
+	local saved_blackboard_loaded
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -37,6 +39,18 @@ describe("mule_pickup", function()
 	end)
 
 	before_each(function()
+		saved_blackboard_preload = package.preload["scripts/extension_systems/blackboard/utilities/blackboard"]
+		saved_blackboard_loaded = package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"]
+		package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"] = nil
+		package.preload["scripts/extension_systems/blackboard/utilities/blackboard"] = function()
+			return {
+				write_component = function(blackboard, component_name)
+					blackboard[component_name] = blackboard[component_name] or {}
+					return blackboard[component_name]
+				end,
+			}
+		end
+		_G.BLACKBOARDS = {}
 		pickups = make_pickups()
 		enabled = false
 		debug_logs = {}
@@ -94,6 +108,12 @@ describe("mule_pickup", function()
 				return unit and unit[key]
 			end,
 		})
+	end)
+
+	after_each(function()
+		package.preload["scripts/extension_systems/blackboard/utilities/blackboard"] = saved_blackboard_preload
+		package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"] = saved_blackboard_loaded
+		_G.BLACKBOARDS = nil
 	end)
 
 	it("patches tome pickup metadata for vanilla mule flow", function()
@@ -193,6 +213,42 @@ describe("mule_pickup", function()
 		assert.is_nil(bot_data.bot_1.pickup_orders.slot_pocketable)
 		assert.is_nil(behavior_component.interaction_unit)
 		assert.is_nil(behavior_component.forced_pickup_unit)
+	end)
+
+	it("refreshes bot destination when clearing a live grimoire pickup order", function()
+		local grim_unit = { pickup_type = "grimoire" }
+		local bot_unit = "bot_1"
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = {},
+				pickup_orders = {
+					slot_pocketable = {
+						unit = grim_unit,
+						pickup_name = "grimoire",
+					},
+				},
+				behavior_component = {},
+			},
+		}
+
+		_G.BLACKBOARDS[bot_unit] = {
+			follow = {
+				needs_destination_refresh = false,
+			},
+		}
+		live_bot_groups = {
+			side_a = {
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable)
+		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
 	end)
 
 	it("blocks grimoire pickup orders when setting is off", function()

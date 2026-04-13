@@ -86,22 +86,13 @@ else
   echo " info: gh CLI not available or not authenticated — skipping issue state checks"
 fi
 
-# ── 3. Module count + name parity ────────────────────────────────────────────
+# ── 3. Module inventory parity ───────────────────────────────────────────────
 
 # Every *.lua file under scripts/mods/BetterBots/ must be mentioned by basename
 # in both README.md (repo layout block) and AGENTS.md (mod file structure block).
 # Catches the drift where new modules ship without being listed in user-facing docs.
 
 actual_module_count=$(find scripts/mods/BetterBots -maxdepth 1 -name '*.lua' | wc -l | tr -d ' ')
-
-for f in README.md AGENTS.md; do
-  while IFS= read -r match; do
-    claimed=$(echo "$match" | grep -oP '\b\d+(?=\s+modules?\b)')
-    if [[ -n "$claimed" && "$claimed" != "$actual_module_count" ]]; then
-      err "$f claims $claimed modules, repo has $actual_module_count"
-    fi
-  done < <(grep -nP '\b\d+\s+modules?\b' "$f" 2>/dev/null || true)
-done
 
 missing_in_readme=()
 missing_in_agents=()
@@ -117,12 +108,11 @@ if ((${#missing_in_agents[@]} > 0)); then
   err "AGENTS.md mod file structure missing modules: ${missing_in_agents[*]}"
 fi
 
-ok "module count: $actual_module_count (parity verified across README + AGENTS)"
+ok "module inventory: $actual_module_count files (parity verified across README + AGENTS)"
 
-# ── 4. Test count + spec name parity ─────────────────────────────────────────
+# ── 4. Test spec inventory parity ────────────────────────────────────────────
 
 # Every tests/*_spec.lua file must be mentioned in AGENTS.md (the test list).
-# Test count claims in README + AGENTS.md must match the live busted run.
 
 missing_specs=()
 for spec_file in tests/*_spec.lua; do
@@ -134,33 +124,8 @@ if ((${#missing_specs[@]} > 0)); then
   err "AGENTS.md test list missing specs: ${missing_specs[*]}"
 fi
 
-# Resolve a busted runner the same way the Makefile does, then count "X successes"
-busted_bin="$(command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || true)"
-if [[ -z "$busted_bin" ]]; then
-  busted_bin="$(ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1 || true)"
-  [[ -n "$busted_bin" ]] && busted_bin="lua $busted_bin"
-fi
-
-if [[ -n "$busted_bin" && -d tests ]]; then
-  # shellcheck disable=SC2086
-  test_output=$($busted_bin 2>&1 || true)
-  actual_test_count=$(echo "$test_output" | grep -oP '\b\d+(?=\s+successes\b)' | tail -1)
-  if [[ -n "$actual_test_count" ]]; then
-    for f in README.md AGENTS.md; do
-      while IFS= read -r match; do
-        claimed=$(echo "$match" | grep -oP '\b\d+(?=\s+(unit\s+)?tests?\b)')
-        if [[ -n "$claimed" && "$claimed" != "$actual_test_count" ]]; then
-          err "$f claims $claimed tests, busted reports $actual_test_count (line: $match)"
-        fi
-      done < <(grep -nP '\b\d+\s+(unit\s+)?tests?\b' "$f" 2>/dev/null || true)
-    done
-    ok "test count: $actual_test_count (parity verified across README + AGENTS)"
-  else
-    warn "could not parse busted success count; skipping test count parity"
-  fi
-else
-  echo " info: busted not available — skipping test count parity"
-fi
+actual_spec_count=$(find tests -maxdepth 1 -name '*_spec.lua' | wc -l | tr -d ' ')
+ok "test spec inventory: $actual_spec_count files (parity verified in AGENTS)"
 
 # ── 5. Audited mock helper enforcement ───────────────────────────────────────
 

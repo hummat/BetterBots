@@ -7,8 +7,10 @@ local _is_grimoire_pickup_enabled
 local _pickups
 local _get_live_bot_groups
 local _unit_get_data
+local _write_blackboard_component
 local _tome_patch_logged = false
 local _last_grimoire_patch_enabled
+local _blackboard_module
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
@@ -42,6 +44,19 @@ local function _default_get_live_bot_groups()
 	end
 
 	return group_system._bot_groups
+end
+
+local function _default_write_blackboard_component(blackboard, component_name)
+	if _blackboard_module == nil then
+		local ok, blackboard_module = pcall(require, "scripts/extension_systems/blackboard/utilities/blackboard")
+		_blackboard_module = ok and blackboard_module or false
+	end
+
+	if _blackboard_module and type(_blackboard_module.write_component) == "function" then
+		return _blackboard_module.write_component(blackboard, component_name)
+	end
+
+	return blackboard and blackboard[component_name] or nil
 end
 
 local function _get_pickup_data(pickup_name)
@@ -78,6 +93,7 @@ function M.init(deps)
 	_pickups = deps.pickups
 	_get_live_bot_groups = deps.get_live_bot_groups or _default_get_live_bot_groups
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
+	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
 	_tome_patch_logged = false
 	_last_grimoire_patch_enabled = nil
 
@@ -127,6 +143,22 @@ function M.sanitize_mule_pickup(pickup_component, unit)
 	pickup_component.mule_pickup = nil
 	pickup_component.mule_pickup_distance = math.huge
 	_log("mule_pickup_block_grim:" .. tostring(unit), "blocked grimoire mule pickup")
+
+	return true
+end
+
+local function _mark_destination_refresh(unit)
+	local blackboard = BLACKBOARDS and unit and BLACKBOARDS[unit]
+	if not (blackboard and _write_blackboard_component) then
+		return false
+	end
+
+	local follow_component = _write_blackboard_component(blackboard, "follow")
+	if not follow_component then
+		return false
+	end
+
+	follow_component.needs_destination_refresh = true
 
 	return true
 end
@@ -192,17 +224,25 @@ function M.sync_live_bot_group(bot_group)
 	end
 
 	for unit, data in pairs(bot_data) do
+		local unit_changed = false
 		if _clear_grimoire_pickup_order(data.pickup_orders) then
+			unit_changed = true
 			changed = true
 			_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
 		end
 
 		if M.sanitize_mule_pickup(data.pickup_component, unit) then
+			unit_changed = true
 			changed = true
 		end
 
 		if _clear_behavior_targets(data.behavior_component) then
+			unit_changed = true
 			changed = true
+		end
+
+		if unit_changed and _mark_destination_refresh(unit) then
+			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing grimoire mule state")
 		end
 	end
 

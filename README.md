@@ -26,7 +26,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 907 unit tests, 40 modules
+- Comprehensive busted test suite
 
 ## What bots can do with this mod
 
@@ -205,7 +205,7 @@ Commands:
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
-| `make test` | Run busted tests (907 tests) |
+| `make test` | Run busted tests |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
@@ -256,7 +256,7 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI
-scripts/mods/BetterBots/          # Mod source (40 modules)
+scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
@@ -297,7 +297,7 @@ scripts/mods/BetterBots/          # Mod source (40 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 907 tests)
+tests/                            # Unit tests (busted)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

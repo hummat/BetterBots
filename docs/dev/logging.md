@@ -56,8 +56,12 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 ## Key BetterBots log lines
 
 - `BetterBots loaded`
-- `BetterBots DEBUG: logging enabled (level=<off|info|debug|trace>)`
-- `patched bt_bot_conditions.can_activate_ability`
+- `BetterBots DEBUG: logging enabled (level=<debug|trace>)` (`startup:logging`; only appears when debug logs are set to `Debug` or `Trace`)
+- `BetterBots DEBUG: settings: preset=..., sprint_dist=..., chase_range=..., tag_bonus=..., horde_bias=..., smart_targeting=..., dh_avoidance=...` (`startup:settings`; concise startup summary, intentionally not a full config dump)
+- `patched <bt_bot_conditions|bt_conditions>.can_activate_ability (version=<N>)` (startup patch confirmation for the condition hooks)
+- `ability template metadata patch installed (version=<N>, injected=<N>, overridden=<N>)` (startup debug/info confirmation that the ability template metadata patch ran)
+- `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (startup debug/info confirmation that the shared melee hook callback installed)
+- `installed BtBotInteractAction.enter hook` (startup debug/info confirmation for the defensive pre-revive hook)
 - `entered GameplayStateRun`
 - `blocked lossy network-sync profile overwrite` (issue `#65` guard fired; the first lossy `BotPlayer.set_profile` sync was dropped on purpose)
 - `allowed profile update (no _bb_resolved sentinel)` (the `BotPlayer.set_profile` hook passed through because the one-shot sentinel was absent or already consumed)

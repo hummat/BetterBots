@@ -19,7 +19,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 907 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
 - `make check` — full quality gate (format + lint + lsp + test)
 
 **In-game** (manual verification):
@@ -218,16 +218,16 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 
 **GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
-**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts, module count/name parity, test count parity, and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
+**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts, module/spec inventory parity, and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
 |---|---|
 | Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
 | Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` + `docs/nexus-description.bbcode` ("What works" + "Known issues") |
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
-| Added a new module under `scripts/mods/BetterBots/` | `docs/dev/architecture.md` + README.md repo layout block + AGENTS.md "Mod file structure" block + module count claims (README highlights, README repo layout header, AGENTS.md). `make doc-check` will fail until parity is restored. |
+| Added a new module under `scripts/mods/BetterBots/` | `docs/dev/architecture.md` + README.md repo layout block + AGENTS.md "Mod file structure" block. `make doc-check` will fail until the file inventories are restored. |
 | Added a new hook (no new module) | `docs/dev/architecture.md` |
-| Added a new `tests/*_spec.lua` file | AGENTS.md test list (in `make test` line + tests/ block) + test count claims in README.md (3 places) + AGENTS.md. `make doc-check` will fail until parity is restored. |
+| Added a new `tests/*_spec.lua` file | AGENTS.md test list. `make doc-check` will fail until the spec inventory is restored. |
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
 | Fixed a user-reported bug or known issue | `docs/nexus-description.bbcode` ("Known issues") + relevant GitHub issue |
 | Added/changed user-visible behavior | README.md highlights + `docs/nexus-description.bbcode` (roadmap, "What works", version notes) |

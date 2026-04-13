@@ -1335,17 +1335,12 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 	end
 end
 
--- All modules are assert-guarded above; if any failed to load we'd have
--- crashed already.  The count serves as a deployment sanity check in logs.
--- Bump when adding/removing modules.
-local _MODULE_COUNT = 37
-mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
+mod:echo("BetterBots loaded")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
 
--- Always emit all resolved slider/toggle values at startup so post-mortem
--- log inspection can confirm which features were active. Once-per-session,
--- log noise is negligible and "value missing" is impossible to diagnose if
--- defaults are silently skipped.
+-- Emit a concise startup summary of the highest-signal behavior settings.
+-- This is intentionally not a full config dump; keep it small and update
+-- docs/dev/logging.md when changing the included fields.
 if _debug_enabled() then
 	local parts = {
 		"preset=" .. Settings.resolve_preset(),
