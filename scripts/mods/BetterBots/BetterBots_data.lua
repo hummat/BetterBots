@@ -214,23 +214,11 @@ return {
 				setting_id = "bot_profiles_group",
 				type = "group",
 				sub_widgets = {
-					{
-						setting_id = "bot_slots_core_group",
-						type = "group",
-						sub_widgets = {
-							make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
-							make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
-							make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
-						},
-					},
-					{
-						setting_id = "bot_slots_tertium_group",
-						type = "group",
-						sub_widgets = {
-							make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
-							make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
-						},
-					},
+					make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
+					make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
+					make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
+					make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
+					make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
 					{
 						setting_id = "bot_weapon_quality",
 						type = "dropdown",

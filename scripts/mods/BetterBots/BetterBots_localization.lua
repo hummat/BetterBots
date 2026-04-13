@@ -1,16 +1,11 @@
--- Settings UI color palette (markers_aio pattern). Tune these two RGB strings
--- to restyle every group header and subtitle in the BetterBots mod options.
+-- Settings UI color palette (markers_aio pattern). Tune this RGB string
+-- to restyle every group header in the BetterBots mod options.
 local colours = {
 	title = "200,140,20", -- Imperial gold: group headers
-	subtitle = "226,199,126", -- citrine: sub-group descriptions
 }
 
 local function title(text)
 	return "{#color(" .. colours.title .. ")}" .. text .. "{#reset()}"
-end
-
-local function subtitle(text)
-	return "{#color(" .. colours.subtitle .. ")}" .. text .. "{#reset()}"
 end
 
 return {
@@ -32,9 +27,6 @@ return {
 	abilities_group = {
 		en = title("Abilities"),
 	},
-	bot_behavior_group = {
-		en = title("Bot Behavior"),
-	},
 	bot_feature_toggles_group = {
 		en = title("Bot Tweaks"),
 	},
@@ -46,18 +38,6 @@ return {
 	},
 	bot_profiles_group = {
 		en = title("Bot Team Setup"),
-	},
-	bot_slots_core_group = {
-		en = title("Solo Play Slots"),
-	},
-	bot_slots_core_group_description = {
-		en = subtitle("The three normal bot slots used in Solo Play."),
-	},
-	bot_slots_tertium_group = {
-		en = title("Extra Tertium Slots"),
-	},
-	bot_slots_tertium_group_description = {
-		en = subtitle("Only used by Tertium extra-bot mods. Leave on None if you do not use one."),
 	},
 	diagnostics_group = {
 		en = title("Diagnostics"),
@@ -178,7 +158,7 @@ return {
 		en = "Timing profile",
 	},
 	human_timing_profile_description = {
-		en = "Controls how much hesitation and reaction delay bots add before using abilities.",
+		en = "Controls how quickly bots react to opportunities and how much they hesitate before non-urgent ability casts.",
 	},
 	human_timing_profile_off = {
 		en = "Off",
@@ -196,37 +176,37 @@ return {
 		en = "Custom",
 	},
 	human_timing_reaction_min = {
-		en = "Minimum reaction delay",
+		en = "Opportunity reaction min (s)",
 	},
 	human_timing_reaction_min_description = {
-		en = "Lowest random reaction delay roll before the bot can respond.",
+		en = "Lowest random opportunity-target reaction delay, in seconds.",
 	},
 	human_timing_reaction_max = {
-		en = "Maximum reaction delay",
+		en = "Opportunity reaction max (s)",
 	},
 	human_timing_reaction_max_description = {
-		en = "Highest random reaction delay roll before the bot can respond.",
+		en = "Highest random opportunity-target reaction delay, in seconds.",
 	},
 	human_timing_defensive_jitter_min_ms = {
-		en = "Minimum defensive jitter",
+		en = "Defensive jitter min (ms)",
 	},
 	human_timing_defensive_jitter_min_ms_description = {
 		en = "Shortest defensive hesitation in milliseconds, used for reactive self-preservation.",
 	},
 	human_timing_defensive_jitter_max_ms = {
-		en = "Maximum defensive jitter",
+		en = "Defensive jitter max (ms)",
 	},
 	human_timing_defensive_jitter_max_ms_description = {
 		en = "Longest defensive hesitation in milliseconds, used for reactive self-preservation.",
 	},
 	human_timing_opportunistic_jitter_min_ms = {
-		en = "Minimum opportunistic jitter",
+		en = "Opportunistic jitter min (ms)",
 	},
 	human_timing_opportunistic_jitter_min_ms_description = {
 		en = "Shortest opportunistic hesitation in milliseconds, used when an ability can wait.",
 	},
 	human_timing_opportunistic_jitter_max_ms = {
-		en = "Maximum opportunistic jitter",
+		en = "Opportunistic jitter max (ms)",
 	},
 	human_timing_opportunistic_jitter_max_ms_description = {
 		en = "Longest opportunistic hesitation in milliseconds, used when an ability can wait.",
@@ -235,7 +215,8 @@ return {
 		en = "Pressure leash profile",
 	},
 	pressure_leash_profile_description = {
-		en = "Controls how much bots tighten their melee leash as combat pressure rises.",
+		en = "Controls how much bots tighten their melee leash as combat pressure rises. "
+			.. "Combat pressure is the summed challenge rating of nearby threats.",
 	},
 	pressure_leash_profile_off = {
 		en = "Off",
@@ -253,25 +234,26 @@ return {
 		en = "Custom",
 	},
 	pressure_leash_start_rating = {
-		en = "Start tightening at challenge rating",
+		en = "Pressure start (rating)",
 	},
 	pressure_leash_start_rating_description = {
-		en = "Challenge-pressure total where leash tightening starts.",
+		en = "Combat-pressure rating where leash tightening starts. "
+			.. "Higher means bots tolerate more nearby danger before staying tighter to the team.",
 	},
 	pressure_leash_full_rating = {
-		en = "Full tightening at challenge rating",
+		en = "Pressure full (rating)",
 	},
 	pressure_leash_full_rating_description = {
-		en = "Challenge-pressure total where leash tightening reaches full strength.",
+		en = "Combat-pressure rating where leash tightening reaches full strength.",
 	},
 	pressure_leash_scale_percent = {
-		en = "Leash strength at full pressure",
+		en = "Full-pressure leash (%%)",
 	},
 	pressure_leash_scale_percent_description = {
 		en = "Percentage of the base leash to keep when combat pressure is maxed out.",
 	},
 	pressure_leash_floor_m = {
-		en = "Minimum leash floor",
+		en = "Minimum leash floor (m)",
 	},
 	pressure_leash_floor_m_description = {
 		en = "Smallest melee engagement leash allowed under pressure, in meters.",
@@ -283,35 +265,35 @@ return {
 		en = "Lets bots carry grimoires. Off by default because grimoires permanently corrupt the team.",
 	},
 	sprint_follow_distance = {
-		en = "Sprint to catch up at",
+		en = "Sprint to catch up at (m)",
 	},
 	sprint_follow_distance_description = {
 		en = "Bots sprint when they fall this far behind the leader. "
 			.. "This also covers traversal and rescue sprints. Set to 0 to disable bot sprinting.",
 	},
 	special_chase_penalty_range = {
-		en = "Stop chasing specials into melee at",
+		en = "Stop chasing specials into melee at (m)",
 	},
 	special_chase_penalty_range_description = {
 		en = "Beyond this distance, bots prefer to shoot specials instead of running in. "
 			.. "Set to 0 to always allow the chase.",
 	},
 	player_tag_bonus = {
-		en = "Response to your pings",
+		en = "Response to your pings (score)",
 	},
 	player_tag_bonus_description = {
 		en = "How aggressively bots prioritize targets pinged by the human player. "
 			.. "Higher values make bots respond faster. Set to 0 to ignore player pings.",
 	},
 	melee_horde_light_bias = {
-		en = "Light attacks into crowds",
+		en = "Light attacks into crowds (score)",
 	},
 	melee_horde_light_bias_description = {
 		en = "Higher values make bots use more quick swings against unarmored hordes. "
 			.. "Set to 0 for vanilla melee choices.",
 	},
 	bot_ranged_ammo_threshold = {
-		en = "Bot ammo reserve",
+		en = "Bot ammo reserve (%%)",
 	},
 	bot_ranged_ammo_threshold_description = {
 		en = "Below this, bots save ammo instead of taking extra ranged shots. "
@@ -319,20 +301,20 @@ return {
 			.. "They still shoot high-priority threats.",
 	},
 	bot_human_ammo_reserve_threshold = {
-		en = "Save ammo for players below",
+		en = "Save ammo for players below (%%)",
 	},
 	bot_human_ammo_reserve_threshold_description = {
 		en = "If any player with a gun is below this, bots leave ammo for players unless they are desperate.",
 	},
 	bot_grenade_charges_threshold = {
-		en = "Bot grenade pickup threshold",
+		en = "Bot grenade pickup threshold (charges)",
 	},
 	bot_grenade_charges_threshold_description = {
 		en = "Bots seek nearby grenade refills only at or below this many remaining charges. "
 			.. "Set to 0 to refill only when empty.",
 	},
 	bot_human_grenade_reserve_threshold = {
-		en = "Save grenade refills for players below",
+		en = "Save grenade refills for players below (%%)",
 	},
 	bot_human_grenade_reserve_threshold_description = {
 		en = "If any player is below this grenade reserve, bots leave grenade refills for players.",
@@ -354,20 +336,20 @@ return {
 		en = "Health stations and med-crates",
 	},
 	healing_deferral_human_threshold = {
-		en = "Give healing to players below",
+		en = "Give healing to players below (%%)",
 	},
 	healing_deferral_human_threshold_description = {
 		en = "Bots let players heal first when any player's health is below this.",
 	},
 	healing_deferral_emergency_threshold = {
-		en = "Bot self-heal emergency",
+		en = "Bot self-heal emergency (%%)",
 	},
 	healing_deferral_emergency_threshold_description = {
 		en = "Bots ignore the rule above and heal themselves below this. Set to 0 to never override.",
 	},
 	-- Bot profiles
 	bot_slot_1_profile = {
-		en = "Bot slot 1",
+		en = "Bot slot 1 (Solo Play)",
 	},
 	bot_slot_1_profile_description = {
 		en = "Chooses the class for this slot. "
@@ -375,7 +357,7 @@ return {
 			.. "None keeps the vanilla Veteran.",
 	},
 	bot_slot_2_profile = {
-		en = "Bot slot 2",
+		en = "Bot slot 2 (Solo Play)",
 	},
 	bot_slot_2_profile_description = {
 		en = "Chooses the class for this slot. "
@@ -383,7 +365,7 @@ return {
 			.. "None keeps the vanilla Veteran.",
 	},
 	bot_slot_3_profile = {
-		en = "Bot slot 3",
+		en = "Bot slot 3 (Solo Play)",
 	},
 	bot_slot_3_profile_description = {
 		en = "Chooses the class for this slot. "
@@ -418,10 +400,10 @@ return {
 		en = "Ogryn - Heavy Stubber + Power Maul",
 	},
 	bot_weapon_quality = {
-		en = "Bot weapon strength",
+		en = "Bot weapon quality",
 	},
 	bot_weapon_quality_description = {
-		en = "Sets how strong bot weapons are. Auto scales with difficulty.",
+		en = "Sets bot weapon power level for every configured bot slot. Auto scales with mission difficulty.",
 	},
 	bot_weapon_quality_auto = {
 		en = "Auto (scales with difficulty)",
