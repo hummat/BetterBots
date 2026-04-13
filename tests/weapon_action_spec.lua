@@ -19,7 +19,9 @@ _G.BLACKBOARDS = setmetatable({}, {
 
 local WeaponAction = dofile("scripts/mods/BetterBots/weapon_action.lua")
 
-local function reset()
+local function reset(opts)
+	opts = opts or {}
+
 	for unit in pairs(_extensions) do
 		_extensions[unit] = nil
 	end
@@ -29,7 +31,7 @@ local function reset()
 	_debug_logs = {}
 
 	WeaponAction.init({
-		mod = {
+		mod = opts.mod or {
 			hook_require = function() end,
 			hook = function() end,
 			hook_safe = function() end,
@@ -57,6 +59,32 @@ local function reset()
 			end,
 		},
 	})
+end
+
+local function make_hooking_mod(hook_targets)
+	return {
+		hook_require = function(_, path, callback)
+			local target = hook_targets[path]
+			if target then
+				callback(target)
+			end
+		end,
+		hook = function(_, target, method_name, handler)
+			local original = target[method_name]
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end,
+		hook_safe = function(_, target, method_name, handler)
+			local original = target[method_name]
+			target[method_name] = function(...)
+				local result = original(...)
+				handler(...)
+				return result
+			end
+		end,
+		echo = function() end,
+	}
 end
 
 local function find_debug_log(pattern)
@@ -164,12 +192,12 @@ describe("weapon_action", function()
 			actions = {
 				action_brace = {
 					start_input = "brace_pressed",
-					stop_input = "brace_release",
 					allowed_chain_actions = {
 						shoot_braced = { action_name = "action_shoot_braced" },
+						brace_release = { action_name = "action_unbrace" },
 					},
 				},
-				action_unbrace = { start_input = "brace_release" },
+				action_unbrace = { start_input = "brace_release", kind = "unaim" },
 				action_shoot_braced = { start_input = "shoot_braced" },
 			},
 		}
@@ -192,12 +220,107 @@ describe("weapon_action", function()
 	end)
 
 	it("logs stream action confirmations for flamer and purgatus queue inputs", function()
-		local logged_flamer = WeaponAction.log_stream_action("bot_1", 3, "flamer_p1_m1", "shoot_braced")
-		local logged_purgatus = WeaponAction.log_stream_action("bot_1", 3, "forcestaff_p2_m1", "trigger_charge_flame")
+		local logged_flamer = WeaponAction.log_stream_action(3, "flamer_p1_m1", "shoot_braced")
+		local logged_purgatus = WeaponAction.log_stream_action(3, "forcestaff_p2_m1", "trigger_charge_flame")
 
 		assert.is_true(logged_flamer)
 		assert.is_true(logged_purgatus)
 		assert.is_truthy(find_debug_log("stream action queued for flamer_p1_m1 via shoot_braced"))
 		assert.is_truthy(find_debug_log("stream action queued for forcestaff_p2_m1 via trigger_charge_flame"))
+	end)
+
+	it("forwards queued stream actions to the observer hook", function()
+		local observed_unit, observed_action_input
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function(_self, _id, _action_input, _raw_input)
+				return 0
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "flamer_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function(unit, action_input)
+				observed_unit = unit
+				observed_action_input = action_input
+			end,
+		})
+
+		PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_braced", nil)
+
+		assert.equals(bot_unit, observed_unit)
+		assert.equals("shoot_braced", observed_action_input)
+		assert.is_truthy(find_debug_log("stream action queued for flamer_p1_m1 via shoot_braced"))
+	end)
+
+	it("translates warp reload to vent before forwarding queued actions", function()
+		local forwarded_action_input
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function(_self, _id, action_input, _raw_input)
+				forwarded_action_input = action_input
+				return 1
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "forcestaff_p2_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+				warp_charge = { current_percentage = 0.5 },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "reload", nil)
+
+		assert.equals("vent", forwarded_action_input)
 	end)
 end)

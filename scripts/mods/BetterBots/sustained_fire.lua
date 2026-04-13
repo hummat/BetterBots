@@ -255,27 +255,6 @@ function M.update_actions(unit, input, current_template_name)
 end
 
 function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/action_input/player_unit_action_input_extension",
-		function(PlayerUnitActionInputExtension)
-			_mod:hook_safe(PlayerUnitActionInputExtension, "extensions_ready", function(self, _world, unit)
-				self._betterbots_player_unit = unit
-			end)
-
-			_mod:hook(
-				PlayerUnitActionInputExtension,
-				"bot_queue_action_input",
-				function(func, self, id, action_input, raw_input)
-					local result = func(self, id, action_input, raw_input)
-					if result and id == "weapon_action" then
-						M.observe_queued_weapon_action(self._betterbots_player_unit, action_input)
-					end
-					return result
-				end
-			)
-		end
-	)
-
 	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
 		_mod:hook(BotUnitInput, "update", function(func, self, unit, dt, t)
 			self._betterbots_player_unit = unit

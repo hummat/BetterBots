@@ -8,6 +8,7 @@ local _perf
 local _Ammo
 local _Settings
 local _ability_extension
+local _bot_slot_for_unit
 local _nearby_grenade_pickups
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
@@ -205,6 +206,65 @@ local function _best_nearby_grenade_pickup(bot_group, unit)
 	return best_pickup, best_distance
 end
 
+local function _current_ammo_percentage(unit)
+	if not (_Ammo and _Ammo.current_total_percentage and _Ammo.uses_ammo and _Ammo.uses_ammo(unit)) then
+		return nil
+	end
+
+	return _Ammo.current_total_percentage(unit)
+end
+
+local function _pickup_snapshot(unit)
+	local grenade_current, grenade_max = _grenade_charge_state(unit)
+
+	return {
+		ammo_pct = _current_ammo_percentage(unit),
+		grenade_current = grenade_current,
+		grenade_max = grenade_max,
+	}
+end
+
+local function _log_pickup_success(interactor_unit, target_unit, pickup_name, before, after)
+	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(interactor_unit) or nil
+	if not bot_slot then
+		return
+	end
+
+	if before.ammo_pct ~= nil and after.ammo_pct ~= nil and after.ammo_pct > before.ammo_pct then
+		_log(
+			"ammo_pickup_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
+			"ammo pickup success: "
+				.. tostring(pickup_name)
+				.. " (bot="
+				.. tostring(bot_slot)
+				.. ", ammo="
+				.. string.format("%.0f%%->%.0f%%", before.ammo_pct * 100, after.ammo_pct * 100)
+				.. ")"
+		)
+	end
+
+	if
+		before.grenade_current ~= nil
+		and after.grenade_current ~= nil
+		and after.grenade_current > before.grenade_current
+	then
+		_log(
+			"grenade_pickup_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
+			"grenade pickup success: "
+				.. tostring(pickup_name)
+				.. " (bot="
+				.. tostring(bot_slot)
+				.. ", charges="
+				.. tostring(before.grenade_current)
+				.. "->"
+				.. tostring(after.grenade_current)
+				.. "/"
+				.. tostring(after.grenade_max or before.grenade_max or "?")
+				.. ")"
+		)
+	end
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -214,9 +274,47 @@ function M.init(deps)
 	_Ammo = deps.ammo_module or require("scripts/utilities/ammo")
 	_Settings = deps.settings
 	_ability_extension = deps.ability_extension or (ScriptUnit and ScriptUnit.has_extension)
+	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_nearby_grenade_pickups = deps.nearby_grenade_pickups
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
+end
+
+function M.install_interaction_hooks(AmmunitionInteraction)
+	_mod:hook(
+		AmmunitionInteraction,
+		"stop",
+		function(func, self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			if not (interactor_is_server and result == "success" and _debug_enabled and _debug_enabled()) then
+				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			end
+
+			local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(interactor_unit) or nil
+			if not bot_slot then
+				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			end
+
+			local target_unit = unit_data_component and unit_data_component.target_unit or nil
+			local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type")
+				or "unknown"
+			local before = _pickup_snapshot(interactor_unit)
+			local stop_result = func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			local after = _pickup_snapshot(interactor_unit)
+
+			_log_pickup_success(interactor_unit, target_unit, pickup_name, before, after)
+
+			return stop_result
+		end
+	)
+end
+
+function M.register_hooks()
+	_mod:hook_require(
+		"scripts/extension_systems/interaction/interactions/ammunition_interaction",
+		function(AmmunitionInteraction)
+			M.install_interaction_hooks(AmmunitionInteraction)
+		end
+	)
 end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
@@ -271,7 +369,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		end
 
 		local grenade_eligible, grenade_current, grenade_max = _eligible_for_grenade_pickup(unit)
-		if grenade_eligible and grenade_current <= _bot_grenade_threshold() then
+		if grenade_eligible and grenade_current < grenade_max and grenade_current <= _bot_grenade_threshold() then
 			local grenade_pickup, grenade_distance = _best_nearby_grenade_pickup(bot_group, unit)
 			if grenade_pickup then
 				local humans_ok_for_grenade = _all_eligible_humans_above_grenade_threshold(

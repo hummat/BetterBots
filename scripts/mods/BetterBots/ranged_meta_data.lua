@@ -169,6 +169,26 @@ local function has_hold_start_input(weapon_template, input_name)
 	return first and first.input == "action_two_hold" and first.value == true
 end
 
+local function find_unaim_action_for_action(weapon_template, action)
+	local actions = weapon_template.actions or {}
+	local unaim_input = action and action.stop_input
+	if unaim_input then
+		local unaim_action_name = find_action_for_input(weapon_template, unaim_input)
+
+		return unaim_input, unaim_action_name
+	end
+
+	for input_name, chain_entry in pairs((action and action.allowed_chain_actions) or {}) do
+		local action_name = chain_entry and chain_entry.action_name
+		local target_action = action_name and actions[action_name]
+		if target_action and target_action.kind == "unaim" then
+			return input_name, action_name
+		end
+	end
+
+	return nil, nil
+end
+
 local function find_aim_action_for_fire(weapon_template, aim_fire_input)
 	if not aim_fire_input then
 		return nil, nil, nil, nil
@@ -183,8 +203,7 @@ local function find_aim_action_for_fire(weapon_template, aim_fire_input)
 			and has_hold_start_input(weapon_template, start_input)
 			and allowed_chain_actions[aim_fire_input]
 		then
-			local unaim_input = action.stop_input
-			local unaim_action = unaim_input and find_action_for_input(weapon_template, unaim_input) or nil
+			local unaim_input, unaim_action = find_unaim_action_for_action(weapon_template, action)
 
 			return start_input, action_name, unaim_input, unaim_action
 		end

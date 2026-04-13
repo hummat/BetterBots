@@ -933,12 +933,12 @@ describe("ranged_meta_data", function()
 					action_shoot = { start_input = "shoot_pressed" },
 					action_brace = {
 						start_input = "brace_pressed",
-						stop_input = "brace_release",
 						allowed_chain_actions = {
 							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
 						},
 					},
-					action_unbrace = { start_input = "brace_release" },
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
 					action_shoot_braced = { start_input = "shoot_braced" },
 				},
 			})
@@ -959,6 +959,41 @@ describe("ranged_meta_data", function()
 			assert.equals("brace_release", template.attack_meta_data.unaim_action_input)
 			assert.equals("action_unbrace", template.attack_meta_data.unaim_action_name)
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+		end)
+
+		it("derives chain-only unaim actions for braced stream weapons", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					brace_pressed = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					brace_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_hold", value = true },
+					} },
+				},
+				actions = {
+					action_brace = {
+						start_input = "brace_pressed",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+
+			local aim_input, aim_action, unaim_input, unaim_action =
+				RangedMetaData._find_aim_action_for_fire(template, "shoot_braced")
+
+			assert.equals("brace_pressed", aim_input)
+			assert.equals("action_brace", aim_action)
+			assert.equals("brace_release", unaim_input)
+			assert.equals("action_unbrace", unaim_action)
 		end)
 
 		it("does not override aim_fire when it already matches hold_input input", function()

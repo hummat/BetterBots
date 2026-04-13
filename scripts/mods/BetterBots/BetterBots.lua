@@ -590,6 +590,7 @@ AmmoPolicy.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	settings = Settings,
 })
 
@@ -721,10 +722,12 @@ WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
+	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
 })
 SustainedFire.register_hooks()
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
+AmmoPolicy.register_hooks()
 MulePickup.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()

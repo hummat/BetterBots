@@ -42,6 +42,26 @@ local function _find_action_for_start_input(actions, input_name)
 	return nil, nil
 end
 
+local function _find_unaim_action_for_action(weapon_template, action)
+	local actions = weapon_template and weapon_template.actions or {}
+	local unaim_input = action and action.stop_input
+	if unaim_input then
+		local unaim_action_name = _find_action_for_start_input(actions, unaim_input)
+
+		return unaim_input, unaim_action_name
+	end
+
+	for input_name, chain_entry in pairs((action and action.allowed_chain_actions) or {}) do
+		local action_name = chain_entry and chain_entry.action_name
+		local target_action = action_name and actions[action_name]
+		if target_action and target_action.kind == "unaim" then
+			return input_name, action_name
+		end
+	end
+
+	return nil, nil
+end
+
 local function _has_hold_start_input(weapon_template, input_name)
 	local input_def = weapon_template and weapon_template.action_inputs and weapon_template.action_inputs[input_name]
 	local seq = input_def and input_def.input_sequence
@@ -56,10 +76,7 @@ local function _find_bt_shoot_aim_chain(weapon_template, aim_fire_input)
 		if start_input and _has_hold_start_input(weapon_template, start_input) then
 			local chain_entry = (action.allowed_chain_actions or {})[aim_fire_input]
 			if chain_entry then
-				local unaim_input = action.stop_input
-				local unaim_action_name = unaim_input
-						and _find_action_for_start_input(weapon_template.actions, unaim_input)
-					or nil
+				local unaim_input, unaim_action_name = _find_unaim_action_for_action(weapon_template, action)
 
 				return start_input, action_name, unaim_input, unaim_action_name
 			end
@@ -98,7 +115,7 @@ function M._stream_action_phase(template_name, action_input)
 	return actions and actions[action_input] or nil
 end
 
-function M.log_stream_action(_unit, bot_slot, template_name, action_input)
+function M.log_stream_action(bot_slot, template_name, action_input)
 	if not (_debug_enabled and _debug_enabled()) then
 		return false
 	end
@@ -270,6 +287,7 @@ function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 	local should_block_weapon_action_input = deps.should_block_weapon_action_input
+	local observe_queued_weapon_action = deps.observe_queued_weapon_action
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -551,9 +569,14 @@ function M.register_hooks(deps)
 					end
 
 					local result = func(self, id, action_input, raw_input)
-					if result and id == "weapon_action" and unit and _debug_enabled() then
+					if result ~= nil and id == "weapon_action" and unit then
+						if observe_queued_weapon_action then
+							observe_queued_weapon_action(unit, action_input)
+						end
+					end
+					if result ~= nil and id == "weapon_action" and unit and _debug_enabled() then
 						local bot_slot, _, weapon_template_name = _weapon_log_context(unit)
-						M.log_stream_action(unit, bot_slot, weapon_template_name, action_input)
+						M.log_stream_action(bot_slot, weapon_template_name, action_input)
 					end
 					if perf_t0 then
 						_perf.finish("weapon_action.bot_queue_action_input", perf_t0)

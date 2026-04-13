@@ -125,7 +125,8 @@ This mod targets bot ability activation in three paths:
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
 28. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
-    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`: observe successful `weapon_action` requests and arm per-unit sustained-fire state for supported held-fire paths
+    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to `SustainedFire.observe_queued_weapon_action(...)`
+    - this avoids same-method hook clobbering between runtime weapon-action translation/protection and sustained-fire queue observation
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
     - hook `BotUnitInput._update_actions`: inject raw hold inputs (`action_one_hold` for most full-auto/stream paths, `action_two_hold` for Purgatus flame charge) while sustained state is fresh
     - scope is execution-only: it respects the current `attack_meta_data` path choice and does not decide ADS vs hipfire vs brace

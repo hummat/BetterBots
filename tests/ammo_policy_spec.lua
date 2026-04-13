@@ -2,11 +2,19 @@ local AmmoPolicy = dofile("scripts/mods/BetterBots/ammo_policy.lua")
 
 describe("ammo_policy", function()
 	local update_hook
+	local captured_hook_require = {}
 	local debug_logs
+	local saved_unit
 
 	before_each(function()
 		update_hook = nil
+		captured_hook_require = {}
 		debug_logs = {}
+		saved_unit = rawget(_G, "Unit")
+	end)
+
+	after_each(function()
+		_G.Unit = saved_unit
 	end)
 
 	local function install_module(overrides)
@@ -14,6 +22,15 @@ describe("ammo_policy", function()
 			mod = {
 				hook_safe = function(_, _, _, fn)
 					update_hook = fn
+				end,
+				hook = function(_, target, method_name, handler)
+					local original = target[method_name]
+					target[method_name] = function(...)
+						return handler(original, ...)
+					end
+				end,
+				hook_require = function(_, path, callback)
+					captured_hook_require[path] = callback
 				end,
 			},
 			debug_log = function(key, fixed_t, message)
@@ -33,6 +50,7 @@ describe("ammo_policy", function()
 			ammo_module = overrides and overrides.ammo_module,
 			ability_extension = overrides and overrides.ability_extension,
 			nearby_grenade_pickups = overrides and overrides.nearby_grenade_pickups,
+			bot_slot_for_unit = overrides and overrides.bot_slot_for_unit,
 			settings = overrides and overrides.settings,
 		})
 	end
@@ -70,6 +88,25 @@ describe("ammo_policy", function()
 		AmmoPolicy.install_behavior_ext_hooks({})
 
 		assert.is_function(update_hook)
+	end)
+
+	it("registers an AmmunitionInteraction stop hook for pickup success logging", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+		})
+
+		AmmoPolicy.register_hooks()
+
+		assert.is_function(
+			captured_hook_require["scripts/extension_systems/interaction/interactions/ammunition_interaction"]
+		)
 	end)
 
 	it("sets needs_ammo when bot is at threshold and all eligible humans are above reserve", function()
@@ -567,6 +604,87 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
+	it("does not bind grenade pickup when bot is already full even if threshold exceeds max charges", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 3
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 3
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 2
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				bot_grenade_charges_threshold = function()
+					return 12
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
+		assert.equals(-math.huge, self._pickup_component.ammo_pickup_valid_until)
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
 	it("defers grenade pickup to low-reserve human but preserves ammo decision", function()
 		install_module({
 			ammo_module = {
@@ -842,5 +960,102 @@ describe("ammo_policy", function()
 
 		assert.equals("ordered_ammo_pickup", self._pickup_component.ammo_pickup)
 		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("logs actual ammo pickup success after a successful interaction", function()
+		local ammo_percentage = {
+			bot1 = 0.10,
+		}
+
+		install_module({
+			debug_enabled = true,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot1" and 2 or nil
+			end,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return ammo_percentage[unit]
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+		})
+
+		local AmmunitionInteraction = {
+			stop = function(_self, _world, interactor_unit, _unit_data_component, _t, result, interactor_is_server)
+				assert.equals("bot1", interactor_unit)
+				assert.equals("success", result)
+				assert.is_true(interactor_is_server)
+				ammo_percentage[interactor_unit] = 0.55
+			end,
+		}
+		_G.Unit = {
+			get_data = function(unit, field)
+				assert.equals("pickup_clip", unit)
+				assert.equals("pickup_type", field)
+				return "small_clip"
+			end,
+		}
+
+		AmmoPolicy.install_interaction_hooks(AmmunitionInteraction)
+		AmmunitionInteraction.stop({}, nil, "bot1", { target_unit = "pickup_clip" }, 100, "success", true)
+
+		assert.is_truthy(find_debug_log("ammo pickup success: small_clip (bot=2, ammo=10%->55%)"))
+	end)
+
+	it("logs actual grenade pickup success after a successful interaction", function()
+		local grenade_charges = {
+			bot1 = 0,
+		}
+
+		install_module({
+			debug_enabled = true,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot1" and 4 or nil
+			end,
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit ~= "bot1" then
+					return nil
+				end
+
+				return {
+					remaining_ability_charges = function(_, ability_type)
+						assert.equals("grenade_ability", ability_type)
+						return grenade_charges[unit]
+					end,
+					max_ability_charges = function(_, ability_type)
+						assert.equals("grenade_ability", ability_type)
+						return 1
+					end,
+				}
+			end,
+		})
+
+		local AmmunitionInteraction = {
+			stop = function(_self, _world, interactor_unit)
+				grenade_charges[interactor_unit] = 1
+			end,
+		}
+		_G.Unit = {
+			get_data = function(unit, field)
+				assert.equals("pickup_grenade", unit)
+				assert.equals("pickup_type", field)
+				return "small_grenade"
+			end,
+		}
+
+		AmmoPolicy.install_interaction_hooks(AmmunitionInteraction)
+		AmmunitionInteraction.stop({}, nil, "bot1", { target_unit = "pickup_grenade" }, 100, "success", true)
+
+		assert.is_truthy(find_debug_log("grenade pickup success: small_grenade (bot=4, charges=0->1/1)"))
 	end)
 end)
