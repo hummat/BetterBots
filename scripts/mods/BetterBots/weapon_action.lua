@@ -17,6 +17,57 @@ local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
 local _weapon_logged_combos = {}
+local _stream_action_logged_combos = {}
+
+local STREAM_CONFIRM_ACTIONS = {
+	flamer_p1_m1 = {
+		brace_pressed = "brace_start",
+		shoot_braced = "stream_fire",
+		shoot_braced_release = "fire_release",
+		brace_release = "brace_end",
+	},
+	forcestaff_p2_m1 = {
+		trigger_charge_flame = "stream_fire",
+		charge_release = "charge_release",
+	},
+}
+
+local function _find_action_for_start_input(actions, input_name)
+	for action_name, action in pairs(actions or {}) do
+		if action.start_input == input_name then
+			return action_name, action
+		end
+	end
+
+	return nil, nil
+end
+
+local function _has_hold_start_input(weapon_template, input_name)
+	local input_def = weapon_template and weapon_template.action_inputs and weapon_template.action_inputs[input_name]
+	local seq = input_def and input_def.input_sequence
+	local first = seq and seq[1]
+
+	return first and first.input == "action_two_hold" and first.value == true
+end
+
+local function _find_bt_shoot_aim_chain(weapon_template, aim_fire_input)
+	for action_name, action in pairs(weapon_template and weapon_template.actions or {}) do
+		local start_input = action.start_input
+		if start_input and _has_hold_start_input(weapon_template, start_input) then
+			local chain_entry = (action.allowed_chain_actions or {})[aim_fire_input]
+			if chain_entry then
+				local unaim_input = action.stop_input
+				local unaim_action_name = unaim_input
+						and _find_action_for_start_input(weapon_template.actions, unaim_input)
+					or nil
+
+				return start_input, action_name, unaim_input, unaim_action_name
+			end
+		end
+	end
+
+	return nil, nil, nil, nil
+end
 
 local function _weapon_log_context(unit)
 	local bot_slot = _bot_slot_for_unit(unit) or "?"
@@ -41,6 +92,81 @@ local M = {}
 
 local _is_enabled
 
+function M._stream_action_phase(template_name, action_input)
+	local actions = STREAM_CONFIRM_ACTIONS[template_name]
+
+	return actions and actions[action_input] or nil
+end
+
+function M.log_stream_action(_unit, bot_slot, template_name, action_input)
+	if not (_debug_enabled and _debug_enabled()) then
+		return false
+	end
+
+	local phase = M._stream_action_phase(template_name, action_input)
+	if not phase then
+		return false
+	end
+
+	local combo_key = tostring(bot_slot) .. ":" .. tostring(template_name) .. ":" .. tostring(action_input)
+	if _stream_action_logged_combos[combo_key] then
+		return true
+	end
+
+	_stream_action_logged_combos[combo_key] = true
+	_debug_log(
+		"stream_action:" .. combo_key,
+		_fixed_time(),
+		"stream action queued for "
+			.. tostring(template_name)
+			.. " via "
+			.. tostring(action_input)
+			.. " (phase="
+			.. tostring(phase)
+			.. ", bot="
+			.. tostring(bot_slot)
+			.. ")"
+	)
+
+	return true
+end
+
+function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
+	if not weapon_template or not scratchpad or not scratchpad.aim_fire_action_input then
+		return false
+	end
+
+	local aim_input, aim_action_name, unaim_input, unaim_action_name =
+		_find_bt_shoot_aim_chain(weapon_template, scratchpad.aim_fire_action_input)
+	if not aim_input then
+		return false
+	end
+
+	local changed = false
+
+	if scratchpad.aim_action_input ~= aim_input then
+		scratchpad.aim_action_input = aim_input
+		changed = true
+	end
+
+	if aim_action_name and scratchpad.aim_action_name ~= aim_action_name then
+		scratchpad.aim_action_name = aim_action_name
+		changed = true
+	end
+
+	if unaim_input and scratchpad.unaim_action_input ~= unaim_input then
+		scratchpad.unaim_action_input = unaim_input
+		changed = true
+	end
+
+	if unaim_action_name and scratchpad.unaim_action_name ~= unaim_action_name then
+		scratchpad.unaim_action_name = unaim_action_name
+		changed = true
+	end
+
+	return changed
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -50,6 +176,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_stream_action_logged_combos = {}
 end
 
 local function _ammo_api()
@@ -179,6 +306,36 @@ function M.register_hooks(deps)
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
+			local PlayerUnitVisualLoadout =
+				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+
+			_mod:hook_safe(BtBotShootAction, "enter", function(_self, unit, _breed, _blackboard, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return
+				end
+
+				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+				local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
+				if not unit_data_extension or not visual_loadout_extension then
+					return
+				end
+
+				local inventory_component = unit_data_extension:read_component("inventory")
+				local weapon_template =
+					PlayerUnitVisualLoadout.wielded_weapon_template(visual_loadout_extension, inventory_component)
+				if M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad) and _debug_enabled() then
+					_debug_log(
+						"shoot_scratchpad_normalized:" .. tostring(unit),
+						_fixed_time(),
+						"normalized shoot scratchpad aim cleanup (aim="
+							.. tostring(scratchpad.aim_action_input)
+							.. ", unaim="
+							.. tostring(scratchpad.unaim_action_input)
+							.. ")"
+					)
+				end
+			end)
+
 			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
 				if scratchpad and not _ads_logged_scratchpads[scratchpad] then
 					_ads_logged_scratchpads[scratchpad] = true
@@ -394,6 +551,10 @@ function M.register_hooks(deps)
 					end
 
 					local result = func(self, id, action_input, raw_input)
+					if result and id == "weapon_action" and unit and _debug_enabled() then
+						local bot_slot, _, weapon_template_name = _weapon_log_context(unit)
+						M.log_stream_action(unit, bot_slot, weapon_template_name, action_input)
+					end
 					if perf_t0 then
 						_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
 					end

@@ -1324,7 +1324,6 @@ local function try_queue(unit, blackboard)
 		-- Ability-based blitz: queue aim input directly on the ability component.
 		-- No slot wield needed — the ability fires from any weapon slot.
 		if aim_input then
-			action_input_extension:bot_queue_action_input(component, aim_input, nil)
 			if release_input then
 				state.stage = "wait_throw"
 				state.wait_t = fixed_t + (throw_delay or DEFAULT_THROW_DELAY_S)
@@ -1333,6 +1332,7 @@ local function try_queue(unit, blackboard)
 				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
 				state.release_t = fixed_t
 			end
+			action_input_extension:bot_queue_action_input(component, aim_input, nil)
 		else
 			-- Ability-based auto-fire: just wait for charge confirmation
 			state.stage = "wait_unwield"
@@ -1379,12 +1379,12 @@ local function try_queue(unit, blackboard)
 		end
 
 		-- Item-based grenade: wield the grenade slot first.
-		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
 		state.stage = "wield"
 		state.deadline_t = fixed_t + WIELD_TIMEOUT_S
 		if not aim_input then
 			state.release_t = fixed_t
 		end
+		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
 		_emit_grenade_event("queued", unit, grenade_name, state, fixed_t, {
 			rule = rule,
 			input = "grenade_ability",

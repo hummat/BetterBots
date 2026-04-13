@@ -7,6 +7,7 @@ local _is_grimoire_pickup_enabled
 local _pickups
 local _get_live_bot_groups
 local _unit_get_data
+local _unit_is_alive
 local _write_blackboard_component
 local _tome_patch_logged = false
 local _last_grimoire_patch_enabled
@@ -22,6 +23,13 @@ local function _log(key, message)
 	end
 
 	_debug_log(key, 0, message)
+end
+
+local function _log_stale_clear(discriminator, source)
+	_log(
+		"mule_pickup_stale_clear:" .. tostring(discriminator),
+		"cleared stale mule pickup ref (source=" .. tostring(source) .. ")"
+	)
 end
 
 local function _pickups_registry()
@@ -72,6 +80,18 @@ local function _grimoire_enabled()
 	return _is_grimoire_pickup_enabled() == true
 end
 
+local function _pickup_unit_is_stale(pickup_unit)
+	if not pickup_unit then
+		return false
+	end
+
+	if not _unit_is_alive then
+		return false
+	end
+
+	return not _unit_is_alive(pickup_unit)
+end
+
 local function _patch_pickup(pickup_name, mule_enabled)
 	local pickup_data = _get_pickup_data(pickup_name)
 	if not pickup_data then
@@ -93,6 +113,7 @@ function M.init(deps)
 	_pickups = deps.pickups
 	_get_live_bot_groups = deps.get_live_bot_groups or _default_get_live_bot_groups
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
+	_unit_is_alive = deps.unit_is_alive or (Unit and Unit.alive)
 	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
 	_tome_patch_logged = false
 	_last_grimoire_patch_enabled = nil
@@ -126,6 +147,10 @@ function M.is_grimoire_pickup_unit(pickup_unit)
 		return false
 	end
 
+	if _pickup_unit_is_stale(pickup_unit) then
+		return false
+	end
+
 	return _unit_get_data(pickup_unit, "pickup_type") == GRIMOIRE_PICKUP_NAME
 end
 
@@ -136,13 +161,19 @@ function M.sanitize_mule_pickup(pickup_component, unit)
 		return false
 	end
 
-	if not M.is_grimoire_pickup_unit(pickup_component.mule_pickup) then
+	local stale = _pickup_unit_is_stale(pickup_component.mule_pickup)
+	local blocked_grimoire = not stale and M.is_grimoire_pickup_unit(pickup_component.mule_pickup)
+	if not (stale or blocked_grimoire) then
 		return false
 	end
 
 	pickup_component.mule_pickup = nil
 	pickup_component.mule_pickup_distance = math.huge
-	_log("mule_pickup_block_grim:" .. tostring(unit), "blocked grimoire mule pickup")
+	if stale then
+		_log_stale_clear(unit, "pickup_component.mule_pickup")
+	else
+		_log("mule_pickup_block_grim:" .. tostring(unit), "blocked grimoire mule pickup")
+	end
 
 	return true
 end
@@ -163,33 +194,45 @@ local function _mark_destination_refresh(unit)
 	return true
 end
 
-local function _clear_behavior_targets(behavior_component)
+local function _clear_behavior_targets(behavior_component, unit)
 	if not behavior_component then
 		return false
 	end
 
 	local changed = false
-	if M.is_grimoire_pickup_unit(behavior_component.interaction_unit) then
+	local stale_interaction = _pickup_unit_is_stale(behavior_component.interaction_unit)
+	if stale_interaction or M.is_grimoire_pickup_unit(behavior_component.interaction_unit) then
 		behavior_component.interaction_unit = nil
 		changed = true
+		if stale_interaction then
+			_log_stale_clear(tostring(unit) .. ":interaction_unit", "behavior_component.interaction_unit")
+		end
 	end
-	if M.is_grimoire_pickup_unit(behavior_component.forced_pickup_unit) then
+	local stale_forced = _pickup_unit_is_stale(behavior_component.forced_pickup_unit)
+	if stale_forced or M.is_grimoire_pickup_unit(behavior_component.forced_pickup_unit) then
 		behavior_component.forced_pickup_unit = nil
 		changed = true
+		if stale_forced then
+			_log_stale_clear(tostring(unit) .. ":forced_pickup_unit", "behavior_component.forced_pickup_unit")
+		end
 	end
 
 	return changed
 end
 
-local function _clear_grimoire_pickup_order(pickup_orders)
+local function _clear_grimoire_pickup_order(pickup_orders, unit)
 	local order = pickup_orders and pickup_orders[POCKETABLE_SLOT_NAME]
-	if not (order and M.is_grimoire_pickup_unit(order.unit)) then
-		return false
+	local stale = order and _pickup_unit_is_stale(order.unit)
+	if not (order and (stale or M.is_grimoire_pickup_unit(order.unit))) then
+		return nil
 	end
 
 	pickup_orders[POCKETABLE_SLOT_NAME] = nil
+	if stale then
+		_log_stale_clear(tostring(unit) .. ":pickup_order", "pickup_orders.slot_pocketable")
+	end
 
-	return true
+	return stale and "stale" or "grimoire"
 end
 
 local function _clear_cached_grimoire_pickups(bot_group)
@@ -201,9 +244,13 @@ local function _clear_cached_grimoire_pickups(bot_group)
 
 	local changed = false
 	for pickup_unit in pairs(available_pickups) do
-		if M.is_grimoire_pickup_unit(pickup_unit) then
+		local stale = _pickup_unit_is_stale(pickup_unit)
+		if stale or M.is_grimoire_pickup_unit(pickup_unit) then
 			available_pickups[pickup_unit] = nil
 			changed = true
+			if stale then
+				_log_stale_clear(pickup_unit, "_available_mule_pickups.slot_pocketable")
+			end
 		end
 	end
 
@@ -225,10 +272,13 @@ function M.sync_live_bot_group(bot_group)
 
 	for unit, data in pairs(bot_data) do
 		local unit_changed = false
-		if _clear_grimoire_pickup_order(data.pickup_orders) then
+		local pickup_order_clear_reason = _clear_grimoire_pickup_order(data.pickup_orders, unit)
+		if pickup_order_clear_reason then
 			unit_changed = true
 			changed = true
-			_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
+			if pickup_order_clear_reason == "grimoire" then
+				_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
+			end
 		end
 
 		if M.sanitize_mule_pickup(data.pickup_component, unit) then
@@ -236,7 +286,7 @@ function M.sync_live_bot_group(bot_group)
 			changed = true
 		end
 
-		if _clear_behavior_targets(data.behavior_component) then
+		if _clear_behavior_targets(data.behavior_component, unit) then
 			unit_changed = true
 			changed = true
 		end
@@ -281,7 +331,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	_mod:hook_safe(BotBehaviorExtension, "_refresh_destination", function(self)
 		local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit)
 		if changed then
-			_clear_behavior_targets(self._behavior_component)
+			_clear_behavior_targets(self._behavior_component, self._unit)
 		end
 	end)
 end

@@ -15,6 +15,9 @@ local _debug_logs = {}
 local _event_decisions = {}
 local _event_emissions = {}
 local _aim_calls = {}
+local _grenade_state_by_unit = {}
+local _last_grenade_charge_event_by_unit = {}
+local unit
 
 -- Mock ability_extension
 local _can_use_grenade = true
@@ -35,6 +38,7 @@ local mock_action_input_extension = test_helper.make_player_action_input_extensi
 			component = component,
 			input = input_name,
 			extra = extra,
+			stage_at_queue = _grenade_state_by_unit[unit] and _grenade_state_by_unit[unit].stage or nil,
 		}
 	end,
 })
@@ -96,11 +100,7 @@ local _grenades_enabled_result = true
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
 
--- Shared state tables (weak-keyed in production, plain here)
-local _grenade_state_by_unit = {}
-local _last_grenade_charge_event_by_unit = {}
-
-local unit = "bot_unit_1"
+unit = "bot_unit_1"
 local blackboard = {}
 
 local function find_debug_log(pattern)
@@ -624,6 +624,12 @@ describe("grenade_fallback", function()
 		assert.is_nil(_recorded_inputs[1].extra)
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
+	end)
+
+	it("marks the grenade sequence active before queueing grenade_ability", function()
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("wield", _recorded_inputs[1].stage_at_queue)
 	end)
 
 	it("defers item grenade activation while the bot is unarmed", function()

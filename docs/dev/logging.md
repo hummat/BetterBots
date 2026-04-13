@@ -105,6 +105,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
+- `stream action queued for <template> via <input> (phase=<phase>, bot=<slot>)` (`#87` validation; direct confirmation that a flamer/Purgatus stream-specific queue input actually reached `bot_queue_action_input` successfully)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
@@ -128,6 +129,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `revive_ability_skip:{no_unit_data,no_ability_ext,no_meta,no_input,no_input_ext,not_queueable}:<unit>` (six skip-reason logs inside `try_pre_revive` after the rescue-interaction gate; identifies which post-commit early return swallowed the attempt — per-bot throttle; direct diagnostic signal for `#7`)
 - `unknown_combat_template:<template_name>` (`combat_ability_identity.resolve` encountered a template not present in any of the three category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
 - `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
+- `cleared stale mule pickup ref (source=<path>)` (`#32`/stale-unit validation; deleted pickup refs were sanitized without touching invalid engine units)
 
 ## Intentionally suppressed (noise reduction)
 

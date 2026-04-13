@@ -105,7 +105,13 @@ describe("mule_pickup", function()
 			end,
 			pickups = pickups,
 			unit_get_data = function(unit, key)
+				if unit and unit.deleted then
+					error("UnitReference is not valid")
+				end
 				return unit and unit[key]
+			end,
+			unit_is_alive = function(unit)
+				return not (unit and unit.deleted)
 			end,
 		})
 	end)
@@ -249,6 +255,42 @@ describe("mule_pickup", function()
 		assert.is_true(changed)
 		assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable)
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+	end)
+
+	it("clears deleted pickup refs during live sync", function()
+		local deleted_grim = { pickup_type = "grimoire", deleted = true }
+		local bot_data = {
+			bot_1 = {
+				pickup_component = {},
+				pickup_orders = {},
+				behavior_component = {
+					interaction_unit = deleted_grim,
+					forced_pickup_unit = deleted_grim,
+				},
+			},
+		}
+
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[deleted_grim] = 20,
+					},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local ok, changed = pcall(MulePickup.sync_live_bot_groups)
+
+		assert.is_true(ok)
+		assert.is_true(changed)
+		assert.is_nil(live_bot_groups.side_a._available_mule_pickups.slot_pocketable[deleted_grim])
+		assert.is_nil(bot_data.bot_1.behavior_component.interaction_unit)
+		assert.is_nil(bot_data.bot_1.behavior_component.forced_pickup_unit)
+		assert.is_truthy(find_debug_log("cleared stale mule pickup ref"))
 	end)
 
 	it("blocks grimoire pickup orders when setting is off", function()

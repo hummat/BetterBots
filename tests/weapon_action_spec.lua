@@ -153,4 +153,51 @@ describe("weapon_action", function()
 		assert.is_true(logged)
 		assert.is_truthy(find_debug_log("ranged dead-zone override kept normal shot"))
 	end)
+
+	it("normalizes braced stream scratchpads to use brace release", function()
+		local weapon_template = {
+			action_inputs = {
+				brace_pressed = { input_sequence = { { input = "action_two_hold", value = true } } },
+				brace_release = { input_sequence = { { input = "action_two_hold", value = false } } },
+				shoot_braced = { input_sequence = { { input = "action_one_hold", value = true } } },
+			},
+			actions = {
+				action_brace = {
+					start_input = "brace_pressed",
+					stop_input = "brace_release",
+					allowed_chain_actions = {
+						shoot_braced = { action_name = "action_shoot_braced" },
+					},
+				},
+				action_unbrace = { start_input = "brace_release" },
+				action_shoot_braced = { start_input = "shoot_braced" },
+			},
+		}
+		local scratchpad = {
+			aim_fire_action_input = "shoot_braced",
+			aim_fire_action_name = "action_shoot_braced",
+			aim_action_input = "zoom",
+			aim_action_name = "action_zoom",
+			unaim_action_input = "unzoom",
+			unaim_action_name = "action_unzoom",
+		}
+
+		local changed = WeaponAction._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
+
+		assert.is_true(changed)
+		assert.equals("brace_pressed", scratchpad.aim_action_input)
+		assert.equals("action_brace", scratchpad.aim_action_name)
+		assert.equals("brace_release", scratchpad.unaim_action_input)
+		assert.equals("action_unbrace", scratchpad.unaim_action_name)
+	end)
+
+	it("logs stream action confirmations for flamer and purgatus queue inputs", function()
+		local logged_flamer = WeaponAction.log_stream_action("bot_1", 3, "flamer_p1_m1", "shoot_braced")
+		local logged_purgatus = WeaponAction.log_stream_action("bot_1", 3, "forcestaff_p2_m1", "trigger_charge_flame")
+
+		assert.is_true(logged_flamer)
+		assert.is_true(logged_purgatus)
+		assert.is_truthy(find_debug_log("stream action queued for flamer_p1_m1 via shoot_braced"))
+		assert.is_truthy(find_debug_log("stream action queued for forcestaff_p2_m1 via trigger_charge_flame"))
+	end)
 end)
