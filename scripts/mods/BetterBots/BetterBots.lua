@@ -1243,7 +1243,7 @@ end)
 
 local function _auto_dump_perf_report()
 	local report = Perf.report_and_reset()
-	if not report then
+	if not report or report.bot_frames <= 0 then
 		return
 	end
 

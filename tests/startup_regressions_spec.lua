@@ -165,6 +165,13 @@ describe("startup regressions", function()
 		assert.is_truthy(init_block:find("perf%s*=%s*Perf", 1))
 	end)
 
+	it("suppresses auto perf dumps when no bot frames were sampled", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local auto_dump = assert(source:match("local function _auto_dump_perf_report%(%)%s*(.-)%s*end"))
+
+		assert.is_truthy(auto_dump:find("report%.bot_frames%s*<=%s*0", 1))
+	end)
+
 	it("rejects duplicate hook_require targets across BetterBots source files", function()
 		local owners_by_target = {}
 		local duplicates = {}

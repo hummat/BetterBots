@@ -147,7 +147,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. `/bb_perf`
    - Shows and resets the current runtime timing window when `Performance timings` is on.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
-   - `GameplayStateRun` exit also auto-emits the same report to the console log with `bb-perf:auto:` prefixes, so mission-end and quit flows still leave a snapshot if `/bb_perf` was not run manually.
+   - `GameplayStateRun` exit also auto-emits the same report to the console log with `bb-perf:auto:` prefixes, but only when the recording window contains at least one sampled bot frame. Hub-only `GameplayStateRun` transitions are intentionally suppressed so starting a mission does not produce meaningless `0 bot frames` dumps.
    - `ability_queue` now exposes breakdown-only rows for `item_fallback`, `template_setup`, `input_validation`, `decision`, and `queue`; `grenade_fallback` now exposes `stage_machine`, `profile_resolution`, and `launch` in addition to the existing `build_context` and `heuristic` rows.
    - `grenade_fallback` has two breakdown-only sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call in `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). They appear as rows in the tag breakdown but do not contribute to the headline `µs/bot/frame` total because the parent `grenade_fallback` timer already includes them.
 5. `/bb_reset`
