@@ -154,6 +154,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
 | 85 | Refactor combat ability identity | Separate `template_name` from `ability_name` semantics. Tech debt cleanup, no user-visible value. |
 | 88 | Deployable crate carry + deploy (ammo + medical) | Bots walk past `pocketable` form crates — cannot carry, cannot deploy. Full vanilla use pipeline for *deployed* crates (see `#39`/`#72`), but no detection, carry, or deploy action for carryable form. Shared pocketable-pickup primitive with `#24` stim section. Design work: deploy-location heuristic (coherency anchor, objective markers, ally resource needs). Filed 2026-04-11 after `#32` triage exposed the gap. |
+| 96 | Bridge explicit smart-tag item interactions into bot pickup/drop orders | Shared bridge issue, not an item-family issue. VT2 precedent is explicit pickup orders via item-ping/social-wheel response; Darktide has `BotOrder` backend plus smart-tag interaction backend but no obvious equivalent Lua UI sender. Scope: route explicit non-enemy smart-tag interaction into bot pickup/drop assignment for supported families; queue after `#24` and `#88`. |
 
 ### Validation-gated — slot into any batch when testable
 

@@ -194,6 +194,10 @@ Confirms SoloPlay is purely session infrastructure — BetterBots has clean sepa
 
 **Source:** [GitHub](https://github.com/Aussiemon/Vermintide-2-Source-Code)
 
+**Supplemental references:**
+- [Dev Blog - How Bots Work in Vermintide 2](https://www.vermintide.com/news/2018/12/17/dev-blog-how-bots-work-in-vermintide-2) — official Fatshark bot-design rationale. Especially useful when evaluating command/tag semantics: Fatshark explicitly called out that overloading generic tagging for bot grimoire pickup would create ambiguous intent and frustrating side effects.
+- [Bots - Vermintide 2 Wiki](https://vermintide2.fandom.com/wiki/Bots) — community-maintained quick reference for bot behavior, commands, and loadout assumptions. Useful for fast orientation, but not authoritative; verify mechanics against code or official posts before copying behavior into BetterBots.
+
 ### Key findings
 
 **Behavior tree structure (`bt_bot.lua`):**
@@ -254,6 +258,15 @@ VT2's bot input is simpler than Darktide's:
 
 No `bot_queue_action_input` — VT2 uses direct flag-based input. Darktide's queued action input system is more complex.
 
+**Item pickup commands use explicit bot orders, not passive tag reactions:**
+
+- `PingTemplates.generic_item` exposes a `PLAYER_PICK_UP` response for pickups / level objects.
+- The item social wheel does not directly "make bots react to the ping." Instead, choosing a hero portrait runs `pickup_item(...)`, which calls `ai_bot_group_system:order("pickup", callee_player_unit, item_unit, caller_player)`.
+- Validity is filtered up front: bots are excluded for `slot_level_event` pickups and any pickup with `disallow_bot_pickup`.
+- The server stores the command as explicit bot-order state: `ammo_pickup_order_unit` for ammo, `pickup_orders[slot_name]` for slot-based items. Re-issuing the same order to another bot aborts the previous assignment.
+- `player_bot_base.lua` treats pending pickup orders as path-refresh / interaction-driving state. Ordered pickups can bypass normal nav-path requirements via the forced-pickup path, which makes the order channel materially stronger than ordinary pickup awareness.
+- Automatic pickup behavior is a separate layer. `AIBotGroupSystem._update_pickups_near_player()` and `_update_mule_pickups()` populate health/ammo/mule candidates opportunistically, but explicit social-wheel orders override reservation / assignment state.
+
 ### Relevance to BetterBots
 
 **High-value patterns to adopt:**
@@ -265,6 +278,8 @@ No `bot_queue_action_input` — VT2 uses direct flag-based input. Darktide's que
 3. **End condition patterns** — Buff-based, slot-based, and destination-based completion checks are more robust than time-based approaches. Could improve BetterBots' hold-duration logic.
 
 4. **Two-path ability categories** — The `activate_ability` vs `shoot_ability` split maps to template-path vs item-path. Worth formalizing this in BetterBots.
+
+5. **Command semantics for tagged items** — The right VT2 precedent is not "bots react to item tags." It is "generic item ping opens a targeted pickup-order action, which writes into dedicated bot-order state." For Darktide, that argues for a smart-tag interaction → bot-order bridge rather than teaching the perception layer to treat all object tags as commands.
 
 **Key differences from Darktide:**
 - VT2 uses direct flag-based bot input; Darktide uses queued action input
