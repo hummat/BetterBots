@@ -8,6 +8,7 @@ local START_CHALLENGE_VALUE = 10 -- Challenge rating sum where leash scaling beg
 local MAX_CHALLENGE_VALUE = 30 -- Challenge rating sum where leash is fully tightened
 local MIN_LEASH_FLOOR = 6 -- Minimum effective leash distance (meters)
 
+local _original_bot_settings = setmetatable({}, { __mode = "k" })
 local _patched_bot_settings = setmetatable({}, { __mode = "k" })
 
 local _debug_log
@@ -28,18 +29,58 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
+local function _restore_original_bot_settings(bot_settings, normal)
+	local original = _original_bot_settings[bot_settings]
+	if not original then
+		return false
+	end
+
+	normal.min = original.min
+	normal.max = original.max
+	_patched_bot_settings[bot_settings] = nil
+
+	return true
+end
+
 function M.patch_bot_settings(bot_settings)
-	if not bot_settings or _patched_bot_settings[bot_settings] then
+	if not bot_settings then
 		return
 	end
 
 	local times = bot_settings.opportunity_target_reaction_times
 	local normal = times and times.normal
-	if normal then
-		normal.min = OPPORTUNITY_REACTION_MIN
-		normal.max = OPPORTUNITY_REACTION_MAX
+	if not normal then
+		return
 	end
 
+	if not _original_bot_settings[bot_settings] then
+		_original_bot_settings[bot_settings] = {
+			min = normal.min,
+			max = normal.max,
+		}
+	end
+
+	if _is_enabled and not _is_enabled() then
+		if _restore_original_bot_settings(bot_settings, normal) and _debug_enabled and _debug_enabled() then
+			_debug_log(
+				"human_likeness_restore",
+				0,
+				"restored opportunity reaction times (min="
+					.. tostring(_original_bot_settings[bot_settings].min)
+					.. ", max="
+					.. tostring(_original_bot_settings[bot_settings].max)
+					.. ")"
+			)
+		end
+		return
+	end
+
+	if _patched_bot_settings[bot_settings] then
+		return
+	end
+
+	normal.min = OPPORTUNITY_REACTION_MIN
+	normal.max = OPPORTUNITY_REACTION_MAX
 	_patched_bot_settings[bot_settings] = true
 
 	if _debug_enabled and _debug_enabled() then

@@ -59,10 +59,9 @@ describe("sustained_fire", function()
 		assert.is_true(input.action_one_hold)
 	end)
 
-	it("refreshes sustained state while hold bridge stays active", function()
+	it("expires sustained state when no new fire input arrives", function()
 		local t = 10
 		local unit = {}
-		local input = {}
 
 		SustainedFire.init({
 			fixed_time = function()
@@ -70,18 +69,38 @@ describe("sustained_fire", function()
 			end,
 		})
 
-		SustainedFire.arm(unit, {
-			template_name = "lasgun_p3_m1",
-			action_input = "shoot",
-			hold_inputs = {
-				action_one_hold = true,
-			},
+		SustainedFire.arm(unit, SustainedFire.resolve_state(unit, "lasgun_p3_m1", "shoot"))
+
+		local input = {}
+		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+		assert.is_true(input.action_one_hold)
+
+		t = t + 0.2
+		SustainedFire.update_actions(unit, {}, "lasgun_p3_m1")
+		t = t + 0.1
+		SustainedFire.update_actions(unit, {}, "lasgun_p3_m1")
+
+		assert.is_nil(SustainedFire.active_state(unit))
+	end)
+
+	it("refreshes sustained state when new fire input arrives", function()
+		local t = 10
+		local unit = {}
+
+		SustainedFire.init({
+			fixed_time = function()
+				return t
+			end,
 		})
 
-		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+		SustainedFire.arm(unit, SustainedFire.resolve_state(unit, "lasgun_p3_m1", "shoot"))
+		SustainedFire.update_actions(unit, {}, "lasgun_p3_m1")
+
 		t = t + 0.2
-		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
+		SustainedFire.observe_weapon_action_input(unit, "lasgun_p3_m1", "shoot")
+
 		t = t + 0.2
+		local input = {}
 		SustainedFire.update_actions(unit, input, "lasgun_p3_m1")
 
 		assert.is_not_nil(SustainedFire.active_state(unit))

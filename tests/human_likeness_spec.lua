@@ -15,6 +15,46 @@ describe("human_likeness", function()
 		assert.equals(5, BotSettings.opportunity_target_reaction_times.normal.max)
 	end)
 
+	it("leaves opportunity target reaction times unchanged when disabled", function()
+		local BotSettings = {
+			opportunity_target_reaction_times = {
+				normal = { min = 10, max = 20 },
+			},
+		}
+
+		HumanLikeness.init({
+			is_enabled = function()
+				return false
+			end,
+		})
+		HumanLikeness.patch_bot_settings(BotSettings)
+
+		assert.equals(10, BotSettings.opportunity_target_reaction_times.normal.min)
+		assert.equals(20, BotSettings.opportunity_target_reaction_times.normal.max)
+	end)
+
+	it("restores original reaction times when toggled off after patching", function()
+		local enabled = true
+		local BotSettings = {
+			opportunity_target_reaction_times = {
+				normal = { min = 10, max = 20 },
+			},
+		}
+
+		HumanLikeness.init({
+			is_enabled = function()
+				return enabled
+			end,
+		})
+		HumanLikeness.patch_bot_settings(BotSettings)
+
+		enabled = false
+		HumanLikeness.patch_bot_settings(BotSettings)
+
+		assert.equals(10, BotSettings.opportunity_target_reaction_times.normal.min)
+		assert.equals(20, BotSettings.opportunity_target_reaction_times.normal.max)
+	end)
+
 	it("treats rescue and panic style rules as jitter bypass", function()
 		HumanLikeness.init({})
 

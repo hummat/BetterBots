@@ -32,6 +32,7 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
+local _bot_settings
 local PERF_SETTING_ID = "enable_perf_timing"
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
@@ -628,6 +629,7 @@ AbilityQueue.wire({
 })
 
 mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+	_bot_settings = BotSettings
 	HumanLikeness.patch_bot_settings(BotSettings)
 end)
 
@@ -1257,6 +1259,16 @@ function mod.on_game_state_changed(status, state)
 
 	if status == "exit" and state == "GameplayStateRun" then
 		EventLog.end_session()
+	end
+end
+
+function mod.on_setting_changed(setting_id)
+	if setting_id == DEBUG_SETTING_ID then
+		_refresh_debug_log_level()
+	end
+
+	if setting_id == "enable_human_likeness" then
+		HumanLikeness.patch_bot_settings(_bot_settings)
 	end
 end
 

@@ -221,6 +221,16 @@ describe("startup regressions", function()
 		assert.is_nil(source:find("mod:save_unsaved_settings_to_file", 1))
 	end)
 
+	it("refreshes human-likeness BotSettings patch when setting changes", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("function mod%.on_setting_changed%(setting_id%)", 1))
+		assert.is_truthy(source:find('if setting_id == "enable_human_likeness" then', 1, true))
+		assert.is_truthy(source:find("HumanLikeness%.patch_bot_settings%(", 1))
+	end)
+
 	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))

@@ -642,6 +642,82 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
+	it("clears reserved grenade pickup when a human newly needs the refill", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.10 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function()
+							return 0
+						end,
+						max_ability_charges = function()
+							return 1
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function()
+							return 0
+						end,
+						max_ability_charges = function()
+							return 1
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function()
+				return "small_grenade_pickup", 2
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				bot_grenade_charges_threshold = function()
+					return 0
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = "small_grenade_pickup",
+				ammo_pickup_distance = 2,
+				ammo_pickup_valid_until = 102,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
+		assert.equals(-math.huge, self._pickup_component.ammo_pickup_valid_until)
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
 	it("ignores grenade pickup for cooldown-only blitz users", function()
 		install_module({
 			ammo_module = {

@@ -103,6 +103,18 @@ local function _eligible_for_grenade_pickup(unit)
 	return max ~= nil and max > 0, current, max
 end
 
+local function _clear_reserved_grenade_pickup(pickup_component, grenade_pickup)
+	if not pickup_component or pickup_component.ammo_pickup ~= grenade_pickup then
+		return false
+	end
+
+	pickup_component.ammo_pickup = nil
+	pickup_component.ammo_pickup_distance = math.huge
+	pickup_component.ammo_pickup_valid_until = -math.huge
+
+	return true
+end
+
 local function _all_eligible_humans_above_grenade_threshold(human_units, threshold)
 	if not human_units then
 		return true
@@ -278,6 +290,12 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 					)
 					_log("grenade_pickup_bind:" .. tostring(unit), "grenade pickup bound into ammo slot")
 				else
+					if _clear_reserved_grenade_pickup(pickup_component, grenade_pickup) then
+						_log(
+							"grenade_pickup_release:" .. tostring(unit),
+							"released reserved grenade pickup to human reserve"
+						)
+					end
 					_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
 				end
 			end
