@@ -48,7 +48,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback queued` | Ability input was sent to the action queue (activation attempt) |
 | `fallback held` | Heuristic decided NOT to activate (with rule name + nearby count) |
 | `fallback blocked` | Ability on cooldown or action_input invalid (post-activation spam) |
-| `blocked lossy network-sync overwrite` | `BotPlayer.set_profile` one-shot guard blocked the lossy 1.11+ sync overwrite for a resolved bot profile (#65) |
+| `blocked lossy network-sync profile overwrite` | `BotPlayer.set_profile` one-shot guard blocked the lossy 1.11+ sync overwrite for a resolved bot profile (#65) |
 | `allowed profile update` | `BotPlayer.set_profile` hook passed a later legitimate profile update through after the one-shot guard |
 | `charge consumed` | Ability charge was spent (confirmed activation) |
 | `post-charge grace started` | Engagement leash recorded a movement-ability charge and started the temporary grace window (#47) |
@@ -57,11 +57,11 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `unsupported grenade template` | Grenade/blitz heuristic approved a template with no mapped throw profile |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
-| `suppressed poxburster target (too_close_to_bot|near_human_player)` | Bot cleared poxburster `target_enemy` when it was unsafe to shoot (#34) |
-| `suppressed poxburster opportunity/urgent/priority target (...)` | Bot cleared unsafe poxburster targets from secondary perception slots (#34) |
+| `suppressed poxburster target_enemy (` | Bot cleared `target_enemy` when a poxburster was unsafe to shoot (#34) |
+| `suppressed poxburster opportunity_target_enemy (` / `suppressed poxburster urgent_target_enemy (` / `suppressed poxburster priority_target_enemy (` | Bot cleared unsafe poxbursters from the secondary perception slots (#34) |
 | `pushing poxburster (bypassed outnumbered gate)` | Bot forced the melee push path against a poxburster; key is per-bot via `scratchpad.unit` to avoid throttle collisions (#54) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
-| `bot ADS confirmed` | Bot entered aim-down-sights with injected gestalt (#35) |
+| `bot ADS confirmed (ranged_gestalt=` | Bot entered aim-down-sights with injected gestalt (#35) |
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `stream action queued for` | Direct confirmation that a stream-specific queue input (`shoot_braced`, `trigger_charge_flame`, etc.) actually reached `bot_queue_action_input` successfully (#87) |
 | `patched opportunity reaction times` | Human-likeness timing patch applied live (#44) |
@@ -72,9 +72,10 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
-| `shield/escort (<type>) dist=<N>` | Ally detected in objective interaction — profile, interaction type, distance. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
+| `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
 | `revive candidate observed: <ability> (template=<template>, need_type=<type>)` | Bot selected a rescue destination while carrying a defensive revive ability, before `BtBotInteractAction.enter`. Use this to tell selector/path misses from interact-hook misses. Key: `revive_candidate:<ability>:<unit>` (#7) |
 | `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` | Bot fired a defensive ability before starting a rescue interaction. Key: `revive_ability:<ability>:<unit>` (#7) |
+| `revive ability skipped (` | Rescue-interaction diagnostics. The throttle key encodes the reason, but the emitted line is always a human-readable `[Bot <slot>] revive ability skipped (...)`. |
 | `cleared stale mule pickup ref` | Deleted mule/grimoire pickup ref was sanitized without crashing; source path in message shows which cache/blackboard field was cleaned |
 
 **Preferred: use `bb-log`** (project root):
@@ -167,14 +168,14 @@ For item-based grenade regressions, check the grenade state-machine phases befor
 
 1. `grenade queued wield for <grenade>` appears:
    - sequence started, but nothing is proven yet.
-2. `grenade_wield_ok` appears:
+2. `grenade wield confirmed, waiting for aim` appears:
    - grenade slot swap succeeded; only **after this** is it reasonable to suspect aim/ballistic logic.
 3. `grenade queued <aim_input>` / `grenade releasing toward ...` appears:
    - aim/release phase actually ran.
 4. `grenade charge consumed for <grenade>` appears:
    - authoritative success for item-based grenades.
 
-If you instead see repeated `grenade queued wield for <grenade>` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade_wield_ok`, the blocker is killing the initial `grenade_ability` queue during the grenade `wield` stage. That is a sequence-allowlist bug, not an aim bug.
+If you instead see repeated `grenade queued wield for <grenade>` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, the blocker is killing the initial `grenade_ability` queue during the grenade `wield` stage. That is a sequence-allowlist bug, not an aim bug.
 
 ### Reading context dumps (deep verification)
 
