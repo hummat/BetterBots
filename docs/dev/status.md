@@ -1,4 +1,4 @@
-# Status Snapshot (April 12, 2026)
+# Status Snapshot (April 13, 2026)
 
 ## What's shipped
 
@@ -161,13 +161,14 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
+- **v0.11.0 is not ready to tag yet** — `make check` is green (`943 successes / 0 failures / 0 errors`), but the release still has open validation gates: `#32`, `#82`, `#87`, `#89`, `#90`, `#91`, plus daemonhost re-validation on `#17`.
 - **v0.10.0 released 2026-04-11** — all 6 issues validated, tagged, pushed, GitHub release + Nexus package ready.
 - **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 813 tests. **Released 2026-04-11.**
-- **v0.11.0 "Combat Execution" (final polish batch)**: #32 (mule pickup — implemented on branch: `mule_pickup.lua` now activates vanilla tome/scripture carry by patching side-mission pickup metadata in place, while grimoires stay behind a new opt-in toggle that also blocks grimoire pickup orders when off), #82 (perf audit — implemented on branch: `ability_queue.lua` now caches one-shot ability-template injection and `target_selection.lua` now memoizes same-frame human-tag, companion-pin, and slot-ammo lookups; no new in-game perf headline claimed yet), #87 (sustained fire for held-fire weapons — implemented on branch: `sustained_fire.lua` now keeps raw hold inputs alive for flamer, Purgatus, recon lasguns, autoguns, autopistol, dual autopistols, bolter hipfire, heavy stubbers, and rippergun braced fire without changing ADS/brace selection policy), #89 (bot grenade pickup heuristic — implemented on branch: `ammo_policy.lua` now binds nearby `small_grenade` refills through the vanilla `ammo_pickup` slot whenever every eligible human is above the configured grenade reserve threshold, ignores cooldown-only blitz users, and preserves ammo pickup when grenade is deferred), #90 (melee/ranged target type hysteresis — implemented on branch: perception-layer margin + momentum stabilization, no BT debounce), #91 (weakspot aim MVP — implemented on branch: allowlisted finesse families now get vanilla-style head/spine aim metadata injection)
+- **v0.11.0 "Combat Execution" (final polish batch)**: code complete on `dev/v0.11.0`, but still validation-gated. `#44` and `#93` closed on 2026-04-13; `#32`, `#82`, `#87`, `#89`, `#90`, and `#91` remain open because the current logs still do not prove tome/scripture pickup, fresh `/bb_perf` evidence, sustained-fire hold injection, grenade pickup success, target-type hysteresis flips/holds in longer combat, or weakspot runtime selection.
 - **Closed 2026-04-13**: #44 (human-likeness Tier A — closed from current branch code + tests + live runtime markers for reaction-time patching and pressure-leash scaling; jitter remains test-covered but not separately logged), #93 (grenade ballistic arc fix — closed from live ballistic aim/wield/consume evidence plus manual gameplay confirmation that the remaining short-throw concern was gone)
 - **v1.0.0 "Bot Identity"**: #13 (navmesh charges), #24 (healing items), #33 (weapon specials), #38 (talent-aware Martyrdom PoC), #41 (weapon-aware ADS), #86 (Tier 3 revive cover), #92 (per-breed weakspot map)
 - **Post-1.0 "Intelligence Architecture"**: #22 (utility scoring), #28 (profile management), #56 (com wheel), #80 (grenade tactical evaluator), #84 (user-authored profiles), #85 (ability identity refactor), #88 (deployable crate carry + deploy — filed 2026-04-11), #96 (explicit smart-tag item interactions -> bot pickup/drop orders — filed 2026-04-13 after VT2/Darktide command-path research; queue behind `#24` and `#88`)

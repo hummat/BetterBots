@@ -125,6 +125,8 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Poxburster targeting
 - [x] Distant special chase penalty (configurable range)
 - [x] Coherency-anchored engagement leash
+- [x] Human-likeness timing and pressure-leash profiles
+- [x] Target-type hysteresis (reduces melee/ranged swap thrash)
 - [x] Smart blitz targeting (togglable)
 - [x] Objective-aware activation (protect interacting allies)
 - [x] Pre-revive defensive ability activation
@@ -136,14 +138,18 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] ADS fix for Tertium 5/6 bots
 - [x] Ranged weapon fixes (plasma gun, staves)
 - [x] Bot warp charge venting
+- [x] Sustained fire support for held-fire ranged paths
 - [x] VFX/SFX bleed suppression
 - [x] Smart melee attack selection (armor-aware, configurable bias)
+- [x] Weakspot aim MVP for finesse firearms
+- [x] Ballistic aim for manual-physics grenade families
 - [x] Ammo awareness (bot + human thresholds)
+- [x] Grenade refill pickup heuristic
 - [x] Healing deferral
+- [x] Mule scripture/tome pickup (grimoires opt-in)
 
 **Long-term**
 - [ ] Talent-aware bot behavior
-- [ ] Human-likeness (jitter, reaction times, difficulty scaling)
 - [ ] Healing item management
 - [ ] Weapon special actions (parry, bayonet)
 - [ ] Utility-based ability scoring

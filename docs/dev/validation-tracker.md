@@ -1197,6 +1197,80 @@ Conclusion:
   in production without collision.
 ```
 
+### Run 2026-04-13-v0.11.0-combat-execution-01
+
+```text
+Run ID: 2026-04-13-v0.11.0-combat-execution-01
+Date (local): 2026-04-13
+Date (UTC): 2026-04-13
+Git commit: d80b934 (pre follow-up logging + hook-guard docs)
+Log file: console-2026-04-13-14.10.19-dcbaab88-4b7a-4797-bd74-76e3f399fa32.log
+Bot lineup / abilities: mixed live squad including Veteran krak, Ogryn box, Zealot knives, Psyker smite, flamer, and Purgatus staff
+Map + difficulty: live mission, combat-heavy session (multiple daemonhost spawns reported by the player)
+
+v0.11.0 evidence:
+- #93 grenade ballistic execution: PASS
+  - visual: yes (player-confirmed in session)
+  - charge consumed log: yes
+  - key lines / counts:
+    - 11 `grenade charge consumed for veteran_krak_grenade`
+    - 6 `grenade charge consumed for ogryn_grenade_box_cluster`
+    - 12 `grenade charge consumed for zealot_throwing_knives`
+    - repeated `grenade external action confirmed for psyker_smite`
+- ammo pickup regression: PASS
+  - visual: yes (player-confirmed in session)
+  - pickup success log: yes
+  - key lines / timestamps:
+    - multiple `ammo pickup success: large_clip ...`
+    - multiple `ammo pickup success: small_clip ...`
+- #87 sustained fire: PARTIAL
+  - stream routing log: yes
+  - hold confirmation log: no
+  - key lines / timestamps:
+    - `stream action queued for flamer_p1_m1 via shoot_braced`
+    - `stream action queued for forcestaff_p2_m1 via trigger_charge_flame`
+    - zero `holding sustained fire inputs`
+- #32 mule pickup stability: PARTIAL
+  - crash fix signal: yes
+  - tome/scripture pickup confirmation: no
+  - key lines / timestamps:
+    - `cleared stale mule pickup ref`
+    - zero live tome/scripture carry confirmation lines
+- #89 grenade pickup heuristic: PARTIAL
+  - policy log: yes
+  - pickup success log: no
+  - key lines / timestamps:
+    - `grenade pickup permitted ...`
+    - `grenade pickup bound into ammo slot`
+    - zero `grenade pickup success`
+- #90 target-type hysteresis: UNKNOWN
+  - key lines / timestamps:
+    - zero `type flip ...`
+    - zero `type hold ... over raw ...`
+- #91 weakspot aim MVP: UNKNOWN
+  - key lines / timestamps:
+    - zero `weakspot aim selected ...`
+- #17 daemonhost avoidance: FAIL
+  - dormancy suppression log: no
+  - key lines / timestamps:
+    - `Spawned monster chaos_daemonhost successfully`
+    - repeated `restoring monster weight for boss targeting bot chaos_daemonhost`
+    - `bot 5 pinged chaos_daemonhost (reason: target_enemy)`
+    - zero `dh_suppress_*` lines
+
+Regression checks:
+- revive/rescue: PASS
+- navigation/pathing: PASS
+- basic combat loop: PASS
+- Lua errors: no (error lines = 0)
+
+Conclusion:
+- #93 has live throw/consume evidence and is releasable from logs.
+- Ammo pickup is fixed in live play.
+- #32, #82, #87, #89, #90, #91 remain validation-gated.
+- #17 is not closeable from this session; the run is evidence against closure.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.
