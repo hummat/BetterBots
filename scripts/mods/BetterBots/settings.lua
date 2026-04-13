@@ -88,7 +88,6 @@ local DEFAULT_BOT_GRENADE_CHARGES_THRESHOLD = 0
 local DEFAULT_HUMAN_GRENADE_RESERVE_THRESHOLD = 1.00
 local BOT_GRENADE_CHARGES_THRESHOLD_SETTING_ID = "bot_grenade_charges_threshold"
 local HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID = "bot_human_grenade_reserve_threshold"
-
 M.DEFAULTS = {
 	enable_stances = true,
 	enable_charges = true,
@@ -107,6 +106,18 @@ M.DEFAULTS = {
 	enable_daemonhost_avoidance = true,
 	enable_target_type_hysteresis = true,
 	enable_human_likeness = true,
+	human_timing_profile = "medium",
+	pressure_leash_profile = "medium",
+	human_timing_reaction_min = 2,
+	human_timing_reaction_max = 4,
+	human_timing_defensive_jitter_min_ms = 100,
+	human_timing_defensive_jitter_max_ms = 250,
+	human_timing_opportunistic_jitter_min_ms = 250,
+	human_timing_opportunistic_jitter_max_ms = 700,
+	pressure_leash_start_rating = 12,
+	pressure_leash_full_rating = 30,
+	pressure_leash_scale_percent = 65,
+	pressure_leash_floor_m = 7,
 	enable_bot_grimoire_pickup = false,
 	sprint_follow_distance = 12,
 	special_chase_penalty_range = 18,
@@ -218,6 +229,138 @@ local function _read_numeric_setting(setting_id, default_value, min_value, max_v
 	return numeric_value
 end
 
+local HUMAN_TIMING_PROFILES = {
+	off = {
+		enabled = false,
+		reaction_min = 10,
+		reaction_max = 20,
+		defensive_jitter_min_s = 0,
+		defensive_jitter_max_s = 0,
+		opportunistic_jitter_min_s = 0,
+		opportunistic_jitter_max_s = 0,
+	},
+	fast = {
+		enabled = true,
+		reaction_min = 1,
+		reaction_max = 3,
+		defensive_jitter_min_s = 0.05,
+		defensive_jitter_max_s = 0.15,
+		opportunistic_jitter_min_s = 0.15,
+		opportunistic_jitter_max_s = 0.45,
+	},
+	medium = {
+		enabled = true,
+		reaction_min = 2,
+		reaction_max = 4,
+		defensive_jitter_min_s = 0.10,
+		defensive_jitter_max_s = 0.25,
+		opportunistic_jitter_min_s = 0.25,
+		opportunistic_jitter_max_s = 0.70,
+	},
+	slow = {
+		enabled = true,
+		reaction_min = 3,
+		reaction_max = 6,
+		defensive_jitter_min_s = 0.15,
+		defensive_jitter_max_s = 0.35,
+		opportunistic_jitter_min_s = 0.40,
+		opportunistic_jitter_max_s = 1.00,
+	},
+}
+
+local PRESSURE_LEASH_PROFILES = {
+	off = {
+		enabled = false,
+		start_rating = 10,
+		full_rating = 30,
+		scale_multiplier = 1.0,
+		floor_m = 6,
+	},
+	light = {
+		enabled = true,
+		start_rating = 16,
+		full_rating = 36,
+		scale_multiplier = 0.80,
+		floor_m = 8,
+	},
+	medium = {
+		enabled = true,
+		start_rating = 12,
+		full_rating = 30,
+		scale_multiplier = 0.65,
+		floor_m = 7,
+	},
+	strong = {
+		enabled = true,
+		start_rating = 8,
+		full_rating = 24,
+		scale_multiplier = 0.50,
+		floor_m = 6,
+	},
+}
+
+local HUMAN_TIMING_PROFILE_OPTIONS = {
+	off = true,
+	fast = true,
+	medium = true,
+	slow = true,
+	custom = true,
+}
+
+local PRESSURE_LEASH_PROFILE_OPTIONS = {
+	off = true,
+	light = true,
+	medium = true,
+	strong = true,
+	custom = true,
+}
+
+local function _copy_config(config)
+	local copy = {}
+	for key, value in pairs(config) do
+		copy[key] = value
+	end
+	return copy
+end
+
+local function _resolve_profile(setting_id, sibling_setting_id, legacy_id, valid_values, default_value)
+	if not _mod then
+		return default_value
+	end
+
+	local explicit_value = _mod:get(setting_id)
+	if explicit_value ~= nil then
+		if valid_values[explicit_value] then
+			return explicit_value
+		end
+		return default_value
+	end
+
+	if _mod:get(sibling_setting_id) == nil and _mod:get(legacy_id) == false then
+		return "off"
+	end
+
+	return default_value
+end
+
+local function _read_custom_numeric_setting(setting_id, min_value, max_value)
+	if not _mod then
+		return nil
+	end
+
+	local raw_value = _mod:get(setting_id)
+	local numeric_value = tonumber(raw_value)
+	if not numeric_value then
+		return nil
+	end
+
+	if numeric_value < min_value or numeric_value > max_value then
+		return nil
+	end
+
+	return numeric_value
+end
+
 function M.bot_grenade_charges_threshold()
 	return _read_numeric_setting(BOT_GRENADE_CHARGES_THRESHOLD_SETTING_ID, DEFAULT_BOT_GRENADE_CHARGES_THRESHOLD, 0, 12)
 end
@@ -266,6 +409,90 @@ end
 
 function M.special_chase_penalty_range()
 	return _read_slider_with_legacy("special_chase_penalty_range", "enable_special_penalty", 18, 0, 30)
+end
+
+function M.human_timing_profile()
+	return _resolve_profile(
+		"human_timing_profile",
+		"pressure_leash_profile",
+		"enable_human_likeness",
+		HUMAN_TIMING_PROFILE_OPTIONS,
+		"medium"
+	)
+end
+
+function M.pressure_leash_profile()
+	return _resolve_profile(
+		"pressure_leash_profile",
+		"human_timing_profile",
+		"enable_human_likeness",
+		PRESSURE_LEASH_PROFILE_OPTIONS,
+		"medium"
+	)
+end
+
+function M.resolve_human_timing_config()
+	local profile = M.human_timing_profile()
+	if profile ~= "custom" then
+		return _copy_config(HUMAN_TIMING_PROFILES[profile] or HUMAN_TIMING_PROFILES.medium)
+	end
+
+	local fallback = HUMAN_TIMING_PROFILES.medium
+	local reaction_min = _read_custom_numeric_setting("human_timing_reaction_min", 0, 20)
+	local reaction_max = _read_custom_numeric_setting("human_timing_reaction_max", 0, 20)
+	local defensive_min_ms = _read_custom_numeric_setting("human_timing_defensive_jitter_min_ms", 0, 1000)
+	local defensive_max_ms = _read_custom_numeric_setting("human_timing_defensive_jitter_max_ms", 0, 1000)
+	local opportunistic_min_ms = _read_custom_numeric_setting("human_timing_opportunistic_jitter_min_ms", 0, 1500)
+	local opportunistic_max_ms = _read_custom_numeric_setting("human_timing_opportunistic_jitter_max_ms", 0, 1500)
+
+	if
+		not reaction_min
+		or not reaction_max
+		or not defensive_min_ms
+		or not defensive_max_ms
+		or not opportunistic_min_ms
+		or not opportunistic_max_ms
+		or reaction_min > reaction_max
+		or defensive_min_ms > defensive_max_ms
+		or opportunistic_min_ms > opportunistic_max_ms
+	then
+		return _copy_config(fallback)
+	end
+
+	return {
+		enabled = true,
+		reaction_min = reaction_min,
+		reaction_max = reaction_max,
+		defensive_jitter_min_s = defensive_min_ms / 1000,
+		defensive_jitter_max_s = defensive_max_ms / 1000,
+		opportunistic_jitter_min_s = opportunistic_min_ms / 1000,
+		opportunistic_jitter_max_s = opportunistic_max_ms / 1000,
+	}
+end
+
+function M.resolve_pressure_leash_config()
+	local profile = M.pressure_leash_profile()
+	if profile ~= "custom" then
+		return _copy_config(PRESSURE_LEASH_PROFILES[profile] or PRESSURE_LEASH_PROFILES.medium)
+	end
+
+	local fallback = PRESSURE_LEASH_PROFILES.medium
+	local start_rating = _read_custom_numeric_setting("pressure_leash_start_rating", 0, 40)
+	local full_rating = _read_custom_numeric_setting("pressure_leash_full_rating", 1, 50)
+	local scale_percent = _read_custom_numeric_setting("pressure_leash_scale_percent", 25, 100)
+	local floor_m = _read_custom_numeric_setting("pressure_leash_floor_m", 4, 12)
+
+	if not start_rating or not full_rating or not scale_percent or not floor_m or full_rating <= start_rating then
+		return _copy_config(fallback)
+	end
+
+	return {
+		enabled = true,
+		start_rating = start_rating,
+		full_rating = full_rating,
+		scale_multiplier = scale_percent / 100,
+		floor_m = floor_m,
+	}
 end
 
 function M.is_combat_template_enabled(template_name, ability_extension)

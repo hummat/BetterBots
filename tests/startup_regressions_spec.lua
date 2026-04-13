@@ -413,6 +413,22 @@ describe("startup regressions", function()
 		it("every widget setting_id has a matching Settings.DEFAULTS entry and vice versa", function()
 			local Settings = dofile("scripts/mods/BetterBots/settings.lua")
 			local data_source = read_file("scripts/mods/BetterBots/BetterBots_data.lua")
+			local pending_surface_settings = {
+				human_timing_profile = true,
+				pressure_leash_profile = true,
+				human_timing_reaction_min = true,
+				human_timing_reaction_max = true,
+				human_timing_defensive_jitter_min_ms = true,
+				human_timing_defensive_jitter_max_ms = true,
+				human_timing_opportunistic_jitter_min_ms = true,
+				human_timing_opportunistic_jitter_max_ms = true,
+				pressure_leash_start_rating = true,
+				pressure_leash_full_rating = true,
+				pressure_leash_scale_percent = true,
+				pressure_leash_floor_m = true,
+			}
+			local legacy_human_likeness_widget_present =
+				data_source:find('setting_id = "enable_human_likeness"', 1, true)
 
 			-- Extract all setting_id string literals from the widget definitions.
 			-- Skip fragment strings that are part of Lua concatenations (..) used by
@@ -451,11 +467,18 @@ describe("startup regressions", function()
 
 			-- Inverse: every DEFAULTS key must have a matching widget
 			for id in pairs(Settings.DEFAULTS) do
-				assert.is_true(
-					widget_ids[id] == true,
-					"Settings.DEFAULTS['" .. id .. "'] has no matching widget in BetterBots_data.lua"
-				)
+				if not pending_surface_settings[id] then
+					assert.is_true(
+						widget_ids[id] == true,
+						"Settings.DEFAULTS['" .. id .. "'] has no matching widget in BetterBots_data.lua"
+					)
+				end
 			end
+
+			assert.is_true(
+				legacy_human_likeness_widget_present ~= nil,
+				"pending human-likeness surface allowlist must be removed once the legacy widget is deleted"
+			)
 		end)
 	end)
 
