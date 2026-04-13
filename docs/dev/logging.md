@@ -79,6 +79,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `unsupported grenade template <grenade> (rule=<rule>)` (heuristic approved a grenade/blitz template that BetterBots has no throw profile for)
 - `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
 - `grenade releasing toward <unit> via <input> (dist_bucket=<close|mid|far|unknown>)` (throw release with resolved aim target; primary validation signal for aimed grenade/blitz releases)
+- `grenade wield confirmed, waiting for aim` (item grenade actually swapped to `slot_grenade_ability`; this is the visible success signal the docs previously referred to as `grenade_wield_ok`)
 - `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
@@ -88,6 +89,9 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade released cleanup lock without explicit unwield (action confirmed)` (external cleanup templates saw their target action, so BetterBots ends the protected sequence immediately)
 - `grenade released cleanup lock without explicit unwield (slot changed)` (external cleanup templates left grenade slot through the engine's normal unwind; BetterBots treats that as success)
 - `grenade external action confirmed for <grenade> (action=<action_name>)` (non-charge blitz confirmation; useful for Psyker Chain Lightning charged-path validation)
+- `ability blitz activated <grenade> on <component> (rule=<rule>) ...` (ability-based blitz path fired directly on the action component instead of through grenade-slot wield)
+- `ability blitz complete (charge confirmed|timeout) ...` (ability-based blitz path reached its terminal confirmation or timeout)
+- `grenade deferred while unarmed (slot=<slot>, template=<template>)` (grenade fallback refused to start because the bot was currently unarmed)
 - `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
 - `post-charge grace started (4s)` (engagement leash recorded a movement-ability charge and started the temporary 20m grace window for that bot)
 - `restored engagement leash overrides after vanilla error` (the `_allow_engage` hook restored shared singleton state before rethrowing; direct failure-path validation signal for `#73`)
@@ -96,11 +100,16 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `ranged ammo gate lowered from 0.5 to <threshold>` (BetterBots rewrote the vanilla ranged-ammo condition to the configured threshold; setup signal for `#72`)
 - `ranged permitted with lowered ammo gate (threshold=<threshold>)` (bot passed the vanilla ranged condition only because BetterBots lowered the threshold; direct validation signal for `#72`)
 - `ammo pickup preserved due to explicit order` (user-issued ammo orders bypassed BetterBots reserve logic; direct validation signal for `#72`)
-- `ammo pickup blocked: bot reserve above threshold (<ammo> > <threshold>)` (bot refused ammo because its own reserve was still above the configured pickup threshold; direct validation signal for `#72`)
+- `ammo pickup deferred to human (bot <ammo>% > <threshold>%)` (a human ammo user was below reserve, so the bot yielded the pickup instead of topping off)
+- `ammo pickup permitted: bot desperate (<ammo>% <= <threshold>%) despite human reserve low` (a human was below reserve, but the bot was under its own desperation threshold and was allowed to pick up anyway)
 - `ammo pickup permitted: all eligible humans above reserve` (decision-level signal only: BetterBots set `pickup_component.needs_ammo = true` because no eligible human ammo user was below reserve; this does **not** prove the bot actually reached and completed the pickup interaction)
 - `ammo pickup success: <pickup> (bot=<slot>, ammo=<before>%-><after>%)` (actual pickup interaction succeeded and the bot's ammo reserve increased; stronger than `ammo pickup permitted` because it proves the interaction completed)
+- `grenade pickup permitted: all eligible humans above reserve` (decision-level signal for grenade refills; BetterBots reserved the pickup for the bot because no eligible human grenade user was below reserve)
+- `grenade pickup bound into ammo slot` (the chosen grenade pickup was attached to the ammo-pickup fields so vanilla interaction code can collect it)
+- `released reserved grenade pickup to human reserve` (a previously reserved grenade pickup was explicitly given back because a human now needs it)
+- `grenade pickup deferred to human reserve` (the bot yielded a nearby grenade refill because at least one eligible human grenade user was below reserve)
+- `grenade pickup skipped: cooldown-based blitz` (the bot has a cooldown-only blitz, so grenade refill logic is not applicable)
 - `grenade pickup success: <pickup> (bot=<slot>, charges=<before>-><after>/<max>)` (actual pickup interaction succeeded and grenade charges increased; strongest confirmation for grenade refill pickups)
-- `ammo pickup blocked: eligible human below reserve` (bot yielded ammo to a human ammo user below the configured reserve; direct validation signal for `#72`)
 - `melee choice <attack> vs <armored|unarmored> target (crowd=<N>, bucket=<solo|pack|horde>, weapon=<template>)` (interesting `_choose_attack` decision; use to validate `#52` without per-swing spam)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
@@ -130,13 +139,14 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag)` (ping system — meaningful suppression, one-shot per repeated target/reason)
 - `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
 - `suppressed <template> (team_cd:<category>)` (team cooldown staggering — another bot already activated the same category within the suppression window; direct validation signal for `#14`)
-- `shield (<type>) dist=<N>` / `escort (luggable) dist=<N>` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
+- `<profile> (<interaction_type>) dist=<N>` such as `shield (objective) dist=4.2` or `escort (luggable) dist=2.1` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
 - `revive candidate observed: <ability> (template=<template>, need_type=<type>)` (bot selected a rescue destination while carrying a defensive revive ability; this fires before `BtBotInteractAction.enter` and distinguishes selector/path misses from interact-hook misses for `#7`)
 - `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` (bot fired a defensive ability before starting a rescue interaction; for shared veteran template this logs the equipped ability name, e.g. `veteran_combat_ability_shout`)
-- `revive_ability_skip:{no_unit_data,no_ability_ext,no_meta,no_input,no_input_ext,not_queueable}:<unit>` (six skip-reason logs inside `try_pre_revive` after the rescue-interaction gate; identifies which post-commit early return swallowed the attempt — per-bot throttle; direct diagnostic signal for `#7`)
-- `unknown_combat_template:<template_name>` (`combat_ability_identity.resolve` encountered a template not present in any of the three category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
+- `[Bot <slot>] revive ability skipped (...)` with reasons such as `no enemies nearby`, `suppressed: <reason>`, `no unit_data_system extension`, `no ability_system extension`, `missing ability_meta_data.activation`, `activation has no action_input`, `no action_input_system extension`, or `<template> action_input <input> not bot-queueable` (the throttle key encodes the reason, but the emitted text is always the human-readable skip message)
+- `combat_ability_identity: unknown template_name '<template>' — returning passthrough identity ...` (`combat_ability_identity.resolve` encountered a template not present in any of the category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
 - `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
 - `cleared stale mule pickup ref (source=<path>)` (`#32`/stale-unit validation; deleted pickup refs were sanitized without touching invalid engine units)
+- `deferred health station to human player` / `deferred medical crate to human player` (healing deferral yielded a medicae station or med-crate because a human player was below the configured reserve)
 
 ## Intentionally suppressed (noise reduction)
 
@@ -159,10 +169,10 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
-- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade_wield_ok`, `grenade queued <aim_input>`, `grenade releasing toward ...`, or `grenade charge consumed`:
+- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input>`, `grenade releasing toward ...`, or `grenade charge consumed`:
   - the grenade weapon-action blocker is swallowing the **initial** item-grenade `grenade_ability` input during `state.stage == "wield"`.
   - this is an allowlist/sequence bug in `grenade_fallback._expected_weapon_action_input()`, not a ballistic/gravity-aim failure.
-  - do not blame the gravity-aware aim path unless the log first reaches `grenade_wield_ok` and then starts emitting `grenade aim ballistic` / `grenade aim flat fallback`.
+  - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic` / `grenade aim flat fallback`.
 
 ## Writing debug logging for new features
 
@@ -257,6 +267,11 @@ Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)
 | `consumed` | Charge spent | charges, attempt_id |
 | `blocked` | Item sequence failure | reason, stage, profile, attempt_id |
 | `snapshot` | Every 30s per bot | cooldown_ready, charges, ctx, item_stage |
+
+For daemonhost investigations, `decision.ctx` now preserves both
+`target_is_dormant_daemonhost` and `target_daemonhost_aggro_state` when the
+current target is a daemonhost, so JSONL traces can distinguish dormant
+pre-aggro approvals from active-fight self-defense behavior.
 
 ### Hot-reload behavior
 

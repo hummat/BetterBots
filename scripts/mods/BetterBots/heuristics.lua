@@ -234,6 +234,7 @@ local function normalize_grenade_context(unit, context, target_unit)
 	normalized.target_is_elite_special = false
 	normalized.target_is_monster = false
 	normalized.target_is_dormant_daemonhost = false
+	normalized.target_daemonhost_aggro_state = nil
 	normalized.target_is_super_armor = false
 
 	if unit_position and target_position and unit_position.x and target_position.x then
@@ -262,8 +263,10 @@ local function normalize_grenade_context(unit, context, target_unit)
 	if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
 		local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
 		local target_perception = target_bb and target_bb.perception
-		local is_aggroed = target_perception and target_perception.aggro_state == "aggroed"
+		local aggro_state = target_perception and target_perception.aggro_state or "missing"
+		local is_aggroed = aggro_state == "aggroed"
 		normalized.target_is_dormant_daemonhost = not is_aggroed
+		normalized.target_daemonhost_aggro_state = aggro_state
 	end
 
 	return normalized
@@ -302,6 +305,7 @@ local function build_context(unit, blackboard)
 		target_is_elite_special = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
+		target_daemonhost_aggro_state = nil,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
@@ -445,8 +449,10 @@ local function build_context(unit, blackboard)
 			if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
 				local target_bb = BLACKBOARDS and BLACKBOARDS[context.target_enemy]
 				local target_perception = target_bb and target_bb.perception
-				local is_aggroed = target_perception and target_perception.aggro_state == "aggroed"
+				local aggro_state = target_perception and target_perception.aggro_state or "missing"
+				local is_aggroed = aggro_state == "aggroed"
 				context.target_is_dormant_daemonhost = not is_aggroed
+				context.target_daemonhost_aggro_state = aggro_state
 			end
 		end
 	end
