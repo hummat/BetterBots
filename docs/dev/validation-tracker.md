@@ -1316,7 +1316,8 @@ v0.11.0 evidence:
 
 Conclusion:
 - #87 is closeable from this run.
-- #89 and #91 gained real runtime evidence, but neither meets its stricter issue text yet.
+- #89 gained real runtime evidence, but still does not meet its stricter issue text yet.
+- #91 now has live weakspot-routing confirmation and is closeable on the MVP "runtime path proven" standard.
 ```
 
 ## Decision Rules
