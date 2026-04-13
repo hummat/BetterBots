@@ -121,21 +121,23 @@ _debug_log(key, fixed_t, message, min_interval_s, level)
 These are implemented and intended for targeted diagnostics, not constant spam.
 
 1. `/bb_state`
-   - Per-bot one-line state snapshot: current ability/template, charges/cooldown, `can_use`, active flag, wielded slot/template, fallback stage, retry timer, last charge age.
+   - Shows each bot's current ability, cooldown, and fallback state on one line.
+   - Includes current template, charges, cooldown, active flag, wielded slot, fallback stage, retry timer, and last charge age.
    - Use this first when something looks off.
 2. `/bb_decide`
-   - Evaluates current heuristic decision (`true/false`) and rule for each alive bot without queuing inputs.
+   - Shows whether each alive bot would use its ability right now, without actually triggering it.
+   - Includes the current decision (`true/false`) and rule for each bot.
    - Best for threshold tuning or "why didn't it cast?" questions.
    - Do **not** run after every successful cast; run around suspected misses or surprising behavior.
 3. `/bb_brain`
-   - Dumps deeper bot snapshot via `mod:dump()` (context + selected perception + fallback state).
+   - Writes a deeper bot snapshot to the log via `mod:dump()` (context + selected perception + fallback state).
    - Use only when `/bb_state` + logs are insufficient.
 4. `/bb_perf`
-   - Prints and resets the current runtime timing window when `Enable runtime timing` is on.
+   - Shows and resets the current runtime timing window when `Performance timings` is on.
    - Reports total `µs/bot/frame` plus a per-hook breakdown for instrumented BetterBots callbacks.
    - `grenade_fallback` has two breakdown-only sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call in `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). They appear as rows in the tag breakdown but do not contribute to the headline `µs/bot/frame` total because the parent `grenade_fallback` timer already includes them.
 5. `/bb_reset`
-   - Resets all BetterBots settings to their code-defined defaults and saves them when the DMF save hook is available.
+   - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
 

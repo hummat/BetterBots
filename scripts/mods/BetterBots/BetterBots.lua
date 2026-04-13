@@ -1162,7 +1162,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	end)
 end)
 
-mod:command("bb_perf", "Print BetterBots runtime timing stats from the current recording window", function()
+mod:command("bb_perf", "Show and clear BetterBots timing stats for the current session", function()
 	Perf.sync_setting()
 
 	local report = Perf.report_and_reset()
@@ -1213,7 +1213,7 @@ mod:command("bb_perf", "Print BetterBots runtime timing stats from the current r
 	end
 end)
 
-mod:command("bb_reset", "Reset BetterBots settings to defaults", function()
+mod:command("bb_reset", "Reset all BetterBots settings to their default values", function()
 	local failures = {}
 	for setting_id, default_value in pairs(Settings.DEFAULTS) do
 		local ok, err = pcall(function()
