@@ -161,14 +161,14 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
-- **v0.11.0 is not ready to tag yet** — `make check` is green (`943 successes / 0 failures / 0 errors`), but the release still has open validation gates: `#32`, `#82`, `#87`, `#89`, `#90`, `#91`, plus daemonhost re-validation on `#17`.
+- **v0.11.0 is not ready to tag yet** — `make check` is green (`943 successes / 0 failures / 0 errors`), but the release still has open validation gates: `#32`, `#82`, `#89`, `#90`, `#91`, plus daemonhost re-validation on `#17`.
 - **v0.10.0 released 2026-04-11** — all 6 issues validated, tagged, pushed, GitHub release + Nexus package ready.
 - **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 813 tests. **Released 2026-04-11.**
-- **v0.11.0 "Combat Execution" (final polish batch)**: code complete on `dev/v0.11.0`, but still validation-gated. `#44` and `#93` closed on 2026-04-13; `#32`, `#82`, `#87`, `#89`, `#90`, and `#91` remain open because the current logs still do not prove tome/scripture pickup, fresh `/bb_perf` evidence, sustained-fire hold injection, grenade pickup success, target-type hysteresis flips/holds in longer combat, or weakspot runtime selection.
+- **v0.11.0 "Combat Execution" (final polish batch)**: code complete on `dev/v0.11.0`, but still validation-gated. `#44`, `#87`, and `#93` closed on 2026-04-13; `#32`, `#82`, `#89`, `#90`, and `#91` remain open because the current logs still do not prove tome/scripture pickup, fresh `/bb_perf` evidence, standalone `small_grenade` pickup consumption, target-type hysteresis flips/holds in longer combat, or stronger weakspot efficacy validation.
 - **Closed 2026-04-13**: #44 (human-likeness Tier A — closed from current branch code + tests + live runtime markers for reaction-time patching and pressure-leash scaling; jitter remains test-covered but not separately logged), #93 (grenade ballistic arc fix — closed from live ballistic aim/wield/consume evidence plus manual gameplay confirmation that the remaining short-throw concern was gone)
 - **v1.0.0 "Bot Identity"**: #13 (navmesh charges), #24 (healing items), #33 (weapon specials), #38 (talent-aware Martyrdom PoC), #41 (weapon-aware ADS), #86 (Tier 3 revive cover), #92 (per-breed weakspot map)
 - **Post-1.0 "Intelligence Architecture"**: #22 (utility scoring), #28 (profile management), #56 (com wheel), #80 (grenade tactical evaluator), #84 (user-authored profiles), #85 (ability identity refactor), #88 (deployable crate carry + deploy — filed 2026-04-11), #96 (explicit smart-tag item interactions -> bot pickup/drop orders — filed 2026-04-13 after VT2/Darktide command-path research; queue behind `#24` and `#88`)

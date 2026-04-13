@@ -1271,6 +1271,54 @@ Conclusion:
 - #17 is not closeable from this session; the run is evidence against closure.
 ```
 
+### Run 2026-04-13-v0.11.0-combat-execution-02
+
+```text
+Run ID: 2026-04-13-v0.11.0-combat-execution-02
+Date (local): 2026-04-13
+Date (UTC): 2026-04-13
+Git commit: 2b4574e+ / 4dd9a96+ / 6a4cbe5+ / d80b934 (post sustained-fire hold fix, pickup-success logging, grenade wield unblock)
+Log file: console-2026-04-13-15.20.37-656e5a8c-12cf-40a6-935a-4d044c41a745.log
+Bot lineup / abilities: mixed live squad including flamer, Purgatus, Veteran krak, Ogryn box, Psyker smite, lasgun weakspot routing
+Map + difficulty: live combat-heavy session
+
+v0.11.0 evidence:
+- #87 sustained fire: PASS
+  - stream routing log: yes
+  - hold confirmation log: yes
+  - key lines / timestamps:
+    - `15:27:02.693 ... stream action queued for forcestaff_p2_m1 via trigger_charge_flame`
+    - `15:27:02.693 ... holding sustained fire inputs (bot=2, template=forcestaff_p2_m1, action=trigger_charge_flame)`
+    - `15:27:04.820 ... stream action queued for flamer_p1_m1 via shoot_braced`
+    - `15:27:04.821 ... holding sustained fire inputs (bot=5, template=flamer_p1_m1, action=shoot_braced)`
+  - parser noise:
+    - one stray `zoom_release` parser error on `unarmed`; no flamer or Purgatus parser errors
+- #89 grenade pickup heuristic: PARTIAL
+  - policy log: yes
+  - pickup success log: yes
+  - key lines / timestamps:
+    - `15:32:12.742 ... grenade pickup success: small_clip (bot=5, charges=0->2/12)`
+    - `15:33:02.025 ... grenade pickup success: ammo_cache_deployable (bot=5, charges=0->12/12)`
+    - `15:33:02.750 ... grenade pickup success: ammo_cache_deployable (bot=4, charges=2->3/3)`
+  - remaining gap:
+    - still no unambiguous standalone `small_grenade` world pickup confirmation
+- #91 weakspot aim MVP: PARTIAL
+  - runtime route log: yes
+  - key lines / timestamps:
+    - `15:26:47.045 ... weakspot aim selected j_head (weapon=lasgun_p3_m2, bot=3)`
+  - remaining gap:
+    - issue body asked for stronger in-game weakspot efficacy / breakpoint validation
+- #93 grenade ballistic execution: PASS
+  - key lines / timestamps:
+    - repeated `grenade charge consumed for veteran_krak_grenade`
+    - `15:27:52.327 ... grenade charge consumed for ogryn_grenade_box_cluster`
+    - repeated `grenade external action confirmed for psyker_smite`
+
+Conclusion:
+- #87 is closeable from this run.
+- #89 and #91 gained real runtime evidence, but neither meets its stricter issue text yet.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.

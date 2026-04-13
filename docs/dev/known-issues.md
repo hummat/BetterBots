@@ -5,10 +5,9 @@
 1. `#17` daemonhost avoidance still needs another live spawn after the 2026-04-13 logging fixes. Earlier 2026-04-13 combat logs showed bots restoring monster weight and even pinging a dormant daemonhost instead of emitting the expected suppression signals.
 2. `#32` mule pickup no longer crashes on stale units, but there is still no live tome/scripture pickup confirmation in the current branch logs.
 3. `#82` perf audit code is in, but there is still no fresh `/bb_perf` capture on the current branch. `make check` being green is not the same thing as a live perf validation.
-4. `#87` sustained-fire routing is improved, but no 2026-04-13 run has emitted `holding sustained fire inputs`, so the hold bridge still is not proven in live play.
-5. `#89` ammo pickup regression is fixed (`ammo pickup success` exists), but there is still no `grenade pickup success`, so the grenade refill behavior is not yet validated.
-6. `#90` target-type hysteresis now logs `type flip ...` and `type hold ... over raw ...`, but the latest validation run did not capture either signal in live combat.
-7. `#91` weakspot aim logging exists, but no run has yet produced `weakspot aim selected ...`, so the runtime path is still unproven.
+4. `#89` ammo pickup regression is fixed and grenade refill logging now fires (`grenade pickup success` exists), but the current evidence is still tied to `small_clip` / `ammo_cache_deployable` restocks rather than an unambiguous standalone `small_grenade` world pickup.
+5. `#90` target-type hysteresis now logs `type flip ...` and `type hold ... over raw ...`, but the latest validation runs still have not captured either signal in live combat.
+6. `#91` weakspot aim routing is now proven live (`weakspot aim selected j_head` / `j_spine`), but the issue body asked for stronger in-game weakspot efficacy validation than one routing signal.
 
 ## High severity
 
