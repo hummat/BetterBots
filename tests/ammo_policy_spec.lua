@@ -52,6 +52,7 @@ describe("ammo_policy", function()
 			nearby_grenade_pickups = overrides and overrides.nearby_grenade_pickups,
 			bot_slot_for_unit = overrides and overrides.bot_slot_for_unit,
 			settings = overrides and overrides.settings,
+			is_enabled = overrides and overrides.is_enabled,
 		})
 	end
 
@@ -964,6 +965,65 @@ describe("ammo_policy", function()
 			},
 			_pickup_component = {
 				needs_ammo = false,
+				ammo_pickup = "small_grenade_pickup",
+				ammo_pickup_distance = 2,
+				ammo_pickup_valid_until = 102,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
+		assert.equals(-math.huge, self._pickup_component.ammo_pickup_valid_until)
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("clears reserved grenade pickup when ammo policy is disabled at runtime", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			is_enabled = function()
+				return false
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		_G.Unit = {
+			get_data = function(unit, key)
+				assert.equals("pickup_type", key)
+				if unit == "small_grenade_pickup" then
+					return "small_grenade"
+				end
+			end,
+		}
+
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = true,
 				ammo_pickup = "small_grenade_pickup",
 				ammo_pickup_distance = 2,
 				ammo_pickup_valid_until = 102,

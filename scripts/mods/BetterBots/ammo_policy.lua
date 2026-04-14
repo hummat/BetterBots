@@ -113,6 +113,22 @@ local function _clear_reserved_grenade_pickup(pickup_component, grenade_pickup)
 	return true
 end
 
+local function _clear_reserved_grenade_pickup_if_present(pickup_component)
+	local grenade_pickup = pickup_component and pickup_component.ammo_pickup
+	if
+		not (
+			grenade_pickup
+			and Unit
+			and Unit.get_data
+			and Unit.get_data(grenade_pickup, "pickup_type") == "small_grenade"
+		)
+	then
+		return false
+	end
+
+	return _clear_reserved_grenade_pickup(pickup_component, grenade_pickup)
+end
+
 local function _all_eligible_humans_above_grenade_threshold(human_units, threshold)
 	if not human_units then
 		return true
@@ -317,12 +333,18 @@ end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	_mod:hook_safe(BotBehaviorExtension, "_update_ammo", function(self, unit)
+		local pickup_component = self._pickup_component
 		if _is_enabled and not _is_enabled() then
+			if _clear_reserved_grenade_pickup_if_present(pickup_component) then
+				_log(
+					"grenade_pickup_release_disabled:" .. tostring(unit),
+					"released reserved grenade pickup because ammo policy was disabled"
+				)
+			end
 			return
 		end
 
 		local perf_t0 = _perf and _perf.begin()
-		local pickup_component = self._pickup_component
 		if not pickup_component then
 			if perf_t0 then
 				_perf.finish("ammo_policy.update_ammo", perf_t0)
