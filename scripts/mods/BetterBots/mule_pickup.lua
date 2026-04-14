@@ -4,12 +4,13 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _is_grimoire_pickup_enabled
+local _is_tome_pickup_enabled
 local _pickups
 local _get_live_bot_groups
 local _unit_get_data
 local _unit_is_alive
 local _write_blackboard_component
-local _tome_patch_logged = false
+local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
 local _blackboard_module
 
@@ -80,6 +81,13 @@ local function _grimoire_enabled()
 	return _is_grimoire_pickup_enabled() == true
 end
 
+local function _tome_enabled()
+	if not _is_tome_pickup_enabled then
+		return true
+	end
+	return _is_tome_pickup_enabled() ~= false
+end
+
 local function _pickup_unit_is_stale(pickup_unit)
 	if not pickup_unit then
 		return false
@@ -90,6 +98,37 @@ local function _pickup_unit_is_stale(pickup_unit)
 	end
 
 	return not _unit_is_alive(pickup_unit)
+end
+
+local function _is_tome_pickup_unit(pickup_unit)
+	if not (pickup_unit and _unit_get_data) then
+		return false
+	end
+
+	if _pickup_unit_is_stale(pickup_unit) then
+		return false
+	end
+
+	return _unit_get_data(pickup_unit, "pickup_type") == TOME_PICKUP_NAME
+end
+
+-- Returns (should_clear, reason). Stale cleanup runs regardless of grimoire/tome settings;
+-- grimoire/tome blocking only runs when that pickup type is opted out, so dead unit
+-- references still get flushed when the user enables pickup for either type.
+local function _should_clear_mule_unit(pickup_unit)
+	if not pickup_unit then
+		return false, nil
+	end
+	if _pickup_unit_is_stale(pickup_unit) then
+		return true, "stale"
+	end
+	if not _grimoire_enabled() and M.is_grimoire_pickup_unit(pickup_unit) then
+		return true, "grimoire"
+	end
+	if not _tome_enabled() and _is_tome_pickup_unit(pickup_unit) then
+		return true, "tome"
+	end
+	return false, nil
 end
 
 local function _patch_pickup(pickup_name, mule_enabled)
@@ -110,12 +149,13 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_is_grimoire_pickup_enabled = deps.is_grimoire_pickup_enabled
+	_is_tome_pickup_enabled = deps.is_tome_pickup_enabled
 	_pickups = deps.pickups
 	_get_live_bot_groups = deps.get_live_bot_groups or _default_get_live_bot_groups
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
 	_unit_is_alive = deps.unit_is_alive or (Unit and Unit.alive)
 	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
-	_tome_patch_logged = false
+	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
 
 	M.patch_pickups()
@@ -123,14 +163,18 @@ function M.init(deps)
 end
 
 function M.patch_pickups()
+	local tome_enabled = _tome_enabled()
 	local grimoire_enabled = _grimoire_enabled()
 
-	_patch_pickup(TOME_PICKUP_NAME, true)
+	_patch_pickup(TOME_PICKUP_NAME, tome_enabled)
 	_patch_pickup(GRIMOIRE_PICKUP_NAME, grimoire_enabled)
 
-	if not _tome_patch_logged then
-		_tome_patch_logged = true
-		_log("mule_pickup_patch:" .. TOME_PICKUP_NAME, "patched mule pickup metadata for tome")
+	if _last_tome_patch_enabled ~= tome_enabled then
+		_last_tome_patch_enabled = tome_enabled
+		_log(
+			"mule_pickup_patch:" .. TOME_PICKUP_NAME,
+			"patched mule pickup metadata for tome (enabled=" .. tostring(tome_enabled) .. ")"
+		)
 	end
 
 	if _last_grimoire_patch_enabled ~= grimoire_enabled then
@@ -157,22 +201,23 @@ end
 function M.sanitize_mule_pickup(pickup_component, unit)
 	M.patch_pickups()
 
-	if _grimoire_enabled() or not pickup_component or not pickup_component.mule_pickup then
+	if not pickup_component or not pickup_component.mule_pickup then
 		return false
 	end
 
-	local stale = _pickup_unit_is_stale(pickup_component.mule_pickup)
-	local blocked_grimoire = not stale and M.is_grimoire_pickup_unit(pickup_component.mule_pickup)
-	if not (stale or blocked_grimoire) then
+	local should_clear, reason = _should_clear_mule_unit(pickup_component.mule_pickup)
+	if not should_clear then
 		return false
 	end
 
 	pickup_component.mule_pickup = nil
 	pickup_component.mule_pickup_distance = math.huge
-	if stale then
+	if reason == "stale" then
 		_log_stale_clear(unit, "pickup_component.mule_pickup")
-	else
+	elseif reason == "grimoire" then
 		_log("mule_pickup_block_grim:" .. tostring(unit), "blocked grimoire mule pickup")
+	elseif reason == "tome" then
+		_log("mule_pickup_block_tome:" .. tostring(unit), "blocked tome mule pickup")
 	end
 
 	return true
@@ -200,19 +245,19 @@ local function _clear_behavior_targets(behavior_component, unit)
 	end
 
 	local changed = false
-	local stale_interaction = _pickup_unit_is_stale(behavior_component.interaction_unit)
-	if stale_interaction or M.is_grimoire_pickup_unit(behavior_component.interaction_unit) then
+	local clear_interaction, reason_interaction = _should_clear_mule_unit(behavior_component.interaction_unit)
+	if clear_interaction then
 		behavior_component.interaction_unit = nil
 		changed = true
-		if stale_interaction then
+		if reason_interaction == "stale" then
 			_log_stale_clear(tostring(unit) .. ":interaction_unit", "behavior_component.interaction_unit")
 		end
 	end
-	local stale_forced = _pickup_unit_is_stale(behavior_component.forced_pickup_unit)
-	if stale_forced or M.is_grimoire_pickup_unit(behavior_component.forced_pickup_unit) then
+	local clear_forced, reason_forced = _should_clear_mule_unit(behavior_component.forced_pickup_unit)
+	if clear_forced then
 		behavior_component.forced_pickup_unit = nil
 		changed = true
-		if stale_forced then
+		if reason_forced == "stale" then
 			_log_stale_clear(tostring(unit) .. ":forced_pickup_unit", "behavior_component.forced_pickup_unit")
 		end
 	end
@@ -222,17 +267,21 @@ end
 
 local function _clear_grimoire_pickup_order(pickup_orders, unit)
 	local order = pickup_orders and pickup_orders[POCKETABLE_SLOT_NAME]
-	local stale = order and _pickup_unit_is_stale(order.unit)
-	if not (order and (stale or M.is_grimoire_pickup_unit(order.unit))) then
+	if not order then
+		return nil
+	end
+
+	local should_clear, reason = _should_clear_mule_unit(order.unit)
+	if not should_clear then
 		return nil
 	end
 
 	pickup_orders[POCKETABLE_SLOT_NAME] = nil
-	if stale then
+	if reason == "stale" then
 		_log_stale_clear(tostring(unit) .. ":pickup_order", "pickup_orders.slot_pocketable")
 	end
 
-	return stale and "stale" or "grimoire"
+	return reason
 end
 
 local function _clear_cached_grimoire_pickups(bot_group)
@@ -244,11 +293,11 @@ local function _clear_cached_grimoire_pickups(bot_group)
 
 	local changed = false
 	for pickup_unit in pairs(available_pickups) do
-		local stale = _pickup_unit_is_stale(pickup_unit)
-		if stale or M.is_grimoire_pickup_unit(pickup_unit) then
+		local should_clear, reason = _should_clear_mule_unit(pickup_unit)
+		if should_clear then
 			available_pickups[pickup_unit] = nil
 			changed = true
-			if stale then
+			if reason == "stale" then
 				_log_stale_clear(pickup_unit, "_available_mule_pickups.slot_pocketable")
 			end
 		end
@@ -260,7 +309,7 @@ end
 function M.sync_live_bot_group(bot_group)
 	M.patch_pickups()
 
-	if _grimoire_enabled() or not bot_group then
+	if not bot_group then
 		return false
 	end
 
@@ -278,6 +327,8 @@ function M.sync_live_bot_group(bot_group)
 			changed = true
 			if pickup_order_clear_reason == "grimoire" then
 				_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
+			elseif pickup_order_clear_reason == "tome" then
+				_log("mule_pickup_order_clear:" .. tostring(unit), "cleared tome mule pickup order")
 			end
 		end
 
@@ -292,7 +343,7 @@ function M.sync_live_bot_group(bot_group)
 		end
 
 		if unit_changed and _mark_destination_refresh(unit) then
-			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing grimoire mule state")
+			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing mule state")
 		end
 	end
 
@@ -302,7 +353,7 @@ end
 function M.sync_live_bot_groups()
 	M.patch_pickups()
 
-	if _grimoire_enabled() or not _get_live_bot_groups then
+	if not _get_live_bot_groups then
 		return false
 	end
 
@@ -324,7 +375,13 @@ end
 function M.should_block_pickup_order(pickup_unit)
 	M.patch_pickups()
 
-	return not _grimoire_enabled() and M.is_grimoire_pickup_unit(pickup_unit)
+	if not _grimoire_enabled() and M.is_grimoire_pickup_unit(pickup_unit) then
+		return true, "grimoire"
+	end
+	if not _tome_enabled() and _is_tome_pickup_unit(pickup_unit) then
+		return true, "tome"
+	end
+	return false, nil
 end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
@@ -348,8 +405,12 @@ function M.register_hooks()
 
 	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
-			if M.should_block_pickup_order(pickup_unit) then
-				_log("mule_pickup_order_block:" .. tostring(bot_unit), "blocked grimoire pickup order")
+			local blocked, reason = M.should_block_pickup_order(pickup_unit)
+			if blocked then
+				_log(
+					"mule_pickup_order_block:" .. tostring(bot_unit),
+					"blocked " .. tostring(reason) .. " pickup order"
+				)
 				return nil
 			end
 

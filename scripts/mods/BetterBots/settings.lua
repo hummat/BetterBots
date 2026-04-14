@@ -68,6 +68,8 @@ local FEATURE_GATES = {
 	smart_targeting = "enable_smart_targeting",
 	daemonhost_avoidance = "enable_daemonhost_avoidance",
 	target_type_hysteresis = "enable_target_type_hysteresis",
+	ammo_policy = "enable_ammo_policy",
+	bot_tome_pickup = "enable_bot_tome_pickup",
 }
 
 -- Preset system
@@ -102,6 +104,8 @@ M.DEFAULTS = {
 	enable_smart_targeting = true,
 	enable_daemonhost_avoidance = true,
 	enable_target_type_hysteresis = true,
+	enable_ammo_policy = true,
+	enable_bot_tome_pickup = true,
 	human_timing_profile = "auto",
 	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,

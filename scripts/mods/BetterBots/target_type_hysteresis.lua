@@ -11,6 +11,7 @@ local _fixed_time
 local _is_enabled
 local _bot_target_selection
 local _breed
+local _warned_errors = {}
 
 local function _load_runtime_deps()
 	if not _bot_target_selection then
@@ -422,14 +423,21 @@ function M.register_hooks()
 					end
 				end)
 
-				if not ok and _debug_enabled and _debug_enabled() then
-					_debug_log(
-						"target_type_hysteresis_error:" .. tostring(unit),
-						_fixed_time and _fixed_time() or t or 0,
-						tostring(err),
-						nil,
-						"debug"
-					)
+				if not ok then
+					local key = tostring(err)
+					if not _warned_errors[key] then
+						_warned_errors[key] = true
+						_mod:warning("TargetTypeHysteresis hook error (reported once per unique error): " .. key)
+					end
+					if _debug_enabled and _debug_enabled() then
+						_debug_log(
+							"target_type_hysteresis_error:" .. tostring(unit),
+							_fixed_time and _fixed_time() or t or 0,
+							key,
+							nil,
+							"debug"
+						)
+					end
 				end
 			end
 		end

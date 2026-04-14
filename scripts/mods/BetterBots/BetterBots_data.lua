@@ -168,6 +168,11 @@ return {
 						type = "checkbox",
 						default_value = DEFAULTS.enable_bot_grimoire_pickup,
 					},
+					{
+						setting_id = "enable_bot_tome_pickup",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_bot_tome_pickup,
+					},
 				},
 			},
 			{
@@ -178,6 +183,11 @@ return {
 					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
 					make_numeric("player_tag_bonus", { 0, 10 }, 1),
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
+					{
+						setting_id = "enable_ammo_policy",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_ammo_policy,
+					},
 					make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
 					make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
 					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),

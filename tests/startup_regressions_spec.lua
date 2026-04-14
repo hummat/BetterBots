@@ -214,7 +214,10 @@ describe("startup regressions", function()
 	it("guards hook_require registration against same-path clobbers at runtime", function()
 		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 
-		assert.is_truthy(source:find("local _original_hook_require = mod%.hook_require", 1))
+		-- The raw DMF function must be stashed on the shared mod table so repeated script
+		-- executions (hot reload) don't recursively wrap the previous guard.
+		assert.is_truthy(source:find("mod%._raw_hook_require = mod%.hook_require", 1))
+		assert.is_truthy(source:find("local _original_hook_require = mod%._raw_hook_require", 1))
 		assert.is_truthy(source:find("local _hook_require_callsite_by_path = {}", 1, true))
 		assert.is_truthy(source:find("BetterBots duplicate hook_require for %%s", 1))
 	end)

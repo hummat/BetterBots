@@ -95,10 +95,11 @@ This mod targets bot ability activation in three paths:
     - grenade refills bind for charge-based grenade users whenever every eligible human is above the configured reserve threshold; cooldown-only blitz users are ignored
     - grenade refill deferral is human-first with no bot desperation override; when grenade is deferred, existing ammo pickup decisions remain intact
     - explicit ammo pickup orders are preserved
-    - `mule_pickup.lua` activates vanilla side-mission book carry by mutating pickup template metadata in place: mirror `inventory_slot_name -> slot_name`, set `bots_mule_pickup = true` for tome/scripture, and gate grimoire carrying behind a BetterBots toggle
-    - hook `BotBehaviorExtension._refresh_destination` (post-process): clears stale live grimoire mule targets when the grimoire toggle is off
-    - hook `BotGroup._update_mule_pickups` plus setting-change sync: prunes cached grimoire reservations and explicit `slot_pocketable` pickup orders immediately when grimoire carry is disabled, so bots can fall through to tomes without waiting for the vanilla cache to expire
-    - hook `BotOrder.pickup`: rejects grimoire pickup orders while the grimoire toggle is off, but leaves tome/scripture orders intact
+    - `mule_pickup.lua` activates vanilla side-mission book carry by mutating pickup template metadata in place: mirror `inventory_slot_name -> slot_name`, set `bots_mule_pickup = true` for tome/scripture and grimoire each gated by its own BetterBots toggle (tome defaults on, grimoire defaults off)
+    - stale-pickup cleanup (dead-unit references) runs unconditionally; tome-blocking and grimoire-blocking only run when their respective toggle is off, so opting in to either pickup type no longer strands dead references in `_available_mule_pickups` / `pickup_component.mule_pickup` / behavior-component interaction targets
+    - hook `BotBehaviorExtension._refresh_destination` (post-process): sanitizes live mule state (stale drops for any type; blocked references for whichever type is currently disabled)
+    - hook `BotGroup._update_mule_pickups` plus setting-change sync: prunes cached reservations and explicit `slot_pocketable` pickup orders immediately when a pickup type is disabled, so bots can fall through to the other type without waiting for the vanilla cache to expire
+    - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled; leaves orders for enabled types intact
 22. ADS fix for T5/T6 bots (#35):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights

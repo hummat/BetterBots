@@ -10,6 +10,7 @@ local _bot_slot_for_unit
 local _is_enabled
 
 local _active_state_by_unit = setmetatable({}, { __mode = "k" })
+local _warned_errors = {}
 
 local CLEAR_ACTION_INPUTS = {
 	reload = true,
@@ -268,8 +269,15 @@ function M.install_bot_unit_input_hooks(BotUnitInput)
 		end
 
 		local ok, err = pcall(M.update_actions, self._betterbots_player_unit, input)
-		if not ok and _debug_enabled and _debug_enabled() then
-			_debug_log("sustained_fire_error:" .. tostring(self._betterbots_player_unit), _fixed_time(), tostring(err))
+		if not ok then
+			local key = tostring(err)
+			if not _warned_errors[key] then
+				_warned_errors[key] = true
+				_mod:warning("SustainedFire hook error (reported once per unique error): " .. key)
+			end
+			if _debug_enabled and _debug_enabled() then
+				_debug_log("sustained_fire_error:" .. tostring(self._betterbots_player_unit), _fixed_time(), key)
+			end
 		end
 	end)
 end

@@ -56,7 +56,10 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
-local _original_hook_require = mod.hook_require
+if not mod._raw_hook_require then
+	mod._raw_hook_require = mod.hook_require
+end
+local _original_hook_require = mod._raw_hook_require
 local _hook_require_callsite_by_path = {}
 
 function mod:hook_require(path, callback)
@@ -616,6 +619,9 @@ AmmoPolicy.init({
 	perf = Perf,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	settings = Settings,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ammo_policy")
+	end,
 })
 
 MulePickup.init({
@@ -624,6 +630,9 @@ MulePickup.init({
 	debug_enabled = _debug_enabled,
 	is_grimoire_pickup_enabled = function()
 		return Settings.is_bot_grimoire_pickup_enabled()
+	end,
+	is_tome_pickup_enabled = function()
+		return Settings.is_feature_enabled("bot_tome_pickup")
 	end,
 })
 
@@ -686,6 +695,11 @@ do
 	local ok, BotSettings = pcall(require, "scripts/settings/bot/bot_settings")
 	if ok and BotSettings then
 		_patch_human_likeness_bot_settings(BotSettings)
+	else
+		mod:warning(
+			"BetterBots: fallback require of bot_settings failed; human-likeness reaction-time patch may be skipped. "
+				.. tostring(BotSettings)
+		)
 	end
 end
 

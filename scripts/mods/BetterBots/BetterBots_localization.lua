@@ -272,6 +272,18 @@ return {
 	enable_bot_grimoire_pickup_description = {
 		en = "Lets bots carry grimoires. Off by default because grimoires permanently corrupt the team.",
 	},
+	enable_bot_tome_pickup = {
+		en = "Bot tome pickup",
+	},
+	enable_bot_tome_pickup_description = {
+		en = "Lets bots carry tomes as mules. Tomes block only one curio slot and can be recovered by dropping.",
+	},
+	enable_ammo_policy = {
+		en = "Bot ammo/grenade pickup policy",
+	},
+	enable_ammo_policy_description = {
+		en = "Bots defer ammo and grenades while humans are below their reserve thresholds. Off restores vanilla pickup.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},

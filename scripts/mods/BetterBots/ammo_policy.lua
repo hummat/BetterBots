@@ -10,6 +10,7 @@ local _Settings
 local _ability_extension
 local _bot_slot_for_unit
 local _nearby_grenade_pickups
+local _is_enabled
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
 local PICKUP_BROADPHASE_CATEGORY = {
@@ -272,6 +273,7 @@ function M.init(deps)
 	_ability_extension = deps.ability_extension or (ScriptUnit and ScriptUnit.has_extension)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_nearby_grenade_pickups = deps.nearby_grenade_pickups
+	_is_enabled = deps.is_enabled
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
 end
@@ -315,6 +317,10 @@ end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	_mod:hook_safe(BotBehaviorExtension, "_update_ammo", function(self, unit)
+		if _is_enabled and not _is_enabled() then
+			return
+		end
+
 		local perf_t0 = _perf and _perf.begin()
 		local pickup_component = self._pickup_component
 		if not pickup_component then
