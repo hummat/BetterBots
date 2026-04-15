@@ -71,7 +71,11 @@ for i in $(seq 1 12); do
   sleep 5
 done
 
-echo "Uploading BetterBots.zip to release..."
-gh release upload "$TAG" BetterBots.zip --clobber
+if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "BetterBots.zip"; then
+  echo "BetterBots.zip already attached by CI — skipping upload."
+else
+  echo "Uploading BetterBots.zip to release..."
+  gh release upload "$TAG" BetterBots.zip --clobber
+fi
 
 echo "Done. Release: https://github.com/hummat/BetterBots/releases/tag/$TAG"
