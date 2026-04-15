@@ -127,6 +127,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `type hold <current> over raw <candidate> (melee=<N>, ranged=<N>)` (`#90` validation; hysteresis actively suppressed a raw flip and kept the current type)
 - `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active and selected an actual runtime node)
 - `shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system` (one-shot diagnostic from the `BtBotShootAction.enter` hook; BetterBots could not normalize ADS/brace inputs for that bot)
+- `BetterBots: shoot scratchpad normalization skipped for <unit> because unit_data_system or visual_loadout_system is missing` (one-shot warning counterpart to the debug line above; emitted even when debug logging is off so operators can see why `#43` diagnostics were incomplete for a bot)
+- `BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled` (one-shot warning that `scripts/utilities/ammo` failed to load, so the dead-zone fire confirmation log for `#51` is unavailable in this session)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
@@ -152,6 +154,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
 - `cleared stale mule pickup ref (source=<path>)` (`#32`/stale-unit validation; deleted pickup refs were sanitized without touching invalid engine units)
 - `BetterBots: group_system unavailable; mule pickup live-sync skipped` (one-shot warning that the live mule-sync path could not resolve `group_system`; pickup metadata patching still ran, but live reservation cleanup did not)
+- `BetterBots: blackboard utility unavailable; mule pickup destination refresh skipped` (one-shot warning that the blackboard write helper could not be loaded, so mule destination refresh fell back to a no-op for that session)
 - `ammo policy skipped: no pickup_component` (debug-only diagnostic that `_update_ammo` ran on a bot without a pickup component, so reserve logic was skipped for that tick)
 - `deferred health station to human player` / `deferred medical crate to human player` (healing deferral yielded a medicae station or med-crate because a human player was below the configured reserve)
 

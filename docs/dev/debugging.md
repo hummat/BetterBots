@@ -71,10 +71,13 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip (#90) |
 | `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
 | `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
+| `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |
+| `ammo utility unavailable; dead-zone ranged fire detection disabled` | `scripts/utilities/ammo` failed to load, so the dead-zone ranged-fire confirmation log for `#51` is unavailable in this session |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
 | `grenade pickup skipped: no ability extension` | Grenade refill logic could not resolve the bot's `ability_system`; grenade reserve policy did not run |
 | `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
+| `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 | `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
 | `revive candidate observed: <ability> (template=<template>, need_type=<type>)` | Bot selected a rescue destination while carrying a defensive revive ability, before `BtBotInteractAction.enter`. Use this to tell selector/path misses from interact-hook misses. Key: `revive_candidate:<ability>:<unit>` (#7) |
