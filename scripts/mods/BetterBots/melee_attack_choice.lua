@@ -34,19 +34,19 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 	local outnumbered = num_enemies > 1
 	local massively_outnumbered = num_enemies > 3
 	local utility = 0
+	local arc = attack_meta_data.arc or 0
+	local penetrating = not not attack_meta_data.penetrating
+	local no_damage = not not attack_meta_data.no_damage
 
-	if outnumbered and attack_meta_data.arc == 1 then
+	if outnumbered and arc == 1 then
 		utility = utility + 1
-	elseif attack_meta_data.no_damage and massively_outnumbered and attack_meta_data.arc > 1 then
+	elseif no_damage and massively_outnumbered and arc > 1 then
 		utility = utility + 2
-	elseif
-		not attack_meta_data.no_damage
-		and ((outnumbered and attack_meta_data.arc > 1) or (not outnumbered and attack_meta_data.arc == 0))
-	then
+	elseif not no_damage and ((outnumbered and arc > 1) or (not outnumbered and arc == 0)) then
 		utility = utility + 4
 	end
 
-	if target_armor ~= armored_type or attack_meta_data.penetrating then
+	if target_armor ~= armored_type or penetrating then
 		utility = utility + 8
 	end
 
@@ -56,7 +56,7 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 		and outnumbered
 		and target_armor ~= armored_type
 		and attack_input == "light_attack"
-		and not attack_meta_data.no_damage
+		and not no_damage
 	then
 		utility = utility + horde_bias
 	end

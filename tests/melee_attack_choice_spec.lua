@@ -74,6 +74,20 @@ describe("melee_attack_choice", function()
 		assert.equals(weapon_meta_data.control_attack, chosen)
 	end)
 
+	it("treats missing attack meta fields as safe defaults", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			light_attack = {
+				action_inputs = {},
+			},
+			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, 1, 4, ARMORED)
+
+		assert.equals(weapon_meta_data.light_attack, chosen)
+	end)
+
 	it("installs a _choose_attack hook via install_melee_hooks", function()
 		local MeleeAttackChoice = load_module()
 		local hooked_method
