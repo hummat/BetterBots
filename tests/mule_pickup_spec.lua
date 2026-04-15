@@ -26,6 +26,8 @@ describe("mule_pickup", function()
 	local warnings
 	local saved_managers
 	local tome_enabled
+	local saved_vector3
+	local saved_position_lookup
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -45,6 +47,8 @@ describe("mule_pickup", function()
 		saved_blackboard_preload = package.preload["scripts/extension_systems/blackboard/utilities/blackboard"]
 		saved_blackboard_loaded = package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"]
 		saved_managers = rawget(_G, "Managers")
+		saved_vector3 = rawget(_G, "Vector3")
+		saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 		package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"] = nil
 		package.preload["scripts/extension_systems/blackboard/utilities/blackboard"] = function()
 			return {
@@ -133,6 +137,8 @@ describe("mule_pickup", function()
 		package.loaded["scripts/extension_systems/blackboard/utilities/blackboard"] = saved_blackboard_loaded
 		_G.BLACKBOARDS = nil
 		_G.Managers = saved_managers
+		_G.Vector3 = saved_vector3
+		_G.POSITION_LOOKUP = saved_position_lookup
 	end)
 
 	it("patches tome pickup metadata for vanilla mule flow", function()
@@ -353,6 +359,61 @@ describe("mule_pickup", function()
 		BotGroup.init(instance)
 
 		assert.is_table(instance._available_mule_pickups.slot_pocketable)
+	end)
+
+	it("assigns an available tome mule pickup even when vanilla leaves it unclaimed", function()
+		local tome_unit = { pickup_type = "tome" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[tome_unit] = { x = 2, y = 0, z = 0 },
+		}
+		_G.BLACKBOARDS[bot_unit] = {
+			follow = {
+				needs_destination_refresh = false,
+			},
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[tome_unit] = 20,
+					},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.equals(tome_unit, pickup_component.mule_pickup)
+		assert.equals(1, pickup_component.mule_pickup_distance)
+		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
 	end)
 
 	it("warns when the group system cannot be resolved", function()

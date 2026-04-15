@@ -19,6 +19,7 @@ local _warned_blackboard_module_lookup_failure
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
 local POCKETABLE_SLOT_NAME = "slot_pocketable"
+local MULE_PICKUP_MAX_DISTANCE_SQ = 400
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -286,6 +287,99 @@ local function _mark_destination_refresh(unit)
 	return true
 end
 
+local function _distance_squared(a, b)
+	if not (a and b and Vector3 and Vector3.distance_squared) then
+		return math.huge
+	end
+
+	return Vector3.distance_squared(a, b)
+end
+
+local function _has_any_pickup_order(pickup_orders, available_mule_pickups)
+	if not (pickup_orders and available_mule_pickups) then
+		return false
+	end
+
+	for slot_name in pairs(available_mule_pickups) do
+		if pickup_orders[slot_name] then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _assign_proactive_mule_pickups(bot_group, bot_data)
+	local available_mule_pickups = bot_group and bot_group._available_mule_pickups
+	if not available_mule_pickups then
+		return false
+	end
+
+	local assigned_pickups = {}
+	for _, data in pairs(bot_data) do
+		local pickup_component = data.pickup_component
+		local current_pickup = pickup_component and pickup_component.mule_pickup
+		if current_pickup then
+			assigned_pickups[current_pickup] = true
+		end
+
+		if data.pickup_orders then
+			for _, order in pairs(data.pickup_orders) do
+				if order and order.unit then
+					assigned_pickups[order.unit] = true
+				end
+			end
+		end
+	end
+
+	local changed = false
+	local position_lookup = POSITION_LOOKUP
+	for unit, data in pairs(bot_data) do
+		local pickup_component = data.pickup_component
+		if pickup_component and not pickup_component.mule_pickup then
+			local has_pickup_order = _has_any_pickup_order(data.pickup_orders, available_mule_pickups)
+			local bot_position = position_lookup and position_lookup[unit]
+			local follow_position = data.follow_position or bot_position
+
+			if not has_pickup_order and bot_position and follow_position then
+				local best_pickup, best_pickup_distance_sq = nil, math.huge
+
+				for _, available_pickups in pairs(available_mule_pickups) do
+					for pickup_unit in pairs(available_pickups) do
+						if not assigned_pickups[pickup_unit] then
+							local pickup_position = position_lookup[pickup_unit]
+							local follow_distance_sq = _distance_squared(follow_position, pickup_position)
+							local bot_distance_sq = _distance_squared(bot_position, pickup_position)
+
+							if
+								follow_distance_sq < MULE_PICKUP_MAX_DISTANCE_SQ
+								and bot_distance_sq < best_pickup_distance_sq
+							then
+								best_pickup = pickup_unit
+								best_pickup_distance_sq = bot_distance_sq
+							end
+						end
+					end
+				end
+
+				if best_pickup then
+					pickup_component.mule_pickup = best_pickup
+					pickup_component.mule_pickup_distance = math.sqrt(best_pickup_distance_sq)
+					assigned_pickups[best_pickup] = true
+					changed = true
+					_log(
+						"mule_pickup_assign:" .. tostring(unit),
+						"assigned proactive mule pickup for " .. tostring(_unit_get_data(best_pickup, "pickup_type"))
+					)
+					_mark_destination_refresh(unit)
+				end
+			end
+		end
+	end
+
+	return changed
+end
+
 local function _clear_behavior_targets(behavior_component, unit)
 	if not behavior_component then
 		return false
@@ -395,6 +489,10 @@ function M.sync_live_bot_group(bot_group)
 		if unit_changed and _mark_destination_refresh(unit) then
 			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing mule state")
 		end
+	end
+
+	if _assign_proactive_mule_pickups(bot_group, bot_data) then
+		changed = true
 	end
 
 	return changed
