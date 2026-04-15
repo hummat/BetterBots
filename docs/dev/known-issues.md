@@ -4,7 +4,7 @@
 
 1. `#17` daemonhost avoidance still needs another live spawn after the 2026-04-13 logging fixes. Earlier 2026-04-13 combat logs showed bots restoring monster weight and even pinging a dormant daemonhost instead of emitting the expected suppression signals.
 2. `#32` mule pickup no longer crashes on stale units, but there is still no live tome/scripture pickup confirmation in the current branch logs.
-3. `#82` perf audit code is in, but there is still no fresh `/bb_perf` capture on the current branch. `make check` being green is not the same thing as a live perf validation.
+3. `#82` perf audit code is in and fresh `/bb_perf` captures now exist on the current branch, but the latest real mission-end samples are still `99.1 us/bot/frame` and `109.3 us/bot/frame`, so the original `<80 us/bot/frame` target is still unmet.
 4. `#89` ammo pickup regression is fixed and grenade refill logging now fires (`grenade pickup success` exists), but the current evidence is still tied to `small_clip` / `ammo_cache_deployable` restocks rather than an unambiguous standalone `small_grenade` world pickup.
 5. `#90` target-type hysteresis now logs `type flip ...` and `type hold ... over raw ...`, but the latest validation runs still have not captured either signal in live combat.
 

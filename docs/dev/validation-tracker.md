@@ -1320,6 +1320,49 @@ Conclusion:
 - #91 now has live weakspot-routing confirmation and is closeable on the MVP "runtime path proven" standard.
 ```
 
+### Run 2026-04-15-v0.11.0-tome-regression
+
+```text
+Run ID: 2026-04-15-v0.11.0-tome-regression
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after the mule-pickup slot-cache fix (post-`24c6e00` local validation run)
+Log file: console-2026-04-15-12.52.04-c4ab46ed-a65e-44d1-9dc4-c3816d070a6b.log
+Bot lineup / abilities: mixed live squad including psyker shout, veteran shout, zealot relic, knives, ogryn frag/charge
+Map + difficulty: `dm_rise`, Heresy/Hunting Grounds, `side_mission_tome`
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PARTIAL
+  - post-fix tome mission crash regression: pass
+  - tome/scripture pickup confirmation: no
+  - key lines / timestamps:
+    - `12:53:17.499 ... side_mission(side_mission_tome)`
+    - `12:55:21.357 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+    - `12:55:21.357 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+    - `bb-log summary`: `Error lines: 0`
+  - remaining gap:
+    - zero positive tome/scripture carry or consume lines, so the issue is still not closeable as a pickup feature
+- #89 grenade pickup heuristic: PARTIAL
+  - pickup success log: yes
+  - key lines / timestamps:
+    - `12:55:27.267 ... grenade pickup success: small_clip (bot=2, charges=4->6/12)`
+    - `12:58:20.743 ... grenade pickup success: small_clip (bot=2, charges=0->2/12)`
+  - remaining gap:
+    - still no standalone `small_grenade` world pickup confirmation
+- #90 target-type hysteresis: UNKNOWN
+  - key lines / timestamps:
+    - zero `type flip ...`
+    - zero `type hold ... over raw ...`
+- #17 daemonhost avoidance: UNKNOWN
+  - key lines / timestamps:
+    - no daemonhost spawn in this run
+
+Conclusion:
+- The mule-pickup slot-cache fix survived a live tome mission without reproducing the 2026-04-15 noon crash.
+- That is only a regression check, not full #32 closure evidence.
+- No additional issue becomes closeable from this run.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.
