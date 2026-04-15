@@ -683,6 +683,68 @@ describe("condition_patch", function()
 			assert.is_not_nil(find_debug_log_by_key("ranged_ammo_threshold_override:bot1"))
 		end)
 
+		it("logs when the bot has the wrong slot for the current target type", function()
+			_debug_enabled_result = true
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+
+			local bb = make_blackboard("gunner1")
+			bb.perception.target_enemy_type = "melee"
+			local orig_called = false
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return false
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 4
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_true(result)
+			assert.is_true(orig_called)
+			assert.is_truthy(find_debug_log("wrong slot for melee target"))
+			assert.is_truthy(find_debug_log("bot 4"))
+			assert.is_truthy(find_debug_log("wielded=slot_secondary"))
+			assert.is_truthy(find_debug_log("wanted=slot_primary"))
+			assert.is_not_nil(find_debug_log_by_key("wrong_slot_for_target_type:bot1"))
+		end)
+
 		it("blocks ability activation when team cooldown suppression is active", function()
 			local unit = "bot1"
 			_extensions[unit] = {

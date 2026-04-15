@@ -325,6 +325,7 @@ TargetTypeHysteresis.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	is_enabled = function()
 		return Settings.is_feature_enabled("target_type_hysteresis")
 	end,

@@ -10,6 +10,7 @@ local _debug_enabled
 local _fixed_time
 local _is_enabled
 local _perf
+local _bot_slot_for_unit
 local _bot_target_selection
 local _breed
 local _warned_errors = {}
@@ -267,6 +268,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_is_enabled = deps.is_enabled
 	_perf = deps.perf
+	_bot_slot_for_unit = deps.bot_slot_for_unit
 end
 
 function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
@@ -446,6 +448,55 @@ function M.register_hooks()
 					end
 				end
 			end
+		end
+	)
+
+	_mod:hook_require(
+		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_inventory_switch_action",
+		function(BtBotInventorySwitchAction)
+			_mod:hook_safe(
+				BtBotInventorySwitchAction,
+				"enter",
+				function(_self, unit, _unit_breed, blackboard, scratchpad, action_data, t)
+					if not (_debug_enabled and _debug_enabled()) then
+						return
+					end
+
+					local wanted_slot = action_data and action_data.wanted_slot or "unknown"
+					local target_type = blackboard and blackboard.perception and blackboard.perception.target_enemy_type
+						or "unknown"
+					local wielded_slot = scratchpad
+							and scratchpad.inventory_component
+							and scratchpad.inventory_component.wielded_slot
+						or "unknown"
+					local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
+					local switch_name = "inventory_switch"
+
+					if target_type == "melee" and wanted_slot == "slot_primary" then
+						switch_name = "switch_melee"
+					elseif target_type == "ranged" and wanted_slot == "slot_secondary" then
+						switch_name = "switch_ranged"
+					end
+
+					_debug_log(
+						"inventory_switch_enter:" .. tostring(unit),
+						_fixed_time and _fixed_time() or t or 0,
+						"bot "
+							.. tostring(bot_slot)
+							.. " "
+							.. switch_name
+							.. " entered (wielded="
+							.. tostring(wielded_slot)
+							.. ", wanted="
+							.. tostring(wanted_slot)
+							.. ", target_type="
+							.. tostring(target_type)
+							.. ")",
+						nil,
+						"debug"
+					)
+				end
+			)
 		end
 	)
 end

@@ -421,6 +421,49 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
+	local orig_wrong_slot_for_target_type = conditions.wrong_slot_for_target_type
+	if orig_wrong_slot_for_target_type then
+		conditions.wrong_slot_for_target_type = function(
+			unit,
+			blackboard,
+			scratchpad,
+			condition_args,
+			action_data,
+			is_running
+		)
+			local result =
+				orig_wrong_slot_for_target_type(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+
+			if result and _debug_enabled and _debug_enabled() then
+				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+				local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
+					or nil
+				local wielded_slot = inventory_component and inventory_component.wielded_slot or "unknown"
+				local wanted_slot = action_data and action_data.wanted_slot or "unknown"
+				local target_type = condition_args and condition_args.target_type or "unknown"
+				local bot_slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(unit) or "unknown"
+
+				_debug_log(
+					"wrong_slot_for_target_type:" .. tostring(unit),
+					_fixed_time(),
+					"bot "
+						.. tostring(bot_slot)
+						.. " wrong slot for "
+						.. tostring(target_type)
+						.. " target (wielded="
+						.. tostring(wielded_slot)
+						.. ", wanted="
+						.. tostring(wanted_slot)
+						.. ")",
+					nil,
+					"debug"
+				)
+			end
+
+			return result
+		end
+	end
+
 	patched_set[conditions] = true
 
 	if _debug_enabled() then

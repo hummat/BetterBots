@@ -196,6 +196,84 @@ local function run_hooked_selection(opts)
 	}
 end
 
+local function run_inventory_switch_enter_hook(opts)
+	opts = opts or {}
+
+	local RuntimeHysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
+	local saved_script_unit = _G.ScriptUnit
+	local debug_logs = {}
+	local inventory_switch_action = {
+		enter = function(_self, _unit, _breed, _blackboard, scratchpad)
+			scratchpad.inventory_component = {
+				wielded_slot = opts.wielded_slot or "slot_secondary",
+			}
+		end,
+	}
+
+	_G.ScriptUnit = {
+		extension = function(unit, system_name)
+			if unit == "bot_1" and system_name == "unit_data_system" then
+				return test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = opts.wielded_slot or "slot_secondary" },
+				})
+			end
+		end,
+	}
+
+	RuntimeHysteresis.init({
+		mod = {
+			hook_require = function(_, path, callback)
+				if path == "scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_inventory_switch_action" then
+					callback(inventory_switch_action)
+				end
+			end,
+			hook_safe = function(_, target, method_name, handler)
+				local original = target[method_name]
+				target[method_name] = function(...)
+					local result = original(...)
+					handler(...)
+					return result
+				end
+			end,
+			warning = function() end,
+		},
+		debug_log = function(key, fixed_t, message)
+			debug_logs[#debug_logs + 1] = {
+				key = key,
+				fixed_t = fixed_t,
+				message = message,
+			}
+		end,
+		debug_enabled = function()
+			return opts.debug_enabled ~= false
+		end,
+		fixed_time = function()
+			return opts.fixed_t or 0
+		end,
+		is_enabled = function()
+			return true
+		end,
+		bot_slot_for_unit = function()
+			return opts.bot_slot or 4
+		end,
+	})
+
+	RuntimeHysteresis.register_hooks()
+	inventory_switch_action.enter(
+		{},
+		"bot_1",
+		nil,
+		{ perception = { target_enemy_type = opts.target_type or "melee" } },
+		{},
+		{ wanted_slot = opts.wanted_slot or "slot_primary" },
+		opts.t or 3
+	)
+
+	_G.ScriptUnit = saved_script_unit
+
+	return debug_logs
+end
+
 describe("target_type_hysteresis", function()
 	it("uses raw winner when current type is none", function()
 		local chosen = Hysteresis.choose_target_type("none", 12, 8)
@@ -459,5 +537,22 @@ describe("target_type_hysteresis", function()
 		assert.equals("target_1", result.perception_component.target_enemy)
 		assert.equals("ranged", result.perception_component.target_enemy_type)
 		assert.equals(2, result.perception_component.target_enemy_reevaluation_t)
+	end)
+
+	it("logs actual inventory switch entry for melee target-type correction", function()
+		local debug_logs = run_inventory_switch_enter_hook({
+			target_type = "melee",
+			wanted_slot = "slot_primary",
+			wielded_slot = "slot_secondary",
+			bot_slot = 4,
+			fixed_t = 7,
+		})
+
+		local log = find_debug_log(debug_logs, "switch_melee entered")
+		assert.is_truthy(log)
+		assert.equals("inventory_switch_enter:bot_1", log.key)
+		assert.is_truthy(log.message:find("bot 4", 1, true))
+		assert.is_truthy(log.message:find("wielded=slot_secondary", 1, true))
+		assert.is_truthy(log.message:find("wanted=slot_primary", 1, true))
 	end)
 end)
