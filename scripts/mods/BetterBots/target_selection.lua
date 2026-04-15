@@ -261,22 +261,23 @@ function M.register_hooks()
 									.. " (reason: dormant_daemonhost)"
 							)
 						end
-						goto after_tag_boost
-					end
-
-					local tag_bonus = _player_tag_bonus and _player_tag_bonus() or 3
-					if tag_bonus > 0 then
-						score = score + tag_bonus
-						if _debug_enabled() then
-							_debug_log(
-								"target_sel_tag_boost:" .. tostring(target_unit) .. ":" .. tostring(unit),
-								_fixed_time(),
-								"boosting score for player-tagged " .. tostring(target_breed.name) .. " +" .. tag_bonus
-							)
+					else
+						local tag_bonus = _player_tag_bonus and _player_tag_bonus() or 3
+						if tag_bonus > 0 then
+							score = score + tag_bonus
+							if _debug_enabled() then
+								_debug_log(
+									"target_sel_tag_boost:" .. tostring(target_unit) .. ":" .. tostring(unit),
+									_fixed_time(),
+									"boosting score for player-tagged "
+										.. tostring(target_breed.name)
+										.. " +"
+										.. tag_bonus
+								)
+							end
 						end
 					end
 				end
-				::after_tag_boost::
 
 				-- Issue #19: Stop chasing distant specials for melee
 				-- Cache chase_range_sq per frame to avoid per-target settings reads.

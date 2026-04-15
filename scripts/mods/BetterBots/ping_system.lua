@@ -221,56 +221,53 @@ function M.update(unit, blackboard)
 		local slot_name = PING_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
+			local skip_candidate = false
 			if _is_dormant_daemonhost(candidate) then
 				_log_skip_once(unit, fixed_t, "dormant_daemonhost", candidate)
-				goto continue
-			end
-
-			if has_live_companion then
+				skip_candidate = true
+			elseif has_live_companion then
 				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
 				return
-			end
-
-			if _has_recent_companion_target and _has_recent_companion_target(candidate, fixed_t) then
+			elseif _has_recent_companion_target and _has_recent_companion_target(candidate, fixed_t) then
 				_log_skip_once(unit, fixed_t, "recent_companion_tag", candidate)
-				goto continue
+				skip_candidate = true
 			end
 
-			-- Candidate found, check if valid for pinging
-			local target_extension = ScriptUnit.has_extension(candidate, "smart_tag_system")
-			local already_tagged = target_extension and target_extension:tag_id()
+			if not skip_candidate then
+				-- Candidate found, check if valid for pinging
+				local target_extension = ScriptUnit.has_extension(candidate, "smart_tag_system")
+				local already_tagged = target_extension and target_extension:tag_id()
 
-			if target_extension and already_tagged then
-				_log_skip_once(unit, fixed_t, "already_tagged", candidate)
-			elseif target_extension and not already_tagged then
-				-- Check LOS via enemy's perception (BotPerceptionExtension has no has_line_of_sight).
-				-- This asks "can the enemy see the bot?" — asymmetric (ignores bot facing), but
-				-- wall occlusion is symmetric and perception slots already filter awareness.
-				local has_los = true
-				local target_perception_extension = ScriptUnit.has_extension(candidate, "perception_system")
-				if target_perception_extension then
-					if target_perception_extension.has_line_of_sight then
-						has_los = target_perception_extension:has_line_of_sight(unit)
-					elseif not _missing_los_method_warned then
-						_missing_los_method_warned = true
-						if _mod then
-							_mod:warning("BetterBots: perception_system missing has_line_of_sight method")
+				if target_extension and already_tagged then
+					_log_skip_once(unit, fixed_t, "already_tagged", candidate)
+				elseif target_extension and not already_tagged then
+					-- Check LOS via enemy's perception (BotPerceptionExtension has no has_line_of_sight).
+					-- This asks "can the enemy see the bot?" — asymmetric (ignores bot facing), but
+					-- wall occlusion is symmetric and perception slots already filter awareness.
+					local has_los = true
+					local target_perception_extension = ScriptUnit.has_extension(candidate, "perception_system")
+					if target_perception_extension then
+						if target_perception_extension.has_line_of_sight then
+							has_los = target_perception_extension:has_line_of_sight(unit)
+						elseif not _missing_los_method_warned then
+							_missing_los_method_warned = true
+							if _mod then
+								_mod:warning("BetterBots: perception_system missing has_line_of_sight method")
+							end
 						end
 					end
-				end
 
-				if has_los then
-					target_unit = candidate
-					reason = slot_name
-					target_distance_sq = _distance_sq_between_units(unit, candidate)
-					break
-				else
-					_log_skip_once(unit, fixed_t, "no_los", candidate)
+					if has_los then
+						target_unit = candidate
+						reason = slot_name
+						target_distance_sq = _distance_sq_between_units(unit, candidate)
+						break
+					else
+						_log_skip_once(unit, fixed_t, "no_los", candidate)
+					end
 				end
 			end
 		end
-
-		::continue::
 	end
 
 	if not target_unit then
