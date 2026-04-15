@@ -16,7 +16,7 @@ describe("companion_tag", function()
 				return opts.debug or false
 			end,
 			fixed_time = fixed_time_mock,
-			bot_slot_for_unit = function()
+			bot_slot_for_unit = opts.bot_slot_for_unit or function()
 				return 1
 			end,
 			shared_rules = SharedRules,
@@ -323,6 +323,81 @@ describe("companion_tag", function()
 
 		current_time = current_time + 2.1
 		assert.is_false(CompanionTag.is_recent_command_target(mutant, current_time))
+	end)
+
+	it("uses per-bot throttle keys for skipped companion-tag logs", function()
+		local second_bot = { name = "bot_unit_two" }
+		local gunner = { name = "gunner_unit" }
+
+		reinit({
+			debug = true,
+			bot_slot_for_unit = function(unit)
+				if unit == second_bot then
+					return 2
+				end
+
+				return 1
+			end,
+		})
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if (unit == bot_unit or unit == second_bot) and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "cyber_mastiff" } },
+				})
+			end
+			if unit == gunner and ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "chaos_ogryn_gunner",
+					tags = { elite = true },
+				})
+			end
+			if unit == gunner and ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			end
+			if unit == gunner and ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = false,
+				})
+			end
+
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = spy.new(function() end),
+					unit_tag = function()
+						return nil
+					end,
+				}
+			end
+
+			return nil
+		end
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = gunner,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		CompanionTag.update(second_bot, blackboard)
+
+		assert.spy(debug_log_mock).was_called(2)
+		assert.spy(debug_log_mock).was_called_with(
+			"companion_tag_skip:no_los:chaos_ogryn_gunner:" .. tostring(bot_unit),
+			current_time,
+			"bot 1 skipped companion tag for chaos_ogryn_gunner (reason: no_los)"
+		)
+		assert.spy(debug_log_mock).was_called_with(
+			"companion_tag_skip:no_los:chaos_ogryn_gunner:" .. tostring(second_bot),
+			current_time,
+			"bot 2 skipped companion tag for chaos_ogryn_gunner (reason: no_los)"
+		)
 	end)
 
 	-- ── Target selection ──────────────────────────────────────────

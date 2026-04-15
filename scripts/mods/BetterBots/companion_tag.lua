@@ -120,6 +120,7 @@ local function _log_skip_once(unit, fixed_t, reason, target_unit)
 	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
 	local target_name = _target_name(target_unit)
 	local skip_key = reason .. ":" .. target_name
+	local throttle_key = skip_key .. ":" .. tostring(unit)
 
 	if _last_skip_log_key_by_bot[unit] == skip_key then
 		return
@@ -127,7 +128,7 @@ local function _log_skip_once(unit, fixed_t, reason, target_unit)
 
 	_last_skip_log_key_by_bot[unit] = skip_key
 	_debug_log(
-		"companion_tag_skip:" .. skip_key,
+		"companion_tag_skip:" .. throttle_key,
 		fixed_t,
 		string.format("bot %s skipped companion tag for %s (reason: %s)", tostring(bot_slot), target_name, reason)
 	)

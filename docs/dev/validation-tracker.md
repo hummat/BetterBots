@@ -1267,7 +1267,7 @@ Regression checks:
 Conclusion:
 - #93 has live throw/consume evidence and is releasable from logs.
 - Ammo pickup is fixed in live play.
-- #32, #82, #87, #90, #91 remain validation-gated.
+- #82, #87, #90, #91 remain validation-gated.
 - #17 is not closeable from this session; the run is evidence against closure.
 ```
 
@@ -1361,6 +1361,84 @@ Conclusion:
 - The mule-pickup slot-cache fix survived a live tome mission without reproducing the 2026-04-15 noon crash.
 - That is only a regression check, not full #32 closure evidence.
 - No additional issue becomes closeable from this run.
+```
+
+### Run 2026-04-15-v0.11.0-book-manual-confirmation
+
+```text
+Run ID: 2026-04-15-v0.11.0-book-manual-confirmation
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after the mule-pickup success-log hook
+Evidence type: direct in-game observation from the operator during live play
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PASS
+  - behavior confirmation: yes
+  - authoritative post-hook log line: no
+  - observed behavior:
+    - a bot picked up the side-mission book
+    - the top-right scripture counter incremented immediately afterward
+  - context:
+    - the confirming run happened after the repo-level mule-assignment override was already in place
+    - BetterBots now also logs `mule pickup success: tome|grimoire (bot=<slot>)`, but that hook landed after the earlier tome-regression run and did not yet have a fresh confirming mission log
+
+Conclusion:
+- #32 is closeable from direct in-game confirmation.
+- Future regressions should use the new `mule pickup success: ...` line as the authoritative log signal instead of relying on assignment logs or memory.
+```
+
+### Run 2026-04-15-v0.11.0-book-success-and-open-gates
+
+```text
+Run ID: 2026-04-15-v0.11.0-book-success-and-open-gates
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after mule-pickup success logging, BT-side target-type debounce, and companion-tag churn fixes
+Log file: console-2026-04-15-18.01.55-f3aa051f-6f95-4c12-afcc-f66d4839fa59.log
+Bot lineup / abilities: mixed live squad including Arbites mastiff, veteran krak grenade, zealot dash, ogryn taunt
+Map + difficulty: live tome mission
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PASS
+  - authoritative success log: yes
+  - key lines / timestamps:
+    - `18:04:53.480 ... assigned proactive mule pickup for tome`
+    - `18:05:16.723 ... mule pickup success: tome (bot=4)`
+    - `18:05:16.883 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+- #82 perf low-hanging fruit audit: STILL OPEN
+  - key line / timestamp:
+    - `18:09:24.214 ... bb-perf:auto: 124.5 µs/bot/frame total (61576 bot frames, 944763 calls, 7665.000 ms total)`
+  - conclusion:
+    - latest live sample is above the original `<80 µs/bot/frame` target
+- #90 target-type hysteresis: STILL OPEN
+  - key counts:
+    - `92` `switch_melee|switch_ranged entered`
+    - `43` `suppressed opposite-type switch ...`
+    - `0` `type hold ...`
+    - `0` `type flip ...`
+  - conclusion:
+    - BT-side debounce is firing, but visible switch churn remains high
+- #17 daemonhost avoidance: UNKNOWN
+  - key lines / timestamps:
+    - no daemonhost spawn in this run
+    - only debug context probes showed `target_is_dormant_daemonhost = false`
+
+Other confirmations:
+- no crashes:
+  - `bb-log summary`: `Error lines: 0`
+- grenade and ammo pickup regressions stayed green:
+  - `18:05:40.128 ... grenade pickup success: small_grenade (bot=2, charges=2->3/3)`
+  - `18:05:57.468 ... grenade pickup success: small_grenade (bot=5, charges=0->1/1)`
+  - `18:08:35.377 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+  - `18:06:34.661 ... ammo pickup success: ammo_cache_deployable (bot=2, ammo=99%->105%)`
+  - `18:06:35.389 ... ammo pickup success: ammo_cache_deployable (bot=5, ammo=77%->100%)`
+
+Conclusion:
+- #32 is now closed on authoritative runtime log evidence, not only manual observation.
+- #82 remains open.
+- #90 remains open.
+- #17 still needs a real daemonhost encounter.
 ```
 
 ### Run 2026-04-15-v0.11.0-small-grenade-confirmation
