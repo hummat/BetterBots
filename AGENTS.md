@@ -129,7 +129,13 @@ Order: detect the surface is outward-facing → invoke `human-writing` → invok
 - Test specs
 - Conversational replies inside a session
 
-**Insider vs outsider calibration:** For technical-insider audiences (Modders Discord, direct mod-author DM) still apply both skills but skip the problem-setup framing — they already know what vanilla bots do. For outsider audiences (r/DarkTide, Fatshark forum, cold Nexus users) lead with the problem, then the fix. See `memory/promotion_plan.md` "Positioning principles" for the split.
+**Register calibration.** Outward-facing is not one register. The two skills strip AI patterns and apply Matthias-blog voice, but that voice is not always the right tone. Pick the register before drafting:
+
+- **Blog / showcase register** — Nexus description, Reddit/forum post, Steam Guide, README highlights, changelog. Explanatory, opinionated, first-person, problem → fix → honest limits. Default when writing *about* the mod for a broad audience.
+- **Peer / insider register** — Modders Discord `#creation-showcase`, mod-author discussions once contact is established, technical PR comments. Skip the problem setup — they know vanilla bots are broken. Lead with what you built mechanically. Concise.
+- **Favor-ask / cold-PM register** — first DM to a stranger (other mod authors, creators, Fatshark staff). Warm, deferential, low-pressure. Name the recipient. Lead with the ask, not the feature list. Keep the feature paragraph short. Close with genuine thanks.
+
+All three still invoke `human-writing` + `style:blog` for pattern-stripping, but the **framing and cadence** differ. A cold-email pitch written in blog-showcase register reads transactional and templated. See `memory/promotion_plan.md` "Positioning principles" and `memory/promotion_drafts.md` for worked examples.
 
 ## Branching workflow
 
