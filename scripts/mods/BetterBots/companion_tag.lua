@@ -182,6 +182,14 @@ local function _has_companion_tag(smart_tag_system, target_unit)
 	return template and template.name == TAG_TEMPLATE or false
 end
 
+local function _unit_tag_id(smart_tag_system, target_unit)
+	if not (smart_tag_system and smart_tag_system.unit_tag_id) then
+		return nil
+	end
+
+	return smart_tag_system:unit_tag_id(target_unit)
+end
+
 local function _slot_index_for_target(perception, target_unit)
 	if not (perception and target_unit) then
 		return nil
@@ -341,8 +349,24 @@ function M.update(unit, blackboard)
 		return
 	end
 
-	-- Place the companion-command tag
-	local success, err = pcall(smart_tag_system.set_tag, smart_tag_system, TAG_TEMPLATE, unit, target_unit, nil)
+	-- Use the engine's override interaction when a normal smart tag already exists.
+	-- Raw set_tag() bypasses the cancel/replace path and can leave the old owner/tag
+	-- lifecycle in a stale state, which shows up as repeated retagging and extra
+	-- generic ping churn around Arbites companion orders.
+	local existing_tag_id = _unit_tag_id(smart_tag_system, target_unit)
+	local success, err
+	if existing_tag_id and smart_tag_system.trigger_tag_interaction then
+		success, err = pcall(
+			smart_tag_system.trigger_tag_interaction,
+			smart_tag_system,
+			existing_tag_id,
+			unit,
+			target_unit,
+			"companion_order"
+		)
+	else
+		success, err = pcall(smart_tag_system.set_tag, smart_tag_system, TAG_TEMPLATE, unit, target_unit, nil)
+	end
 
 	if success then
 		_last_tagged_target_by_bot[unit] = {

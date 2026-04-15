@@ -610,6 +610,71 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_called(1)
 	end)
 
+	it("uses the engine override interaction when upgrading an existing normal tag to companion order", function()
+		local elite = { name = "elite_unit" }
+		local set_tag_mock = spy.new(function() end)
+		local trigger_tag_interaction_mock = spy.new(function() end)
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if unit == bot_unit and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "cyber_mastiff" } },
+				})
+			end
+			if unit == elite and ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
+			end
+			if unit == elite and ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(123)
+			end
+			if unit == elite and ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = set_tag_mock,
+					trigger_tag_interaction = trigger_tag_interaction_mock,
+					unit_tag_id = function(_, target_unit)
+						return target_unit == elite and 123 or nil
+					end,
+					unit_tag = function(_, target_unit)
+						if target_unit == elite then
+							return {
+								template = function()
+									return { name = "enemy_over_here" }
+								end,
+							}
+						end
+						return nil
+					end,
+				}
+			end
+			return nil
+		end
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = elite,
+			},
+		})
+
+		assert.spy(trigger_tag_interaction_mock).was_called(1)
+		assert
+			.spy(trigger_tag_interaction_mock)
+			.was_called_with(match.is_table(), 123, match.is_ref(bot_unit), match.is_ref(elite), "companion_order")
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
 	it("holds the current companion tag during the minimum hold window", function()
 		local current_target = { name = "current_target" }
 		local lower_priority_target = { name = "lower_priority_target" }
