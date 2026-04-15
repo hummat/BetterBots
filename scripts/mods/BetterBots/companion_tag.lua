@@ -289,30 +289,33 @@ function M.update(unit, blackboard)
 		local slot_name = TAG_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
-			local skip_candidate = false
 			if _is_dormant_daemonhost(candidate) then
 				_log_skip_once(unit, fixed_t, "dormant_daemonhost", candidate)
-				skip_candidate = true
-			elseif not _has_line_of_sight_to_candidate(unit, candidate) then
-				_log_skip_once(unit, fixed_t, "no_los", candidate)
-				skip_candidate = true
+				goto continue
 			end
 
-			if not skip_candidate then
-				if hold_active and held_target and candidate == held_target then
-					hold_reason = slot_name
-					break
+			if not _has_line_of_sight_to_candidate(unit, candidate) then
+				_log_skip_once(unit, fixed_t, "no_los", candidate)
+				goto continue
+			end
+
+			if hold_active and held_target and candidate == held_target then
+				hold_reason = slot_name
+				break
+			end
+
+			if not _has_companion_tag(smart_tag_system, candidate) then
+				if hold_active and held_slot_index and i >= held_slot_index then
+					goto continue
 				end
 
-				if not _has_companion_tag(smart_tag_system, candidate) then
-					if not (hold_active and held_slot_index and i >= held_slot_index) then
-						target_unit = candidate
-						reason = slot_name
-						break
-					end
-				end
+				target_unit = candidate
+				reason = slot_name
+				break
 			end
 		end
+
+		::continue::
 	end
 
 	if hold_active and not target_unit then

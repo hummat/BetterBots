@@ -142,40 +142,46 @@ local function _collect_stabilized_choice(
 			local target_unit = target_units[i]
 			local target_unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
 
-			if target_unit_data_extension then
-				local target_breed = target_unit_data_extension:breed()
+			if not target_unit_data_extension then
+				goto continue
+			end
 
-				if _is_valid_target(target_unit, target_breed, aggroed_minion_target_units) then
-					local target_position = position_lookup[target_unit]
+			local target_breed = target_unit_data_extension:breed()
 
-					if target_position then
-						local target_distance_sq = vector3_distance_squared(unit_position, target_position)
-						local melee_score, ranged_score = _calculate_score(
-							unit,
-							target_unit,
-							target_breed,
-							target_distance_sq,
-							melee_gestalt,
-							ranged_gestalt,
-							t,
-							bot_group,
-							current_target_enemy,
-							target_ally,
-							threat_units
-						)
+			if _is_valid_target(target_unit, target_breed, aggroed_minion_target_units) then
+				local target_position = position_lookup[target_unit]
 
-						if best_melee_score < melee_score then
-							best_melee_score, best_melee_target, best_melee_target_distance_sq =
-								melee_score, target_unit, target_distance_sq
-						end
+				if not target_position then
+					goto continue
+				end
 
-						if best_ranged_score < ranged_score then
-							best_ranged_score, best_ranged_target, best_ranged_target_distance_sq =
-								ranged_score, target_unit, target_distance_sq
-						end
-					end
+				local target_distance_sq = vector3_distance_squared(unit_position, target_position)
+				local melee_score, ranged_score = _calculate_score(
+					unit,
+					target_unit,
+					target_breed,
+					target_distance_sq,
+					melee_gestalt,
+					ranged_gestalt,
+					t,
+					bot_group,
+					current_target_enemy,
+					target_ally,
+					threat_units
+				)
+
+				if best_melee_score < melee_score then
+					best_melee_score, best_melee_target, best_melee_target_distance_sq =
+						melee_score, target_unit, target_distance_sq
+				end
+
+				if best_ranged_score < ranged_score then
+					best_ranged_score, best_ranged_target, best_ranged_target_distance_sq =
+						ranged_score, target_unit, target_distance_sq
 				end
 			end
+
+			::continue::
 		end
 
 		if not best_melee_target and not best_ranged_target then
