@@ -416,6 +416,67 @@ describe("mule_pickup", function()
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
 	end)
 
+	it("logs actual tome pickup success after a successful pocketable interaction", function()
+		local PocketableInteraction = {
+			stop = function(_, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+				return {
+					world = world,
+					interactor_unit = interactor_unit,
+					target_unit = interaction_context and interaction_context.target_unit or nil,
+					t = t,
+					result = result,
+					interactor_is_server = interactor_is_server,
+				}
+			end,
+		}
+
+		MulePickup.init({
+			mod = fake_mod,
+			debug_enabled = function()
+				return true
+			end,
+			debug_log = function(key, _t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					message = message,
+				}
+			end,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot_3" and 3 or nil
+			end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			get_live_bot_groups = function()
+				return live_bot_groups
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+
+		local target_unit = { pickup_type = "tome" }
+		PocketableInteraction.stop(
+			PocketableInteraction,
+			"world",
+			"bot_3",
+			{ target_unit = target_unit },
+			10,
+			"success",
+			true
+		)
+
+		assert.is_truthy(find_debug_log("mule pickup success: tome (bot=3)"))
+	end)
+
 	it("warns when the group system cannot be resolved", function()
 		_G.Managers = {
 			state = {

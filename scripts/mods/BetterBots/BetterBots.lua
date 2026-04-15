@@ -644,6 +644,7 @@ MulePickup.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	is_grimoire_pickup_enabled = function()
 		return Settings.is_bot_grimoire_pickup_enabled()
 	end,

@@ -10,6 +10,7 @@ local _get_live_bot_groups
 local _unit_get_data
 local _unit_is_alive
 local _write_blackboard_component
+local _bot_slot_for_unit
 local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
 local _blackboard_module
@@ -33,6 +34,22 @@ local function _log_stale_clear(discriminator, source)
 	_log(
 		"mule_pickup_stale_clear:" .. tostring(discriminator),
 		"cleared stale mule pickup ref (source=" .. tostring(source) .. ")"
+	)
+end
+
+local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_name)
+	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(interactor_unit) or nil
+	if not bot_slot then
+		return
+	end
+
+	if pickup_name ~= TOME_PICKUP_NAME and pickup_name ~= GRIMOIRE_PICKUP_NAME then
+		return
+	end
+
+	_log(
+		"mule_pickup_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
+		"mule pickup success: " .. tostring(pickup_name) .. " (bot=" .. tostring(bot_slot) .. ")"
 	)
 end
 
@@ -201,6 +218,7 @@ function M.init(deps)
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
 	_unit_is_alive = deps.unit_is_alive or (Unit and Unit.alive)
 	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
+	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
 	_warned_group_system_lookup_failure = false
@@ -556,6 +574,13 @@ function M.register_hooks()
 	M.patch_pickups()
 	M.sync_live_bot_groups()
 
+	_mod:hook_require(
+		"scripts/extension_systems/interaction/interactions/pocketable_interaction",
+		function(PocketableInteraction)
+			M.install_interaction_hooks(PocketableInteraction)
+		end
+	)
+
 	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
 			local blocked, reason = M.should_block_pickup_order(pickup_unit)
@@ -570,6 +595,26 @@ function M.register_hooks()
 			return func(bot_unit, pickup_unit, ordering_player)
 		end)
 	end)
+end
+
+function M.install_interaction_hooks(PocketableInteraction)
+	_mod:hook(
+		PocketableInteraction,
+		"stop",
+		function(func, self, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+			if not (_debug_enabled and _debug_enabled() and interactor_is_server and result == "success") then
+				return func(self, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+			end
+
+			local target_unit = interaction_context and interaction_context.target_unit or nil
+			local pickup_name = target_unit and _unit_get_data and _unit_get_data(target_unit, "pickup_type") or nil
+			local stop_result = func(self, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+
+			_log_mule_pickup_success(interactor_unit, target_unit, pickup_name)
+
+			return stop_result
+		end
+	)
 end
 
 return M
