@@ -1267,7 +1267,7 @@ Regression checks:
 Conclusion:
 - #93 has live throw/consume evidence and is releasable from logs.
 - Ammo pickup is fixed in live play.
-- #32, #82, #87, #89, #90, #91 remain validation-gated.
+- #32, #82, #87, #90, #91 remain validation-gated.
 - #17 is not closeable from this session; the run is evidence against closure.
 ```
 
@@ -1361,6 +1361,37 @@ Conclusion:
 - The mule-pickup slot-cache fix survived a live tome mission without reproducing the 2026-04-15 noon crash.
 - That is only a regression check, not full #32 closure evidence.
 - No additional issue becomes closeable from this run.
+```
+
+### Run 2026-04-15-v0.11.0-small-grenade-confirmation
+
+```text
+Run ID: 2026-04-15-v0.11.0-small-grenade-confirmation
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after grenade-pickup success logging and sticky reservation fixes
+Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
+Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
+Map + difficulty: live combat session
+
+v0.11.0 evidence:
+- #89 grenade pickup heuristic: PASS
+  - policy log: yes
+  - standalone `small_grenade` success log: yes
+  - key lines / timestamps:
+    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:46:59.743 ... grenade pickup bound into ammo slot`
+    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:48:20.564 ... grenade pickup bound into ammo slot`
+    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
+  - supporting signals:
+    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
+    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+
+Conclusion:
+- #89 is closeable from this run.
+- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
 ```
 
 ## Decision Rules
