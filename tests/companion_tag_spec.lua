@@ -357,6 +357,120 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_called(1)
 	end)
 
+	it("holds the current companion tag during the minimum hold window", function()
+		local current_target = { name = "current_target" }
+		local lower_priority_target = { name = "lower_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_captain", tags = { elite = true } },
+				[lower_priority_target] = { name = "renegade_sniper", tags = { special = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 0.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+				target_enemy = lower_priority_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(1)
+	end)
+
+	it("allows an early retag when a strictly higher-priority target appears", function()
+		local current_target = { name = "current_target" }
+		local higher_priority_target = { name = "higher_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_sniper", tags = { special = true } },
+				[higher_priority_target] = { name = "chaos_ogryn_executor", tags = { elite = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 0.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = higher_priority_target,
+				target_enemy = current_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(2)
+		assert
+			.spy(set_tag_mock)
+			.was_called_with(
+				match.is_table(),
+				"enemy_companion_target",
+				match.is_ref(bot_unit),
+				match.is_ref(higher_priority_target),
+				nil
+			)
+	end)
+
+	it("allows a lower-priority retag after the hold window expires", function()
+		local current_target = { name = "current_target" }
+		local lower_priority_target = { name = "lower_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_captain", tags = { elite = true } },
+				[lower_priority_target] = { name = "renegade_sniper", tags = { special = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 2.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+				target_enemy = lower_priority_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(2)
+		assert
+			.spy(set_tag_mock)
+			.was_called_with(
+				match.is_table(),
+				"enemy_companion_target",
+				match.is_ref(bot_unit),
+				match.is_ref(lower_priority_target),
+				nil
+			)
+	end)
+
 	-- ── Failure backoff ───────────────────────────────────────────
 
 	it("backs off after set_tag failure", function()

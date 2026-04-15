@@ -169,7 +169,9 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 Local clone: `../Darktide-Source-Code/`
 
-**Before starting any new feature work**, pull the latest decompiled source:
+**Before starting any new feature work, or answering any Darktide patch/"latest"/"did Fatshark change X" question, pull the latest decompiled source first. Do this before any web search or browsing.** The local decompiled repo is the first source of truth for mechanics and patch impact in this project; online sources are fallback only when the local clone is missing or confirmed not yet updated.
+
+Required command:
 ```bash
 cd ../Darktide-Source-Code && git pull && cd -
 ```
@@ -177,6 +179,14 @@ If the clone doesn't exist, create it:
 ```bash
 gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 1
 ```
+
+**Hard rule for patch analysis:** if the user mentions a version number (for example `1.11.4`), "Warband", "new path", patch notes, or asks whether a game change has implications for BetterBots, first:
+1. Check that `../Darktide-Source-Code/` exists
+2. Run `git pull`
+3. Inspect the local repo's latest commit/version
+4. Only then decide whether external browsing is still necessary
+
+Do not jump to web search first for Darktide mechanics or patch-impact questions.
 
 **Repo structure:**
 - `scripts/extension_systems/` — runtime systems (ability, behavior, weapon, input, UI)
