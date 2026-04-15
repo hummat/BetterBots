@@ -105,6 +105,26 @@ local function _copy_table(source)
 	return result
 end
 
+local function _apply_audited_overrides(builder_name, ext, overrides, allowed_keys)
+	if not overrides then
+		return
+	end
+
+	for key, value in pairs(overrides) do
+		if not allowed_keys[key] then
+			error(
+				string.format(
+					"tests/test_helper.lua: unknown audited override key '%s' for %s",
+					tostring(key),
+					builder_name
+				)
+			)
+		end
+
+		ext[key] = value
+	end
+end
+
 function M.make_player_unit_data_extension(components, overrides)
 	local ext = {
 		read_component = function(_, component_name)
@@ -112,11 +132,13 @@ function M.make_player_unit_data_extension(components, overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_player_unit_data_extension", ext, overrides, {
+		read_component = true,
+		breed = true,
+		breed_name = true,
+		is_companion = true,
+		is_resimulating = true,
+	})
 
 	return ext
 end
@@ -141,11 +163,13 @@ function M.make_minion_unit_data_extension(breed, overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_minion_unit_data_extension", ext, overrides, {
+		breed = true,
+		faction_name = true,
+		is_companion = true,
+		breed_name = true,
+		breed_size_variation = true,
+	})
 
 	return ext
 end
@@ -209,11 +233,15 @@ function M.make_player_ability_extension(opts)
 		_equipped_abilities = equipped_abilities,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_player_ability_extension", ext, opts.overrides, {
+		can_use_ability = true,
+		action_input_is_currently_valid = true,
+		remaining_ability_charges = true,
+		max_ability_charges = true,
+		get_current_grenade_ability_name = true,
+		ability_name = true,
+		_equipped_abilities = true,
+	})
 
 	return ext
 end
@@ -225,11 +253,10 @@ function M.make_player_action_input_extension(opts)
 		bot_queue_action_input = opts.bot_queue_action_input or function() end,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_player_action_input_extension", ext, opts.overrides, {
+		bot_queue_action_input = true,
+		_action_input_parsers = true,
+	})
 
 	return ext
 end
@@ -244,11 +271,9 @@ function M.make_bot_perception_extension(opts)
 		end,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_bot_perception_extension", ext, opts.overrides, {
+		enemies_in_proximity = true,
+	})
 
 	return ext
 end
@@ -267,11 +292,9 @@ function M.make_minion_perception_extension(opts)
 			end,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_minion_perception_extension", ext, opts.overrides, {
+		has_line_of_sight = true,
+	})
 
 	return ext
 end
@@ -296,11 +319,9 @@ function M.make_smart_tag_extension(tag_id, overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_smart_tag_extension", ext, overrides, {
+		tag_id = true,
+	})
 
 	return ext
 end
@@ -312,11 +333,9 @@ function M.make_coherency_extension(current_radius, overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_coherency_extension", ext, overrides, {
+		current_radius = true,
+	})
 
 	return ext
 end
@@ -333,11 +352,9 @@ function M.make_player_talent_extension(opts)
 		end,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_player_talent_extension", ext, opts.overrides, {
+		has_special_rule = true,
+	})
 
 	return ext
 end
@@ -359,11 +376,10 @@ function M.make_companion_spawner_extension(opts)
 		end,
 	}
 
-	if opts.overrides then
-		for k, v in pairs(opts.overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_companion_spawner_extension", ext, opts.overrides, {
+		should_have_companion = true,
+		companion_units = true,
+	})
 
 	return ext
 end

@@ -22,11 +22,11 @@ Current status:
 
 | Surface | Real class/system | BetterBots-tested API | Decompiled proof | Notes |
 |---|---|---|---|---|
-| `unit_data_system` (player) | `PlayerUnitDataExtension` | `read_component()` | `scripts/extension_systems/unit_data/player_unit_data_extension.lua:547` | Player path only |
+| `unit_data_system` (player) | `PlayerUnitDataExtension` | `read_component()`, `breed()`, `breed_name()`, `is_companion()`, `is_resimulating` | `scripts/extension_systems/unit_data/player_unit_data_extension.lua:547`, `:783`, `:787`, `:794`, private field initialized at `:163` and toggled at `:1210`/`:1214` | `is_resimulating` is a private field, not a method; tests may only mock it because production smart-targeting reads that exact field |
 | `unit_data_system` (minion) | `MinionUnitDataExtension` | `breed()`, `faction_name()`, `is_companion()`, `breed_name()`, `breed_size_variation()` | `scripts/extension_systems/unit_data/minion_unit_data_extension.lua:110`, `:114`, `:118`, `:124`, `:167` | Minions do **not** expose `read_component()` |
 | `locomotion_system` (player) | `PlayerUnitLocomotionExtension` | `current_velocity()` | `scripts/extension_systems/locomotion/player_unit_locomotion_extension.lua:1187` | |
 | `locomotion_system` (minion) | `MinionLocomotionExtension` | `current_velocity()` | `scripts/extension_systems/locomotion/minion_locomotion_extension.lua:134` | |
-| `ability_system` | `PlayerUnitAbilityExtension` | `can_use_ability()`, `action_input_is_currently_valid()`, `remaining_ability_charges()`, `_equipped_abilities` | `scripts/extension_systems/ability/player_unit_ability_extension.lua:613`, `:655`, `:750`, `_equipped_abilities` initialized at `:62` | `_equipped_abilities` is private but BetterBots reads it directly |
+| `ability_system` | `PlayerUnitAbilityExtension` | `can_use_ability()`, `action_input_is_currently_valid()`, `remaining_ability_charges()`, `max_ability_charges()`, `get_current_grenade_ability_name()`, `ability_name()`, `_equipped_abilities` | `scripts/extension_systems/ability/player_unit_ability_extension.lua:613`, `:655`, `:750`, `:772`, `:896`, `:903`, `_equipped_abilities` initialized at `:62` | `_equipped_abilities` is private but BetterBots reads it directly |
 | `action_input_system` | `PlayerUnitActionInputExtension` | `bot_queue_action_input()`, `_action_input_parsers` | `scripts/extension_systems/action_input/player_unit_action_input_extension.lua:204`, `_action_input_parsers` initialized at `:9` | `_action_input_parsers` is private but BetterBots reads it directly |
 | `input_system` | `PlayerUnitInputExtension` | `bot_unit_input()` | `scripts/extension_systems/input/player_unit_input_extension.lua:46` | Used by grenade fallback aim control |
 | `perception_system` (bot) | `BotPerceptionExtension` | `enemies_in_proximity()` | `scripts/extension_systems/perception/bot_perception_extension.lua:94` | |
@@ -51,4 +51,5 @@ Current status:
 - Add new shared builders to `tests/test_helper.lua` before spreading a new extension family across specs.
 - If production code reads a private engine field, the audit must record the exact file and line where that field exists.
 - If decompiled source does not prove a method/field exists, do not mock it. Get an in-game dump first.
+- Audited shared builders in `tests/test_helper.lua` must reject unknown override keys at construction time. If a test needs a newly verified method, update this audit file and the builder allowlist in the same change.
 - `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above. Extend that check when a new audited family is added.

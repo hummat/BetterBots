@@ -431,5 +431,6 @@ tests/
   ability_queue_spec.lua                    # combat ability fallback queueing
   ammo_policy_spec.lua                      # ammo policy thresholds + defer logic
   combat_ability_identity_spec.lua          # semantic ability identity routing
+  test_helper_spec.lua                      # audited mock-builder override hardening
   vfx_suppression_spec.lua                  # bot VFX/SFX bleed suppression
 ```
