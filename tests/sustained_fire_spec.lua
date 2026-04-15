@@ -160,6 +160,40 @@ describe("sustained_fire", function()
 		assert.is_nil(input.action_one_hold)
 	end)
 
+	it("skips sustained-fire injection when the feature is disabled", function()
+		local BotUnitInput = {
+			update = function() end,
+			_update_actions = function(_self, input)
+				input.base_action = true
+			end,
+		}
+		local mod = make_hooking_mod()
+		local unit = {}
+		local self = {}
+
+		SustainedFire.init({
+			mod = mod,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 5
+			end,
+			is_enabled = function()
+				return false
+			end,
+		})
+		SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
+		BotUnitInput.update(self, unit, 0, 0)
+		SustainedFire.arm(unit, SustainedFire.resolve_state(unit, "flamer_p1_m1", "shoot_braced"))
+
+		local input = {}
+		BotUnitInput._update_actions(self, input)
+
+		assert.is_true(input.base_action)
+		assert.is_nil(input.action_one_hold)
+	end)
+
 	it("coexists with sprint on BotUnitInput without losing sustained-fire injection", function()
 		local BotUnitInput = {
 			update = function(self, unit)

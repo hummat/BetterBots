@@ -1,6 +1,38 @@
 local HumanLikeness = dofile("scripts/mods/BetterBots/human_likeness.lua")
 
 describe("human_likeness", function()
+	it("warns once when the bot settings reaction-time API is missing", function()
+		local warnings = {}
+
+		HumanLikeness.init({
+			mod = {
+				warning = function(_, message)
+					warnings[#warnings + 1] = message
+				end,
+			},
+			get_timing_config = function()
+				return {
+					enabled = true,
+					reaction_min = 2,
+					reaction_max = 4,
+					defensive_jitter_min_s = 0.10,
+					defensive_jitter_max_s = 0.25,
+					opportunistic_jitter_min_s = 0.25,
+					opportunistic_jitter_max_s = 0.70,
+				}
+			end,
+			get_pressure_leash_config = function()
+				return { enabled = false }
+			end,
+		})
+
+		HumanLikeness.patch_bot_settings({})
+		HumanLikeness.patch_bot_settings({})
+
+		assert.equals(1, #warnings)
+		assert.is_truthy(warnings[1]:find("opportunity_target_reaction_times", 1, true))
+	end)
+
 	it("patches opportunity target reaction times from the medium timing profile", function()
 		local BotSettings = {
 			opportunity_target_reaction_times = {
@@ -145,6 +177,46 @@ describe("human_likeness", function()
 		local delay = HumanLikeness.random_ability_jitter_delay("veteran_voc_critical_toughness")
 		assert.is_true(delay >= 0.10)
 		assert.is_true(delay <= 0.25)
+	end)
+
+	it("returns opportunistic jitter from the timing config", function()
+		HumanLikeness.init({
+			get_timing_config = function()
+				return {
+					enabled = true,
+					reaction_min = 2,
+					reaction_max = 4,
+					defensive_jitter_min_s = 0.10,
+					defensive_jitter_max_s = 0.25,
+					opportunistic_jitter_min_s = 0.25,
+					opportunistic_jitter_max_s = 0.70,
+				}
+			end,
+		})
+
+		local delay = HumanLikeness.random_ability_jitter_delay("ogryn_charge_priority_target")
+		assert.is_true(delay >= 0.25)
+		assert.is_true(delay <= 0.70)
+	end)
+
+	it("only bypasses immediate jitter when timing is enabled", function()
+		HumanLikeness.init({
+			get_timing_config = function()
+				return {
+					enabled = true,
+					reaction_min = 2,
+					reaction_max = 4,
+					defensive_jitter_min_s = 0.10,
+					defensive_jitter_max_s = 0.25,
+					opportunistic_jitter_min_s = 0.25,
+					opportunistic_jitter_max_s = 0.70,
+				}
+			end,
+		})
+
+		assert.is_true(HumanLikeness.should_bypass_ability_jitter("zealot_stealth_emergency"))
+		assert.is_false(HumanLikeness.should_bypass_ability_jitter("veteran_voc_critical_toughness"))
+		assert.is_false(HumanLikeness.should_bypass_ability_jitter("ogryn_charge_priority_target"))
 	end)
 
 	it("bypasses non-emergency jitter and leash scaling when both profiles are off", function()

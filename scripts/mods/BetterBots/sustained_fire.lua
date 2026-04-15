@@ -1,4 +1,5 @@
 local STALE_WINDOW_S = 0.25
+local TEMPLATE_REFRESH_INTERVAL_S = 0.10
 
 local _mod
 local _debug_log
@@ -88,6 +89,25 @@ local function _current_weapon_template_name(unit)
 	return weapon_action and weapon_action.template_name or nil
 end
 
+local function _live_weapon_template_name(unit, state, current_template_name)
+	local now = _fixed_time()
+	if current_template_name ~= nil then
+		state.live_template_name = current_template_name
+		state.live_template_t = now
+		return current_template_name
+	end
+
+	if state.live_template_t and now - state.live_template_t < TEMPLATE_REFRESH_INTERVAL_S then
+		return state.live_template_name
+	end
+
+	local live_template_name = _current_weapon_template_name(unit)
+	state.live_template_name = live_template_name
+	state.live_template_t = now
+
+	return live_template_name
+end
+
 local function _debug_key(prefix, unit, template_name)
 	return prefix .. ":" .. tostring(unit) .. ":" .. tostring(template_name or "none")
 end
@@ -169,9 +189,11 @@ function M.resolve_state(unit, template_name, action_input)
 	return {
 		unit = unit,
 		template_name = template_name,
+		live_template_name = template_name,
 		action_input = action_input,
 		hold_inputs = _copy_table(hold_inputs),
 		last_seen_t = _fixed_time(),
+		live_template_t = _fixed_time(),
 		hold_logged = false,
 	}
 end
@@ -236,7 +258,7 @@ function M.update_actions(unit, input, current_template_name)
 		return
 	end
 
-	local live_template_name = current_template_name or _current_weapon_template_name(unit)
+	local live_template_name = _live_weapon_template_name(unit, state, current_template_name)
 	if live_template_name ~= state.template_name then
 		M.clear(unit, "template_changed")
 		return

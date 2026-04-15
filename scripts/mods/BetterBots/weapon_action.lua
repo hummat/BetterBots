@@ -10,6 +10,8 @@ local _fixed_time
 local _bot_slot_for_unit
 local _perf
 local _ammo
+local _is_enabled
+local _missing_shoot_extension_warned = {}
 
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
@@ -127,8 +129,6 @@ local function _weapon_log_context(unit)
 end
 
 local M = {}
-
-local _is_enabled
 
 function M._stream_action_phase(template_name, action_input)
 	local actions = STREAM_CONFIRM_ACTIONS[template_name]
@@ -267,22 +267,24 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_missing_shoot_extension_warned = {}
 	_stream_action_logged_combos = {}
 end
 
 local function _ammo_api()
-	if _ammo then
-		return _ammo
+	if _ammo ~= nil then
+		return _ammo or nil
 	end
 
 	local ok, ammo = pcall(require, "scripts/utilities/ammo")
 	if ok then
 		_ammo = ammo
 	elseif _mod and _mod.warning then
+		_ammo = false
 		_mod:warning("BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled")
 	end
 
-	return _ammo
+	return _ammo or nil
 end
 
 local function _dead_zone_target_breed(unit)
@@ -409,6 +411,22 @@ function M.register_hooks(deps)
 				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 				local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
 				if not unit_data_extension or not visual_loadout_extension then
+					local unit_key = tostring(unit)
+					if _debug_enabled() then
+						_debug_log(
+							"shoot_scratchpad_missing_ext:" .. unit_key,
+							_fixed_time(),
+							"shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system"
+						)
+					end
+					if not _missing_shoot_extension_warned[unit_key] and _mod and _mod.warning then
+						_missing_shoot_extension_warned[unit_key] = true
+						_mod:warning(
+							"BetterBots: shoot scratchpad normalization skipped for "
+								.. unit_key
+								.. " because unit_data_system or visual_loadout_system is missing"
+						)
+					end
 					return
 				end
 
@@ -709,7 +727,8 @@ function M.register_hooks(deps)
 		end
 	)
 
-	-- Perils of the warp achievement guard: bot players can have nil account_id.
+	-- WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement calls
+	-- player:account_id() unconditionally; bot-backed player objects can return nil.
 	_mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
 		_mod:hook(
 			WeaponSystem,

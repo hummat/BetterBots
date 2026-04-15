@@ -1,7 +1,8 @@
 local M = {}
 
+local _mod
 local _original_bot_settings = setmetatable({}, { __mode = "k" })
-local _patched_bot_settings = setmetatable({}, { __mode = "k" })
+local _warned_missing_reaction_times_shape = false
 
 local _debug_log
 local _debug_enabled
@@ -35,10 +36,12 @@ local function _lerp(a, b, t)
 end
 
 function M.init(deps)
+	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_get_timing_config = deps.get_timing_config
 	_get_pressure_leash_config = deps.get_pressure_leash_config
+	_warned_missing_reaction_times_shape = false
 end
 
 local function _timing_config()
@@ -65,7 +68,6 @@ local function _restore_original_bot_settings(bot_settings, normal)
 
 	normal.min = original.min
 	normal.max = original.max
-	_patched_bot_settings[bot_settings] = nil
 
 	return true
 end
@@ -78,6 +80,13 @@ function M.patch_bot_settings(bot_settings)
 	local times = bot_settings.opportunity_target_reaction_times
 	local normal = times and times.normal
 	if not normal then
+		if not _warned_missing_reaction_times_shape and _mod and _mod.warning then
+			_warned_missing_reaction_times_shape = true
+			_mod:warning(
+				"HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal; "
+					.. "reaction-time patch skipped"
+			)
+		end
 		return
 	end
 
@@ -107,7 +116,6 @@ function M.patch_bot_settings(bot_settings)
 
 	normal.min = config.reaction_min
 	normal.max = config.reaction_max
-	_patched_bot_settings[bot_settings] = true
 
 	if _debug_enabled and _debug_enabled() then
 		_debug_log(

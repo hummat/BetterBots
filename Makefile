@@ -1,12 +1,13 @@
 LUA_FILES := $(shell find scripts tests -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
+ARCH_BUSTED_BIN := $(shell ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
 
-.PHONY: deps lint format format-check lsp-check check test doc-check release package
+.PHONY: deps lint format format-check lsp-check check test doc-check release package tool-info
 
 deps:
 	git config core.hooksPath scripts/hooks
 
-LUACHECK_BIN := $(shell command -v bin/luacheck 2>/dev/null || command -v luacheck 2>/dev/null)
+LUACHECK_BIN := $(CURDIR)/bin/luacheck
 
 lint:
 	$(LUACHECK_BIN) $(LUA_FILES)
@@ -29,8 +30,8 @@ test:
 	@if [ -d tests ]; then \
 		if [ -n "$(BUSTED_BIN)" ]; then \
 			"$(BUSTED_BIN)"; \
-		elif [ -n "$$(ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)" ]; then \
-			lua "$$(ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)"; \
+		elif [ -n "$(ARCH_BUSTED_BIN)" ]; then \
+			lua "$(ARCH_BUSTED_BIN)"; \
 		else \
 			echo "No busted runner found on PATH or in /usr/lib/luarocks."; \
 			exit 1; \
@@ -38,6 +39,15 @@ test:
 	else \
 		echo "No tests directory; skipping busted."; \
 	fi
+
+tool-info:
+	@echo "make lint -> $(LUACHECK_BIN)"
+	@echo "system luacheck: $$(command -v luacheck || echo missing)"
+	@echo "system busted: $$(command -v busted || echo missing)"
+	@echo "system lua-busted: $$(command -v lua-busted || echo missing)"
+	@echo "arch luarocks busted: $(if $(ARCH_BUSTED_BIN),$(ARCH_BUSTED_BIN),missing)"
+	@echo "stylua: $$(command -v stylua || echo missing)"
+	@echo "lua-language-server: $$(command -v lua-language-server || echo missing)"
 
 package:
 	@rm -f BetterBots.zip

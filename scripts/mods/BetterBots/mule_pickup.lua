@@ -13,6 +13,8 @@ local _write_blackboard_component
 local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
 local _blackboard_module
+local _warned_group_system_lookup_failure
+local _warned_blackboard_module_lookup_failure
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
@@ -49,6 +51,10 @@ local function _default_get_live_bot_groups()
 
 	local ok, group_system = pcall(extension_manager.system, extension_manager, "group_system")
 	if not ok or not group_system then
+		if not _warned_group_system_lookup_failure and _mod and _mod.warning then
+			_warned_group_system_lookup_failure = true
+			_mod:warning("BetterBots: group_system unavailable; mule pickup live-sync skipped")
+		end
 		return nil
 	end
 
@@ -58,14 +64,22 @@ end
 local function _default_write_blackboard_component(blackboard, component_name)
 	if _blackboard_module == nil then
 		local ok, blackboard_module = pcall(require, "scripts/extension_systems/blackboard/utilities/blackboard")
-		_blackboard_module = ok and blackboard_module or false
+		if ok then
+			_blackboard_module = blackboard_module
+		else
+			if not _warned_blackboard_module_lookup_failure and _mod and _mod.warning then
+				_warned_blackboard_module_lookup_failure = true
+				_mod:warning("BetterBots: blackboard utility unavailable; mule pickup destination refresh skipped")
+			end
+			return nil
+		end
 	end
 
 	if _blackboard_module and type(_blackboard_module.write_component) == "function" then
 		return _blackboard_module.write_component(blackboard, component_name)
 	end
 
-	return blackboard and blackboard[component_name] or nil
+	return nil
 end
 
 local function _get_pickup_data(pickup_name)
@@ -157,6 +171,8 @@ function M.init(deps)
 	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
 	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
+	_warned_group_system_lookup_failure = false
+	_warned_blackboard_module_lookup_failure = false
 
 	M.patch_pickups()
 	M.sync_live_bot_groups()

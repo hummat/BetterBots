@@ -9,6 +9,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _is_enabled
+local _perf
 local _bot_target_selection
 local _breed
 local _warned_errors = {}
@@ -265,6 +266,7 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_is_enabled = deps.is_enabled
+	_perf = deps.perf
 end
 
 function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
@@ -352,6 +354,7 @@ function M.register_hooks()
 					target_selection_debug_info_or_nil
 				)
 
+				local perf_t0 = _perf and _perf.begin() or nil
 				local ok, err = pcall(function()
 					if _is_enabled and not _is_enabled() then
 						return
@@ -422,6 +425,9 @@ function M.register_hooks()
 						perception_component.target_enemy_reevaluation_t = t + REEVALUATION_INTERVAL_S
 					end
 				end)
+				if perf_t0 and _perf then
+					_perf.finish("target_type_hysteresis.post_process", perf_t0)
+				end
 
 				if not ok then
 					local key = tostring(err)

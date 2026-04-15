@@ -182,6 +182,86 @@ describe("ammo_policy", function()
 		assert.is_false(self._pickup_component.needs_ammo)
 	end)
 
+	it("logs when grenade charge state cannot resolve an ability extension", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.50
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function()
+				return nil
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = {} },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_truthy(find_debug_log("grenade pickup skipped: no ability extension"))
+	end)
+
+	it("logs when _update_ammo runs without a pickup component", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.50
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = {} },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = nil,
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_truthy(find_debug_log("ammo policy skipped: no pickup_component"))
+	end)
+
 	it("allows desperate bot to pick up even when human is below reserve", function()
 		install_module({
 			ammo_module = {

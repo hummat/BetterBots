@@ -648,6 +648,18 @@ describe("grenade_fallback", function()
 		assert.equals(0, #_recorded_inputs)
 	end)
 
+	it("logs the interaction guard on idle-path deferrals", function()
+		_debug_enabled_result = true
+		blackboard.behavior = {
+			current_interaction_unit = "med_station",
+		}
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.is_truthy(find_debug_log("grenade blocked: interacting with med_station"))
+	end)
+
 	it("does nothing when heuristic blocks", function()
 		_heuristic_result = false
 		GrenadeFallback.try_queue(unit, blackboard)
@@ -2252,6 +2264,28 @@ describe("grenade_fallback", function()
 			assert.equals(1, #blocked)
 			assert.equals("lost_wield", blocked[1].reason)
 			assert.equals("wait_aim", blocked[1].stage)
+		end)
+
+		it("emits blocked event and resets immediately when action_input_system disappears mid-sequence", function()
+			_debug_enabled_result = true
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_extensions[unit].action_input_system = nil
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("action_input_missing", blocked[1].reason)
+			assert.equals("wait_aim", blocked[1].stage)
+			assert.equals("aim_hold", blocked[1].input)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.is_truthy(find_debug_log("missing action_input_system for aim_hold"))
 		end)
 
 		it("emits blocked event on revalidation failure", function()

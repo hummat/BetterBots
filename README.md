@@ -202,6 +202,10 @@ This repo is configured for local Lua lint/format/type diagnostics:
 - `luacheck` via `.luacheckrc`
 - `stylua` via `.stylua.toml`
 - `lua-language-server` diagnostics via `.luarc.json`
+- a repo-local `bin/luacheck` compatibility wrapper for the known Lua 5.5 mismatch
+
+The repo does not modify your shell `PATH`. Use `make tool-info` to see the
+exact tool paths and fallbacks the Make targets will use on this machine.
 
 Commands:
 
@@ -214,10 +218,15 @@ Commands:
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Run all of the above |
 | `make test` | Run busted tests |
+| `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
 After cloning, run `make deps` to install the commit-msg hook.
+
+`make lint` always uses the repo's `bin/luacheck` wrapper. `make test` tries, in
+order: `busted`, `lua-busted`, then Arch's `/usr/lib/luarocks/.../busted`
+runner.
 
 CI runs `make check` on every push to `main` and on pull requests.
 

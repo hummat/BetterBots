@@ -65,11 +65,15 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
 | `stream action queued for` | Direct confirmation that a stream-specific queue input (`shoot_braced`, `trigger_charge_flame`, etc.) actually reached `bot_queue_action_input` successfully (#87) |
 | `patched opportunity reaction times` | Human-likeness timing patch applied live (#44) |
+| `HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal` | Human-likeness timing patch could not bind because the engine settings shape changed |
 | `leash scaled` | Human-likeness pressure leash scaling fired in combat (#44) |
 | `type flip ` | Target-type hysteresis allowed a real melee/ranged transition (#90) |
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip (#90) |
 | `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
+| `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
+| `grenade pickup skipped: no ability extension` | Grenade refill logic could not resolve the bot's `ability_system`; grenade reserve policy did not run |
+| `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 | `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
@@ -150,6 +154,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - `GameplayStateRun` exit also auto-emits the same report to the console log with `bb-perf:auto:` prefixes, but only when the recording window contains at least one sampled bot frame. Hub-only `GameplayStateRun` transitions are intentionally suppressed so starting a mission does not produce meaningless `0 bot frames` dumps.
    - `ability_queue` now exposes breakdown-only rows for `item_fallback`, `template_setup`, `input_validation`, `decision`, and `queue`; `grenade_fallback` now exposes `stage_machine`, `profile_resolution`, and `launch` in addition to the existing `build_context` and `heuristic` rows.
    - `grenade_fallback` has two breakdown-only sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call in `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). They appear as rows in the tag breakdown but do not contribute to the headline `µs/bot/frame` total because the parent `grenade_fallback` timer already includes them.
+   - `target_type_hysteresis.post_process` now appears as a breakdown-only row for the post-vanilla melee/ranged stabilization pass.
 5. `/bb_reset`
    - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
@@ -229,11 +234,17 @@ tests/
 ### Running tests
 
 ```bash
-make test      # runs busted (auto-detected)
+make tool-info # shows the exact wrappers/binaries this repo will use
+make test      # runs busted, lua-busted, or Arch's luarocks path
 make check     # runs format + lint + lsp + test (full quality gate)
 ```
 
-Tests are enforced by CI — `make check` depends on `test`, and CI installs busted via luarocks.
+`make lint` uses the repo-local `bin/luacheck` wrapper. `make test` does not
+depend on shell `PATH` mutation; it falls back to Arch's packaged luarocks
+runner when `busted` is not installed globally.
+
+Tests are enforced by CI — `make check` depends on `test`, and CI installs
+busted via luarocks.
 
 ### Engine stubs
 

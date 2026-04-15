@@ -21,6 +21,23 @@ local PICKUP_VALID_DURATION = 5
 local PICKUP_MAX_DISTANCE = 5
 local PICKUP_MAX_FOLLOW_DISTANCE = 15
 
+local function _cached_scan_result(cache, fixed_t, human_units, threshold)
+	if cache.fixed_t == fixed_t and cache.human_units == human_units and cache.threshold == threshold then
+		return cache.result
+	end
+
+	return nil
+end
+
+local function _store_scan_result(cache, fixed_t, human_units, threshold, result)
+	cache.fixed_t = fixed_t
+	cache.human_units = human_units
+	cache.threshold = threshold
+	cache.result = result
+
+	return result
+end
+
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
 		return
@@ -48,12 +65,9 @@ local function _all_eligible_humans_above_threshold(human_units, threshold)
 	end
 
 	local fixed_t = _fixed_time and _fixed_time() or 0
-	if
-		_human_ammo_scan_cache.fixed_t == fixed_t
-		and _human_ammo_scan_cache.human_units == human_units
-		and _human_ammo_scan_cache.threshold == threshold
-	then
-		return _human_ammo_scan_cache.result
+	local cached = _cached_scan_result(_human_ammo_scan_cache, fixed_t, human_units, threshold)
+	if cached ~= nil then
+		return cached
 	end
 
 	for i = 1, #human_units do
@@ -61,29 +75,18 @@ local function _all_eligible_humans_above_threshold(human_units, threshold)
 		if human_unit and _Ammo.uses_ammo(human_unit) then
 			local ammo_percentage = _Ammo.current_total_percentage(human_unit)
 			if ammo_percentage <= threshold then
-				_human_ammo_scan_cache = {
-					fixed_t = fixed_t,
-					human_units = human_units,
-					threshold = threshold,
-					result = false,
-				}
-				return false
+				return _store_scan_result(_human_ammo_scan_cache, fixed_t, human_units, threshold, false)
 			end
 		end
 	end
 
-	_human_ammo_scan_cache = {
-		fixed_t = fixed_t,
-		human_units = human_units,
-		threshold = threshold,
-		result = true,
-	}
-	return true
+	return _store_scan_result(_human_ammo_scan_cache, fixed_t, human_units, threshold, true)
 end
 
 local function _grenade_charge_state(unit)
 	local ability_extension = _ability_extension and _ability_extension(unit, "ability_system")
 	if not ability_extension then
+		_log("grenade_pickup_skip_no_ability:" .. tostring(unit), "grenade pickup skipped: no ability extension")
 		return nil, nil
 	end
 
@@ -135,12 +138,9 @@ local function _all_eligible_humans_above_grenade_threshold(human_units, thresho
 	end
 
 	local fixed_t = _fixed_time and _fixed_time() or 0
-	if
-		_human_grenade_scan_cache.fixed_t == fixed_t
-		and _human_grenade_scan_cache.human_units == human_units
-		and _human_grenade_scan_cache.threshold == threshold
-	then
-		return _human_grenade_scan_cache.result
+	local cached = _cached_scan_result(_human_grenade_scan_cache, fixed_t, human_units, threshold)
+	if cached ~= nil then
+		return cached
 	end
 
 	for i = 1, #human_units do
@@ -149,24 +149,12 @@ local function _all_eligible_humans_above_grenade_threshold(human_units, thresho
 		if eligible then
 			local charge_fraction = current / max
 			if charge_fraction < threshold then
-				_human_grenade_scan_cache = {
-					fixed_t = fixed_t,
-					human_units = human_units,
-					threshold = threshold,
-					result = false,
-				}
-				return false
+				return _store_scan_result(_human_grenade_scan_cache, fixed_t, human_units, threshold, false)
 			end
 		end
 	end
 
-	_human_grenade_scan_cache = {
-		fixed_t = fixed_t,
-		human_units = human_units,
-		threshold = threshold,
-		result = true,
-	}
-	return true
+	return _store_scan_result(_human_grenade_scan_cache, fixed_t, human_units, threshold, true)
 end
 
 local function _best_nearby_grenade_pickup(bot_group, unit)
@@ -346,6 +334,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		local perf_t0 = _perf and _perf.begin()
 		if not pickup_component then
+			_log("ammo_pickup_skip_no_component:" .. tostring(unit), "ammo policy skipped: no pickup_component")
 			if perf_t0 then
 				_perf.finish("ammo_policy.update_ammo", perf_t0)
 			end
@@ -366,11 +355,9 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			_all_eligible_humans_above_threshold(self._side and self._side.valid_human_units, _human_threshold())
 
 		if humans_ok then
-			-- All humans are stocked — bot picks up freely to top off.
 			pickup_component.needs_ammo = true
 			_log("ammo_pickup_allow:" .. tostring(unit), "ammo pickup permitted: all eligible humans above reserve")
 		else
-			-- A human is low — bot only picks up when desperate (below bot threshold).
 			local bot_ammo_percentage = _Ammo.current_total_percentage(unit)
 			local bot_threshold = _bot_threshold()
 			local bot_desperate = bot_ammo_percentage <= bot_threshold

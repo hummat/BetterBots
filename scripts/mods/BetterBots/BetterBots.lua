@@ -313,6 +313,7 @@ BotProfiles.init({
 })
 
 HumanLikeness.init({
+	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	get_timing_config = Settings.resolve_human_timing_config,
@@ -327,6 +328,7 @@ TargetTypeHysteresis.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("target_type_hysteresis")
 	end,
+	perf = Perf,
 })
 
 EngagementLeash.init({
@@ -808,6 +810,7 @@ end)
 mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
 	MeleeMetaData.inject(WeaponTemplates)
 	RangedMetaData.inject(WeaponTemplates)
+	GrenadeFallback.prime_weapon_templates(WeaponTemplates)
 end)
 
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the

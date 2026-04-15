@@ -78,6 +78,7 @@ Every BetterBots addition must be adjustable or toggleable via the mod settings 
 
 Use project-local tooling configs before handing off changes:
 
+- `make tool-info` → show the exact tool binaries and fallback paths that `make` will use
 - `make deps` → install git hooks (conventional commits + StyLua pre-commit)
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
@@ -90,7 +91,7 @@ Use project-local tooling configs before handing off changes:
 
 Notes:
 
-- `make test` auto-detects a busted runner (`busted`, `lua-busted`, or Arch's packaged luarocks path).
+- `make test` tries `busted`, `lua-busted`, then Arch's packaged luarocks path.
 - `make test` is a no-op unless a `tests/` directory exists.
 
 ## Commit conventions
