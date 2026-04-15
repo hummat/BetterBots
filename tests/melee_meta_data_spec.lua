@@ -294,6 +294,53 @@ describe("melee_meta_data", function()
 			assert.equals(existing, templates.sword.attack_meta_data)
 		end)
 
+		it("backfills missing fields on existing attack_meta_data entries", function()
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.8), nil)
+			template.attack_meta_data = {
+				light_attack = {
+					arc = 1,
+					penetrating = true,
+					action_inputs = {
+						{ action_input = "start_attack", timing = 0 },
+						{ action_input = "light_attack", timing = 0 },
+					},
+				},
+			}
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+
+			local light_attack = templates.sword.attack_meta_data.light_attack
+			assert.equals(1, light_attack.arc)
+			assert.is_true(light_attack.penetrating)
+			assert.equals(2.5, light_attack.max_range)
+		end)
+
+		it("restores backfilled attack_meta_data fields when disabling melee improvements", function()
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.8), nil)
+			template.attack_meta_data = {
+				light_attack = {
+					arc = 1,
+					penetrating = true,
+					action_inputs = {
+						{ action_input = "start_attack", timing = 0 },
+						{ action_input = "light_attack", timing = 0 },
+					},
+				},
+			}
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+			assert.equals(2.5, templates.sword.attack_meta_data.light_attack.max_range)
+
+			enabled = false
+			MeleeMetaData.sync_all()
+
+			assert.is_nil(templates.sword.attack_meta_data.light_attack.max_range)
+			assert.equals(1, templates.sword.attack_meta_data.light_attack.arc)
+			assert.is_true(templates.sword.attack_meta_data.light_attack.penetrating)
+		end)
+
 		it("is idempotent for the same table", function()
 			local templates = {
 				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),

@@ -5,6 +5,7 @@ local _debug_enabled
 local _armored_type
 local _is_enabled
 
+local ABSENT = {}
 local DEFAULT_MELEE_RANGE = 2.5
 local CLEAVE_ARC_1_THRESHOLD = 2
 local CLEAVE_ARC_2_THRESHOLD = 9
@@ -124,41 +125,110 @@ local function inject(WeaponTemplates)
 	if not state then
 		state = {
 			applied = false,
-			injected = {},
+			changes = {},
 		}
 		_patched_set[WeaponTemplates] = state
 	end
 
 	if _is_enabled and not _is_enabled() then
 		if state.applied then
-			for template, injected_meta in pairs(state.injected) do
-				if template.attack_meta_data == injected_meta then
-					template.attack_meta_data = nil
+			for template, change in pairs(state.changes) do
+				if change.mode == "replace" then
+					if template.attack_meta_data == change.injected_table then
+						template.attack_meta_data = nil
+					end
+				elseif change.mode == "fields" and template.attack_meta_data then
+					for attack_input, original_fields in pairs(change.original_fields or {}) do
+						local entry = template.attack_meta_data[attack_input]
+						if type(entry) == "table" then
+							for key, original_value in pairs(original_fields) do
+								if original_value == ABSENT then
+									entry[key] = nil
+								else
+									entry[key] = original_value
+								end
+							end
+						end
+					end
 				end
 			end
-			state.injected = {}
+			state.changes = {}
 			state.applied = false
 		end
 		return
 	end
 
 	local injected = 0
+	local patched = 0
 	local skipped = 0
+
+	local function ensure_change(template, mode)
+		local change = state.changes[template]
+		if not change then
+			change = { mode = mode }
+			state.changes[template] = change
+		end
+		if mode == "fields" and change.mode ~= "replace" then
+			change.mode = "fields"
+			change.original_fields = change.original_fields or {}
+		end
+		return change
+	end
+
+	local function record_original_field(change, attack_input, entry, key)
+		local original_fields = change.original_fields
+		local attack_fields = original_fields[attack_input]
+		if not attack_fields then
+			attack_fields = {}
+			original_fields[attack_input] = attack_fields
+		end
+		if attack_fields[key] ~= nil then
+			return
+		end
+
+		if entry[key] == nil then
+			attack_fields[key] = ABSENT
+		else
+			attack_fields[key] = entry[key]
+		end
+	end
 
 	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
 		if type(template) == "table" and has_keyword(template, "melee") then
-			if state.injected[template] then
+			local change = state.changes[template]
+			if change and change.mode == "replace" then
 				if template.attack_meta_data == nil then
-					template.attack_meta_data = state.injected[template]
+					template.attack_meta_data = change.injected_table
 				end
 				skipped = skipped + 1
 			elseif template.attack_meta_data then
-				skipped = skipped + 1
+				local meta = build_meta_data(template, _armored_type)
+				local merged = 0
+				if meta then
+					for attack_input, generated_entry in pairs(meta) do
+						local existing_entry = template.attack_meta_data[attack_input]
+						if type(existing_entry) == "table" then
+							for key, value in pairs(generated_entry) do
+								if existing_entry[key] == nil then
+									local field_change = ensure_change(template, "fields")
+									record_original_field(field_change, attack_input, existing_entry, key)
+									existing_entry[key] = value
+									merged = merged + 1
+								end
+							end
+						end
+					end
+				end
+				if merged > 0 then
+					patched = patched + 1
+				else
+					skipped = skipped + 1
+				end
 			else
 				local meta = build_meta_data(template, _armored_type)
 				if meta then
 					template.attack_meta_data = meta
-					state.injected[template] = meta
+					ensure_change(template, "replace").injected_table = meta
 					injected = injected + 1
 				end
 			end
@@ -170,7 +240,13 @@ local function inject(WeaponTemplates)
 		_debug_log(
 			"melee_meta_injection:" .. tostring(WeaponTemplates),
 			0,
-			"melee attack_meta_data patch installed (injected=" .. injected .. ", skipped=" .. skipped .. ")",
+			"melee attack_meta_data patch installed (injected="
+				.. injected
+				.. ", patched="
+				.. patched
+				.. ", skipped="
+				.. skipped
+				.. ")",
 			nil,
 			"info"
 		)
