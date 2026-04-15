@@ -104,6 +104,33 @@ Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `revert
 
 Enforced by local `commit-msg` hook (install via `make deps`) and CI commit-lint on PRs.
 
+## Outward-facing writing
+
+Before drafting any text aimed at users or external communities, invoke **both** of these skills:
+
+1. **`human-writing`** skill — strips AI-generated patterns (over-enthusiastic openings, buzzword soup, vague claims, unnecessary hedging, robotic feature lists). Mandates specifics, honest limitations, active voice.
+2. **`style`** skill with **`blog:`** register — applies Matthias's voice (first person singular, "turns out" signature, short payoff sentences alternating with longer ones, fragments OK, honest opinions, no banned vocab like "delve"/"showcase"/"underscore"/"utilize").
+
+Order: detect the surface is outward-facing → invoke `human-writing` → invoke `style` with `blog:` prefix → draft → self-check against both skills' red flags before presenting.
+
+**Surfaces this applies to:**
+- Nexus description (`docs/nexus-description.bbcode`)
+- Nexus changelog text (when preparing a release entry)
+- README highlights / user-visible blocks
+- Reddit / Fatshark forum / Discord / Steam Community Hub posts
+- Promotion drafts in memory (`promotion_drafts.md`)
+- Any DM/PM to a mod author, creator, or community member
+- Any text copied out of this repo into an external channel
+
+**Exempt:**
+- CLAUDE.md, AGENTS.md, internal docs under `docs/dev/`
+- Source code + code comments
+- Commit messages (use the `/commit` skill instead)
+- Test specs
+- Conversational replies inside a session
+
+**Insider vs outsider calibration:** For technical-insider audiences (Modders Discord, direct mod-author DM) still apply both skills but skip the problem-setup framing — they already know what vanilla bots do. For outsider audiences (r/DarkTide, Fatshark forum, cold Nexus users) lead with the problem, then the fix. See `memory/promotion_plan.md` "Positioning principles" for the split.
+
 ## Branching workflow
 
 ### Single feature
