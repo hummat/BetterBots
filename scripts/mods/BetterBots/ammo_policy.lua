@@ -13,6 +13,8 @@ local _nearby_grenade_pickups
 local _is_enabled
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
+local _last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
+local _last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local PICKUP_BROADPHASE_CATEGORY = {
 	"pickups",
 }
@@ -28,6 +30,7 @@ local NON_PICKUP_GRENADE_ABILITIES = {
 local AMMO_REFILL_GRENADE_ABILITIES = {
 	zealot_throwing_knives = true,
 }
+local _grenade_ability_name
 local _needs_ammo_pickup_for_grenade_refill
 
 local function _cached_scan_result(cache, fixed_t, human_units, threshold)
@@ -53,6 +56,36 @@ local function _log(key, message)
 	end
 
 	_debug_log(key, _fixed_time and _fixed_time() or 0, message)
+end
+
+local function _clear_grenade_skip_log_state(unit)
+	_last_grenade_skip_log_state_by_unit[unit] = nil
+end
+
+local function _log_grenade_skip_once(unit, reason, message, ability_extension)
+	local ability_name = _grenade_ability_name(ability_extension) or "none"
+	local state = tostring(reason) .. ":" .. tostring(ability_name)
+
+	if _last_grenade_skip_log_state_by_unit[unit] == state then
+		return
+	end
+
+	_last_grenade_skip_log_state_by_unit[unit] = state
+	_log("grenade_pickup_skip_" .. tostring(reason) .. ":" .. tostring(unit), message)
+end
+
+local function _clear_grenade_pickup_log_state(unit)
+	_last_grenade_pickup_log_state_by_unit[unit] = nil
+end
+
+local function _grenade_pickup_log_state_changed(unit, state)
+	if _last_grenade_pickup_log_state_by_unit[unit] == state then
+		return false
+	end
+
+	_last_grenade_pickup_log_state_by_unit[unit] = state
+
+	return true
 end
 
 local function _bot_threshold()
@@ -94,7 +127,7 @@ local function _all_eligible_humans_above_threshold(human_units, threshold)
 	return _store_scan_result(_human_ammo_scan_cache, fixed_t, human_units, threshold, true)
 end
 
-local function _grenade_ability_name(ability_extension)
+function _grenade_ability_name(ability_extension)
 	if not ability_extension then
 		return nil
 	end
@@ -128,7 +161,7 @@ end
 local function _grenade_charge_state(unit, ability_extension)
 	ability_extension = ability_extension or (_ability_extension and _ability_extension(unit, "ability_system"))
 	if not ability_extension then
-		_log("grenade_pickup_skip_no_ability:" .. tostring(unit), "grenade pickup skipped: no ability extension")
+		_log_grenade_skip_once(unit, "no_ability", "grenade pickup skipped: no ability extension")
 		return nil, nil
 	end
 
@@ -154,7 +187,6 @@ end
 local function _eligible_for_grenade_pickup(unit)
 	local ability_extension = _ability_extension and _ability_extension(unit, "ability_system")
 	if not ability_extension then
-		_log("grenade_pickup_skip_no_ability:" .. tostring(unit), "grenade pickup skipped: no ability extension")
 		return false, nil, nil, "no_ability"
 	end
 
@@ -406,6 +438,8 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
+	_last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
+	_last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 end
 
 function M.install_interaction_hooks(AmmunitionInteraction)
@@ -456,7 +490,9 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local pickup_component = self._pickup_component
 		local bot_group = self._bot_group
 		if _is_enabled and not _is_enabled() then
+			_clear_grenade_skip_log_state(unit)
 			if _clear_reserved_grenade_pickup_if_present(bot_group, unit, pickup_component) then
+				_clear_grenade_pickup_log_state(unit)
 				_log(
 					"grenade_pickup_release_disabled:" .. tostring(unit),
 					"released reserved grenade pickup because ammo policy was disabled"
@@ -467,6 +503,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		local perf_t0 = _perf and _perf.begin()
 		if not pickup_component then
+			_clear_grenade_skip_log_state(unit)
+			_clear_grenade_pickup_log_state(unit)
 			_log("ammo_pickup_skip_no_component:" .. tostring(unit), "ammo policy skipped: no pickup_component")
 			if perf_t0 then
 				_perf.finish("ammo_policy.update_ammo", perf_t0)
@@ -479,6 +517,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local has_external_ammo_pickup_order = pickup_order_unit ~= nil and pickup_order_unit ~= reserved_grenade_pickup
 
 		if has_external_ammo_pickup_order then
+			_clear_grenade_skip_log_state(unit)
+			_clear_grenade_pickup_log_state(unit)
 			pickup_component.needs_ammo = true
 			_log("ammo_pickup_order:" .. tostring(unit), "ammo pickup preserved due to explicit order")
 			if perf_t0 then
@@ -523,6 +563,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 					grenade_pickup = reserved_grenade_pickup
 					grenade_distance = pickup_component.ammo_pickup_distance
 				elseif _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, reserved_grenade_pickup) then
+					_clear_grenade_pickup_log_state(unit)
 					_log(
 						"grenade_pickup_release_range:" .. tostring(unit),
 						"released reserved grenade pickup after leaving range"
@@ -537,34 +578,47 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 				if humans_ok_for_grenade then
 					_reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance)
 					pickup_component.needs_ammo = true
-					_log(
-						"grenade_pickup_allow:" .. tostring(unit),
-						"grenade pickup permitted: all eligible humans above reserve"
-					)
-					_log("grenade_pickup_bind:" .. tostring(unit), "grenade pickup bound into ammo slot")
+					local pickup_state = "reserved:" .. tostring(grenade_pickup)
+					if _grenade_pickup_log_state_changed(unit, pickup_state) then
+						_log(
+							"grenade_pickup_allow:" .. tostring(unit),
+							"grenade pickup permitted: all eligible humans above reserve"
+						)
+						_log("grenade_pickup_bind:" .. tostring(unit), "grenade pickup bound into ammo slot")
+					end
 				else
 					if _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup) then
+						_clear_grenade_pickup_log_state(unit)
 						_log(
 							"grenade_pickup_release:" .. tostring(unit),
 							"released reserved grenade pickup to human reserve"
 						)
 					end
-					_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
+					local pickup_state = "deferred:" .. tostring(grenade_pickup)
+					if _grenade_pickup_log_state_changed(unit, pickup_state) then
+						_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
+					end
 				end
 			end
 		else
 			if reserved_grenade_pickup then
 				_clear_reserved_grenade_pickup(bot_group, unit, pickup_component, reserved_grenade_pickup)
 			end
+			_clear_grenade_pickup_log_state(unit)
 		end
 
-		if grenade_reason == "pickup_disabled" then
-			_log(
-				"grenade_pickup_skip_disabled:" .. tostring(unit),
+		if grenade_reason == "no_ability" then
+			_log_grenade_skip_once(unit, "no_ability", "grenade pickup skipped: no ability extension")
+		elseif grenade_reason == "pickup_disabled" then
+			_log_grenade_skip_once(
+				unit,
+				"pickup_disabled",
 				"grenade pickup skipped: ability does not use grenade pickups"
 			)
 		elseif grenade_reason == "cooldown_only" then
-			_log("grenade_pickup_skip_ineligible:" .. tostring(unit), "grenade pickup skipped: cooldown-based blitz")
+			_log_grenade_skip_once(unit, "cooldown_only", "grenade pickup skipped: cooldown-based blitz")
+		else
+			_clear_grenade_skip_log_state(unit)
 		end
 
 		if perf_t0 then

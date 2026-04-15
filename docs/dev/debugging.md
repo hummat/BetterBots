@@ -74,6 +74,11 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |
 | `ammo utility unavailable; dead-zone ranged fire detection disabled` | `scripts/utilities/ammo` failed to load, so the dead-zone ranged-fire confirmation log for `#51` is unavailable in this session |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
+| `grenade pickup permitted: all eligible humans above reserve` | BetterBots reserved a world grenade pickup for the bot because no eligible human grenade user was below reserve; one-shot per bot+pickup reservation episode |
+| `grenade pickup bound into ammo slot` | BetterBots attached the reserved world grenade pickup to the ammo-pickup fields so vanilla interaction code can collect it; one-shot per bot+pickup reservation episode |
+| `grenade pickup deferred to human reserve` | Bot yielded a nearby world grenade pickup because at least one eligible human grenade user was below reserve; one-shot per bot+pickup defer episode |
+| `grenade pickup skipped: ability does not use grenade pickups` | Equipped blitz replenishes via cooldown/passive logic instead of world grenade pickups; one-shot per bot+equipped ability state |
+| `grenade pickup skipped: cooldown-based blitz` | Blitz has no grenade charges at all, so world grenade pickup logic does not apply; one-shot per bot+equipped ability state |
 | `grenade pickup skipped: no ability extension` | Grenade refill logic could not resolve the bot's `ability_system`; grenade reserve policy did not run |
 | `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
