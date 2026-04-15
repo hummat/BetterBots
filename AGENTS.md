@@ -20,7 +20,8 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 
 **Automated** (outside the game):
 - `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
-- `make check` — full quality gate (format + lint + lsp + test)
+- `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
+- `make check-ci` — CI quality gate: format-check + lint + lsp + test + doc-check
 
 **In-game** (manual verification):
 1. Launch with SoloPlay + Tertium5/6 mods active
@@ -84,7 +85,8 @@ Use project-local tooling configs before handing off changes:
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
 - `make doc-check` → verify doc claims against code (heuristic function counts, closed issue state)
-- `make check` → runs all of the above
+- `make check` → auto-formats, then runs lint + lsp + test + doc-check
+- `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
   - **Post-release:** prepare a Nexus changelog entry (version + summary of user-facing changes) and add it via the Nexus "Add new changelog" form

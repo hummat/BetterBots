@@ -71,4 +71,4 @@ jobs:
       - name: Run checks
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make check
+        run: make check-ci

@@ -239,14 +239,15 @@ tests/
 ```bash
 make tool-info # shows the exact wrappers/binaries this repo will use
 make test      # runs busted, lua-busted, or Arch's luarocks path
-make check     # runs format + lint + lsp + test (full quality gate)
+make check     # auto-formats, then runs lint + lsp + test + doc-check
+make check-ci  # non-mutating CI gate: format-check + lint + lsp + test + doc-check
 ```
 
 `make lint` uses the repo-local `bin/luacheck` wrapper. `make test` does not
 depend on shell `PATH` mutation; it falls back to Arch's packaged luarocks
 runner when `busted` is not installed globally.
 
-Tests are enforced by CI — `make check` depends on `test`, and CI installs
+Tests are enforced by CI — `make check-ci` depends on `test`, and CI installs
 busted via luarocks.
 
 ### Engine stubs

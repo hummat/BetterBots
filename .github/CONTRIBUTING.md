@@ -37,7 +37,8 @@ tool paths and fallbacks the Make targets will use locally.
 | `make format` | Format with StyLua |
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
-| `make check` | Run all of the above |
+| `make check` | Auto-format, then run lint + lsp + tests + doc checks |
+| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
 | `make test` | Run busted tests (if tests/ exists) |
 | `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make release` | Tag and push a release |

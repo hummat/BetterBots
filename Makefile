@@ -2,7 +2,7 @@ LUA_FILES := $(shell find scripts tests -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
 ARCH_BUSTED_BIN := $(shell ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
 
-.PHONY: deps lint format format-check lsp-check check test doc-check release package tool-info
+.PHONY: deps lint format format-check lsp-check check check-ci test doc-check release package tool-info
 
 deps:
 	git config core.hooksPath scripts/hooks
@@ -24,7 +24,9 @@ lsp-check:
 doc-check:
 	@scripts/doc-check.sh
 
-check: format-check lint lsp-check test doc-check
+check: format lint lsp-check test doc-check
+
+check-ci: format-check lint lsp-check test doc-check
 
 test:
 	@if [ -d tests ]; then \
