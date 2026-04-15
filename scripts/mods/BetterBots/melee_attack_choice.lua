@@ -30,23 +30,49 @@ local DEFAULT_ATTACK_META_DATA = {
 	},
 }
 
+local function normalize_attack_meta_data(attack_meta_data)
+	if type(attack_meta_data) ~= "table" then
+		return nil
+	end
+
+	local action_inputs = attack_meta_data.action_inputs
+	if type(action_inputs) ~= "table" or type(action_inputs[1]) ~= "table" or action_inputs[1].action_input == nil then
+		return nil
+	end
+
+	if attack_meta_data.arc == nil then
+		attack_meta_data.arc = 0
+	end
+	if attack_meta_data.penetrating == nil then
+		attack_meta_data.penetrating = false
+	end
+	if attack_meta_data.no_damage == nil then
+		attack_meta_data.no_damage = false
+	end
+	if attack_meta_data.max_range == nil then
+		attack_meta_data.max_range = DEFAULT_MAXIMAL_MELEE_RANGE
+	end
+
+	return attack_meta_data
+end
+
 local function _score_attack(attack_input, attack_meta_data, target_armor, num_enemies, armored_type)
 	local outnumbered = num_enemies > 1
 	local massively_outnumbered = num_enemies > 3
 	local utility = 0
+	local arc = attack_meta_data.arc or 0
+	local penetrating = not not attack_meta_data.penetrating
+	local no_damage = not not attack_meta_data.no_damage
 
-	if outnumbered and attack_meta_data.arc == 1 then
+	if outnumbered and arc == 1 then
 		utility = utility + 1
-	elseif attack_meta_data.no_damage and massively_outnumbered and attack_meta_data.arc > 1 then
+	elseif no_damage and massively_outnumbered and arc > 1 then
 		utility = utility + 2
-	elseif
-		not attack_meta_data.no_damage
-		and ((outnumbered and attack_meta_data.arc > 1) or (not outnumbered and attack_meta_data.arc == 0))
-	then
+	elseif not no_damage and ((outnumbered and arc > 1) or (not outnumbered and arc == 0)) then
 		utility = utility + 4
 	end
 
-	if target_armor ~= armored_type or attack_meta_data.penetrating then
+	if target_armor ~= armored_type or penetrating then
 		utility = utility + 8
 	end
 
@@ -56,7 +82,7 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 		and outnumbered
 		and target_armor ~= armored_type
 		and attack_input == "light_attack"
-		and not attack_meta_data.no_damage
+		and not no_damage
 	then
 		utility = utility + horde_bias
 	end
@@ -71,19 +97,23 @@ local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemi
 	local best_utility = -math.huge
 
 	for attack_input, attack_meta_data in pairs(meta_data) do
-		local utility = _score_attack(attack_input, attack_meta_data, target_armor, num_enemies, armored_type)
-		local prefer_light_tie = utility == best_utility
-			and attack_input == "light_attack"
-			and best_attack_input ~= "light_attack"
+		local normalized_attack_meta_data = normalize_attack_meta_data(attack_meta_data)
+		if normalized_attack_meta_data then
+			local utility =
+				_score_attack(attack_input, normalized_attack_meta_data, target_armor, num_enemies, armored_type)
+			local prefer_light_tie = utility == best_utility
+				and attack_input == "light_attack"
+				and best_attack_input ~= "light_attack"
 
-		if best_utility < utility or prefer_light_tie then
-			best_attack_input = attack_input
-			best_attack_meta_data = attack_meta_data
-			best_utility = utility
+			if best_utility < utility or prefer_light_tie then
+				best_attack_input = attack_input
+				best_attack_meta_data = normalized_attack_meta_data
+				best_utility = utility
+			end
 		end
 	end
 
-	return best_attack_meta_data
+	return best_attack_meta_data or DEFAULT_ATTACK_META_DATA.light_attack
 end
 
 local function _enemy_bucket(num_enemies)
@@ -192,7 +222,10 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			and chosen == (weapon_template.attack_meta_data or {}).light_attack
 		then
 			_debug_log(
-				"melee_light_bias:" .. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
+				"melee_light_bias:"
+					.. tostring(weapon_template.name or weapon_template.display_name or "weapon")
+					.. ":"
+					.. tostring(scratchpad),
 				_fixed_time(),
 				"melee light-bias selected light attack for unarmored horde target"
 			)

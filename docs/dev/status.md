@@ -1,4 +1,4 @@
-# Status Snapshot (April 9, 2026)
+# Status Snapshot (April 13, 2026)
 
 ## What's shipped
 
@@ -40,7 +40,7 @@
 - **Staff charged fire fix** (#43): all 4 force staves now fire charged attacks. `find_chain_target_action()` fallback for chain-only fire actions (p1 Voidstrike, p2 Purgatus).
 - **Bot pinging** (#16): bots ping elites and specials for the human player.
 - **Distant special penalty** (#19): melee target selection distance penalty discourages bots from chasing distant specials.
-- **Daemonhost avoidance** (#17): suppress bot combat near dormant daemonhosts (code + tests, unverifiable in-game — no DH spawn).
+- **Daemonhost avoidance** (#17): suppress bot combat near non-aggroed daemonhosts. The current branch now has two gates: daemonhost `stage` is authoritative when available for target-based suppression, and offensive abilities plus close-range melee/ranged checks also bail out on a tight daemonhost proximity radius. Live re-validation is still pending.
 - **Unit tests**: 370 tests via busted.
 
 ## Current Tier Status
@@ -69,7 +69,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 | #4 | Blitz: shock mine | **Untested** | Profile in place, no bot equipped with it yet |
 | #4 | Grenade: ogryn cluster | **PASS** | 3 charges consumed with full wield→aim→throw→unwield cycle |
 | #16 | Bot pinging | **PASS** | 4 ping events for elites across multiple bots |
-| #17 | Daemonhost avoidance | **Gap found + patched 2026-04-11** | First DH spawn in v0.10.0 validation. Heuristic-path gap exposed: `grenade_fallback` → `_grenade_priority_target` bypassed the `condition_patch` BT wrappers, `psyker_smite` fired on dormant DH at 19m. Fix in commits `03ce4fd` + `ffe7c6b` adds `target_is_dormant_daemonhost` flag with a global aggro check and gates 5 heuristic sites. Re-validation pending. |
+| #17 | Daemonhost avoidance | **Gap found three times; patched 2026-04-11 and twice on 2026-04-15** | First DH spawn in v0.10.0 validation exposed the heuristic-path gap: `grenade_fallback` → `_grenade_priority_target` bypassed the `condition_patch` BT wrappers, `psyker_smite` fired on dormant DH at 19m. Fix in commits `03ce4fd` + `ffe7c6b` added `target_is_dormant_daemonhost` and gated 5 heuristic sites. A later 2026-04-15 run still behaved incorrectly because BetterBots only consulted `aggro_state`; the next patch made daemonhost `stage` authoritative when available across combat, ping, companion-tag, player-tag boost, sprint, and debug context. The latest 2026-04-15 DH run still showed immediate aggro because offensive abilities were only target-gated; the current branch now also restores a tight proximity gate for offensive abilities plus close-range melee/ranged checks. Re-validation pending. |
 | #19 | Distant special penalty | **PASS** | 30+ penalty events across 6 special breeds |
 | #43 | Staff p1 Voidstrike charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion` (bot=2, forcestaff_p1_m1) |
 | #43 | Staff p2 Purgatus charged fire | **PASS** | `_may_fire swap: fire=shoot_pressed -> aim_fire=trigger_charge_flame` (post-hotreload, charge=4) |
@@ -78,7 +78,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 ## Known Blockers
 
 1. **Hive Scum DLC (broker_ archetype)**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation. Arbites (adamant_ archetype) is available and testable.
-2. **#17 daemonhost avoidance**: v0.6.0 suppression had a heuristic-path gap (grenade_fallback bypassed BT condition wrappers). Found + patched 2026-04-11 in `03ce4fd` + `ffe7c6b`. Re-validation with the new build is the next gate — watch for `*_block_dormant_daemonhost` rule hits on a DH spawn. Secondary open question: how DH enters bot `target_enemy` pre-aggro with zero other enemies in proximity (vanilla target selection quirk, unresolved, masked by the carve-out).
+2. **#17 daemonhost avoidance**: v0.6.0 suppression first had a heuristic-path gap (grenade_fallback bypassed BT condition wrappers), then a state-model gap (`aggro_state` only was too late once the daemonhost started waking), then a scope gap (offensive abilities were still allowed near a sleeping daemonhost unless the DH had already become `target_enemy`). The current branch now uses daemonhost `stage` when available, preserves the long-range target-based carve-out, and restores a tight proximity gate for offensive abilities plus close-range melee/ranged checks. Re-validation with the new build is the next gate — watch for `*_block_dormant_daemonhost`, `ability suppressed (daemonhost_nearby)`, `melee/ranged suppressed (daemonhost nearby)`, and `dormant_daemonhost` skip lines on a DH spawn.
 3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
 ## v0.7.0 (2026-03-12)
@@ -161,16 +161,18 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
+- **v0.11.0 is not ready to tag yet** — `make check` is green on the current branch, but the release still has open validation gates: `#82`, `#90`, plus daemonhost re-validation on `#17`. `#82` no longer lacks live profiling data; it stays open because the latest real mission-end captures are still `99.1 us/bot/frame`, `109.3 us/bot/frame`, and `124.5 us/bot/frame`, all above the original `<80 us/bot/frame` target.
 - **v0.10.0 released 2026-04-11** — all 6 issues validated, tagged, pushed, GitHub release + Nexus package ready.
 - **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 
 ### Later batches
 
 - **v0.10.0 "Team Coordination"**: ALL CLOSED — ~~#7~~, ~~#14~~, ~~#37~~, ~~#49~~, ~~#81~~, ~~#83~~. 813 tests. **Released 2026-04-11.**
-- **v0.11.0 "Combat Execution" (final polish batch)**: #32 (mule pickup), #44 (human-likeness Tier A), #82 (perf audit, hard-capped), #87 (sustained fire for flamers), #89 (bot grenade pickup heuristic), #90 (melee/ranged target type hysteresis), #91 (weakspot aim MVP), #93 (grenade ballistic arc fix)
-- **v1.0.0 "Bot Identity"**: #13 (navmesh charges), #24 (healing items), #33 (weapon specials), #38 (talent-aware Martyrdom PoC), #41 (weapon-aware ADS), #86 (Tier 3 revive cover), #92 (per-breed weakspot map)
-- **Post-1.0 "Intelligence Architecture"**: #22 (utility scoring), #28 (profile management), #56 (com wheel), #80 (grenade tactical evaluator), #84 (user-authored profiles), #85 (ability identity refactor), #88 (deployable crate carry + deploy — filed 2026-04-11)
-- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost — heuristic carve-out staged 2026-04-11, re-validation pending)
+- **v0.11.0 "Combat Execution" (final polish batch)**: code complete on `dev/v0.11.0`, but still validation-gated. `#32`, `#44`, `#87`, `#89`, `#91`, and `#93` are now closed; `#82` and `#90` remain open. `#32` is now closed on authoritative runtime evidence from `console-2026-04-15-18.01.55...` (`mule pickup success: tome (bot=4)`), not just manual observation. `#90` now also has a BT-side opposite-type reswitch debounce on top of the earlier perception-layer hysteresis, but the latest run still shows heavy churn (`92` switch-entered lines vs `43` debounce suppressions, zero `type hold` / `type flip`), so it remains open.
+- **Closed 2026-04-13**: #44 (human-likeness Tier A — closed from current branch code + tests + live runtime markers for reaction-time patching and pressure-leash scaling; jitter remains test-covered but not separately logged), #93 (grenade ballistic arc fix — closed from live ballistic aim/wield/consume evidence plus manual gameplay confirmation that the remaining short-throw concern was gone)
+- **v1.0.0 "Bot Identity"**: #13 (navmesh charges), #24 (healing items), #33 (weapon specials), #38 (talent-aware Martyrdom PoC), #41 (weapon-aware ADS), #86 (Tier 3 revive cover), #92 (per-breed weakspot map), #97 (unified non-book resource arbitration after human reserve; deferred policy change from v0.11.x), #98 (engine-facing sparse metadata hardening after repeated melee crash fixes on 2026-04-15)
+- **Post-1.0 "Intelligence Architecture"**: #22 (utility scoring), #28 (profile management), #56 (com wheel), #80 (grenade tactical evaluator), #84 (user-authored profiles), #85 (ability identity refactor), #88 (deployable crate carry + deploy — filed 2026-04-11), #96 (explicit smart-tag item interactions -> bot pickup/drop orders — filed 2026-04-13 after VT2/Darktide command-path research; queue behind `#24` and `#88`)
+- **Validation-gated**: #8 (Hive Scum, DLC), #17 (daemonhost — heuristic carve-out staged 2026-04-11, stage-aware dormant detection and tight proximity suppression added 2026-04-15, re-validation pending)
 - **Closed 2026-04-11**: #54 (poxburster push validated in run `2026-04-11-poxburster-push`), #74 (per-bot throttle discriminator shipped v0.9.1 + exercised in same run)
 
 Planning artifacts for `#80`:

@@ -136,11 +136,9 @@ describe("resolve_decision", function()
 			_saved_has_extension = _G.ScriptUnit.has_extension
 			_G.ScriptUnit.has_extension = function(_unit, system_name)
 				if system_name == "perception_system" then
-					return {
-						enemies_in_proximity = function()
-							return {}, _num_enemies or 0
-						end,
-					}
+					return helper.make_bot_perception_extension({
+						num_enemies = _num_enemies or 0,
+					})
 				end
 
 				return nil
@@ -233,14 +231,10 @@ describe("resolve_decision", function()
 			-- returns a chaos_daemonhost breed with monster tag.
 			_G.ScriptUnit.has_extension = function(unit, system_name)
 				if unit == "dh_unit" and system_name == "unit_data_system" then
-					return {
-						breed = function()
-							return {
-								name = "chaos_daemonhost",
-								tags = { monster = true, witch = true },
-							}
-						end,
-					}
+					return helper.make_minion_unit_data_extension({
+						name = "chaos_daemonhost",
+						tags = { monster = true, witch = true },
+					})
 				end
 				return nil
 			end
@@ -264,6 +258,7 @@ describe("resolve_decision", function()
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_true(ctx.target_is_monster)
 			assert.is_true(ctx.target_is_dormant_daemonhost)
+			assert.equals("missing", ctx.target_daemonhost_aggro_state)
 		end)
 
 		it("sets flag true when DH perception aggro_state is passive", function()
@@ -271,6 +266,7 @@ describe("resolve_decision", function()
 			BLACKBOARDS["dh_unit"] = { perception = { aggro_state = "passive" } }
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_true(ctx.target_is_dormant_daemonhost)
+			assert.equals("passive", ctx.target_daemonhost_aggro_state)
 		end)
 
 		it("sets flag true when DH perception aggro_state is alerted", function()
@@ -278,6 +274,7 @@ describe("resolve_decision", function()
 			BLACKBOARDS["dh_unit"] = { perception = { aggro_state = "alerted" } }
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_true(ctx.target_is_dormant_daemonhost)
+			assert.equals("alerted", ctx.target_daemonhost_aggro_state)
 		end)
 
 		it("clears flag when DH perception aggro_state is aggroed", function()
@@ -286,6 +283,7 @@ describe("resolve_decision", function()
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_true(ctx.target_is_monster)
 			assert.is_false(ctx.target_is_dormant_daemonhost)
+			assert.equals("aggroed", ctx.target_daemonhost_aggro_state)
 		end)
 
 		it("clears flag when DH is aggroed on a different unit (global semantics)", function()
@@ -297,19 +295,16 @@ describe("resolve_decision", function()
 			}
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_false(ctx.target_is_dormant_daemonhost)
+			assert.equals("aggroed", ctx.target_daemonhost_aggro_state)
 		end)
 
 		it("leaves flag false for non-daemonhost monster breeds", function()
 			_G.ScriptUnit.has_extension = function(unit, system_name)
 				if unit == "beast_unit" and system_name == "unit_data_system" then
-					return {
-						breed = function()
-							return {
-								name = "chaos_beast_of_nurgle",
-								tags = { monster = true },
-							}
-						end,
-					}
+					return helper.make_minion_unit_data_extension({
+						name = "chaos_beast_of_nurgle",
+						tags = { monster = true },
+					})
 				end
 				return nil
 			end
@@ -319,6 +314,7 @@ describe("resolve_decision", function()
 			local ctx = Heuristics.build_context("bot1", blackboard)
 			assert.is_true(ctx.target_is_monster)
 			assert.is_false(ctx.target_is_dormant_daemonhost)
+			assert.is_nil(ctx.target_daemonhost_aggro_state)
 		end)
 	end)
 end)

@@ -1,8 +1,13 @@
+local test_helper = require("tests.test_helper")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
+
 describe("TargetSelection", function()
 	local TargetSelection
 	local _mod
 	local original_slot_weight
 	local original_line_of_sight_weight
+	local game_object_ids
+	local game_object_fields
 
 	local function make_smart_tag_system(target_unit, is_human)
 		return {
@@ -29,11 +34,7 @@ describe("TargetSelection", function()
 		_G.ScriptUnit = {
 			has_extension = function(unit, name)
 				if name == "unit_data_system" and unit and unit._breed then
-					return {
-						breed = function()
-							return unit._breed
-						end,
-					}
+					return test_helper.make_minion_unit_data_extension(unit._breed)
 				end
 				return nil
 			end,
@@ -53,8 +54,27 @@ describe("TargetSelection", function()
 						end
 					end,
 				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
 			},
 		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+		game_object_ids = {}
+		game_object_fields = {}
 
 		-- Mock the mod object
 		_mod = {
@@ -79,6 +99,7 @@ describe("TargetSelection", function()
 			fixed_time = function()
 				return 0
 			end,
+			shared_rules = SharedRules,
 		})
 
 		original_slot_weight = function(_unit, _target_unit, _target_distance_sq, _target_breed, _target_ally)
@@ -115,6 +136,7 @@ describe("TargetSelection", function()
 		_G.Managers = nil
 		_G.BLACKBOARDS = nil
 		_G.ScriptUnit = nil
+		_G.GameSession = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -194,6 +216,140 @@ describe("TargetSelection", function()
 		assert.are.equal(5, score)
 	end)
 
+	it("reuses smart-tag lookup within one fixed_t and refreshes on next frame", function()
+		local target_unit = {}
+		local smart_tag_calls = 0
+		local fixed_t = 0
+
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return {
+					unit_tag = function(_, unit)
+						if unit == target_unit then
+							smart_tag_calls = smart_tag_calls + 1
+							return {
+								tagger_player = function()
+									return {
+										is_human_controlled = function()
+											return true
+										end,
+									}
+								end,
+							}
+						end
+						return nil
+					end,
+				}
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "chaos_hound" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(1, smart_tag_calls)
+
+		fixed_t = 1
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(2, smart_tag_calls)
+	end)
+
+	it("reuses companion-pin lookup within one fixed_t", function()
+		local target_unit = {}
+		local attacker_unit = {
+			_breed = { breed_type = "companion" },
+		}
+		local fixed_t = 0
+		local extension_calls = 0
+		local saved_script_unit = _G.ScriptUnit
+
+		_G.BLACKBOARDS[target_unit] = {
+			disable = { is_disabled = true, type = "pounced", attacker_unit = attacker_unit },
+		}
+		_G.ScriptUnit = {
+			has_extension = function(unit, name)
+				if unit == attacker_unit and name == "unit_data_system" then
+					extension_calls = extension_calls + 1
+				end
+				if name == "unit_data_system" and unit and unit._breed then
+					return test_helper.make_minion_unit_data_extension(unit._breed)
+				end
+				return nil
+			end,
+		}
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { elite = true }, name = "renegade_captain" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(1, extension_calls)
+
+		_G.ScriptUnit = saved_script_unit
+	end)
+
+	it("reuses slot ammo lookup within one fixed_t and refreshes on next frame", function()
+		local target_unit = {}
+		local ammo_calls = 0
+		local fixed_t = 0
+
+		package.loaded["scripts/utilities/ammo"].current_slot_percentage = function(unit, _slot)
+			ammo_calls = ammo_calls + 1
+			if unit.has_ammo then
+				return 1.0
+			end
+			return 0.0
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { special = true }, name = "chaos_hound" }
+
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		assert.are.equal(1, ammo_calls)
+
+		fixed_t = 1
+		_mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 400, breed, nil)
+		assert.are.equal(2, ammo_calls)
+	end)
+
 	-- #48: player tag boost
 	it("has_human_player_tag returns true for human-tagged unit", function()
 		local target_unit = {}
@@ -265,6 +421,113 @@ describe("TargetSelection", function()
 		local target_unit = {}
 		local unit = { has_ammo = true }
 		local breed = { tags = { elite = true }, name = "chaos_hound" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("does not boost score for a human-tagged dormant daemonhost when avoidance is enabled", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "passive",
+			},
+		}
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("still boosts score for a human-tagged aggroed daemonhost when avoidance is enabled", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "aggroed",
+			},
+		}
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(8, score)
+	end)
+
+	it("does not boost score for a waking daemonhost stage even if aggro_state already flipped", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "aggroed",
+			},
+		}
+		game_object_ids[target_unit] = "daemonhost_go"
+		game_object_fields.daemonhost_go = { stage = 5 }
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
 		assert.are.equal(5, score)
 	end)

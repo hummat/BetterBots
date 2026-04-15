@@ -1,5 +1,12 @@
 # Known Issues and Risks
 
+## Current v0.11.0 release-candidate blockers
+
+1. `#17` daemonhost avoidance still needs another live spawn after the 2026-04-15 stage-aware dormant-daemonhost fix. Earlier logs proved daemonhosts spawn dormant, but BetterBots was only consulting `aggro_state`, so by the time bots reacted the target often already looked `aggroed`. The code now treats daemonhost `stage != aggroed` as authoritative when the field is available; the next real spawn needs to show the new `dormant_daemonhost` suppression lines.
+2. `#32` mule pickup no longer crashes on stale units, and the current branch now overrides vanilla's nearby-human suppression for auto-mule books, but there is still no live tome/scripture pickup confirmation in the current branch logs.
+3. `#82` perf audit code is in and fresh `/bb_perf` captures now exist on the current branch, but the latest real mission-end samples are still `99.1 us/bot/frame` and `109.3 us/bot/frame`, so the original `<80 us/bot/frame` target is still unmet.
+4. `#90` target-type hysteresis still needs another live combat run. The latest log finally proved the symptom layer is real (`230` `wrong slot ...` / `switch_* entered` lines) while the old perception-layer hysteresis never fired (`0` `type flip` / `type hold`). A BT-side opposite-type switch debounce is now in place, but it still needs live confirmation.
+
 ## High severity
 
 1. ~~DMF `hook_require` clobbering~~ **Fixed in v0.9.1** (#67). The melee hooks now install through one consolidated `bt_bot_melee_action` hook, restoring both melee light bias and poxburster push behavior. `#54` and `#74` validated in the 2026-04-11 live run (full push chain at 16:33:12), so the related follow-ups are also closed.

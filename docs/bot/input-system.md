@@ -106,6 +106,8 @@ This ensures ephemeral inputs (like `jump`, `dodge`, `combat_ability_pressed`, e
 
 **Important:** BotUnitInput only sets `jump`, `crouching`, `interact_pressed/hold`, and `dodge` in `_update_actions` and `_update_movement`. It does NOT set weapon/ability raw inputs (like `combat_ability_pressed`). Those go through the ActionInputParser's bot request queue instead.
 
+**With BetterBots `#87`:** supported sustained-fire ranged paths are the exception to that last sentence. The queued `weapon_action` still enters through `ActionInputParser`, but `sustained_fire.lua` mirrors the required low-level hold inputs back into `BotUnitInput._update_actions` while the sustained path is active. That bridge currently covers `action_one_hold` full-auto/stream paths plus Purgatus's `action_two_hold` flame-charge hold.
+
 ### Setter Methods Called by BT Nodes
 
 | Method | Called By | Effect |
@@ -642,6 +644,22 @@ BetterBots also implements a fallback path that hooks into the BT condition chec
 4. Manages its own state machine with `state.active`, `state.wait_sent`, `state.next_try_t`
 
 This duplicates the BT node's logic but runs outside the BT, providing a safety net when the normal BT path fails.
+
+### BetterBots Sustained-Fire Bridge
+
+Held-fire ranged weapons split across both bot input pathways:
+
+1. high-level `weapon_action` queue selects the action input (`shoot`, `zoom_shoot`, `shoot_braced`, `trigger_charge_flame`, etc.)
+2. low-level raw hold input must stay true across frames for the action state to keep streaming
+
+Vanilla bots do step 1 but not step 2, so full-auto / stream weapons degrade into taps. BetterBots `#87` fixes this by:
+
+1. observing successful `weapon_action` requests on `PlayerUnitActionInputExtension.bot_queue_action_input`
+2. arming short-lived per-unit sustained state for supported template/action-input pairs
+3. injecting the required raw hold inputs during `BotUnitInput._update_actions`
+4. clearing the state on explicit stop inputs, template changes, or staleness
+
+This is intentionally narrower than `#41`: it does not decide whether the bot should ADS, brace, or hipfire. It only keeps the already-chosen sustained path alive.
 
 ---
 

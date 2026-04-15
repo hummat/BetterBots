@@ -2,6 +2,7 @@ local Settings = dofile("scripts/mods/BetterBots/settings.lua")
 local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local helper = require("tests.test_helper")
+local _saved_managers = rawget(_G, "Managers")
 
 local function mock_mod(overrides)
 	return {
@@ -14,7 +15,31 @@ local function mock_mod(overrides)
 	}
 end
 
+local function set_challenge(challenge)
+	_G.Managers = {
+		state = {
+			difficulty = {
+				get_challenge = function()
+					return challenge
+				end,
+			},
+		},
+	}
+end
+
+local function restore_managers()
+	_G.Managers = _saved_managers
+end
+
 describe("settings", function()
+	before_each(function()
+		restore_managers()
+	end)
+
+	after_each(function()
+		restore_managers()
+	end)
+
 	describe("resolve_preset", function()
 		it("defaults to balanced when mod returns nil", function()
 			Settings.init(mock_mod({}))
@@ -125,6 +150,409 @@ describe("settings", function()
 
 			assert.are.equal(0.20, Settings.bot_ranged_ammo_threshold())
 			assert.are.equal(0.80, Settings.human_ammo_reserve_threshold())
+		end)
+	end)
+
+	describe("grenade pickup settings", function()
+		it("returns default human grenade reserve threshold when mod returns nil", function()
+			Settings.init(mock_mod({}))
+
+			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
+		end)
+
+		it("reads numeric human grenade reserve slider values", function()
+			Settings.init(mock_mod({
+				bot_human_grenade_reserve_threshold = 75,
+			}))
+
+			assert.are.equal(0.75, Settings.human_grenade_reserve_threshold())
+		end)
+
+		it("accepts stringified human grenade reserve slider values from DMF", function()
+			Settings.init(mock_mod({
+				bot_human_grenade_reserve_threshold = "100",
+			}))
+
+			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
+		end)
+
+		it("falls back to defaults for invalid human grenade reserve slider values", function()
+			Settings.init(mock_mod({
+				bot_human_grenade_reserve_threshold = 101,
+			}))
+
+			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
+		end)
+	end)
+
+	describe("mule pickup settings", function()
+		it("disables bot grimoire pickup by default", function()
+			Settings.init(mock_mod({}))
+
+			assert.is_false(Settings.is_bot_grimoire_pickup_enabled())
+		end)
+
+		it("enables bot grimoire pickup when setting is on", function()
+			Settings.init(mock_mod({
+				enable_bot_grimoire_pickup = true,
+			}))
+
+			assert.is_true(Settings.is_bot_grimoire_pickup_enabled())
+		end)
+	end)
+
+	describe("human-likeness profiles", function()
+		it("defaults split profiles and custom defaults to auto", function()
+			Settings.init(mock_mod({}))
+
+			assert.equals("auto", Settings.human_timing_profile())
+			assert.equals("auto", Settings.pressure_leash_profile())
+			assert.equals("auto", Settings.DEFAULTS.human_timing_profile)
+			assert.equals("auto", Settings.DEFAULTS.pressure_leash_profile)
+			assert.equals(2, Settings.DEFAULTS.human_timing_reaction_min)
+			assert.equals(4, Settings.DEFAULTS.human_timing_reaction_max)
+			assert.equals(100, Settings.DEFAULTS.human_timing_defensive_jitter_min_ms)
+			assert.equals(250, Settings.DEFAULTS.human_timing_defensive_jitter_max_ms)
+			assert.equals(250, Settings.DEFAULTS.human_timing_opportunistic_jitter_min_ms)
+			assert.equals(700, Settings.DEFAULTS.human_timing_opportunistic_jitter_max_ms)
+			assert.equals(12, Settings.DEFAULTS.pressure_leash_start_rating)
+			assert.equals(30, Settings.DEFAULTS.pressure_leash_full_rating)
+			assert.equals(65, Settings.DEFAULTS.pressure_leash_scale_percent)
+			assert.equals(7, Settings.DEFAULTS.pressure_leash_floor_m)
+		end)
+
+		it("migrates legacy enable_human_likeness=false to off when new profiles are unset", function()
+			Settings.init(mock_mod({
+				enable_human_likeness = false,
+			}))
+
+			assert.equals("off", Settings.human_timing_profile())
+			assert.equals("off", Settings.pressure_leash_profile())
+		end)
+
+		it("defaults unset sibling profiles to auto when only one axis is explicitly set", function()
+			Settings.init(mock_mod({
+				enable_human_likeness = false,
+				human_timing_profile = "fast",
+			}))
+
+			assert.equals("fast", Settings.human_timing_profile())
+			assert.equals("auto", Settings.pressure_leash_profile())
+		end)
+
+		it("resolves auto timing config to medium when no difficulty manager exists", function()
+			Settings.init(mock_mod({ human_timing_profile = "auto" }))
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 2,
+				reaction_max = 4,
+				defensive_jitter_min_s = 0.10,
+				defensive_jitter_max_s = 0.25,
+				opportunistic_jitter_min_s = 0.25,
+				opportunistic_jitter_max_s = 0.70,
+			}, Settings.resolve_human_timing_config())
+		end)
+
+		it("prefers explicit profiles over the legacy checkbox", function()
+			Settings.init(mock_mod({
+				enable_human_likeness = false,
+				human_timing_profile = "fast",
+				pressure_leash_profile = "strong",
+			}))
+
+			assert.equals("fast", Settings.human_timing_profile())
+			assert.equals("strong", Settings.pressure_leash_profile())
+		end)
+
+		it("resolves auto timing config by mission difficulty", function()
+			local cases = {
+				{
+					challenge = 1,
+					expected = {
+						enabled = true,
+						reaction_min = 3,
+						reaction_max = 6,
+						defensive_jitter_min_s = 0.15,
+						defensive_jitter_max_s = 0.35,
+						opportunistic_jitter_min_s = 0.40,
+						opportunistic_jitter_max_s = 1.00,
+					},
+				},
+				{
+					challenge = 3,
+					expected = {
+						enabled = true,
+						reaction_min = 2,
+						reaction_max = 4,
+						defensive_jitter_min_s = 0.10,
+						defensive_jitter_max_s = 0.25,
+						opportunistic_jitter_min_s = 0.25,
+						opportunistic_jitter_max_s = 0.70,
+					},
+				},
+				{
+					challenge = 4,
+					expected = {
+						enabled = true,
+						reaction_min = 1,
+						reaction_max = 3,
+						defensive_jitter_min_s = 0.05,
+						defensive_jitter_max_s = 0.15,
+						opportunistic_jitter_min_s = 0.15,
+						opportunistic_jitter_max_s = 0.45,
+					},
+				},
+				{
+					challenge = 5,
+					expected = {
+						enabled = true,
+						reaction_min = 1,
+						reaction_max = 3,
+						defensive_jitter_min_s = 0.05,
+						defensive_jitter_max_s = 0.15,
+						opportunistic_jitter_min_s = 0.15,
+						opportunistic_jitter_max_s = 0.45,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				set_challenge(case.challenge)
+				Settings.init(mock_mod({ human_timing_profile = "auto" }))
+
+				assert.are.same(case.expected, Settings.resolve_human_timing_config())
+			end
+		end)
+
+		it("resolves medium timing config", function()
+			Settings.init(mock_mod({ human_timing_profile = "medium" }))
+
+			local config = Settings.resolve_human_timing_config()
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 2,
+				reaction_max = 4,
+				defensive_jitter_min_s = 0.10,
+				defensive_jitter_max_s = 0.25,
+				opportunistic_jitter_min_s = 0.25,
+				opportunistic_jitter_max_s = 0.70,
+			}, config)
+		end)
+
+		it("resolves off timing config", function()
+			Settings.init(mock_mod({ human_timing_profile = "off" }))
+
+			local config = Settings.resolve_human_timing_config()
+
+			assert.are.same({
+				enabled = false,
+				reaction_min = 10,
+				reaction_max = 20,
+				defensive_jitter_min_s = 0,
+				defensive_jitter_max_s = 0,
+				opportunistic_jitter_min_s = 0,
+				opportunistic_jitter_max_s = 0,
+			}, config)
+		end)
+
+		it("uses medium timing config when custom sliders are invalid", function()
+			Settings.init(mock_mod({
+				human_timing_profile = "custom",
+				human_timing_reaction_min = "bad",
+				human_timing_reaction_max = 5,
+				human_timing_defensive_jitter_min_ms = 80,
+				human_timing_defensive_jitter_max_ms = 180,
+				human_timing_opportunistic_jitter_min_ms = 200,
+				human_timing_opportunistic_jitter_max_ms = 900,
+			}))
+
+			local config = Settings.resolve_human_timing_config()
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 2,
+				reaction_max = 4,
+				defensive_jitter_min_s = 0.10,
+				defensive_jitter_max_s = 0.25,
+				opportunistic_jitter_min_s = 0.25,
+				opportunistic_jitter_max_s = 0.70,
+			}, config)
+		end)
+
+		it("uses medium timing config when custom ranges are inverted", function()
+			Settings.init(mock_mod({
+				human_timing_profile = "custom",
+				human_timing_reaction_min = 5,
+				human_timing_reaction_max = 1,
+				human_timing_defensive_jitter_min_ms = 80,
+				human_timing_defensive_jitter_max_ms = 180,
+				human_timing_opportunistic_jitter_min_ms = 200,
+				human_timing_opportunistic_jitter_max_ms = 900,
+			}))
+
+			local config = Settings.resolve_human_timing_config()
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 2,
+				reaction_max = 4,
+				defensive_jitter_min_s = 0.10,
+				defensive_jitter_max_s = 0.25,
+				opportunistic_jitter_min_s = 0.25,
+				opportunistic_jitter_max_s = 0.70,
+			}, config)
+		end)
+
+		it("uses custom timing slider values when valid", function()
+			Settings.init(mock_mod({
+				human_timing_profile = "custom",
+				human_timing_reaction_min = 1,
+				human_timing_reaction_max = 5,
+				human_timing_defensive_jitter_min_ms = 80,
+				human_timing_defensive_jitter_max_ms = 180,
+				human_timing_opportunistic_jitter_min_ms = 200,
+				human_timing_opportunistic_jitter_max_ms = 900,
+			}))
+
+			local config = Settings.resolve_human_timing_config()
+
+			assert.are.same({
+				enabled = true,
+				reaction_min = 1,
+				reaction_max = 5,
+				defensive_jitter_min_s = 0.08,
+				defensive_jitter_max_s = 0.18,
+				opportunistic_jitter_min_s = 0.20,
+				opportunistic_jitter_max_s = 0.90,
+			}, config)
+		end)
+
+		it("resolves strong pressure leash config", function()
+			Settings.init(mock_mod({ pressure_leash_profile = "strong" }))
+
+			local config = Settings.resolve_pressure_leash_config()
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 8,
+				full_rating = 24,
+				scale_multiplier = 0.50,
+				floor_m = 6,
+			}, config)
+		end)
+
+		it("resolves auto pressure leash config by mission difficulty", function()
+			local cases = {
+				{
+					challenge = 1,
+					expected = {
+						enabled = true,
+						start_rating = 16,
+						full_rating = 36,
+						scale_multiplier = 0.80,
+						floor_m = 8,
+					},
+				},
+				{
+					challenge = 3,
+					expected = {
+						enabled = true,
+						start_rating = 12,
+						full_rating = 30,
+						scale_multiplier = 0.65,
+						floor_m = 7,
+					},
+				},
+				{
+					challenge = 4,
+					expected = {
+						enabled = true,
+						start_rating = 12,
+						full_rating = 30,
+						scale_multiplier = 0.65,
+						floor_m = 7,
+					},
+				},
+				{
+					challenge = 5,
+					expected = {
+						enabled = true,
+						start_rating = 8,
+						full_rating = 24,
+						scale_multiplier = 0.50,
+						floor_m = 6,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				set_challenge(case.challenge)
+				Settings.init(mock_mod({ pressure_leash_profile = "auto" }))
+
+				assert.are.same(case.expected, Settings.resolve_pressure_leash_config())
+			end
+		end)
+
+		it("uses medium pressure config when custom sliders are invalid", function()
+			Settings.init(mock_mod({
+				pressure_leash_profile = "custom",
+				pressure_leash_start_rating = "bad",
+				pressure_leash_full_rating = 20,
+				pressure_leash_scale_percent = 75,
+				pressure_leash_floor_m = 9,
+			}))
+
+			local config = Settings.resolve_pressure_leash_config()
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 12,
+				full_rating = 30,
+				scale_multiplier = 0.65,
+				floor_m = 7,
+			}, config)
+		end)
+
+		it("uses medium pressure config when full rating is not greater than start", function()
+			Settings.init(mock_mod({
+				pressure_leash_profile = "custom",
+				pressure_leash_start_rating = 14,
+				pressure_leash_full_rating = 14,
+				pressure_leash_scale_percent = 75,
+				pressure_leash_floor_m = 9,
+			}))
+
+			local config = Settings.resolve_pressure_leash_config()
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 12,
+				full_rating = 30,
+				scale_multiplier = 0.65,
+				floor_m = 7,
+			}, config)
+		end)
+
+		it("uses custom pressure slider values when valid", function()
+			Settings.init(mock_mod({
+				pressure_leash_profile = "custom",
+				pressure_leash_start_rating = 14,
+				pressure_leash_full_rating = 34,
+				pressure_leash_scale_percent = 75,
+				pressure_leash_floor_m = 9,
+			}))
+
+			local config = Settings.resolve_pressure_leash_config()
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 14,
+				full_rating = 34,
+				scale_multiplier = 0.75,
+				floor_m = 9,
+			}, config)
 		end)
 	end)
 
@@ -283,6 +711,7 @@ describe("settings", function()
 			assert.is_true(Settings.is_feature_enabled("engagement_leash"))
 			assert.is_true(Settings.is_feature_enabled("smart_targeting"))
 			assert.is_true(Settings.is_feature_enabled("daemonhost_avoidance"))
+			assert.is_true(Settings.is_feature_enabled("target_type_hysteresis"))
 		end)
 
 		it("returns true for unknown feature names", function()
@@ -320,6 +749,16 @@ describe("settings", function()
 		it("gates engagement_leash feature correctly", function()
 			Settings.init(mock_mod({ enable_engagement_leash = false }))
 			assert.is_false(Settings.is_feature_enabled("engagement_leash"))
+		end)
+
+		it("gates target_type_hysteresis feature correctly", function()
+			Settings.init(mock_mod({ enable_target_type_hysteresis = false }))
+			assert.is_false(Settings.is_feature_enabled("target_type_hysteresis"))
+		end)
+
+		it("gates team_cooldown feature correctly", function()
+			Settings.init(mock_mod({ enable_team_cooldown = false }))
+			assert.is_false(Settings.is_feature_enabled("team_cooldown"))
 		end)
 	end)
 
@@ -515,6 +954,62 @@ describe("settings", function()
 						tostring(result),
 						tostring(rule)
 					)
+				)
+			end
+		end)
+
+		it("resolves auto pressure leash config to medium when no difficulty manager exists", function()
+			Settings.init(mock_mod({ pressure_leash_profile = "auto" }))
+
+			assert.are.same({
+				enabled = true,
+				start_rating = 12,
+				full_rating = 30,
+				scale_multiplier = 0.65,
+				floor_m = 7,
+			}, Settings.resolve_pressure_leash_config())
+		end)
+	end)
+
+	describe("settings surface parity", function()
+		it("every defaulted setting has a widget and localization entry", function()
+			local data_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
+			local data_source = assert(data_handle:read("*a"))
+			data_handle:close()
+
+			local localization_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
+			local localization_source = assert(localization_handle:read("*a"))
+			localization_handle:close()
+			assert.is_truthy(data_source:find('setting_id = "human_timing_profile"', 1, true))
+			assert.is_truthy(data_source:find('setting_id = "pressure_leash_profile"', 1, true))
+			assert.is_truthy(data_source:find('text = "human_timing_profile_auto", value = "auto"', 1, true))
+			assert.is_truthy(data_source:find('text = "pressure_leash_profile_auto", value = "auto"', 1, true))
+			assert.is_nil(data_source:find('setting_id = "enable_human_likeness"', 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_auto = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_fast = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_slow = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_auto = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_light = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_strong = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_custom = {", 1, true))
+
+			for setting_id in pairs(Settings.DEFAULTS) do
+				local has_widget = data_source:find('"' .. setting_id .. '"', 1, true)
+				if not has_widget and setting_id:match("^bot_slot_%d+_profile$") then
+					has_widget = data_source:find("make_slot_dropdown(", 1, true)
+				end
+
+				assert.is_truthy(has_widget, "missing widget for setting " .. setting_id)
+				assert.is_truthy(
+					localization_source:find(setting_id .. " = {", 1, true),
+					"missing localization for setting " .. setting_id
 				)
 			end
 		end)

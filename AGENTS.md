@@ -19,8 +19,9 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — 813 unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, target_selection, team_cooldown, vfx_suppression, weapon_action)
-- `make check` — full quality gate (format + lint + lsp + test)
+- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
+- `make check-ci` — CI quality gate: format-check + lint + lsp + test + doc-check
 
 **In-game** (manual verification):
 1. Launch with SoloPlay + Tertium5/6 mods active
@@ -29,6 +30,8 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 4. See `docs/dev/validation-tracker.md` for structured run entries and the heuristic validation matrix
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
+
+**Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95. Current audited surface + source-line evidence: `docs/dev/mock-api-audit.md`.
 
 ## Debugging
 
@@ -53,23 +56,44 @@ See `docs/dev/logging.md` for the full logging architecture, output channels, lo
 - Console logs: `tail -f` on `console_logs/console-*.log` — **read `docs/dev/debugging.md` for log patterns and grep recipes before searching logs** (the log format is non-obvious and easy to miss with wrong patterns)
 - **Modding Tools** (Nexus #312): table inspector + variable watcher (recommended for development)
 
+## Settings surface
+
+Every BetterBots addition must be adjustable or toggleable via the mod settings UI, with one exception: vanilla bug fixes (guards against engine crashes, nil-safety patches, etc.) that restore correct behavior may be unconditionally active.
+
+**What "adjustable" means per feature type:**
+- **New behavior** (ability activation, targeting changes, pickup policies): a boolean toggle under the appropriate settings category, defaulting to `true` (on)
+- **Tuning parameters** (distances, thresholds, timers): a numeric slider or dropdown with sensible defaults and min/max bounds
+- **Risky or opinionated behavior** (grimoire pickup, aggressive presets): default to `false` (off) — opt-in, not opt-out
+
+**Implementation checklist for new settings:**
+1. Add default to `M.DEFAULTS` in `settings.lua`
+2. Add `FEATURE_GATES` entry (for boolean toggles) or accessor function (for numeric values)
+3. Add widget definition in `BetterBots_data.lua`
+4. Add localized label + description in `BetterBots_localization.lua`
+5. Wire `is_enabled` / getter through the module's `init()` deps
+6. Gate the module's hooks/behavior behind the setting at runtime
+
+**Why:** Solo Play users have wildly different preferences and hardware. A feature that helps one player may annoy another. Settings cost almost nothing to add but are impossible to retrofit without breaking saved configs. The mod's value proposition is "bots that actually use abilities" — not "bots that behave exactly how the developer thinks they should."
+
 ## Local static checks
 
 Use project-local tooling configs before handing off changes:
 
+- `make tool-info` → show the exact tool binaries and fallback paths that `make` will use
 - `make deps` → install git hooks (conventional commits + StyLua pre-commit)
 - `make lint` → `luacheck` with `.luacheckrc`
 - `make format-check` / `make format` → `stylua` with `.stylua.toml`
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
 - `make doc-check` → verify doc claims against code (heuristic function counts, closed issue state)
-- `make check` → runs all of the above
+- `make check` → auto-formats, then runs lint + lsp + test + doc-check
+- `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → check + package + tag + push + upload ZIP (CI also attaches ZIP)
   - **Post-release:** prepare a Nexus changelog entry (version + summary of user-facing changes) and add it via the Nexus "Add new changelog" form
 
 Notes:
 
-- `make test` auto-detects a busted runner (`busted`, `lua-busted`, or Arch's packaged luarocks path).
+- `make test` tries `busted`, `lua-busted`, then Arch's packaged luarocks path.
 - `make test` is a no-op unless a `tests/` directory exists.
 
 ## Commit conventions
@@ -79,6 +103,39 @@ Use [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): 
 Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `revert`, `style`, `build`
 
 Enforced by local `commit-msg` hook (install via `make deps`) and CI commit-lint on PRs.
+
+## Outward-facing writing
+
+Before drafting any text aimed at users or external communities, invoke **both** of these skills:
+
+1. **`human-writing`** skill — strips AI-generated patterns (over-enthusiastic openings, buzzword soup, vague claims, unnecessary hedging, robotic feature lists). Mandates specifics, honest limitations, active voice.
+2. **`style`** skill with **`blog:`** register — applies Matthias's voice (first person singular, "turns out" signature, short payoff sentences alternating with longer ones, fragments OK, honest opinions, no banned vocab like "delve"/"showcase"/"underscore"/"utilize").
+
+Order: detect the surface is outward-facing → invoke `human-writing` → invoke `style` with `blog:` prefix → draft → self-check against both skills' red flags before presenting.
+
+**Surfaces this applies to:**
+- Nexus description (`docs/nexus-description.bbcode`)
+- Nexus changelog text (when preparing a release entry)
+- README highlights / user-visible blocks
+- Reddit / Fatshark forum / Discord / Steam Community Hub posts
+- Promotion drafts in memory (`promotion_drafts.md`)
+- Any DM/PM to a mod author, creator, or community member
+- Any text copied out of this repo into an external channel
+
+**Exempt:**
+- CLAUDE.md, AGENTS.md, internal docs under `docs/dev/`
+- Source code + code comments
+- Commit messages (use the `/commit` skill instead)
+- Test specs
+- Conversational replies inside a session
+
+**Register calibration.** Outward-facing is not one register. The two skills strip AI patterns and apply Matthias-blog voice, but that voice is not always the right tone. Pick the register before drafting:
+
+- **Blog / showcase register** — Nexus description, Reddit/forum post, Steam Guide, README highlights, changelog. Explanatory, opinionated, first-person, problem → fix → honest limits. Default when writing *about* the mod for a broad audience.
+- **Peer / insider register** — Modders Discord `#creation-showcase`, mod-author discussions once contact is established, technical PR comments. Skip the problem setup — they know vanilla bots are broken. Lead with what you built mechanically. Concise.
+- **Favor-ask / cold-PM register** — first DM to a stranger (other mod authors, creators, Fatshark staff). Warm, deferential, low-pressure. Name the recipient. Lead with the ask, not the feature list. Keep the feature paragraph short. Close with genuine thanks.
+
+All three still invoke `human-writing` + `style:blog` for pattern-stripping, but the **framing and cadence** differ. A cold-email pitch written in blog-showcase register reads transactional and templated. See `memory/promotion_plan.md` "Positioning principles" and `memory/promotion_drafts.md` for worked examples.
 
 ## Branching workflow
 
@@ -147,7 +204,9 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 Local clone: `../Darktide-Source-Code/`
 
-**Before starting any new feature work**, pull the latest decompiled source:
+**Before starting any new feature work, or answering any Darktide patch/"latest"/"did Fatshark change X" question, pull the latest decompiled source first. Do this before any web search or browsing.** The local decompiled repo is the first source of truth for mechanics and patch impact in this project; online sources are fallback only when the local clone is missing or confirmed not yet updated.
+
+Required command:
 ```bash
 cd ../Darktide-Source-Code && git pull && cd -
 ```
@@ -155,6 +214,14 @@ If the clone doesn't exist, create it:
 ```bash
 gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 1
 ```
+
+**Hard rule for patch analysis:** if the user mentions a version number (for example `1.11.4`), "Warband", "new path", patch notes, or asks whether a game change has implications for BetterBots, first:
+1. Check that `../Darktide-Source-Code/` exists
+2. Run `git pull`
+3. Inspect the local repo's latest commit/version
+4. Only then decide whether external browsing is still necessary
+
+Do not jump to web search first for Darktide mechanics or patch-impact questions.
 
 **Repo structure:**
 - `scripts/extension_systems/` — runtime systems (ability, behavior, weapon, input, UI)
@@ -197,16 +264,18 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 
 **GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
-**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts, module count/name parity, test count parity, and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
+**CLI failure handling:** If a critical CLI command fails in a way that looks like sandbox/network/auth-context breakage, retry it once with escalation before declaring the tool unavailable. This especially applies to `gh`: a sandboxed auth failure or API connection error is not evidence that GitHub is actually unreachable from the host.
+
+**Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts, module/spec inventory parity, and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
 |---|---|
 | Added/removed a `_can_activate_*` function | Function count in this file + `docs/dev/debugging.md` |
 | Changed tier status or validation result | Tier table in this file + `docs/dev/validation-tracker.md` + `docs/dev/status.md` + `docs/nexus-description.bbcode` ("What works" + "Known issues") |
 | Closed a GitHub issue | Remove from active tables in `docs/dev/roadmap.md` + `docs/dev/status.md` |
-| Added a new module under `scripts/mods/BetterBots/` | `docs/dev/architecture.md` + README.md repo layout block + AGENTS.md "Mod file structure" block + module count claims (README highlights, README repo layout header, AGENTS.md). `make doc-check` will fail until parity is restored. |
+| Added a new module under `scripts/mods/BetterBots/` | `docs/dev/architecture.md` + README.md repo layout block + AGENTS.md "Mod file structure" block. `make doc-check` will fail until the file inventories are restored. |
 | Added a new hook (no new module) | `docs/dev/architecture.md` |
-| Added a new `tests/*_spec.lua` file | AGENTS.md test list (in `make test` line + tests/ block) + test count claims in README.md (3 places) + AGENTS.md. `make doc-check` will fail until parity is restored. |
+| Added a new `tests/*_spec.lua` file | AGENTS.md test list. `make doc-check` will fail until the spec inventory is restored. |
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
 | Fixed a user-reported bug or known issue | `docs/nexus-description.bbcode` ("Known issues") + relevant GitHub issue |
 | Added/changed user-visible behavior | README.md highlights + `docs/nexus-description.bbcode` (roadmap, "What works", version notes) |
@@ -331,8 +400,10 @@ scripts/mods/BetterBots/
   melee_attack_choice.lua                   # Melee attack-choice hook: bias lights into unarmored hordes while preserving armored heavy preference (#52)
   ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
   weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
+  sustained_fire.lua                        # Held-input bridge for sustained-fire ranged weapon paths (#87)
   team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
   target_selection.lua                      # Melee target selection distance penalty for specials
+  target_type_hysteresis.lua                # Perception-layer melee/ranged target type stabilization (#90)
   ping_system.lua                           # Bot elite/special pinging system
   companion_tag.lua                         # Arbites Cyber-Mastiff companion-command smart tag (#49)
   poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
@@ -341,8 +412,10 @@ scripts/mods/BetterBots/
   smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
   vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
   healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
-  ammo_policy.lua                           # Bot ammo pickup awareness: defer to humans, configurable thresholds (#72)
+  ammo_policy.lua                           # Bot ammo + grenade pickup policy: defer scarce resources to humans, configurable thresholds (#72/#89)
+  mule_pickup.lua                           # Book mule pickup activation + grimoire opt-in policy (#32)
   bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
+  human_likeness.lua                        # Tier A teammate-feel tuning: profile-driven reaction times, bucketed ability jitter, pressure leash scaling (#44)
   engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
   revive_ability.lua                        # Pre-revive defensive ability activation (#7)
   settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
@@ -376,16 +449,21 @@ tests/
   airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
   smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
   bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
+  human_likeness_spec.lua                   # profile-driven reaction times, jitter buckets/bypass, pressure leash scaling
   engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
+  target_type_hysteresis_spec.lua           # momentum + margin stabilization for melee/ranged target type flips
   revive_ability_spec.lua                   # revive-with-ability hook + guards
   team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides
   settings_spec.lua                         # tier gates, behavior profile, grenade toggle
+  mule_pickup_spec.lua                      # book template patching, grimoire toggle, mule-order suppression
   log_levels_spec.lua                       # log level resolution
   perf_spec.lua                             # perf timing recorder
   debug_spec.lua                            # debug command registration
   startup_regressions_spec.lua              # structural regression guards
+  sustained_fire_spec.lua                   # sustained-fire path detection, hold injection, stale clears
   ability_queue_spec.lua                    # combat ability fallback queueing
   ammo_policy_spec.lua                      # ammo policy thresholds + defer logic
   combat_ability_identity_spec.lua          # semantic ability identity routing
+  test_helper_spec.lua                      # audited mock-builder override hardening
   vfx_suppression_spec.lua                  # bot VFX/SFX bleed suppression
 ```

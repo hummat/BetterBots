@@ -10,11 +10,15 @@
 			"cjson",
 			"ALIVE",
 			"BLACKBOARDS",
+			"Broadphase",
+			"HEALTH_ALIVE",
 			"POSITION_LOOKUP",
+			"Quaternion",
 			"Vector3",
 			"Managers",
 			"Unit"
-			]	},
+		]
+	},
 	"workspace": {
 		"checkThirdParty": false,
 		"library": [

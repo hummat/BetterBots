@@ -20,11 +20,14 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Ammo awareness: bots defer ammo pickups when humans are low
 - Engagement leash: bots stay in combat longer using coherency-based ranges
 - Healing deferral: bots let humans heal first at health stations and med-crates
+- Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
+- Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
+- Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- 813 unit tests, 36 modules
+- Comprehensive busted test suite
 
 ## What bots can do with this mod
 
@@ -65,6 +68,7 @@ Bots use 18 per-ability heuristic functions to decide when to activate — based
 - Boss engagement self-defense exception
 - Poxburster safe targeting (close-range fire suppression)
 - Distant special melee chase penalty (prefer ranged)
+- Target-type hysteresis (reduces melee/ranged swap thrash on close scores)
 - Melee attack selection (lights into hordes, heavies into armor)
 - Smart blitz targeting from bot perception
 - Pre-revive defensive ability activation
@@ -90,7 +94,9 @@ Bots use 18 per-ability heuristic functions to decide when to activate — based
 - Daemonhost avoidance toggle
 - Poxburster safe targeting toggle
 - Bot ranged ammo threshold and human ammo reserve threshold
+- Human-likeness timing and pressure-leash profiles (auto / manual / custom)
 - Healing deferral mode + thresholds
+- Bot grimoire pickup toggle
 - Bot profiles: class per slot, weapon quality
 - Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
 
@@ -119,6 +125,8 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Poxburster targeting
 - [x] Distant special chase penalty (configurable range)
 - [x] Coherency-anchored engagement leash
+- [x] Human-likeness timing and pressure-leash profiles
+- [x] Target-type hysteresis (reduces melee/ranged swap thrash)
 - [x] Smart blitz targeting (togglable)
 - [x] Objective-aware activation (protect interacting allies)
 - [x] Pre-revive defensive ability activation
@@ -130,14 +138,18 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] ADS fix for Tertium 5/6 bots
 - [x] Ranged weapon fixes (plasma gun, staves)
 - [x] Bot warp charge venting
+- [x] Sustained fire support for held-fire ranged paths
 - [x] VFX/SFX bleed suppression
 - [x] Smart melee attack selection (armor-aware, configurable bias)
+- [x] Weakspot aim MVP for finesse firearms
+- [x] Ballistic aim for manual-physics grenade families
 - [x] Ammo awareness (bot + human thresholds)
+- [x] Grenade refill pickup heuristic
 - [x] Healing deferral
+- [x] Mule scripture/tome pickup (grimoires opt-in)
 
 **Long-term**
 - [ ] Talent-aware bot behavior
-- [ ] Human-likeness (jitter, reaction times, difficulty scaling)
 - [ ] Healing item management
 - [ ] Weapon special actions (parry, bayonet)
 - [ ] Utility-based ability scoring
@@ -190,6 +202,10 @@ This repo is configured for local Lua lint/format/type diagnostics:
 - `luacheck` via `.luacheckrc`
 - `stylua` via `.stylua.toml`
 - `lua-language-server` diagnostics via `.luarc.json`
+- a repo-local `bin/luacheck` compatibility wrapper for the known Lua 5.5 mismatch
+
+The repo does not modify your shell `PATH`. Use `make tool-info` to see the
+exact tool paths and fallbacks the Make targets will use on this machine.
 
 Commands:
 
@@ -200,14 +216,20 @@ Commands:
 | `make format` | Format with StyLua |
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
-| `make check` | Run all of the above |
-| `make test` | Run busted tests (813 tests) |
+| `make check` | Auto-format, then run lint + lsp + tests + doc checks |
+| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
+| `make test` | Run busted tests |
+| `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
 
 After cloning, run `make deps` to install the commit-msg hook.
 
-CI runs `make check` on every push to `main` and on pull requests.
+`make lint` always uses the repo's `bin/luacheck` wrapper. `make test` tries, in
+order: `busted`, `lua-busted`, then Arch's `/usr/lib/luarocks/.../busted`
+runner.
+
+CI runs `make check-ci` on every push to `main` and on pull requests.
 
 ## Contributing
 
@@ -252,7 +274,7 @@ Each class also has a tactics doc with community-sourced heuristics for when/how
 ```text
 BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI
-scripts/mods/BetterBots/          # Mod source (36 modules)
+scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
@@ -266,17 +288,21 @@ scripts/mods/BetterBots/          # Mod source (36 modules)
   bot_targeting.lua               #   Shared perception target resolver + helpers
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
+  target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
   weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix
+  sustained_fire.lua              #   Held-input bridge for sustained-fire ranged weapons
   ping_system.lua                 #   Bot elite/special pinging
   companion_tag.lua               #   Arbites Cyber-Mastiff companion-command smart tag
   smart_targeting.lua             #   Precision blitz target seeding from perception
   poxburster.lua                  #   Poxburster targeting + close-range suppression
+  human_likeness.lua              #   Tier A teammate-feel tuning
   engagement_leash.lua            #   Coherency-anchored melee engagement range
   healing_deferral.lua            #   Defer health stations/med-crates to humans
-  ammo_policy.lua                 #   Bot ammo pickup awareness
+  ammo_policy.lua                 #   Bot ammo + grenade pickup policy
+  mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
@@ -289,7 +315,7 @@ scripts/mods/BetterBots/          # Mod source (36 modules)
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted, 813 tests)
+tests/                            # Unit tests (busted)
 scripts/hooks/                    # Git hooks (conventional commits)
 scripts/release.sh                # Release automation
 docs/                             # Architecture, class refs, status, roadmap

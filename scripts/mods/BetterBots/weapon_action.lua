@@ -10,6 +10,8 @@ local _fixed_time
 local _bot_slot_for_unit
 local _perf
 local _ammo
+local _is_enabled
+local _missing_shoot_extension_warned = {}
 
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
@@ -17,6 +19,95 @@ local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
 local _weapon_logged_combos = {}
+local _stream_action_logged_combos = {}
+local _weakspot_aim_logged_scratchpads = setmetatable({}, { __mode = "k" })
+
+local STREAM_CONFIRM_ACTIONS = {
+	flamer_p1_m1 = {
+		brace_pressed = "brace_start",
+		shoot_braced = "stream_fire",
+		shoot_braced_release = "fire_release",
+		brace_release = "brace_end",
+	},
+	forcestaff_p2_m1 = {
+		trigger_charge_flame = "stream_fire",
+		charge_release = "charge_release",
+	},
+}
+
+local function _find_action_for_start_input(actions, input_name)
+	for action_name, action in pairs(actions or {}) do
+		if action.start_input == input_name then
+			return action_name, action
+		end
+	end
+
+	return nil, nil
+end
+
+local function _is_head_spine_aim_table(aim_at_node)
+	if type(aim_at_node) ~= "table" then
+		return false
+	end
+
+	local has_head = false
+	local has_spine = false
+
+	for i = 1, #aim_at_node do
+		local node_name = aim_at_node[i]
+		if node_name == "j_head" then
+			has_head = true
+		elseif node_name == "j_spine" then
+			has_spine = true
+		end
+	end
+
+	return has_head and has_spine
+end
+
+local function _find_unaim_action_for_action(weapon_template, action)
+	local actions = weapon_template and weapon_template.actions or {}
+	local unaim_input = action and action.stop_input
+	if unaim_input then
+		local unaim_action_name = _find_action_for_start_input(actions, unaim_input)
+
+		return unaim_input, unaim_action_name
+	end
+
+	for input_name, chain_entry in pairs((action and action.allowed_chain_actions) or {}) do
+		local action_name = chain_entry and chain_entry.action_name
+		local target_action = action_name and actions[action_name]
+		if target_action and target_action.kind == "unaim" then
+			return input_name, action_name
+		end
+	end
+
+	return nil, nil
+end
+
+local function _has_hold_start_input(weapon_template, input_name)
+	local input_def = weapon_template and weapon_template.action_inputs and weapon_template.action_inputs[input_name]
+	local seq = input_def and input_def.input_sequence
+	local first = seq and seq[1]
+
+	return first and first.input == "action_two_hold" and first.value == true
+end
+
+local function _find_bt_shoot_aim_chain(weapon_template, aim_fire_input)
+	for action_name, action in pairs(weapon_template and weapon_template.actions or {}) do
+		local start_input = action.start_input
+		if start_input and _has_hold_start_input(weapon_template, start_input) then
+			local chain_entry = (action.allowed_chain_actions or {})[aim_fire_input]
+			if chain_entry then
+				local unaim_input, unaim_action_name = _find_unaim_action_for_action(weapon_template, action)
+
+				return start_input, action_name, unaim_input, unaim_action_name
+			end
+		end
+	end
+
+	return nil, nil, nil, nil
+end
 
 local function _weapon_log_context(unit)
 	local bot_slot = _bot_slot_for_unit(unit) or "?"
@@ -39,7 +130,133 @@ end
 
 local M = {}
 
-local _is_enabled
+function M._stream_action_phase(template_name, action_input)
+	local actions = STREAM_CONFIRM_ACTIONS[template_name]
+
+	return actions and actions[action_input] or nil
+end
+
+function M.log_stream_action(bot_slot, template_name, action_input)
+	if not (_debug_enabled and _debug_enabled()) then
+		return false
+	end
+
+	local phase = M._stream_action_phase(template_name, action_input)
+	if not phase then
+		return false
+	end
+
+	local combo_key = tostring(bot_slot) .. ":" .. tostring(template_name) .. ":" .. tostring(action_input)
+	if _stream_action_logged_combos[combo_key] then
+		return true
+	end
+
+	_stream_action_logged_combos[combo_key] = true
+	_debug_log(
+		"stream_action:" .. combo_key,
+		_fixed_time(),
+		"stream action queued for "
+			.. tostring(template_name)
+			.. " via "
+			.. tostring(action_input)
+			.. " (phase="
+			.. tostring(phase)
+			.. ", bot="
+			.. tostring(bot_slot)
+			.. ")"
+	)
+
+	return true
+end
+
+function M.weakspot_aim_selection_context(unit, weapon_template, scratchpad)
+	if not unit or not weapon_template or not scratchpad or not scratchpad.aim_at_node then
+		return nil
+	end
+
+	local attack_meta_data = weapon_template.attack_meta_data or {}
+	if not _is_head_spine_aim_table(attack_meta_data.aim_at_node) then
+		return nil
+	end
+
+	if scratchpad.aim_at_node ~= "j_head" and scratchpad.aim_at_node ~= "j_spine" then
+		return nil
+	end
+
+	local bot_slot, _, weapon_template_name = _weapon_log_context(unit)
+
+	return {
+		bot_slot = bot_slot,
+		weapon_template_name = weapon_template_name,
+		selected_node = scratchpad.aim_at_node,
+	}
+end
+
+function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+	if not (_debug_enabled and _debug_enabled()) then
+		return false
+	end
+
+	if _weakspot_aim_logged_scratchpads[scratchpad] then
+		return true
+	end
+
+	local context = M.weakspot_aim_selection_context(unit, weapon_template, scratchpad)
+	if not context then
+		return false
+	end
+
+	_weakspot_aim_logged_scratchpads[scratchpad] = true
+	_debug_log(
+		"weakspot_aim:" .. tostring(unit),
+		_fixed_time(),
+		"weakspot aim selected "
+			.. tostring(context.selected_node)
+			.. " (weapon="
+			.. tostring(context.weapon_template_name)
+			.. ", bot="
+			.. tostring(context.bot_slot)
+			.. ")"
+	)
+
+	return true
+end
+
+function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
+	if not weapon_template or not scratchpad or not scratchpad.aim_fire_action_input then
+		return false
+	end
+
+	local aim_input, aim_action_name, unaim_input, unaim_action_name =
+		_find_bt_shoot_aim_chain(weapon_template, scratchpad.aim_fire_action_input)
+	if not aim_input then
+		return false
+	end
+
+	local changed = false
+
+	if scratchpad.aim_action_input ~= aim_input then
+		scratchpad.aim_action_input = aim_input
+		changed = true
+	end
+
+	if aim_action_name and scratchpad.aim_action_name ~= aim_action_name then
+		scratchpad.aim_action_name = aim_action_name
+		changed = true
+	end
+
+	if unaim_input and scratchpad.unaim_action_input ~= unaim_input then
+		scratchpad.unaim_action_input = unaim_input
+		changed = true
+	end
+
+	if unaim_action_name and scratchpad.unaim_action_name ~= unaim_action_name then
+		scratchpad.unaim_action_name = unaim_action_name
+		changed = true
+	end
+
+	return changed
+end
 
 function M.init(deps)
 	_mod = deps.mod
@@ -50,21 +267,24 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_missing_shoot_extension_warned = {}
+	_stream_action_logged_combos = {}
 end
 
 local function _ammo_api()
-	if _ammo then
-		return _ammo
+	if _ammo ~= nil then
+		return _ammo or nil
 	end
 
 	local ok, ammo = pcall(require, "scripts/utilities/ammo")
 	if ok then
 		_ammo = ammo
 	elseif _mod and _mod.warning then
+		_ammo = false
 		_mod:warning("BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled")
 	end
 
-	return _ammo
+	return _ammo or nil
 end
 
 local function _dead_zone_target_breed(unit)
@@ -143,6 +363,7 @@ function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 	local should_block_weapon_action_input = deps.should_block_weapon_action_input
+	local observe_queued_weapon_action = deps.observe_queued_weapon_action
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -179,6 +400,54 @@ function M.register_hooks(deps)
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
+			local PlayerUnitVisualLoadout =
+				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+
+			_mod:hook_safe(BtBotShootAction, "enter", function(_self, unit, _breed, _blackboard, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return
+				end
+
+				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+				local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
+				if not unit_data_extension or not visual_loadout_extension then
+					local unit_key = tostring(unit)
+					if _debug_enabled() then
+						_debug_log(
+							"shoot_scratchpad_missing_ext:" .. unit_key,
+							_fixed_time(),
+							"shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system"
+						)
+					end
+					if not _missing_shoot_extension_warned[unit_key] and _mod and _mod.warning then
+						_missing_shoot_extension_warned[unit_key] = true
+						_mod:warning(
+							"BetterBots: shoot scratchpad normalization skipped for "
+								.. unit_key
+								.. " because unit_data_system or visual_loadout_system is missing"
+						)
+					end
+					return
+				end
+
+				local inventory_component = unit_data_extension:read_component("inventory")
+				local weapon_template =
+					PlayerUnitVisualLoadout.wielded_weapon_template(visual_loadout_extension, inventory_component)
+				if M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad) and _debug_enabled() then
+					_debug_log(
+						"shoot_scratchpad_normalized:" .. tostring(unit),
+						_fixed_time(),
+						"normalized shoot scratchpad aim cleanup (aim="
+							.. tostring(scratchpad.aim_action_input)
+							.. ", unaim="
+							.. tostring(scratchpad.unaim_action_input)
+							.. ")"
+					)
+				end
+
+				M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+			end)
+
 			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
 				if scratchpad and not _ads_logged_scratchpads[scratchpad] then
 					_ads_logged_scratchpads[scratchpad] = true
@@ -394,6 +663,15 @@ function M.register_hooks(deps)
 					end
 
 					local result = func(self, id, action_input, raw_input)
+					if result ~= nil and id == "weapon_action" and unit then
+						if observe_queued_weapon_action then
+							observe_queued_weapon_action(unit, action_input)
+						end
+					end
+					if result ~= nil and id == "weapon_action" and unit and _debug_enabled() then
+						local bot_slot, _, weapon_template_name = _weapon_log_context(unit)
+						M.log_stream_action(bot_slot, weapon_template_name, action_input)
+					end
 					if perf_t0 then
 						_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
 					end
@@ -449,7 +727,8 @@ function M.register_hooks(deps)
 		end
 	)
 
-	-- Perils of the warp achievement guard: bot players can have nil account_id.
+	-- WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement calls
+	-- player:account_id() unconditionally; bot-backed player objects can return nil.
 	_mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
 		_mod:hook(
 			WeaponSystem,

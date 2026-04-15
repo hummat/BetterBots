@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local ItemFallback = dofile("scripts/mods/BetterBots/item_fallback.lua")
 
 local _mock_time = 10
@@ -20,7 +22,7 @@ local _weapon_templates
 
 local unit = "bot_unit_1"
 
-local mock_action_input_extension = {
+local mock_action_input_extension = test_helper.make_player_action_input_extension({
 	bot_queue_action_input = function(_self, component, input_name, raw_input)
 		_queued_inputs[#_queued_inputs + 1] = {
 			component = component,
@@ -28,13 +30,13 @@ local mock_action_input_extension = {
 			raw_input = raw_input,
 		}
 	end,
-}
+})
 
-local mock_ability_extension = {
+local mock_ability_extension = test_helper.make_player_ability_extension({
 	can_use_ability = function(_self, ability_type)
 		return ability_type == "combat_ability"
 	end,
-}
+})
 
 local mock_unit_data_extension = {
 	read_component = function(_self, component_name)
@@ -101,7 +103,9 @@ local function reset()
 
 	_extensions[unit] = {
 		action_input_system = mock_action_input_extension,
-		unit_data_system = mock_unit_data_extension,
+		unit_data_system = test_helper.make_player_unit_data_extension(nil, {
+			read_component = mock_unit_data_extension.read_component,
+		}),
 	}
 
 	ItemFallback.init({

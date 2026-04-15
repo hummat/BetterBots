@@ -1,7 +1,10 @@
 -- grenade_fallback_spec.lua — tests for grenade throw state machine (#4)
 
+local test_helper = require("tests.test_helper")
+
 -- Controllable mock time
 local _mock_time = 0
+local _original_require = require
 
 -- Mock extensions per unit
 local _extensions = {}
@@ -12,29 +15,34 @@ local _debug_logs = {}
 local _event_decisions = {}
 local _event_emissions = {}
 local _aim_calls = {}
+local _grenade_state_by_unit = {}
+local _last_grenade_charge_event_by_unit = {}
+local _perf_calls = {}
+local unit
 
 -- Mock ability_extension
 local _can_use_grenade = true
 
-local mock_ability_extension = {
+local mock_ability_extension = test_helper.make_player_ability_extension({
 	can_use_ability = function(_self, ability_name)
 		if ability_name == "grenade_ability" then
 			return _can_use_grenade
 		end
 		return false
 	end,
-}
+})
 
 -- Mock action_input_extension
-local mock_action_input_extension = {
+local mock_action_input_extension = test_helper.make_player_action_input_extension({
 	bot_queue_action_input = function(_self, component, input_name, extra)
 		_recorded_inputs[#_recorded_inputs + 1] = {
 			component = component,
 			input = input_name,
 			extra = extra,
+			stage_at_queue = _grenade_state_by_unit[unit] and _grenade_state_by_unit[unit].stage or nil,
 		}
 	end,
-}
+})
 
 local mock_bot_unit_input = {
 	set_aiming = function(_self, aiming, soft, use_rotation)
@@ -43,6 +51,12 @@ local mock_bot_unit_input = {
 			aiming = aiming,
 			soft = soft,
 			use_rotation = use_rotation,
+		}
+	end,
+	set_aim_rotation = function(_self, rotation)
+		_aim_calls[#_aim_calls + 1] = {
+			method = "set_aim_rotation",
+			rotation = rotation,
 		}
 	end,
 	set_aim_position = function(_self, position)
@@ -59,18 +73,9 @@ local mock_input_extension = {
 	end,
 }
 
--- Mock unit_data_extension
+-- Mock unit_data component state
 local _wielded_slot = "slot_secondary"
 local _component_state_by_name = {}
-
-local mock_unit_data_extension = {
-	read_component = function(_self, component_name)
-		if component_name == "inventory" then
-			return { wielded_slot = _wielded_slot }
-		end
-		return _component_state_by_name[component_name]
-	end,
-}
 
 -- Mock ScriptUnit
 _G.ScriptUnit = {
@@ -96,11 +101,7 @@ local _grenades_enabled_result = true
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
 
--- Shared state tables (weak-keyed in production, plain here)
-local _grenade_state_by_unit = {}
-local _last_grenade_charge_event_by_unit = {}
-
-local unit = "bot_unit_1"
+unit = "bot_unit_1"
 local blackboard = {}
 
 local function find_debug_log(pattern)
@@ -115,6 +116,7 @@ end
 
 local function reset()
 	_mock_time = 10.0
+	_G.require = _original_require
 	_can_use_grenade = true
 	_wielded_slot = "slot_secondary"
 	_heuristic_result = true
@@ -131,6 +133,7 @@ local function reset()
 	_aim_calls = {}
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
+	_perf_calls = {}
 	_component_state_by_name = {}
 	_component_state_by_name.weapon_action = {
 		template_name = "autogun_p1_m1",
@@ -142,10 +145,21 @@ local function reset()
 		ability_system = mock_ability_extension,
 		action_input_system = mock_action_input_extension,
 		input_system = mock_input_extension,
-		unit_data_system = mock_unit_data_extension,
+		unit_data_system = test_helper.make_player_unit_data_extension({
+			inventory = { wielded_slot = _wielded_slot },
+			weapon_action = _component_state_by_name.weapon_action,
+		}, {
+			read_component = function(_self, component_name)
+				if component_name == "inventory" then
+					return { wielded_slot = _wielded_slot }
+				end
+				return _component_state_by_name[component_name]
+			end,
+		}),
 	}
 
 	_G.POSITION_LOOKUP = {
+		[unit] = { x = 0, y = 0, z = 0 },
 		enemy_1 = { x = 10, y = 0, z = 0 },
 	}
 
@@ -194,6 +208,17 @@ local function reset()
 		end,
 		grenade_state_by_unit = _grenade_state_by_unit,
 		last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
+		perf = {
+			begin = function()
+				return {}
+			end,
+			finish = function(tag, _start_clock, _elapsed_s, opts)
+				_perf_calls[#_perf_calls + 1] = {
+					tag = tag,
+					include_total = not (opts and opts.include_total == false),
+				}
+			end,
+		},
 	})
 
 	GrenadeFallback.wire({
@@ -240,9 +265,61 @@ local function advance_to_stage(target_stage)
 	-- now in wait_unwield
 end
 
+local function perf_tags()
+	local tags = {}
+	for i = 1, #_perf_calls do
+		local call = _perf_calls[i]
+		tags[#tags + 1] = call.tag .. ":" .. tostring(call.include_total)
+	end
+	return tags
+end
+
 describe("grenade_fallback", function()
+	it("test helper exposes engine-accurate player/minion extension builders", function()
+		local player_ext = test_helper.make_player_unit_data_extension({
+			locomotion = { velocity_current = { x = 1, y = 2, z = 3 } },
+		})
+		local minion_ext = test_helper.make_minion_unit_data_extension({
+			name = "chaos_poxwalker",
+			tags = {},
+		})
+		local minion_locomotion = test_helper.make_minion_locomotion_extension({ x = 4, y = 5, z = 6 })
+
+		assert.is_function(player_ext.read_component)
+		assert.is_nil(player_ext.breed)
+		assert.is_function(minion_ext.breed)
+		assert.is_nil(minion_ext.read_component)
+		assert.is_function(minion_locomotion.current_velocity)
+	end)
+
 	before_each(function()
 		reset()
+	end)
+
+	describe("perf breakdowns", function()
+		it("records idle-path profile resolution and launch buckets", function()
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.same({
+				"grenade_fallback.build_context:false",
+				"grenade_fallback.heuristic:false",
+				"grenade_fallback.profile_resolution:false",
+				"grenade_fallback.launch:false",
+			}, perf_tags())
+		end)
+
+		it("records a stage-machine bucket while advancing an active sequence", function()
+			GrenadeFallback.try_queue(unit, blackboard)
+			_perf_calls = {}
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.5
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.same({
+				"grenade_fallback.stage_machine:false",
+			}, perf_tags())
+		end)
 	end)
 
 	describe("should_block_wield_input", function()
@@ -329,6 +406,13 @@ describe("grenade_fallback", function()
 			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
 		end)
 
+		it("allows the initial grenade wield input during item-based grenade wield stage", function()
+			advance_to_stage("wield")
+
+			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "grenade_ability"))
+			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "zoom"))
+		end)
+
 		it("blocks foreign weapon actions during Assail cleanup", function()
 			GrenadeFallback.wire({
 				build_context = function()
@@ -405,6 +489,68 @@ describe("grenade_fallback", function()
 			-- Should never have entered the state machine — no wield queued
 			assert.is_nil(_grenade_state_by_unit[unit].stage)
 			assert.equals(0, #_recorded_inputs)
+		end)
+
+		it("normalizes priority-only targets before evaluating and selecting Assail profile", function()
+			local seen_context
+			local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
+			local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+			local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+			Heuristics.init({
+				combat_ability_identity = CombatAbilityIdentity,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = "super_armor",
+			})
+			_extensions.enemy_1 = {
+				unit_data_system = test_helper.make_player_unit_data_extension(nil, {
+					breed = function()
+						return {
+							name = "chaos_traitor_gunner",
+							tags = { special = true },
+							ranged = true,
+							game_object_type = "minion_ranged",
+						}
+					end,
+				}),
+			}
+
+			GrenadeFallback.wire({
+				build_context = function()
+					return {
+						num_nearby = 1,
+						target_enemy = nil,
+						target_enemy_distance = nil,
+						priority_target_enemy = "enemy_1",
+					}
+				end,
+				evaluate_grenade_heuristic = function(_, context)
+					seen_context = context
+					return true, "grenade_assail_priority_target"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+				bot_targeting = BotTargeting,
+				normalize_grenade_context = Heuristics.normalize_grenade_context,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals("enemy_1", seen_context.target_enemy)
+			assert.equals(10, seen_context.target_enemy_distance)
+			assert.equals("ranged", seen_context.target_enemy_type)
+			assert.is_true(seen_context.target_is_elite_special)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("weapon_action", _recorded_inputs[1].component)
+			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("zoom", _grenade_state_by_unit[unit].aim_input)
 		end)
 
 		it("allows the expected Smite followup input", function()
@@ -502,6 +648,18 @@ describe("grenade_fallback", function()
 		assert.equals(0, #_recorded_inputs)
 	end)
 
+	it("logs the interaction guard on idle-path deferrals", function()
+		_debug_enabled_result = true
+		blackboard.behavior = {
+			current_interaction_unit = "med_station",
+		}
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.is_truthy(find_debug_log("grenade blocked: interacting with med_station"))
+	end)
+
 	it("does nothing when heuristic blocks", function()
 		_heuristic_result = false
 		GrenadeFallback.try_queue(unit, blackboard)
@@ -533,6 +691,12 @@ describe("grenade_fallback", function()
 		assert.is_nil(_recorded_inputs[1].extra)
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
+	end)
+
+	it("marks the grenade sequence active before queueing grenade_ability", function()
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("wield", _recorded_inputs[1].stage_at_queue)
 	end)
 
 	it("defers item grenade activation while the bot is unarmed", function()
@@ -757,6 +921,397 @@ describe("grenade_fallback", function()
 		assert.is_false(_aim_calls[1].use_rotation)
 		assert.equals("set_aim_position", _aim_calls[2].method)
 		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("uses aim rotation for supported ballistic projectiles", function()
+		local mock_rotation = { yaw = 1, pitch = 2 }
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return mock_rotation
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("resolves standard grenade ballistics from projectile templates", function()
+		local mock_rotation = { yaw = 5, pitch = 6 }
+
+		_G.require = function(path)
+			if path == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+				return {}
+			end
+
+			if path == "scripts/settings/projectile/projectile_templates" then
+				return {
+					veteran_frag_grenade = {
+						item_name = "content/items/weapons/player/grenade_frag",
+						locomotion_template = {
+							integrator_parameters = {
+								gravity = 12.5,
+							},
+							trajectory_parameters = {
+								throw = {
+									speed_maximal = 30,
+								},
+							},
+						},
+					},
+				}
+			end
+
+			return _original_require(path)
+		end
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension,
+					{
+						name = "veteran_frag_grenade",
+						inventory_item_name = "content/items/weapons/player/grenade_frag",
+					}
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			solve_ballistic_rotation = function(_unit, _aim_unit, projectile_data)
+				assert.equals("ballistic", projectile_data.mode)
+				assert.equals(30, projectile_data.speed)
+				assert.equals(12.5, projectile_data.gravity)
+				return mock_rotation
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("uses ballistic aim for zealot throwing knives during auto-fire wield", function()
+		local mock_rotation = { yaw = 3, pitch = 4 }
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 15 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_knives_pressure"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "zealot_throwing_knives" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 75,
+					gravity = 17.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return mock_rotation
+			end,
+		})
+
+		GrenadeFallback.try_queue(unit, blackboard)
+		_wielded_slot = "slot_grenade_ability"
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+		assert.same(mock_rotation, _aim_calls[2].rotation)
+	end)
+
+	it("falls back to flat aim for excluded projectile families", function()
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_missile_launcher"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "broker_missile_launcher" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "flat",
+					reason = "excluded_family",
+				}
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_false(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_position", _aim_calls[2].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("falls back to flat aim when ballistic solver fails", function()
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 75,
+					gravity = 17.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return nil, "trajectory_solver_failed"
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_false(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_position", _aim_calls[2].method)
+		assert.same(POSITION_LOOKUP.enemy_1, _aim_calls[2].position)
+	end)
+
+	it("logs ballistic aim path when debug is enabled", function()
+		_debug_enabled_result = true
+
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+			solve_ballistic_rotation = function()
+				return { yaw = 1, pitch = 2 }
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_debug_logs = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.truthy(find_debug_log("grenade aim ballistic"))
+	end)
+
+	it("does not crash when target has minion-style unit_data (no read_component)", function()
+		-- MinionUnitDataExtension has breed() but no read_component.
+		-- _target_velocity must guard read_component before calling it.
+		-- Regression: without the guard this crashes with
+		-- "attempt to call method 'read_component' (a nil value)".
+		_extensions.enemy_1 = {
+			unit_data_system = test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker" }),
+		}
+
+		-- Mock engine math globals so the default solver can run end-to-end.
+		-- Real Vector3 is C userdata with operator overloads; we emulate with metatables.
+		local saved_vector3 = _G.Vector3
+		local saved_quaternion = _G.Quaternion
+		local saved_require = require
+
+		local vec_mt = {
+			__sub = function(a, b)
+				return { x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }
+			end,
+		}
+		local function vec(x, y, z)
+			return setmetatable({ x = x, y = y, z = z }, vec_mt)
+		end
+
+		_G.POSITION_LOOKUP[unit] = vec(0, 0, 0)
+		_G.POSITION_LOOKUP.enemy_1 = vec(10, 0, 0)
+
+		_G.Vector3 = {
+			zero = function()
+				return vec(0, 0, 0)
+			end,
+			flat = function(v)
+				return vec(v.x, 0, v.z)
+			end,
+			normalize = function(v)
+				return v
+			end,
+			up = function()
+				return vec(0, 1, 0)
+			end,
+			right = function()
+				return vec(1, 0, 0)
+			end,
+			length_squared = function(_v)
+				return 100
+			end,
+		}
+		local mock_rotation = { yaw = 5, pitch = 6 }
+		local mock_trajectory = {
+			angle_to_hit_moving_target = function()
+				return 0.5, vec(10, 0, 2)
+			end,
+		}
+		rawset(_G, "require", function(path)
+			if path == "scripts/utilities/trajectory" then
+				return mock_trajectory
+			end
+			return saved_require(path)
+		end)
+		_G.Quaternion = setmetatable({
+			look = function()
+				return mock_rotation
+			end,
+			multiply = function()
+				return mock_rotation
+			end,
+		}, {
+			__call = function()
+				return mock_rotation
+			end,
+		})
+
+		-- Do NOT inject solve_ballistic_rotation — exercise the default solver
+		-- which calls _target_velocity internally.
+		GrenadeFallback.wire({
+			build_context = function()
+				return { num_nearby = 3, target_enemy = "enemy_1", target_enemy_distance = 20 }
+			end,
+			evaluate_grenade_heuristic = function()
+				return true, "grenade_frag_horde"
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return false
+			end,
+			is_grenade_enabled = function()
+				return true
+			end,
+			resolve_grenade_projectile_data = function()
+				return {
+					mode = "ballistic",
+					speed = 30,
+					gravity = 12.5,
+				}
+			end,
+		})
+
+		advance_to_stage("wait_aim")
+		_aim_calls = {}
+
+		_mock_time = _mock_time + 0.05
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("set_aiming", _aim_calls[1].method)
+		assert.is_true(_aim_calls[1].use_rotation)
+		assert.equals("set_aim_rotation", _aim_calls[2].method)
+
+		_extensions.enemy_1 = nil
+		_G.POSITION_LOOKUP[unit] = { x = 0, y = 0, z = 0 }
+		_G.POSITION_LOOKUP.enemy_1 = { x = 10, y = 0, z = 0 }
+		_G.Vector3 = saved_vector3
+		_G.Quaternion = saved_quaternion
+		rawset(_G, "require", saved_require)
 	end)
 
 	it("clears bot aim when the grenade state resets", function()
@@ -1709,6 +2264,28 @@ describe("grenade_fallback", function()
 			assert.equals(1, #blocked)
 			assert.equals("lost_wield", blocked[1].reason)
 			assert.equals("wait_aim", blocked[1].stage)
+		end)
+
+		it("emits blocked event and resets immediately when action_input_system disappears mid-sequence", function()
+			_debug_enabled_result = true
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_wielded_slot = "slot_grenade_ability"
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_extensions[unit].action_input_system = nil
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("action_input_missing", blocked[1].reason)
+			assert.equals("wait_aim", blocked[1].stage)
+			assert.equals("aim_hold", blocked[1].input)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.is_truthy(find_debug_log("missing action_input_system for aim_hold"))
 		end)
 
 		it("emits blocked event on revalidation failure", function()

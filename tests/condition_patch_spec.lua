@@ -1,10 +1,17 @@
 -- Tests for condition_patch.lua daemonhost combat suppression wrappers (#17).
--- Verifies that melee/ranged combat is suppressed only when the bot's
--- current target IS a dormant daemonhost, not when any DH is nearby.
+-- Verifies that melee/ranged combat is suppressed when the bot is inside the
+-- close daemonhost safety radius, or when the current target IS a dormant
+-- daemonhost outside that radius.
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _blackboards = {}
 local _debug_logs = {}
 local _debug_enabled_result = false
+local _fixed_time_value = 0
+local _game_object_ids = {}
+local _game_object_fields = {}
+local _is_near_daemonhost_result = false
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -41,11 +48,32 @@ _G.ALIVE = setmetatable({}, {
 		return _alive[unit]
 	end,
 })
-_G.Managers = { state = { extension = {
-	system = function()
-		return nil
+_G.Managers = {
+	state = {
+		extension = {
+			system = function()
+				return nil
+			end,
+		},
+		unit_spawner = {
+			game_object_id = function(_, unit)
+				return _game_object_ids[unit]
+			end,
+		},
+		game_session = {
+			game_session = function()
+				return "test_game_session"
+			end,
+		},
+	},
+}
+_G.GameSession = {
+	game_object_field = function(game_session, game_object_id, field_name)
+		assert.equals("test_game_session", game_session)
+		local fields = _game_object_fields[game_object_id]
+		return fields and fields[field_name] or nil
 	end,
-} } }
+}
 
 -- Stub require so condition_patch.lua doesn't crash on game modules
 local _orig_require = require
@@ -79,7 +107,10 @@ ConditionPatch.init({
 		return _debug_enabled_result
 	end,
 	fixed_time = function()
-		return 0
+		return _fixed_time_value
+	end,
+	is_near_daemonhost = function()
+		return _is_near_daemonhost_result
 	end,
 	is_suppressed = function()
 		return false
@@ -119,12 +150,23 @@ local function setup_breed(unit, breed_name)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
 	end
-	_extensions[unit].unit_data_system = {
-		breed = function()
-			return { name = breed_name }
-		end,
-	}
+	_extensions[unit].unit_data_system = test_helper.make_minion_unit_data_extension({ name = breed_name })
 	_alive[unit] = true
+end
+
+local function setup_daemonhost_state(unit, opts)
+	opts = opts or {}
+	local game_object_id = opts.game_object_id or tostring(unit) .. "_go"
+	_game_object_ids[unit] = game_object_id
+	_game_object_fields[game_object_id] = {
+		stage = opts.stage,
+	}
+	_blackboards[unit] = {
+		perception = {
+			aggro_state = opts.aggro_state,
+			target_unit = opts.target_unit,
+		},
+	}
 end
 
 -- Helper: build a blackboard with a target_enemy
@@ -150,8 +192,16 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	for k in pairs(_game_object_ids) do
+		_game_object_ids[k] = nil
+	end
+	for k in pairs(_game_object_fields) do
+		_game_object_fields[k] = nil
+	end
 	_debug_logs = {}
 	_debug_enabled_result = false
+	_fixed_time_value = 0
+	_is_near_daemonhost_result = false
 end
 
 local function find_debug_log(pattern)
@@ -177,12 +227,62 @@ end
 describe("condition_patch", function()
 	before_each(function()
 		reset()
+		ConditionPatch.init({
+			shared_rules = SharedRules,
+			mod = { echo = function() end, hook_require = function() end },
+			debug_log = function(key, fixed_t, message)
+				_debug_logs[#_debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return _debug_enabled_result
+			end,
+			fixed_time = function()
+				return _fixed_time_value
+			end,
+			is_near_daemonhost = function()
+				return _is_near_daemonhost_result
+			end,
+			is_suppressed = function()
+				return false
+			end,
+			equipped_combat_ability_name = function()
+				return "none"
+			end,
+			patched_bt_bot_conditions = {},
+			patched_bt_conditions = {},
+			rescue_intent = {},
+			DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+			CONDITIONS_PATCH_VERSION = "test",
+		})
+		ConditionPatch.wire({
+			Heuristics = {
+				resolve_decision = function()
+					return false
+				end,
+			},
+			MetaData = { inject = function() end },
+			Debug = {
+				log_ability_decision = function() end,
+				bot_slot_for_unit = function()
+					return 1
+				end,
+			},
+			EventLog = {
+				is_enabled = function()
+					return false
+				end,
+			},
+		})
 	end)
 
 	describe("_action_input_is_bot_queueable", function()
 		it("accepts parser-level ability inputs even when action validation rejects them", function()
-			local action_input_extension = {
-				_action_input_parsers = {
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				action_input_parsers = {
 					combat_ability_action = {
 						_ACTION_INPUT_SEQUENCE_CONFIGS = {
 							veteran_combat_ability = {
@@ -193,12 +293,12 @@ describe("condition_patch", function()
 						},
 					},
 				},
-			}
-			local ability_extension = {
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
 				action_input_is_currently_valid = function()
 					return false
 				end,
-			}
+			})
 
 			assert.is_true(
 				ConditionPatch._action_input_is_bot_queueable(
@@ -268,6 +368,30 @@ describe("condition_patch", function()
 			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
 
+		it("returns true when daemonhost stage is waking_up even if aggro_state already flipped", function()
+			local target = "dh_waking"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "aggroed",
+				stage = 5,
+			})
+			local bb = make_blackboard(target)
+
+			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns false when daemonhost stage is aggroed even if aggro_state is stale", function()
+			local target = "dh_stage_aggroed"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "alerted",
+				stage = 6,
+			})
+			local bb = make_blackboard(target)
+
+			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
 		it("returns false when target enemy is dead", function()
 			local target = "dh_dead"
 			setup_breed(target, "chaos_daemonhost")
@@ -287,12 +411,10 @@ describe("condition_patch", function()
 	end)
 
 	describe("combat wrapper integration", function()
-		it("allows melee against non-DH target with sleeping DH nearby", function()
-			-- Bot targets a poxwalker. A sleeping DH is nearby but not the target.
+		it("suppresses melee against non-DH target when inside daemonhost safety radius", function()
 			local target = "poxwalker1"
-			local dh = "dh_sleeping"
 			setup_breed(target, "chaos_poxwalker")
-			setup_breed(dh, "chaos_daemonhost")
+			_is_near_daemonhost_result = true
 
 			local bb = make_blackboard(target)
 			local melee_called = false
@@ -309,8 +431,8 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
-			assert.is_true(result)
-			assert.is_true(melee_called)
+			assert.is_false(result)
+			assert.is_false(melee_called)
 		end)
 
 		it("suppresses melee against dormant daemonhost target", function()
@@ -399,6 +521,9 @@ describe("condition_patch", function()
 				fixed_time = function()
 					return 0
 				end,
+				is_near_daemonhost = function()
+					return true
+				end,
 				is_suppressed = function()
 					return false
 				end,
@@ -453,6 +578,9 @@ describe("condition_patch", function()
 				fixed_time = function()
 					return 0
 				end,
+				is_near_daemonhost = function()
+					return _is_near_daemonhost_result
+				end,
 				is_suppressed = function()
 					return false
 				end,
@@ -491,9 +619,10 @@ describe("condition_patch", function()
 			assert.is_false(orig_called)
 		end)
 
-		it("allows ranged against non-DH target near sleeping DH", function()
+		it("suppresses ranged against non-DH target when inside daemonhost safety radius", function()
 			local target = "gunner1"
 			setup_breed(target, "renegade_gunner")
+			_is_near_daemonhost_result = true
 
 			local bb = make_blackboard(target)
 			bb.perception.target_enemy_type = "ranged"
@@ -511,8 +640,8 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, {}, {}, false)
-			assert.is_true(result)
-			assert.is_true(orig_called)
+			assert.is_false(result)
+			assert.is_false(orig_called)
 		end)
 
 		it("uses the configured ammo threshold for opportunistic ranged fire", function()
@@ -685,22 +814,190 @@ describe("condition_patch", function()
 			assert.is_not_nil(find_debug_log_by_key("ranged_ammo_threshold_override:bot1"))
 		end)
 
+		it("logs when the bot has the wrong slot for the current target type", function()
+			_debug_enabled_result = true
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+
+			local bb = make_blackboard("gunner1")
+			bb.perception.target_enemy_type = "melee"
+			local orig_called = false
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					orig_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return false
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 4
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_true(result)
+			assert.is_true(orig_called)
+			assert.is_truthy(find_debug_log("wrong slot for melee target"))
+			assert.is_truthy(find_debug_log("bot 4"))
+			assert.is_truthy(find_debug_log("wielded=slot_secondary"))
+			assert.is_truthy(find_debug_log("wanted=slot_primary"))
+			assert.is_not_nil(find_debug_log_by_key("wrong_slot_for_target_type:bot1"))
+		end)
+
+		it("suppresses recent opposite-type switches to cut weapon-swap thrash", function()
+			_debug_enabled_result = true
+			_fixed_time_value = 10
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_debounce")
+
+			local ranged_bb = make_blackboard("gunner1")
+			ranged_bb.perception.target_enemy_type = "ranged"
+			assert.is_true(
+				conditions.wrong_slot_for_target_type(
+					unit,
+					ranged_bb,
+					{},
+					{ target_type = "ranged" },
+					{ wanted_slot = "slot_secondary" },
+					false
+				)
+			)
+
+			_fixed_time_value = 10.3
+			local melee_bb = make_blackboard("poxwalker1")
+			melee_bb.perception.target_enemy_type = "melee"
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				melee_bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_false(result)
+			assert.is_truthy(find_debug_log("suppressed opposite-type switch"))
+		end)
+
+		it("still allows immediate opposite-type switches for elite targets", function()
+			_fixed_time_value = 20
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+			_extensions.elite1 = {
+				unit_data_system = test_helper.make_minion_unit_data_extension({
+					name = "chaos_ogryn_executor",
+					tags = { elite = true },
+				}),
+			}
+			_alive.elite1 = true
+
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_debounce_elite")
+
+			local ranged_bb = make_blackboard("gunner1")
+			ranged_bb.perception.target_enemy_type = "ranged"
+			assert.is_true(
+				conditions.wrong_slot_for_target_type(
+					unit,
+					ranged_bb,
+					{},
+					{ target_type = "ranged" },
+					{ wanted_slot = "slot_secondary" },
+					false
+				)
+			)
+
+			_fixed_time_value = 20.2
+			local melee_bb = make_blackboard("elite1")
+			melee_bb.perception.target_enemy_type = "melee"
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				melee_bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_true(result)
+		end)
+
 		it("blocks ability activation when team cooldown suppression is active", function()
 			local unit = "bot1"
 			_extensions[unit] = {
-				unit_data_system = {
-					read_component = function(_self, component_name)
-						assert.equals("combat_ability_action", component_name)
-						return { template_name = "ogryn_taunt_shout" }
-					end,
-				},
-				ability_system = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "ogryn_taunt_shout" },
+				}),
+				ability_system = test_helper.make_player_ability_extension({
 					action_input_is_currently_valid = function()
 						return true
 					end,
-				},
-				action_input_system = {
-					_action_input_parsers = {
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
 						combat_ability_action = {
 							_ACTION_INPUT_SEQUENCE_CONFIGS = {
 								ogryn_taunt_shout = {
@@ -711,7 +1008,7 @@ describe("condition_patch", function()
 							},
 						},
 					},
-				},
+				}),
 			}
 
 			ConditionPatch.wire({
@@ -781,13 +1078,10 @@ describe("condition_patch", function()
 			-- shout bots never match the aoe_shout category map.
 			local unit = "vet_bot"
 			_extensions[unit] = {
-				unit_data_system = {
-					read_component = function(_self, component_name)
-						assert.equals("combat_ability_action", component_name)
-						return { template_name = "veteran_combat_ability" }
-					end,
-				},
-				ability_system = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "veteran_combat_ability" },
+				}),
+				ability_system = test_helper.make_player_ability_extension({
 					action_input_is_currently_valid = function()
 						return true
 					end,
@@ -797,9 +1091,9 @@ describe("condition_patch", function()
 							ability_template_tweak_data = { class_tag = "squad_leader" },
 						},
 					},
-				},
-				action_input_system = {
-					_action_input_parsers = {
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
 						combat_ability_action = {
 							_ACTION_INPUT_SEQUENCE_CONFIGS = {
 								veteran_combat_ability = {
@@ -810,7 +1104,7 @@ describe("condition_patch", function()
 							},
 						},
 					},
-				},
+				}),
 			}
 
 			local recorded_team_key

@@ -1,9 +1,11 @@
 local CompanionTag = require("scripts.mods.BetterBots.companion_tag")
 local test_helper = require("tests.test_helper")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 
 describe("companion_tag", function()
 	local mod_mock, debug_log_mock, fixed_time_mock, bot_unit
 	local current_time = 0
+	local game_object_ids, game_object_fields
 
 	local function reinit(opts)
 		opts = opts or {}
@@ -14,9 +16,10 @@ describe("companion_tag", function()
 				return opts.debug or false
 			end,
 			fixed_time = fixed_time_mock,
-			bot_slot_for_unit = function()
+			bot_slot_for_unit = opts.bot_slot_for_unit or function()
 				return 1
 			end,
+			shared_rules = SharedRules,
 		})
 	end
 
@@ -56,8 +59,27 @@ describe("companion_tag", function()
 						return nil
 					end,
 				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
 			},
 		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+		game_object_ids = {}
+		game_object_fields = {}
 	end)
 
 	after_each(function()
@@ -66,25 +88,20 @@ describe("companion_tag", function()
 		_G.POSITION_LOOKUP = nil
 		_G.Vector3 = nil
 		_G.Managers = nil
+		_G.GameSession = nil
 	end)
 
 	-- Helper: set up a bot with companion_spawner_extension
 	local function setup_arbites_bot(has_companion)
-		local companion_unit = has_companion and { name = "cyber_mastiff" } or nil
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return has_companion
-					end,
-					companion_unit = function()
-						return companion_unit
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = has_companion,
+					companion_units = has_companion and { { name = "cyber_mastiff" } } or nil,
+				})
 			end
 			return nil
 		end
-		return companion_unit
 	end
 
 	-- Helper: set up full environment with targets and smart_tag_system
@@ -96,40 +113,29 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return companion_unit
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { companion_unit },
+				})
 			end
 			if ext == "unit_data_system" then
 				local breed = opts.breeds and opts.breeds[unit]
 				if breed then
-					return {
-						breed = function()
-							return breed
-						end,
-					}
+					return test_helper.make_minion_unit_data_extension(breed)
 				end
 				return nil
 			end
 			if ext == "smart_tag_system" then
-				return {
-					tag_id = function()
-						-- Return a tag_id if this target has a companion tag
-						return existing_companion_tags[unit] or nil
-					end,
-				}
+				return test_helper.make_smart_tag_extension(existing_companion_tags[unit] or nil)
 			end
 			if ext == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return opts.has_los ~= false
-					end,
-				}
+				local has_los = opts.has_los
+				if opts.has_los_by_unit and opts.has_los_by_unit[unit] ~= nil then
+					has_los = opts.has_los_by_unit[unit]
+				end
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = has_los ~= false,
+				})
 			end
 			return nil
 		end
@@ -221,6 +227,179 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_not_called()
 	end)
 
+	it("does not companion-tag a target without line of sight", function()
+		local gunner = { name = "gunner_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[gunner] = { name = "chaos_ogryn_gunner", tags = { elite = true } },
+			},
+			has_los_by_unit = {
+				[gunner] = false,
+			},
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = gunner,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("does not companion-tag while waiting for companion respawn", function()
+		local elite = { name = "elite_unit" }
+		local dead_companion = { name = "dead_mastiff" }
+		local set_tag_mock = spy.new(function() end)
+		local original_unit_alive = _G.Unit.alive
+		_G.Unit.alive = function(unit)
+			if unit == dead_companion then
+				return false
+			end
+			return original_unit_alive(unit)
+		end
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if unit == bot_unit and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { dead_companion },
+				})
+			end
+			if ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
+			end
+			if ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			end
+			if ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = set_tag_mock,
+					unit_tag = function()
+						return nil
+					end,
+				}
+			end
+			return nil
+		end
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = elite,
+			},
+		})
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("marks a successfully commanded target as recently companion-tagged", function()
+		local mutant = { name = "mutant_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[mutant] = { name = "cultist_mutant", tags = { special = true } },
+			},
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = mutant,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(1)
+		assert.is_true(CompanionTag.is_recent_command_target(mutant, current_time))
+
+		current_time = current_time + 2.1
+		assert.is_false(CompanionTag.is_recent_command_target(mutant, current_time))
+	end)
+
+	it("uses per-bot throttle keys for skipped companion-tag logs", function()
+		local second_bot = { name = "bot_unit_two" }
+		local gunner = { name = "gunner_unit" }
+
+		reinit({
+			debug = true,
+			bot_slot_for_unit = function(unit)
+				if unit == second_bot then
+					return 2
+				end
+
+				return 1
+			end,
+		})
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if (unit == bot_unit or unit == second_bot) and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "cyber_mastiff" } },
+				})
+			end
+			if unit == gunner and ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "chaos_ogryn_gunner",
+					tags = { elite = true },
+				})
+			end
+			if unit == gunner and ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			end
+			if unit == gunner and ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = false,
+				})
+			end
+
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = spy.new(function() end),
+					unit_tag = function()
+						return nil
+					end,
+				}
+			end
+
+			return nil
+		end
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = gunner,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		CompanionTag.update(second_bot, blackboard)
+
+		assert.spy(debug_log_mock).was_called(2)
+		assert.spy(debug_log_mock).was_called_with(
+			"companion_tag_skip:no_los:chaos_ogryn_gunner:" .. tostring(bot_unit),
+			current_time,
+			"bot 1 skipped companion tag for chaos_ogryn_gunner (reason: no_los)"
+		)
+		assert.spy(debug_log_mock).was_called_with(
+			"companion_tag_skip:no_los:chaos_ogryn_gunner:" .. tostring(second_bot),
+			current_time,
+			"bot 2 skipped companion tag for chaos_ogryn_gunner (reason: no_los)"
+		)
+	end)
+
 	-- ── Target selection ──────────────────────────────────────────
 
 	it("tags highest-priority elite target with companion-command tag", function()
@@ -278,6 +457,134 @@ describe("companion_tag", function()
 
 		CompanionTag.update(bot_unit, blackboard)
 		assert.spy(set_tag_mock).was_called(1)
+	end)
+
+	it("does not companion-tag a dormant daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "passive",
+				},
+			},
+		}
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("still companion-tags an aggroed daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_called(1)
+	end)
+
+	it("still treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+		game_object_ids[daemonhost] = "daemonhost_go"
+		game_object_fields.daemonhost_go = { stage = 5 }
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
 	end)
 
 	it("follows ping slot priority order", function()
@@ -378,6 +685,185 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_called(1)
 	end)
 
+	it("uses the engine override interaction when upgrading an existing normal tag to companion order", function()
+		local elite = { name = "elite_unit" }
+		local set_tag_mock = spy.new(function() end)
+		local trigger_tag_interaction_mock = spy.new(function() end)
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if unit == bot_unit and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "cyber_mastiff" } },
+				})
+			end
+			if unit == elite and ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
+			end
+			if unit == elite and ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(123)
+			end
+			if unit == elite and ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = set_tag_mock,
+					trigger_tag_interaction = trigger_tag_interaction_mock,
+					unit_tag_id = function(_, target_unit)
+						return target_unit == elite and 123 or nil
+					end,
+					unit_tag = function(_, target_unit)
+						if target_unit == elite then
+							return {
+								template = function()
+									return { name = "enemy_over_here" }
+								end,
+							}
+						end
+						return nil
+					end,
+				}
+			end
+			return nil
+		end
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = elite,
+			},
+		})
+
+		assert.spy(trigger_tag_interaction_mock).was_called(1)
+		assert
+			.spy(trigger_tag_interaction_mock)
+			.was_called_with(match.is_table(), 123, match.is_ref(bot_unit), match.is_ref(elite), "companion_order")
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("holds the current companion tag during the minimum hold window", function()
+		local current_target = { name = "current_target" }
+		local lower_priority_target = { name = "lower_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_captain", tags = { elite = true } },
+				[lower_priority_target] = { name = "renegade_sniper", tags = { special = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 0.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+				target_enemy = lower_priority_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(1)
+	end)
+
+	it("allows an early retag when a strictly higher-priority target appears", function()
+		local current_target = { name = "current_target" }
+		local higher_priority_target = { name = "higher_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_sniper", tags = { special = true } },
+				[higher_priority_target] = { name = "chaos_ogryn_executor", tags = { elite = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 0.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = higher_priority_target,
+				target_enemy = current_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(2)
+		assert
+			.spy(set_tag_mock)
+			.was_called_with(
+				match.is_table(),
+				"enemy_companion_target",
+				match.is_ref(bot_unit),
+				match.is_ref(higher_priority_target),
+				nil
+			)
+	end)
+
+	it("allows a lower-priority retag after the hold window expires", function()
+		local current_target = { name = "current_target" }
+		local lower_priority_target = { name = "lower_priority_target" }
+		local existing_tags = {}
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[current_target] = { name = "renegade_captain", tags = { elite = true } },
+				[lower_priority_target] = { name = "renegade_sniper", tags = { special = true } },
+			},
+			existing_companion_tags = existing_tags,
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+			},
+		})
+		assert.spy(set_tag_mock).was_called(1)
+
+		existing_tags[current_target] = 123
+		current_time = 2.5
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = current_target,
+				target_enemy = lower_priority_target,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(2)
+		assert
+			.spy(set_tag_mock)
+			.was_called_with(
+				match.is_table(),
+				"enemy_companion_target",
+				match.is_ref(bot_unit),
+				match.is_ref(lower_priority_target),
+				nil
+			)
+	end)
+
 	-- ── Failure backoff ───────────────────────────────────────────
 
 	it("backs off after set_tag failure", function()
@@ -434,21 +920,16 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return { name = "dog" }
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "dog" } },
+				})
 			end
 			if ext == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_captain", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
 			end
 			return nil
 		end
@@ -490,35 +971,24 @@ describe("companion_tag", function()
 
 		_G.ScriptUnit.has_extension = function(unit, ext)
 			if unit == bot_unit and ext == "companion_spawner_system" then
-				return {
-					should_have_companion = function()
-						return true
-					end,
-					companion_unit = function()
-						return { name = "dog" }
-					end,
-				}
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { { name = "dog" } },
+				})
 			end
 			if ext == "unit_data_system" then
-				return {
-					breed = function()
-						return { name = "renegade_captain", tags = { elite = true } }
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
 			end
 			if ext == "smart_tag_system" then
-				return {
-					tag_id = function()
-						return nil
-					end,
-				}
+				return test_helper.make_smart_tag_extension(nil)
 			end
 			if ext == "perception_system" then
-				return {
-					has_line_of_sight = function()
-						return true
-					end,
-				}
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
 			end
 			return nil
 		end

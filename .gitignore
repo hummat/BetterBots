@@ -10,3 +10,5 @@ BetterBots.zip
 .superpowers/
 .codex
 .remember/
+
+.claude/settings.local.json

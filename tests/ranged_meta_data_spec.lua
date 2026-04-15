@@ -12,13 +12,19 @@ local function make_ranged_template(opts)
 end
 
 describe("ranged_meta_data", function()
+	local enabled
+
 	before_each(function()
+		enabled = true
 		RangedMetaData.init({
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
 			debug_log = noop_debug_log,
 			debug_enabled = function()
 				return false
+			end,
+			is_enabled = function()
+				return enabled
 			end,
 		})
 	end)
@@ -353,6 +359,95 @@ describe("ranged_meta_data", function()
 	end)
 
 	describe("inject", function()
+		it("does not inject when ranged improvements are disabled", function()
+			enabled = false
+			local templates = {
+				forcestaff = make_ranged_template({
+					keywords = { "ranged", "force_staff" },
+					actions = {
+						action_shoot = {},
+						action_charge = { start_input = "charge" },
+						action_shoot_charged = { start_input = "trigger_explosion" },
+					},
+					action_inputs = {
+						shoot_charge = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.is_nil(templates.forcestaff.attack_meta_data)
+		end)
+
+		it("reverts injected ranged attack_meta_data when setting is disabled at runtime", function()
+			local templates = {
+				staff = make_ranged_template({
+					keywords = { "ranged", "force_staff" },
+					actions = {
+						action_shoot = {},
+						action_shoot_charged = { start_input = "shoot_charge" },
+					},
+					action_inputs = {
+						shoot_charge = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+			assert.is_table(templates.staff.attack_meta_data)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.is_nil(templates.staff.attack_meta_data)
+		end)
+
+		it("restores original attack_meta_data fields when disabling ranged improvements", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "force_staff" },
+				actions = {
+					action_shoot = {},
+					action_charge = {
+						start_input = "charge",
+						allowed_chain_actions = {
+							trigger_explosion = { action_name = "action_explode" },
+						},
+					},
+					action_explode = {
+						stop_input = "charge_release",
+					},
+				},
+				action_inputs = {
+					charge = { input_sequence = { { input = "action_two_hold", value = true } } },
+					trigger_explosion = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+					charge_release = { input_sequence = { { input = "action_two_hold", value = false } } },
+				},
+			})
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				aim_fire_action_input = "zoom_shoot",
+			}
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+			assert.equals("trigger_explosion", template.attack_meta_data.aim_fire_action_input)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+			assert.equals("zoom_shoot", template.attack_meta_data.aim_fire_action_input)
+			assert.is_nil(template.attack_meta_data.aim_action_input)
+			assert.is_nil(template.attack_meta_data.aim_action_name)
+			assert.is_nil(template.attack_meta_data.unaim_action_input)
+			assert.is_nil(template.attack_meta_data.unaim_action_name)
+		end)
+
 		it("injects attack_meta_data for weapon with broken fire input", function()
 			local templates = {
 				forcestaff = make_ranged_template({
@@ -460,9 +555,10 @@ describe("ranged_meta_data", function()
 			assert.is_nil(meta.aim_action_input)
 		end)
 
-		it("skips weapons where vanilla fallback is valid", function()
+		it("skips non-allowlisted weapons where vanilla fallback is valid", function()
 			local templates = {
-				lasgun = make_ranged_template({
+				autopistol = make_ranged_template({
+					keywords = { "ranged", "autopistol", "p1" },
 					action_inputs = {
 						shoot_pressed = {
 							input_sequence = {
@@ -488,7 +584,116 @@ describe("ranged_meta_data", function()
 
 			RangedMetaData.inject(templates)
 
-			assert.is_nil(templates.lasgun.attack_meta_data)
+			assert.is_nil(templates.autopistol.attack_meta_data)
+		end)
+
+		it("injects weakspot aim nodes for allowlisted ranged families", function()
+			local templates = {
+				lasgun = make_ranged_template({
+					keywords = { "ranged", "lasgun", "p1" },
+					action_inputs = {
+						shoot_pressed = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+						zoom = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						zoom_shoot = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { start_input = "shoot_pressed" },
+						action_zoom = { start_input = "zoom" },
+						action_shoot_zoomed = { start_input = "zoom_shoot" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.same({ "j_head", "j_spine" }, templates.lasgun.attack_meta_data.aim_at_node)
+		end)
+
+		it("merges weakspot aim nodes into existing attack_meta_data", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "autogun", "p2" },
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+					zoom = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					zoom_shoot = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_zoom = { start_input = "zoom" },
+					action_shoot_zoomed = { start_input = "zoom_shoot" },
+				},
+			})
+			template.attack_meta_data = { aim_data = { min_distance = 5 } }
+
+			RangedMetaData.inject({ autogun = template })
+
+			assert.equals(5, template.attack_meta_data.aim_data.min_distance)
+			assert.same({ "j_head", "j_spine" }, template.attack_meta_data.aim_at_node)
+		end)
+
+		it("preserves existing aim_at_node values", function()
+			local template = make_ranged_template({
+				keywords = { "ranged", "bolter", "p1" },
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+				},
+			})
+			template.attack_meta_data = { aim_at_node = "j_neck" }
+
+			RangedMetaData.inject({ bolter = template })
+
+			assert.equals("j_neck", template.attack_meta_data.aim_at_node)
+		end)
+
+		it("combines fire-input correction with weakspot aim injection", function()
+			local templates = {
+				stubrevolver = make_ranged_template({
+					keywords = { "ranged", "stub_pistol", "p1" },
+					action_inputs = {
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+					},
+					actions = {
+						action_shoot = { kind = "shoot_hit_scan" },
+						action_charge_direct = { start_input = "shoot_charge" },
+					},
+				}),
+			}
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("shoot_charge", templates.stubrevolver.attack_meta_data.fire_action_input)
+			assert.same({ "j_head", "j_spine" }, templates.stubrevolver.attack_meta_data.aim_at_node)
 		end)
 
 		it("skips non-ranged weapons", function()
@@ -706,6 +911,89 @@ describe("ranged_meta_data", function()
 			assert.equals("charge_flame_release", template.attack_meta_data.unaim_action_input)
 			assert.equals("action_charge_flame_release", template.attack_meta_data.unaim_action_name)
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+		end)
+
+		it("overrides aim metadata for braced stream weapons (#87 flamer)", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					brace_pressed = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					brace_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_hold", value = true },
+					} },
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_brace = {
+						start_input = "brace_pressed",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+			template.attack_meta_data = {
+				fire_action_input = "shoot_pressed",
+				fire_action_name = "action_shoot",
+				aim_fire_action_input = "shoot_pressed",
+				aim_fire_action_name = "action_shoot",
+			}
+			local templates = { flamer = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.equals("shoot_braced", template.attack_meta_data.aim_fire_action_input)
+			assert.equals("action_shoot_braced", template.attack_meta_data.aim_fire_action_name)
+			assert.equals("brace_pressed", template.attack_meta_data.aim_action_input)
+			assert.equals("action_brace", template.attack_meta_data.aim_action_name)
+			assert.equals("brace_release", template.attack_meta_data.unaim_action_input)
+			assert.equals("action_unbrace", template.attack_meta_data.unaim_action_name)
+			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+		end)
+
+		it("derives chain-only unaim actions for braced stream weapons", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					brace_pressed = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					brace_release = { input_sequence = {
+						{ input = "action_two_hold", value = false },
+					} },
+					shoot_braced = { input_sequence = {
+						{ input = "action_one_hold", value = true },
+					} },
+				},
+				actions = {
+					action_brace = {
+						start_input = "brace_pressed",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+
+			local aim_input, aim_action, unaim_input, unaim_action =
+				RangedMetaData._find_aim_action_for_fire(template, "shoot_braced")
+
+			assert.equals("brace_pressed", aim_input)
+			assert.equals("action_brace", aim_action)
+			assert.equals("brace_release", unaim_input)
+			assert.equals("action_unbrace", unaim_action)
 		end)
 
 		it("does not override aim_fire when it already matches hold_input input", function()

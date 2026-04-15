@@ -32,7 +32,19 @@ local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
+local _bot_settings
 local PERF_SETTING_ID = "enable_perf_timing"
+local Settings
+local Sprint
+local TIMING_SETTING_IDS = {
+	human_timing_profile = true,
+	human_timing_reaction_min = true,
+	human_timing_reaction_max = true,
+	human_timing_defensive_jitter_min_ms = true,
+	human_timing_defensive_jitter_max_ms = true,
+	human_timing_opportunistic_jitter_min_ms = true,
+	human_timing_opportunistic_jitter_max_ms = true,
+}
 
 -- ADS fix (#35): T5/T6 bot profiles lack bot_gestalts, causing fallback to
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
@@ -46,6 +58,32 @@ local _rescue_intent = setmetatable({}, { __mode = "k" })
 
 local ARMOR_TYPES = ArmorSettings.types
 local ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPES and ARMOR_TYPES.super_armor
+if not mod._raw_hook_require then
+	mod._raw_hook_require = mod.hook_require
+end
+local _original_hook_require = mod._raw_hook_require
+local _hook_require_callsite_by_path = {}
+
+function mod:hook_require(path, callback)
+	local caller = debug.getinfo(2, "Sl")
+	local callsite = string.format("%s:%s", caller and caller.short_src or "?", caller and caller.currentline or 0)
+	local first_callsite = _hook_require_callsite_by_path[path]
+
+	if first_callsite then
+		error(
+			string.format(
+				"BetterBots duplicate hook_require for %s at %s (first registered at %s)",
+				tostring(path),
+				callsite,
+				first_callsite
+			)
+		)
+	end
+
+	_hook_require_callsite_by_path[path] = callsite
+
+	return _original_hook_require(self, path, callback)
+end
 
 local function _fixed_time()
 	return FixedFrame.get_latest_fixed_time() or 0
@@ -132,10 +170,16 @@ local function _is_suppressed(unit)
 		return remember(true, "moving_platform")
 	end
 
-	-- #17: daemonhost combat suppression is handled target-specifically in
-	-- condition_patch.lua (melee/ranged suppression when targeting a dormant DH).
-	-- Blanket proximity suppression was removed — it blocked abilities in mixed
-	-- encounters where bots fight other enemies near a sleeping daemonhost.
+	-- #17: keep offensive abilities and blitzes quiet when the bot is actually
+	-- inside the close daemonhost safety radius. This is intentionally tighter
+	-- than the sprint safety radius so bots still fight mixed encounters unless
+	-- they are crowding the sleeping daemonhost.
+	if
+		Settings.is_feature_enabled("daemonhost_avoidance")
+		and Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+	then
+		return remember(true, "daemonhost_nearby")
+	end
 
 	return remember(false)
 end
@@ -165,7 +209,7 @@ end
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
 
-local Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
+Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
 assert(Settings, "BetterBots: failed to load settings module")
 
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
@@ -183,7 +227,7 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 local Perf = mod:io_dofile("BetterBots/scripts/mods/BetterBots/perf")
 assert(Perf, "BetterBots: failed to load perf module")
 
-local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
+Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
 
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
@@ -216,6 +260,9 @@ assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
 assert(WeaponAction, "BetterBots: failed to load weapon_action module")
 
+local SustainedFire = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sustained_fire")
+assert(SustainedFire, "BetterBots: failed to load sustained_fire module")
+
 local ConditionPatch = mod:io_dofile("BetterBots/scripts/mods/BetterBots/condition_patch")
 assert(ConditionPatch, "BetterBots: failed to load condition_patch module")
 
@@ -237,8 +284,17 @@ assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
 assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 
+local MulePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/mule_pickup")
+assert(MulePickup, "BetterBots: failed to load mule_pickup module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
+
+local HumanLikeness = mod:io_dofile("BetterBots/scripts/mods/BetterBots/human_likeness")
+assert(HumanLikeness, "BetterBots: failed to load human_likeness module")
+
+local TargetTypeHysteresis = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_type_hysteresis")
+assert(TargetTypeHysteresis, "BetterBots: failed to load target_type_hysteresis module")
 
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
@@ -264,6 +320,26 @@ BotProfiles.init({
 	debug_enabled = _debug_enabled,
 })
 
+HumanLikeness.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	get_timing_config = Settings.resolve_human_timing_config,
+	get_pressure_leash_config = Settings.resolve_pressure_leash_config,
+})
+
+TargetTypeHysteresis.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_enabled = function()
+		return Settings.is_feature_enabled("target_type_hysteresis")
+	end,
+	perf = Perf,
+})
+
 EngagementLeash.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -273,6 +349,8 @@ EngagementLeash.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("engagement_leash")
 	end,
+	HumanLikeness = HumanLikeness,
+	Heuristics = Heuristics,
 })
 
 MetaData.init({
@@ -356,6 +434,9 @@ MeleeMetaData.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	is_enabled = function()
+		return Settings.is_feature_enabled("melee_improvements")
+	end,
 })
 
 MeleeAttackChoice.init({
@@ -375,6 +456,9 @@ RangedMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
 })
 
 TargetSelection.init({
@@ -385,6 +469,10 @@ TargetSelection.init({
 	perf = Perf,
 	player_tag_bonus = Settings.player_tag_bonus,
 	special_chase_penalty_range = Settings.special_chase_penalty_range,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 Poxburster.init({
@@ -441,6 +529,17 @@ WeaponAction.init({
 	end,
 })
 
+SustainedFire.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
+})
+
 ConditionPatch.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -458,6 +557,9 @@ ConditionPatch.init({
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")
 	end,
+	is_near_daemonhost = function(unit)
+		return Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+	end,
 })
 
 AbilityQueue.init({
@@ -471,6 +573,7 @@ AbilityQueue.init({
 	fallback_state_by_unit = _fallback_state_by_unit,
 	fallback_queue_dumped_by_key = _fallback_queue_dumped_by_key,
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
+	perf = Perf,
 	shared_rules = SharedRules,
 })
 
@@ -507,6 +610,11 @@ PingSystem.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	bot_targeting = BotTargeting,
+	has_recent_companion_target = CompanionTag.is_recent_command_target,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 CompanionTag.init({
@@ -516,6 +624,10 @@ CompanionTag.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	bot_targeting = BotTargeting,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 HealingDeferral.init({
@@ -532,7 +644,24 @@ AmmoPolicy.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	settings = Settings,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ammo_policy")
+	end,
+})
+
+MulePickup.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_grimoire_pickup_enabled = function()
+		return Settings.is_bot_grimoire_pickup_enabled()
+	end,
+	is_tome_pickup_enabled = function()
+		return Settings.is_feature_enabled("bot_tome_pickup")
+	end,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -560,6 +689,9 @@ ConditionPatch.wire({
 	bot_ranged_ammo_threshold = Settings.bot_ranged_ammo_threshold,
 	TeamCooldown = TeamCooldown,
 	combat_ability_identity = CombatAbilityIdentity,
+	is_team_cooldown_enabled = function()
+		return Settings.is_feature_enabled("team_cooldown")
+	end,
 })
 
 AbilityQueue.wire({
@@ -571,8 +703,33 @@ AbilityQueue.wire({
 	EngagementLeash = EngagementLeash,
 	TeamCooldown = TeamCooldown,
 	CombatAbilityIdentity = CombatAbilityIdentity,
+	HumanLikeness = HumanLikeness,
 	is_combat_template_enabled = Settings.is_combat_template_enabled,
+	is_team_cooldown_enabled = function()
+		return Settings.is_feature_enabled("team_cooldown")
+	end,
 })
+
+local function _patch_human_likeness_bot_settings(BotSettings)
+	_bot_settings = BotSettings
+	HumanLikeness.patch_bot_settings(BotSettings)
+end
+
+mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+	_patch_human_likeness_bot_settings(BotSettings)
+end)
+
+do
+	local ok, BotSettings = pcall(require, "scripts/settings/bot/bot_settings")
+	if ok and BotSettings then
+		_patch_human_likeness_bot_settings(BotSettings)
+	else
+		mod:warning(
+			"BetterBots: fallback require of bot_settings failed; human-likeness reaction-time patch may be skipped. "
+				.. tostring(BotSettings)
+		)
+	end
+end
 
 ReviveAbility.wire({
 	MetaData = MetaData,
@@ -583,6 +740,7 @@ ReviveAbility.wire({
 
 GrenadeFallback.wire({
 	build_context = Heuristics.build_context,
+	normalize_grenade_context = Heuristics.normalize_grenade_context,
 	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
 	equipped_grenade_ability = _equipped_grenade_ability,
 	is_combat_ability_active = function(unit)
@@ -619,6 +777,7 @@ end
 
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
+TargetTypeHysteresis.register_hooks()
 Poxburster.register_hooks()
 MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()
@@ -629,9 +788,12 @@ WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
+	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
 })
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
+AmmoPolicy.register_hooks()
+MulePickup.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()
@@ -674,9 +836,24 @@ end)
 mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
 	MeleeMetaData.inject(WeaponTemplates)
 	RangedMetaData.inject(WeaponTemplates)
+	GrenadeFallback.prime_weapon_templates(WeaponTemplates)
 end)
 
-Sprint.register_hook()
+-- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
+-- same mod on the same path silently clobber each other. Install all
+-- BotUnitInput hooks through one callback so sprint and sustained-fire coexist.
+mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
+	SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
+	Sprint.install_bot_unit_input_hooks(BotUnitInput)
+end)
+
+-- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
+-- same mod on the same path silently clobber each other. Install all BotGroup
+-- hooks through one callback so healing deferral and mule pickup both survive.
+mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+	HealingDeferral.install_bot_group_hooks(BotGroup)
+	MulePickup.install_bot_group_hooks(BotGroup)
+end)
 
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
 mod:hook_require(
@@ -870,12 +1047,14 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 				-- key team_cooldown.CATEGORY_MAP uses (psyker_shout). Without
 				-- this, record() is a silent no-op for variant abilities and
 				-- staggering never fires for their category.
-				local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
-				local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
-				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
-				local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
-				local team_key = (identity and identity.semantic_key) or ability_name
-				TeamCooldown.record(unit, team_key, fixed_t)
+				if Settings.is_feature_enabled("team_cooldown") then
+					local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
+					local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
+					local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
+					local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
+					local team_key = (identity and identity.semantic_key) or ability_name
+					TeamCooldown.record(unit, team_key, fixed_t)
+				end
 			end
 
 			if EventLog.is_enabled() then
@@ -967,6 +1146,10 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	ok, err = pcall(AmmoPolicy.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
 		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(MulePickup.install_behavior_ext_hooks, BotBehaviorExtension)
+	if not ok then
+		mod:echo("BetterBots: mule_pickup behavior hook install failed: " .. tostring(err))
 	end
 	ok, err = pcall(ReviveAbility.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
@@ -1082,7 +1265,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	end)
 end)
 
-mod:command("bb_perf", "Print BetterBots runtime timing stats from the current recording window", function()
+mod:command("bb_perf", "Show and clear BetterBots timing stats for the current session", function()
 	Perf.sync_setting()
 
 	local report = Perf.report_and_reset()
@@ -1095,45 +1278,25 @@ mod:command("bb_perf", "Print BetterBots runtime timing stats from the current r
 		return
 	end
 
-	mod:echo(
-		string.format(
-			"bb-perf: %.1f µs/bot/frame total (%d bot frames, %d calls, %.3f ms total)",
-			report.total_us_per_bot_frame or 0,
-			report.bot_frames,
-			report.total_calls,
-			report.total_us / 1000
-		)
-	)
-
-	local rows = {}
-	for tag, stats in pairs(report.tags) do
-		rows[#rows + 1] = {
-			tag = tag,
-			total_us = stats.total_us,
-			calls = stats.calls,
-			avg_us_per_call = stats.avg_us_per_call,
-		}
-	end
-
-	table.sort(rows, function(a, b)
-		return a.total_us > b.total_us
-	end)
-
-	for i = 1, #rows do
-		local row = rows[i]
-		mod:echo(
-			string.format(
-				"bb-perf: %s %.3f ms total (%d calls, %.1f µs/call)",
-				row.tag,
-				row.total_us / 1000,
-				row.calls,
-				row.avg_us_per_call
-			)
-		)
+	local lines = Perf.format_report_lines(report, "bb-perf:")
+	for i = 1, #lines do
+		mod:echo(lines[i])
 	end
 end)
 
-mod:command("bb_reset", "Reset BetterBots settings to defaults", function()
+local function _auto_dump_perf_report()
+	local report = Perf.report_and_reset()
+	if not report or report.bot_frames <= 0 then
+		return
+	end
+
+	local lines = Perf.format_report_lines(report, "bb-perf:auto:")
+	for i = 1, #lines do
+		mod:echo(lines[i])
+	end
+end
+
+mod:command("bb_reset", "Reset all BetterBots settings to their default values", function()
 	local failures = {}
 	for setting_id, default_value in pairs(Settings.DEFAULTS) do
 		local ok, err = pcall(function()
@@ -1192,7 +1355,35 @@ function mod.on_game_state_changed(status, state)
 	end
 
 	if status == "exit" and state == "GameplayStateRun" then
+		_auto_dump_perf_report()
 		EventLog.end_session()
+	end
+end
+
+function mod.on_setting_changed(setting_id)
+	if setting_id == DEBUG_SETTING_ID then
+		_refresh_debug_log_level()
+	end
+
+	if TIMING_SETTING_IDS[setting_id] then
+		HumanLikeness.patch_bot_settings(_bot_settings)
+	end
+
+	if setting_id == "enable_bot_grimoire_pickup" then
+		MulePickup.patch_pickups()
+		MulePickup.sync_live_bot_groups()
+	end
+
+	if setting_id == "enable_melee_improvements" then
+		MeleeMetaData.sync_all()
+	end
+
+	if setting_id == "enable_ranged_improvements" then
+		RangedMetaData.sync_all()
+	end
+
+	if setting_id == "enable_team_cooldown" then
+		TeamCooldown.reset()
 	end
 end
 
@@ -1209,17 +1400,12 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 	end
 end
 
--- All modules are assert-guarded above; if any failed to load we'd have
--- crashed already.  The count serves as a deployment sanity check in logs.
--- Bump when adding/removing modules.
-local _MODULE_COUNT = 33
-mod:echo("BetterBots loaded (" .. _MODULE_COUNT .. " modules)")
+mod:echo("BetterBots loaded")
 _debug_log("startup:logging", 0, "logging enabled (level=" .. LogLevels.level_name(_log_level) .. ")", nil, "debug")
 
--- Always emit all resolved slider/toggle values at startup so post-mortem
--- log inspection can confirm which features were active. Once-per-session,
--- log noise is negligible and "value missing" is impossible to diagnose if
--- defaults are silently skipped.
+-- Emit a concise startup summary of the highest-signal behavior settings.
+-- This is intentionally not a full config dump; keep it small and update
+-- docs/dev/logging.md when changing the included fields.
 if _debug_enabled() then
 	local parts = {
 		"preset=" .. Settings.resolve_preset(),

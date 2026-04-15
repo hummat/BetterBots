@@ -89,6 +89,11 @@ return {
 						default_value = DEFAULTS.enable_ranged_improvements,
 					},
 					{
+						setting_id = "enable_team_cooldown",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_team_cooldown,
+					},
+					{
 						setting_id = "enable_engagement_leash",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_engagement_leash,
@@ -103,6 +108,71 @@ return {
 						type = "checkbox",
 						default_value = DEFAULTS.enable_daemonhost_avoidance,
 					},
+					{
+						setting_id = "enable_target_type_hysteresis",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_target_type_hysteresis,
+					},
+					{
+						setting_id = "human_timing_profile",
+						type = "dropdown",
+						default_value = DEFAULTS.human_timing_profile,
+						tooltip = "human_timing_profile_description",
+						options = {
+							{ text = "human_timing_profile_auto", value = "auto" },
+							{ text = "human_timing_profile_off", value = "off" },
+							{ text = "human_timing_profile_fast", value = "fast" },
+							{ text = "human_timing_profile_medium", value = "medium" },
+							{ text = "human_timing_profile_slow", value = "slow" },
+							{
+								text = "human_timing_profile_custom",
+								value = "custom",
+								show_widgets = { 1, 2, 3, 4, 5, 6 },
+							},
+						},
+						sub_widgets = {
+							make_numeric("human_timing_reaction_min", { 0, 20 }, 1),
+							make_numeric("human_timing_reaction_max", { 0, 20 }, 1),
+							make_numeric("human_timing_defensive_jitter_min_ms", { 0, 1000 }, 25),
+							make_numeric("human_timing_defensive_jitter_max_ms", { 0, 1000 }, 25),
+							make_numeric("human_timing_opportunistic_jitter_min_ms", { 0, 1500 }, 25),
+							make_numeric("human_timing_opportunistic_jitter_max_ms", { 0, 1500 }, 25),
+						},
+					},
+					{
+						setting_id = "pressure_leash_profile",
+						type = "dropdown",
+						default_value = DEFAULTS.pressure_leash_profile,
+						tooltip = "pressure_leash_profile_description",
+						options = {
+							{ text = "pressure_leash_profile_auto", value = "auto" },
+							{ text = "pressure_leash_profile_off", value = "off" },
+							{ text = "pressure_leash_profile_light", value = "light" },
+							{ text = "pressure_leash_profile_medium", value = "medium" },
+							{ text = "pressure_leash_profile_strong", value = "strong" },
+							{
+								text = "pressure_leash_profile_custom",
+								value = "custom",
+								show_widgets = { 1, 2, 3, 4 },
+							},
+						},
+						sub_widgets = {
+							make_numeric("pressure_leash_start_rating", { 0, 40 }, 1),
+							make_numeric("pressure_leash_full_rating", { 1, 50 }, 1),
+							make_numeric("pressure_leash_scale_percent", { 25, 100 }, 5),
+							make_numeric("pressure_leash_floor_m", { 4, 12 }, 1),
+						},
+					},
+					{
+						setting_id = "enable_bot_grimoire_pickup",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_bot_grimoire_pickup,
+					},
+					{
+						setting_id = "enable_bot_tome_pickup",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_bot_tome_pickup,
+					},
 				},
 			},
 			{
@@ -113,8 +183,14 @@ return {
 					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
 					make_numeric("player_tag_bonus", { 0, 10 }, 1),
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
+					{
+						setting_id = "enable_ammo_policy",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_ammo_policy,
+					},
 					make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
 					make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
+					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
 				},
 			},
 			{
@@ -149,23 +225,11 @@ return {
 				setting_id = "bot_profiles_group",
 				type = "group",
 				sub_widgets = {
-					{
-						setting_id = "bot_slots_core_group",
-						type = "group",
-						sub_widgets = {
-							make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
-							make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
-							make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
-						},
-					},
-					{
-						setting_id = "bot_slots_tertium_group",
-						type = "group",
-						sub_widgets = {
-							make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
-							make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
-						},
-					},
+					make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
+					make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
+					make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
+					make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
+					make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
 					{
 						setting_id = "bot_weapon_quality",
 						type = "dropdown",

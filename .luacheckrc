@@ -7,7 +7,11 @@ read_globals = {
 	"cjson",
 	"ALIVE",
 	"BLACKBOARDS",
+	"Broadphase",
+	"HEALTH_ALIVE",
 	"POSITION_LOOKUP",
+	"Quaternion",
+	"Unit",
 	"Vector3",
 	"Managers",
 }

@@ -227,55 +227,54 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 end
 
 function M.register_hooks()
-	_mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
-		_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
-			local perf_t0 = _perf and _perf.begin()
-			if not (_health and _health.current_health_percent) then
-				_warn_missing_health_once()
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_deployables", perf_t0)
-				end
-				return
-			end
-
-			local settings = _resolve_settings()
-			if not _mode_allows_resource(settings.mode, "health_deployable") then
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_deployables", perf_t0)
-				end
-				return
-			end
-
-			local side = self._side
-			local human_needs_healing =
-				_any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
-			if not human_needs_healing then
-				if perf_t0 then
-					_perf.finish("healing_deferral.health_deployables", perf_t0)
-				end
-				return
-			end
-
-			for unit, data in pairs(bot_data) do
-				local pickup_component = data and data.pickup_component
-				if pickup_component and pickup_component.health_deployable then
-					local bot_health_pct = _health.current_health_percent(unit)
-					if _should_defer_resource("health_deployable", bot_health_pct, human_needs_healing, settings) then
-						_apply_health_deployable_deferral(pickup_component)
-						_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
-					end
-				end
-			end
-
-			if perf_t0 then
-				_perf.finish("healing_deferral.health_deployables", perf_t0)
-			end
-		end)
-	end)
-
 	-- The issue body also mentioned pocketable health pickups, but the decompiled
 	-- Lua path is currently dead for bots (`bots_mule_pickup` is not set on the
 	-- relevant templates). Don't hook a dead path and claim behavior we can't prove.
+end
+
+function M.install_bot_group_hooks(BotGroup)
+	_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
+		local perf_t0 = _perf and _perf.begin()
+		if not (_health and _health.current_health_percent) then
+			_warn_missing_health_once()
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_deployables", perf_t0)
+			end
+			return
+		end
+
+		local settings = _resolve_settings()
+		if not _mode_allows_resource(settings.mode, "health_deployable") then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_deployables", perf_t0)
+			end
+			return
+		end
+
+		local side = self._side
+		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
+		if not human_needs_healing then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_deployables", perf_t0)
+			end
+			return
+		end
+
+		for unit, data in pairs(bot_data) do
+			local pickup_component = data and data.pickup_component
+			if pickup_component and pickup_component.health_deployable then
+				local bot_health_pct = _health.current_health_percent(unit)
+				if _should_defer_resource("health_deployable", bot_health_pct, human_needs_healing, settings) then
+					_apply_health_deployable_deferral(pickup_component)
+					_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
+				end
+			end
+		end
+
+		if perf_t0 then
+			_perf.finish("healing_deferral.health_deployables", perf_t0)
+		end
+	end)
 end
 
 M.any_human_needs_healing = _any_human_needs_healing

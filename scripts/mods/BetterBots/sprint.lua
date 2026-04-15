@@ -5,6 +5,7 @@ local _fixed_time
 local _perf
 local _sprint_follow_distance
 local _is_daemonhost_avoidance_enabled
+local _is_non_aggroed_daemonhost
 local _logged_sprint_disabled = false
 local _logged_dh_avoidance_off = false
 
@@ -59,10 +60,13 @@ local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixe
 					if unit_data_ext then
 						local breed = unit_data_ext:breed()
 						if breed and DAEMONHOST_BREED_NAMES[breed.name] then
-							local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
-							local dh_perception = dh_bb and dh_bb.perception
-							local is_aggroed = dh_perception and dh_perception.aggro_state == "aggroed"
-							if not is_aggroed then
+							local is_non_aggroed = _is_non_aggroed_daemonhost and _is_non_aggroed_daemonhost(enemy_unit)
+							if is_non_aggroed == nil then
+								local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
+								local dh_perception = dh_bb and dh_bb.perception
+								is_non_aggroed = not (dh_perception and dh_perception.aggro_state == "aggroed")
+							end
+							if is_non_aggroed then
 								_dh_units_cache[#_dh_units_cache + 1] = enemy_unit
 							end
 						end
@@ -294,6 +298,7 @@ Sprint.init = function(deps)
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost
 	_dh_units_cache_t = nil
 	_dh_units_cache_side_system = nil
 	_dh_units_cache_enemy_sides = nil
@@ -302,10 +307,12 @@ Sprint.init = function(deps)
 	end
 end
 
+Sprint.install_bot_unit_input_hooks = function(BotUnitInput)
+	_mod:hook(BotUnitInput, "_update_movement", on_update_movement)
+end
+
 Sprint.register_hook = function()
-	_mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-		_mod:hook(BotUnitInput, "_update_movement", on_update_movement)
-	end)
+	error("BetterBots: Sprint.register_hook is obsolete; install through BetterBots.lua")
 end
 
 Sprint.should_sprint = _should_sprint

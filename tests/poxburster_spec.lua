@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local Poxburster = dofile("scripts/mods/BetterBots/poxburster.lua")
 
 local function distance(a, b)
@@ -86,11 +88,7 @@ describe("poxburster", function()
 					end
 
 					if unit == "poxburster" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker_bomber" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker_bomber" })
 					end
 
 					return nil
@@ -199,11 +197,7 @@ describe("poxburster", function()
 						return nil
 					end
 					if unit == "poxburster" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker_bomber" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker_bomber" })
 					end
 					return nil
 				end,
@@ -278,11 +272,7 @@ describe("poxburster", function()
 						return nil
 					end
 					if unit == "poxburster" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker_bomber" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker_bomber" })
 					end
 					return nil
 				end,
@@ -324,11 +314,7 @@ describe("poxburster", function()
 						return nil
 					end
 					if unit == "horde_enemy" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker" })
 					end
 					return nil
 				end,
@@ -429,18 +415,10 @@ describe("poxburster", function()
 						return nil
 					end
 					if unit == "poxburster" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker_bomber" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker_bomber" })
 					end
 					if unit == "horde_enemy" then
-						return {
-							breed = function()
-								return { name = "chaos_poxwalker" }
-							end,
-						}
+						return test_helper.make_minion_unit_data_extension({ name = "chaos_poxwalker" })
 					end
 					return nil
 				end,

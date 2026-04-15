@@ -155,10 +155,11 @@ Community claims bots "hip-fire only" — **this is incorrect for vanilla bots**
 | ADS for Tertium 5/6 bots | Custom profiles may lack `bot_gestalts` → fallback to `none` → no ADS | `bot_behavior_extension.lua:91` — falls back to `NO_GESTALTS` when nil |
 | Player weapon compatibility | No player weapon has `attack_meta_data` — bots fall back to hardcoded names | See "Player weapon `attack_meta_data` gap" section below |
 | Warp charge venting | BT vent node sends wrong action_input (`reload` vs `vent`) | Issue #30 |
+| Sustained-fire execution | Vanilla queues the fire action but never mirrors the required raw hold input back through `BotUnitInput`, so stream/full-auto paths collapse into taps. BetterBots `#87` now bridges held inputs for an allowlist of sustained-fire templates without changing path selection policy. | `bot_unit_input.lua`, `player_unit_action_input_extension.lua`, `bt_bot_shoot_action.lua` |
 | Suppressive fire | No concept of suppression output | No suppression scoring |
 | Target leading (projectile) | Ballistic prediction exists but limited | `_ballistic_shoot_angle` only for gravity projectiles |
 | Ammo conservation | Bots pick up ammo they don't need (infinite effective ammo) | `can_loot` checks ammo %, but bot ammo rarely depletes |
-| Weakspot / headshot aim | Bots aim `j_spine` (chest) for every shot — finesse stats and weakspot blessings/perks/talents are wasted | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 (MVP, v0.11.0), #92 (per-breed map, v1.0.0) |
+| Weakspot / headshot aim | Vanilla bots aim `j_spine` (chest) for every shot, so finesse stats and weakspot blessings/perks/talents are wasted. BetterBots `#91` partially overrides this for lasguns, autoguns, bolters, and stub revolvers by injecting `{ "j_head", "j_spine" }` into `attack_meta_data.aim_at_node` when unset. | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 (MVP shipped in mod), #92 (per-breed map, v1.0.0) |
 
 **Note on "infinite ammo":** Community claims bots have infinite ammo. **Verified false.** Bots consume ammo per shot through the identical `ActionShoot._spend_ammunition()` path as players (`action_shoot.lua:469-553`). No `is_human_controlled` exemption exists anywhere in the ammo deduction chain. The only infinite ammo flag (`infinite_ammo_reserve`) is exclusive to prologue missions (`prologue_mission_templates.lua:18`). Bots appear to have infinite ammo because: (a) conservative firing behavior with accuracy gating, (b) ammo pickup priority when below threshold, (c) high reserve on bot weapons.
 
@@ -445,7 +446,7 @@ When a player tags an enemy, it becomes a priority/opportunity target. Bots will
 
 **Source:** `bt_bot_conditions.can_loot`, `bt_bot_interact_action.lua`
 
-**With mods:** BetterBots adds weapon switch lock during Tier 3 item-ability sequences. Does not change item pickup behavior.
+**With mods:** BetterBots now activates side-mission book mule pickup (tomes/scriptures always, grimoires opt-in) by patching the dead vanilla metadata path, and still adds weapon switch lock during Tier 3 item-ability sequences.
 
 ---
 
@@ -625,7 +626,7 @@ What a DMF mod can and cannot fix. DMF hooks can replace/wrap any Lua function a
 | # | Missing capability | Moddable? | Confidence | Approach | Blockers |
 |---|---|---|---|---|---|
 | 1 | **ADS for Tertium 5/6 bots** | **Yes** | High | Tertium 5/6 custom profiles may lack `bot_gestalts`, causing `ranged_gestalt = none` (no ADS). Fix by injecting `bot_gestalts.ranged = "killshot"` into custom profiles, or hook `_init_blackboard_components` to force the gestalt. Vanilla bots already ADS — this is only needed for modded profiles. | None — decision logic already exists in vanilla shoot action |
-| 2 | **Mule items (scriptures/grimoires)** | **Yes** | Medium-High | Set `bots_mule_pickup = true` on pickup templates AND fix field name mismatch: `bot_group.lua:26` reads `pickup_settings.slot_name` but pickup templates use `inventory_slot_name`. Both fixes needed for `BotGroup` scanning, `can_loot` condition, and destination priority 5 to activate. See #32. | Field name mismatch requires either template mutation or hook |
+| 2 | **Mule items (scriptures/grimoires)** | **Yes** | Medium-High | Set `bots_mule_pickup = true` on pickup templates, fix field name mismatch (`bot_group.lua:26` reads `pickup_settings.slot_name` but pickup templates use `inventory_slot_name`), and backfill `_available_mule_pickups[slot_name]` because vanilla `BotGroup.init` iterates `pairs(Pickups)` over the registry wrapper instead of individual pickup definitions. BetterBots now ships this via template mutation, init/live-sync cache backfill, and a grimoire opt-in toggle. | Vanilla init path leaves mule slot caches empty unless a mod repairs them |
 | 3 | **Heavy melee attacks** | **Yes** | High | Inject `attack_meta_data` with heavy/charged entries into bot melee weapon templates via `require()` mutation. Bot melee weapons (e.g. `bot_combatsword_linesman_p1`) already have full `action_left_heavy` action definitions and `heavy_attack` chain entries — only the metadata table that drives `_choose_attack` scoring is missing. | Need to map correct `action_inputs` timings per weapon; scoring utility already handles arc/penetrating/outnumbered |
 | 4 | **Weapon specials** | **Yes** | Medium-High | Queue `bot_queue_action_input("weapon_action", "special_action", nil)`. Bot melee weapons have `special_action` → `action_parry_special` with chain entries from most melee states (idle, after light, during block). | Decision logic needed (when to parry vs block vs attack); `action_input_is_currently_valid` gates on current weapon state; not all bot weapons may have useful specials |
 | 5 | **Healing item self-use** | **Partial** | Medium | Syringe pocketables have full action templates: `use_self` → `action_use_self` (kind `"use_syringe"`, 1.9s). Same wield → use → unwield pattern as Tier 3 item fallback. Could queue via `bot_queue_action_input`. | **Inventory gate**: bots never pick up pocketables. Requires either (a) new pickup BT logic, (b) inventory injection at spawn, or (c) player order → forced pickup. Also needs health threshold decision logic. |
@@ -650,7 +651,7 @@ What a DMF mod can and cannot fix. DMF hooks can replace/wrap any Lua function a
 | Feature | Effort | Issue | Notes |
 |---|---|---|---|
 | ADS for Tertium 5/6 bots | Low | #35 | Inject `bot_gestalts` into custom profiles (vanilla already has ADS) |
-| Mule item pickup | Low | #32 | One-line metadata injection, everything else activates automatically |
+| Mule item pickup | Low | #32 | Shipped in BetterBots via template metadata mutation (`inventory_slot_name -> slot_name`, `bots_mule_pickup = true`) plus a grimoire opt-in toggle and order guard. |
 | Player weapon ranged `attack_meta_data` | Medium-High | #31 | Inject per-weapon-family metadata so bots can fire non-standard weapons (plasma, etc.). Without this, Tertium 5/6 bots silently fail to shoot weapons that don't match hardcoded fallback names. |
 | Player weapon melee `attack_meta_data` | Medium | #23 | Inject metadata with heavy/charged attack entries + timing. Enables heavy attacks, armor-penetrating swings, charged strikes for player weapons. |
 | Weapon special actions | Medium | #33 | Queue `special_action` input + build decision logic (when to parry vs block) |

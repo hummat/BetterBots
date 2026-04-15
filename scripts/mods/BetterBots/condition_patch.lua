@@ -18,6 +18,7 @@ local _is_combat_template_enabled
 local _perf
 local _TeamCooldown
 local _combat_ability_identity
+local _is_team_cooldown_enabled
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -27,6 +28,8 @@ local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local _bot_ranged_ammo_threshold
+local _is_non_aggroed_daemonhost
+local _is_near_daemonhost
 
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
@@ -49,13 +52,18 @@ local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ign
 		return false
 	end
 
-	local target_bb = BLACKBOARDS and BLACKBOARDS[target_enemy]
-	local target_perception = target_bb and target_bb.perception
-	if target_perception and target_perception.aggro_state == "aggroed" then
-		return false
+	if _is_non_aggroed_daemonhost then
+		return _is_non_aggroed_daemonhost(target_enemy)
 	end
 
-	return true
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_enemy]
+	local target_perception = target_bb and target_bb.perception
+	return not (target_perception and target_perception.aggro_state == "aggroed")
+end
+
+local function _is_close_to_dormant_daemonhost(unit)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	return dh_avoidance and _is_near_daemonhost and _is_near_daemonhost(unit) or false
 end
 
 local RESCUE_CHARGE_RULES = {
@@ -65,6 +73,60 @@ local RESCUE_CHARGE_RULES = {
 }
 
 local _action_input_is_bot_queueable
+local _last_target_type_switch_by_unit = setmetatable({}, { __mode = "k" })
+local TARGET_TYPE_SWITCH_DEBOUNCE_S = 1.0
+
+local function _target_is_high_priority_switch_candidate(target_enemy)
+	if not (target_enemy and ALIVE[target_enemy]) then
+		return false
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(target_enemy, "unit_data_system")
+	local breed = unit_data_extension and unit_data_extension:breed()
+	local tags = breed and breed.tags
+
+	return tags and (tags.elite or tags.special or tags.monster) or false
+end
+
+local function _should_debounce_target_type_switch(unit, blackboard, condition_args)
+	local target_type = condition_args and condition_args.target_type
+	if target_type ~= "melee" and target_type ~= "ranged" then
+		return false
+	end
+
+	local previous = _last_target_type_switch_by_unit[unit]
+	if not previous or previous.target_type == target_type then
+		return false
+	end
+
+	local fixed_t = _fixed_time()
+	local elapsed = fixed_t - previous.fixed_t
+	if elapsed >= TARGET_TYPE_SWITCH_DEBOUNCE_S then
+		return false
+	end
+
+	local perception = blackboard and blackboard.perception
+	local target_enemy = perception and perception.target_enemy
+	if _target_is_high_priority_switch_candidate(target_enemy) then
+		return false
+	end
+
+	return true, previous, elapsed
+end
+
+local function _remember_target_type_switch(unit, blackboard, condition_args)
+	local target_type = condition_args and condition_args.target_type
+	if target_type ~= "melee" and target_type ~= "ranged" then
+		return
+	end
+
+	local perception = blackboard and blackboard.perception
+	_last_target_type_switch_by_unit[unit] = {
+		fixed_t = _fixed_time(),
+		target_type = target_type,
+		target_enemy = perception and perception.target_enemy or nil,
+	}
+end
 
 local function _return_with_perf(perf_t0, ...)
 	if perf_t0 and _perf then
@@ -275,7 +337,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		end
 	end
 
-	if can_activate and _TeamCooldown then
+	if can_activate and _TeamCooldown and (not _is_team_cooldown_enabled or _is_team_cooldown_enabled()) then
 		local identity = _combat_ability_identity
 				and _combat_ability_identity.resolve(unit, ability_extension, { template_name = ability_template_name })
 			or nil
@@ -350,10 +412,11 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat when the bot's current target IS a
-	-- non-aggroed daemonhost. Target-specific (not proximity-based) so bots
-	-- can still fight hordes/specials in mixed encounters near a sleeping DH.
-	-- Gated by daemonhost_avoidance setting (#81).
+	-- #17: suppress melee/ranged combat when the bot is inside the close
+	-- daemonhost safety radius, or when its current target IS a non-aggroed
+	-- daemonhost outside that radius. The proximity gate is intentionally
+	-- tight (Sprint.DAEMONHOST_COMBAT_RANGE_SQ) so bots still fight mixed
+	-- encounters unless they are actually crowding the sleeping DH.
 	local orig_bot_in_melee_range = conditions.bot_in_melee_range
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -367,6 +430,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					nil,
 					"info"
 				)
+			end
+			if _is_close_to_dormant_daemonhost(unit) then
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_melee_nearby:" .. tostring(unit),
+						_fixed_time(),
+						"melee suppressed (daemonhost nearby)"
+					)
+				end
+				return false
 			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
@@ -393,6 +466,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			is_running
 		)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+			if _is_close_to_dormant_daemonhost(unit) then
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_ranged_nearby:" .. tostring(unit),
+						_fixed_time(),
+						"ranged suppressed (daemonhost nearby)"
+					)
+				end
+				return false
+			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
 					_debug_log(
@@ -416,6 +499,86 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					10
 				)
 			end
+			return result
+		end
+	end
+
+	local orig_wrong_slot_for_target_type = conditions.wrong_slot_for_target_type
+	if orig_wrong_slot_for_target_type then
+		conditions.wrong_slot_for_target_type = function(
+			unit,
+			blackboard,
+			scratchpad,
+			condition_args,
+			action_data,
+			is_running
+		)
+			local result =
+				orig_wrong_slot_for_target_type(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+
+			if result then
+				local suppressed, previous, elapsed =
+					_should_debounce_target_type_switch(unit, blackboard, condition_args)
+				if suppressed then
+					if _debug_enabled and _debug_enabled() then
+						local target_type = condition_args and condition_args.target_type or "unknown"
+						local previous_target_type = previous and previous.target_type or "unknown"
+						local bot_slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(unit)
+							or "unknown"
+						_debug_log(
+							"target_type_switch_debounce:"
+								.. tostring(unit)
+								.. ":"
+								.. tostring(previous_target_type)
+								.. "->"
+								.. tostring(target_type),
+							_fixed_time(),
+							"bot "
+								.. tostring(bot_slot)
+								.. " suppressed opposite-type switch "
+								.. tostring(previous_target_type)
+								.. " -> "
+								.. tostring(target_type)
+								.. " (elapsed="
+								.. string.format("%.2fs", elapsed)
+								.. ")",
+							nil,
+							"debug"
+						)
+					end
+
+					return false
+				end
+
+				_remember_target_type_switch(unit, blackboard, condition_args)
+			end
+
+			if result and _debug_enabled and _debug_enabled() then
+				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+				local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
+					or nil
+				local wielded_slot = inventory_component and inventory_component.wielded_slot or "unknown"
+				local wanted_slot = action_data and action_data.wanted_slot or "unknown"
+				local target_type = condition_args and condition_args.target_type or "unknown"
+				local bot_slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(unit) or "unknown"
+
+				_debug_log(
+					"wrong_slot_for_target_type:" .. tostring(unit),
+					_fixed_time(),
+					"bot "
+						.. tostring(bot_slot)
+						.. " wrong slot for "
+						.. tostring(target_type)
+						.. " target (wielded="
+						.. tostring(wielded_slot)
+						.. ", wanted="
+						.. tostring(wanted_slot)
+						.. ")",
+					nil,
+					"debug"
+				)
+			end
+
 			return result
 		end
 	end
@@ -447,10 +610,13 @@ function M.init(deps)
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	_is_near_daemonhost = deps.is_near_daemonhost
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
+	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost
+	_last_target_type_switch_by_unit = setmetatable({}, { __mode = "k" })
 end
 
 function M.wire(deps)
@@ -462,6 +628,7 @@ function M.wire(deps)
 	_bot_ranged_ammo_threshold = deps.bot_ranged_ammo_threshold
 	_TeamCooldown = deps.TeamCooldown
 	_combat_ability_identity = deps.combat_ability_identity
+	_is_team_cooldown_enabled = deps.is_team_cooldown_enabled
 end
 
 function M.can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)

@@ -46,7 +46,10 @@ local function make_damage_profile(cleave_max, armored_max)
 end
 
 describe("melee_meta_data", function()
+	local enabled
+
 	before_each(function()
+		enabled = true
 		MeleeMetaData.init({
 			mod = { echo = function() end },
 			patched_weapon_templates = {},
@@ -55,6 +58,9 @@ describe("melee_meta_data", function()
 				return false
 			end,
 			ARMOR_TYPE_ARMORED = ARMORED,
+			is_enabled = function()
+				return enabled
+			end,
 		})
 	end)
 
@@ -179,6 +185,44 @@ describe("melee_meta_data", function()
 	end)
 
 	describe("inject", function()
+		it("does not inject when melee improvements are disabled", function()
+			enabled = false
+			local templates = {
+				sword = make_weapon_template({ "melee", "combat_sword" }, make_damage_profile(6, 0.3), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+
+			assert.is_nil(templates.sword.attack_meta_data)
+		end)
+
+		it("reverts injected attack_meta_data when melee improvements are disabled at runtime", function()
+			local templates = {
+				sword = make_weapon_template({ "melee", "combat_sword" }, make_damage_profile(6, 0.3), nil),
+			}
+
+			MeleeMetaData.inject(templates)
+			assert.is_table(templates.sword.attack_meta_data)
+
+			enabled = false
+			MeleeMetaData.sync_all()
+
+			assert.is_nil(templates.sword.attack_meta_data)
+		end)
+
+		it("preserves pre-existing attack_meta_data when disabling melee improvements", function()
+			local existing = { custom = { arc = 99 } }
+			local template = make_weapon_template({ "melee", "combat_sword" }, make_damage_profile(6, 0.3), nil)
+			template.attack_meta_data = existing
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+			enabled = false
+			MeleeMetaData.sync_all()
+
+			assert.equals(existing, templates.sword.attack_meta_data)
+		end)
+
 		it("injects attack_meta_data for melee weapon with light and heavy", function()
 			local light_dp = make_damage_profile(6, 0.3)
 			local heavy_dp = make_damage_profile(0.001, 1.0)
@@ -248,6 +292,53 @@ describe("melee_meta_data", function()
 			MeleeMetaData.inject(templates)
 
 			assert.equals(existing, templates.sword.attack_meta_data)
+		end)
+
+		it("backfills missing fields on existing attack_meta_data entries", function()
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.8), nil)
+			template.attack_meta_data = {
+				light_attack = {
+					arc = 1,
+					penetrating = true,
+					action_inputs = {
+						{ action_input = "start_attack", timing = 0 },
+						{ action_input = "light_attack", timing = 0 },
+					},
+				},
+			}
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+
+			local light_attack = templates.sword.attack_meta_data.light_attack
+			assert.equals(1, light_attack.arc)
+			assert.is_true(light_attack.penetrating)
+			assert.equals(2.5, light_attack.max_range)
+		end)
+
+		it("restores backfilled attack_meta_data fields when disabling melee improvements", function()
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.8), nil)
+			template.attack_meta_data = {
+				light_attack = {
+					arc = 1,
+					penetrating = true,
+					action_inputs = {
+						{ action_input = "start_attack", timing = 0 },
+						{ action_input = "light_attack", timing = 0 },
+					},
+				},
+			}
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+			assert.equals(2.5, templates.sword.attack_meta_data.light_attack.max_range)
+
+			enabled = false
+			MeleeMetaData.sync_all()
+
+			assert.is_nil(templates.sword.attack_meta_data.light_attack.max_range)
+			assert.equals(1, templates.sword.attack_meta_data.light_attack.arc)
+			assert.is_true(templates.sword.attack_meta_data.light_attack.penetrating)
 		end)
 
 		it("is idempotent for the same table", function()

@@ -83,6 +83,9 @@ local function context_snapshot(context)
 		target_ally_distance = _json_safe_number(context.target_ally_distance),
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,
+		target_is_dormant_daemonhost = context.target_is_dormant_daemonhost,
+		target_daemonhost_aggro_state = context.target_daemonhost_aggro_state,
+		target_daemonhost_stage = context.target_daemonhost_stage,
 		target_is_super_armor = context.target_is_super_armor,
 		allies_in_coherency = context.allies_in_coherency,
 		avg_ally_toughness_pct = context.avg_ally_toughness_pct,
@@ -222,7 +225,7 @@ local function log_ability_decision(ability_template_name, fixed_t, can_activate
 end
 
 local function register_commands()
-	_mod:command("bb_state", "Dump BetterBots bot ability + fallback state", function()
+	_mod:command("bb_state", "Show each bot's current ability, cooldown, and fallback state", function()
 		local bots, error_message = _collect_alive_bots()
 		if error_message then
 			_mod:echo("BetterBots: /bb_state unavailable (" .. error_message .. ")")
@@ -295,7 +298,7 @@ local function register_commands()
 		end
 	end)
 
-	_mod:command("bb_brain", "Dump BetterBots bot brain/blackboard snapshots", function()
+	_mod:command("bb_brain", "Write a deep bot state snapshot to the log for troubleshooting", function()
 		local bots, error_message = _collect_alive_bots()
 		if error_message then
 			_mod:echo("BetterBots: /bb_brain unavailable (" .. error_message .. ")")
@@ -356,7 +359,7 @@ local function register_commands()
 		end
 	end)
 
-	_mod:command("bb_decide", "Evaluate BetterBots heuristics without queuing input", function()
+	_mod:command("bb_decide", "Show whether each bot would use its ability right now", function()
 		local bots, error_message = _collect_alive_bots()
 		if error_message then
 			_mod:echo("BetterBots: /bb_decide unavailable (" .. error_message .. ")")

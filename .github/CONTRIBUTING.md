@@ -25,6 +25,9 @@ make deps
 make check
 ```
 
+The repo does not edit your shell `PATH`. Use `make tool-info` to see the exact
+tool paths and fallbacks the Make targets will use locally.
+
 ### Available Make Targets
 
 | Target | Description |
@@ -34,9 +37,18 @@ make check
 | `make format` | Format with StyLua |
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
-| `make check` | Run all of the above |
+| `make check` | Auto-format, then run lint + lsp + tests + doc checks |
+| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
 | `make test` | Run busted tests (if tests/ exists) |
+| `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make release` | Tag and push a release |
+
+### Tool Resolution
+
+- `make lint` always uses `./bin/luacheck`, which keeps luacheck on a working Lua runtime.
+- `make test` tries `busted`, then `lua-busted`, then Arch's packaged
+  `/usr/lib/luarocks/.../busted` runner.
+- `make tool-info` prints the exact paths and fallbacks used by the Makefile.
 
 ## Code Style
 

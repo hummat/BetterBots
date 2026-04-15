@@ -1,4 +1,6 @@
 -- tests/revive_ability_spec.lua
+local test_helper = require("tests.test_helper")
+
 local _extensions = {}
 local _debug_logs = {}
 local _debug_on = false
@@ -56,7 +58,7 @@ local function make_unit(id)
 end
 
 local function make_action_input_ext()
-	return {
+	return test_helper.make_player_action_input_extension({
 		bot_queue_action_input = function(_, component, input, raw)
 			_recorded_inputs[#_recorded_inputs + 1] = {
 				component = component,
@@ -64,14 +66,14 @@ local function make_action_input_ext()
 				raw = raw,
 			}
 		end,
-		_action_input_parsers = {},
-	}
+		action_input_parsers = {},
+	})
 end
 
 local function make_ability_ext(can_use, charges, opts)
 	local combat_ability_name = opts and opts.combat_ability_name or "test_combat_ability"
 	local combat_ability_tweak_data = opts and opts.combat_ability_tweak_data or nil
-	return {
+	return test_helper.make_player_ability_extension({
 		can_use_ability = function(_, _ability_type)
 			return can_use
 		end,
@@ -87,29 +89,24 @@ local function make_ability_ext(can_use, charges, opts)
 				ability_template_tweak_data = combat_ability_tweak_data,
 			},
 		},
-	}
+	})
 end
 
 local function make_unit_data_ext(template_name)
-	return {
-		read_component = function(_, component_name)
-			if component_name == "combat_ability_action" then
-				return { template_name = template_name or "none" }
-			end
-			return nil
-		end,
-	}
+	return test_helper.make_player_unit_data_extension({
+		combat_ability_action = { template_name = template_name or "none" },
+	})
 end
 
 local _perception_enemy_count = 3
 
 local function make_perception_ext(num_enemies)
-	return {
+	return test_helper.make_bot_perception_extension({
 		enemies_in_proximity = function()
 			local n = num_enemies or _perception_enemy_count
 			return {}, n
 		end,
-	}
+	})
 end
 
 local function setup_unit(unit, template_name, can_use, charges, num_enemies, opts)

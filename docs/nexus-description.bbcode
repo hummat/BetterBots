@@ -1,139 +1,86 @@
-[size=4][b]BetterBots — Bot Combat Abilities for Solo Play[/b][/size]
+[size=4][b]BetterBots — Smarter Solo Play Bots for Darktide[/b][/size]
 
-Aims to bring VT2-level bot ability usage to Darktide. Covers stance, dash, charge, shout, stealth, item-based abilities, and grenade/blitz with smart per-ability trigger heuristics.
+BetterBots makes Solo Play bots act more like real teammates.
 
-Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects the missing metadata so the existing infrastructure handles the rest.
+They use combat abilities, throw grenades and blitzes, protect revives, ping threats, carry scriptures and tomes, manage ammo more sensibly, and generally stop feeling like dead weight.
 
-[size=3][b]Why does this infrastructure exist?[/b][/size]
+[b]Solo Play only.[/b] Darktide uses dedicated servers, so gameplay mods only work when you host locally through [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]. This mod does [b]not[/b] affect public matchmaking.
 
-The bot ability system — behavior tree nodes, action queuing, ability extension — all work end-to-end in vanilla Darktide. So why did Fatshark build it and never turn it on?
+[size=3][b]Why use this mod?[/b][/size]
 
 [list]
-[*][b]Vermintide 2 inheritance:[/b] Both games share the same engine. VT2 bots use career abilities ([url=https://www.vermintide.com/news/2018/12/17/dev-blog-how-bots-work-in-vermintide-2]dev blog[/url]) — the architecture carried over, but the ability-specific logic was never rewritten for Darktide's templates.
-[*][b]Launch triage:[/b] Darktide launched in Nov 2022 in an unfinished state. In Jan 2023, Fatshark [url=https://www.shacknews.com/article/133824/warhammer-40000-darktide-launch-apology]paused all new content[/url] to fix crafting, progression, and stability. Solo mode — and bot abilities with it — was shelved from "final stages of testing" to "not a priority."
-[*][b]Ability system redesign:[/b] The [url=https://www.playdarktide.com/news/dev-blog-class-overhaul]Class Overhaul (Oct 2023)[/url] completely reworked abilities, adding talent trees with 3 combat abilities per class. Writing bot heuristics for a system in flux would have been thrown away.
-[*][b]Design philosophy:[/b] Fatshark wants bots as matchmaking placeholders, not capable teammates. A developer stated: [i]"It's easy to make great bots that can carry. It's hard to make average ones. But average is the goal."[/i]
-[*][b]Server architecture:[/b] VT2 was peer-to-peer (host runs bots locally). Darktide uses dedicated servers — solo play requires local hosting with added performance cost, which was never implemented officially.
+[*]Bots actually use their career abilities instead of sitting on them all mission
+[*]Grenades and blitzes are supported across all classes
+[*]Bots help more with revives, pressure, poxbursters, and priority targets
+[*]Ammo, healing, and pickup behavior is less selfish
+[*]Class-diverse bot profiles give you more than four copy-pasted veterans
 [/list]
 
-BetterBots picks up where Fatshark left off: we populate the condition tables, inject the missing metadata, and add per-ability decision logic so the existing engine infrastructure can do what it was designed to do.
+[size=3][b]New in v0.11.0 — Combat Execution[/b][/size]
 
-[b]Solo Play only.[/b] Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url] mod. It does [b]not[/b] work in public matchmaking or any other online mode.
-
-[size=3][b]New in v0.10.0 — Team Coordination[/b][/size]
+Upgrading from v0.10? Highlights:
 
 [list]
-[*][b]Revive with ability (#7):[/b] Bots activate defensive abilities — dash, shout, stealth — before reviving downed allies, so revive attempts survive pressure instead of getting interrupted.
-[*][b]Team cooldown staggering (#14):[/b] Per-ability cooldown windows stop the whole squad from blowing stances and shouts on the same wave. Emergencies (low health, disabled ally) override the stagger.
-[*][b]Objective-aware activation (#37):[/b] Bots now protect allies interacting with pickups, scriptures, grimoires, and mission interactables by triggering stances and shouts when the interactor is threatened.
-[*][b]Arbites companion-command tag (#49):[/b] Smart tag steers the Cyber-Mastiff onto priority targets — disablers, ogryns, specials — instead of drifting onto trash.
-[*][b]Expanded settings surface (#81 + #83):[/b] More slider-with-zero controls, grouped section headers, reliable dropdown labels, a gilded mod entry, and a full startup value dump for diagnosing config issues.
-[*][b]Daemonhost heuristic carve-out (#17):[/b] The first live daemonhost spawn during v0.10.0 testing exposed a gap where grenade and blitz decisions bypassed the behavior-tree wrappers. New global aggro check gates 5 heuristic sites against dormant DH targets.
+[*][b]Grenade ballistics fixed:[/b] gravity-affected grenades now arc like projectiles instead of flat-lobbing into walls
+[*][b]Book mules:[/b] bots can carry scriptures and tomes; grimoires stay opt-in behind a setting
+[*][b]Held-fire weapons fixed:[/b] flamers, Purgatus, heavy stubbers, recon/autoguns, autopistols, bolter hipfire, and ripperguns now drive the correct sustained-fire input path (regression in v0.10)
+[*][b]Auto timing profiles:[/b] reaction time, ability jitter, and pressure leash now auto-scale with difficulty instead of needing manual tuning
+[*][b]Steadier target type selection:[/b] bots swap less erratically between melee and ranged priorities (hysteresis + momentum)
+[*][b]Pickup arbitration:[/b] bot ammo and grenade pickups honor human-first thresholds; grenade refill support added
 [/list]
 
-[size=3][b]What works[/b][/size]
+[size=3][b]What bots can use[/b][/size]
 
-[b]Stance abilities (reliable):[/b]
+[b]Combat abilities[/b]
 [list]
-[*]Veteran: Executioner's Stance / Voice of Command
-[*]Psyker: Scrier's Gaze
-[*]Ogryn: Point-Blank Barrage
-[*]Arbites: Castigator's Stance
-[*]Hive Scum: Enhanced Desperado / Rampage (untested — DLC required)
+[*]Veteran: Executioner's Stance, Voice of Command, Infiltrate
+[*]Zealot: Fury of the Faithful, Shroudfield, relic
+[*]Psyker: Scrier's Gaze, Venting Shriek, Telekine Shield
+[*]Ogryn: Point-Blank Barrage, Bull Rush, Loyal Protector
+[*]Arbites: Castigator's Stance, Break the Line, Nuncio-Aquila
+[*]Hive Scum: Desperado (Focus), Rampage, Stimm Supply field — untested, DLC not owned
 [/list]
 
-[b]Dash / shout / stealth abilities (reliable):[/b]
+[b]Grenades and blitzes[/b]
 [list]
-[*]Veteran: Infiltrate (stealth)
-[*]Zealot: Fury of the Faithful (dash), Shroudfield (stealth)
-[*]Ogryn: Bull Rush (charge), Loyal Protector (taunt)
-[*]Psyker: Venting Shriek (shout)
-[*]Arbites: Break the Line (charge)
+[*]Standard grenades: frag, krak, smoke, fire, shock, cluster, rock
+[*]Zealot Throwing Knives
+[*]Psyker Assail, Smite, Chain Lightning
+[*]Arbites whistle and shock mine
+[*]Hive Scum Blinder, Chem, and Boom Bringer — untested, DLC not owned
 [/list]
 
-[b]Item-based abilities (new in v0.3.0):[/b]
+[size=3][b]What bots do better[/b][/size]
+
 [list]
-[*]Zealot: Bolstering Prayer (relic) — activates when allies need toughness
-[*]Psyker: Telekine Shield (all 3 variants) — deploys under sustained fire
-[*]Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
+[*]Use abilities when a fight actually calls for them
+[*]Pop defensive abilities before reviving downed allies
+[*]Stagger team cooldowns instead of dumping everything at once
+[*]Protect allies doing objectives and pickups
+[*]Ping elites and specials for the player
+[*]Avoid wasteful poxburster shots and push when needed
+[*]Stay engaged in fights longer without wandering off uselessly
+[*]Use smarter melee attacks into hordes and armor
+[*]Carry scriptures and tomes for the team
+[*]Defer healing and ammo more intelligently to human players
+[*]Steer the Arbites mastiff onto better targets
 [/list]
 
-[b]Grenade / blitz support (new in v0.6.0):[/b]
+[size=3][b]Settings you can control[/b][/size]
+
 [list]
-[*]All standard grenades: frag, krak, smoke, fire, shock, cluster, friend rock, flash, tox
-[*]Zealot: Throwing Knives
-[*]Arbites: Remote Detonation (whistle), Shock Mine
-[*]Hive Scum: Missile Launcher (untested — DLC required)
-[*]Psyker blitz: Smite, Chain Lightning, Assail
-[/list]
-
-[b]Smart trigger conditions:[/b]
-Bots use per-ability heuristics to decide [i]when[/i] to activate — based on enemy count, threat level, health/toughness, distance, ally coherency, and corruption. Each ability has specific activate and hold rules grounded in community tactics. 15 of 18 trigger functions validated in-game (12 combat + 3 item); 1 N/A (cut content), 2 DLC-blocked.
-
-[b]In-game settings and diagnostics:[/b]
-[list]
-[*][b]Ability categories:[/b] enable/disable stances, charges, shouts, stealth, deployables, grenades independently
-[*][b]Behavior presets:[/b] Testing / Aggressive / Balanced / Conservative — controls how eagerly bots use abilities
-[*][b]Feature toggles:[/b] bot sprinting, elite/special pinging, distant-special penalty, poxburster suppression, melee improvements, ranged improvements. Disable everything to revert to vanilla bot behavior.
-[*]Bot ranged ammo threshold
-[*]Human ammo reserve threshold
-[*]Healing deferral mode and thresholds
-[*]`Info / Debug / Trace` log levels
-[*]Optional JSONL event log and `/bb_perf` runtime timing
-[/list]
-
-[size=3][b]Roadmap[/b][/size]
-
-See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]full roadmap[/url] for details.
-
-[b]Ability activation[/b]
-[list]
-[*][color=green]✓[/color] Stance, dash, charge, shout, stealth abilities (all 6 classes)
-[*][color=green]✓[/color] Item-based abilities (relic, force field, drone)
-[*][color=green]✓[/color] Smart per-ability trigger heuristics
-[*][color=green]✓[/color] Safety guards (revive protection, suppression, warp peril block)
-[*][color=green]✓[/color] Grenade / blitz support (per-grenade heuristics + psyker blitz)
-[*][color=green]✓[/color] Ability settings surface (category toggles + 4 behavior presets + feature gates)
-[*][color=green]✓[/color] Bot-optimized class profiles with full talent trees + weapon blessings/perks (redesigned in v0.9.1)
-[*][color=green]✓[/color] Team cooldown staggering (per-ability, emergency override)
-[*]Hive Scum validation (DLC-blocked)
-[/list]
-
-[b]Bot combat behavior[/b]
-[list]
-[*][color=green]✓[/color] Charge/dash to rescue disabled allies
-[*][color=green]✓[/color] Bot sprinting
-[*][color=green]✓[/color] Daemonhost avoidance
-[*][color=green]✓[/color] Bot pinging of elites/specials
-[*][color=green]✓[/color] Boss engagement discipline
-[*][color=green]✓[/color] Poxburster targeting + push
-[*][color=green]✓[/color] Stop chasing distant specials
-[*][color=green]✓[/color] Combat engagement leash (coherency-anchored, post-charge grace)
-[*][color=green]✓[/color] Mastiff-pounce priority
-[*][color=green]✓[/color] Healing deferral (health stations + med-crates)
-[*][color=green]✓[/color] Revive-with-ability (defensive ability before downed-ally revive)
-[*][color=green]✓[/color] Objective-aware ability activation (pickups, scriptures, grimoires, interactables)
-[*][color=green]✓[/color] Arbites Cyber-Mastiff companion-command smart tag
-[/list]
-
-[b]Bot weapon/equipment fixes[/b]
-[list]
-[*][color=green]✓[/color] Fix ADS for Tertium 5/6 bots
-[*][color=green]✓[/color] Fix ranged weapons (plasma gun etc.) for Tertium 5/6
-[*][color=green]✓[/color] Bot warp charge venting
-[*][color=green]✓[/color] Suppress bot VFX/SFX bleed to human player
-[*][color=green]✓[/color] Smart melee attack selection (armor-aware light/heavy balance)
-[*][color=green]✓[/color] Force staff charged fire (all 4 staves)
-[*]Weapon/enemy-aware ADS vs hip-fire
-[*][color=green]✓[/color] Poxburster push
-[*][color=green]✓[/color] Configurable ammo policy — opportunistic fire and pickup onset share one threshold, plus a human ammo reserve guard
-[/list]
-
-[b]Long-term[/b]
-[list]
-[*]Utility-based ability scoring
-[*]Healing item management
-[*]Weapon special actions (parry, bayonet)
+[*]Aggression preset: Testing / Aggressive / Balanced / Conservative
+[*]Toggle ability groups on or off: stances, charges, shouts, stealth, deployables, grenades
+[*]Sprint distance, chase range, player-tag response, and melee horde bias sliders
+[*]Smart blitz targeting toggle
+[*]Daemonhost avoidance toggle
+[*]Poxburster safety toggle
+[*]Ammo reserve thresholds for bots and humans
+[*]Human-likeness timing and pressure profiles
+[*]Healing deferral options
+[*]Bot grimoire pickup toggle
+[*]Bot profile class selection and weapon quality
+[*]Debug level, JSONL event log, and `/bb_perf` diagnostics
 [/list]
 
 [size=3][b]Requirements[/b][/size]
@@ -141,40 +88,37 @@ See the [url=https://github.com/hummat/BetterBots/blob/main/docs/dev/roadmap.md]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/19]Darktide Mod Loader[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/8]Darktide Mod Framework (DMF)[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]
-[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] — optional. BetterBots v0.8.0+ has built-in class profiles with talents and blessed weapons. Tertium is still useful if you want bots to use your own player characters.
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] if you want class-diverse bots based on player profiles
 [/list]
 
-[b]Note:[/b] Tertium 5 can crash on startup with newer classes (Arbites, Hive Scum). If this happens, use [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] instead — it supports all 6 classes.
+[b]Note:[/b] If Tertium 5 crashes with newer classes like Arbites or Hive Scum, switch to [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url].
 
 [size=3][b]Install[/b][/size]
 [list=1]
 [*]Extract [font=Courier New]BetterBots.zip[/font] into your Darktide [font=Courier New]mods/[/font] folder
-[*]Add [font=Courier New]BetterBots[/font] to [font=Courier New]mods/mod_load_order.txt[/font] (below [font=Courier New]dmf[/font])
+[*]Add [font=Courier New]BetterBots[/font] to [font=Courier New]mods/mod_load_order.txt[/font] below [font=Courier New]dmf[/font]
 [*]Re-patch mods
 [/list]
 
-[size=3][b]Verify[/b][/size]
+[size=3][b]Quick check[/b][/size]
 
-Look for [font=Courier New]BetterBots loaded[/font] and [font=Courier New]injected meta_data for ...[/font] in game chat on mission start.
+Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font] in chat.
 
 [size=3][b]Known issues[/b][/size]
 
-[b]Known bugs:[/b]
 [list]
+[*]Daemonhost avoidance has improved, but rare edge cases with dormant daemonhosts are still being watched
+[*]Mods are disabled after every Darktide update — re-patch via the toggle script
+[*]Hive Scum abilities and blitzes are implemented but unvalidated in-game (DLC not owned by the author)
+[*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after game patches until the path is updated
 [/list]
 
-[b]Vanilla bot limitations being addressed:[/b]
-[list]
-[*][b]Weapon-aware ADS[/b] — bots don't yet switch to hipfire for short-range or flamer weapons. ([url=https://github.com/hummat/BetterBots/issues/41]#41[/url])
-[*][b]Sustained fire[/b] — bots tap-fire held-fire weapons like flamers instead of holding the trigger. ([url=https://github.com/hummat/BetterBots/issues/87]#87[/url])
-[/list]
+[size=3][b]Planned next[/b][/size]
 
-[b]Other limitations:[/b]
 [list]
-[*]Item-based abilities use a heuristic wield/use/unwield sequence — new or changed weapon templates may not be recognized
-[*]Mods are disabled after every Darktide update — re-patch required
-[*]Hive Scum abilities (Enhanced Desperado, Rampage, Stimm Field) are untested — DLC required for validation
-[*]Bot mastiff names may appear to the player despite the "mine only" companion name setting — this is a vanilla issue with how bots share network identity
+[*]Better weapon-aware ADS vs hip-fire behavior
+[*]Healing item management
+[*]Weapon special actions like parry/bayonet
 [/list]
 
 [size=3][b]Source & feedback[/b][/size]

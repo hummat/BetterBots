@@ -30,6 +30,13 @@ local function each_mod_source_file(callback)
 	handle:close()
 end
 
+local function read_file(path)
+	local handle = assert(io.open(path, "r"))
+	local source = assert(handle:read("*a"))
+	handle:close()
+	return source
+end
+
 describe("startup regressions", function()
 	it("escapes percent signs in localized setting labels", function()
 		for key, entry in pairs(Localization) do
@@ -101,6 +108,22 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/revive_ability"%)', 1))
 	end)
 
+	it("loads sustained_fire through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/sustained_fire"%)', 1))
+	end)
+
+	it("loads mule_pickup through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/mule_pickup"%)', 1))
+	end)
+
 	it("loads companion_tag through mod io", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -110,9 +133,7 @@ describe("startup regressions", function()
 	end)
 
 	it("initializes and registers extracted runtime modules", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 
 		assert.is_truthy(source:find("AnimationGuard%.init%(", 1))
 		assert.is_truthy(source:find("AnimationGuard%.register_hooks%(", 1))
@@ -124,8 +145,92 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MeleeAttackChoice%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ReviveAbility%.init%(", 1))
 		assert.is_truthy(source:find("ReviveAbility%.register_hooks%(", 1))
+		assert.is_truthy(source:find("SustainedFire%.init%(", 1))
+		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/input/bot_unit_input"', 1))
+		assert.is_truthy(source:find("SustainedFire%.install_bot_unit_input_hooks%(", 1))
+		assert.is_truthy(source:find("Sprint%.install_bot_unit_input_hooks%(", 1))
+		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/group/bot_group"', 1))
+		assert.is_truthy(source:find("HealingDeferral%.install_bot_group_hooks%(", 1))
+		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
+		assert.is_truthy(source:find("MulePickup%.init%(", 1))
+		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.init%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.update%(", 1))
+	end)
+
+	it("wires Perf into AbilityQueue initialization", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local init_block = assert(source:match("AbilityQueue%.init%(%{%s*(.-)%s*%}%)"))
+
+		assert.is_truthy(init_block:find("perf%s*=%s*Perf", 1))
+	end)
+
+	it("restores close-range daemonhost suppression for ability activation", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local condition_init_block = assert(source:match("ConditionPatch%.init%(%{%s*(.-)%s*%}%)"))
+
+		assert.is_truthy(source:find("Sprint%.is_near_daemonhost%(unit, Sprint%.DAEMONHOST_COMBAT_RANGE_SQ%)", 1))
+		assert.is_truthy(condition_init_block:find("is_near_daemonhost%s*=%s*function%(unit%)", 1))
+		assert.is_truthy(
+			condition_init_block:find("Sprint%.is_near_daemonhost%(unit, Sprint%.DAEMONHOST_COMBAT_RANGE_SQ%)", 1)
+		)
+	end)
+
+	it("suppresses auto perf dumps when no bot frames were sampled", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local auto_dump = assert(source:match("local function _auto_dump_perf_report%(%)%s*(.-)%s*end"))
+
+		assert.is_truthy(auto_dump:find("report%.bot_frames%s*<=%s*0", 1))
+	end)
+
+	it("rejects duplicate hook_require targets across BetterBots source files", function()
+		local owners_by_target = {}
+		local duplicates = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+
+			for target in source:gmatch('hook_require%(%s*"([^"]+)"') do
+				local owners = owners_by_target[target]
+				if not owners then
+					owners = {}
+					owners_by_target[target] = owners
+				end
+
+				local already_listed = false
+				for i = 1, #owners do
+					if owners[i] == path then
+						already_listed = true
+						break
+					end
+				end
+
+				if not already_listed then
+					owners[#owners + 1] = path
+				end
+			end
+		end)
+
+		for target, owners in pairs(owners_by_target) do
+			if #owners > 1 then
+				table.sort(owners)
+				duplicates[#duplicates + 1] = target .. " => " .. table.concat(owners, ", ")
+			end
+		end
+
+		table.sort(duplicates)
+		assert.same({}, duplicates)
+	end)
+
+	it("guards hook_require registration against same-path clobbers at runtime", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		-- The raw DMF function must be stashed on the shared mod table so repeated script
+		-- executions (hot reload) don't recursively wrap the previous guard.
+		assert.is_truthy(source:find("mod%._raw_hook_require = mod%.hook_require", 1))
+		assert.is_truthy(source:find("local _original_hook_require = mod%._raw_hook_require", 1))
+		assert.is_truthy(source:find("local _hook_require_callsite_by_path = {}", 1, true))
+		assert.is_truthy(source:find("BetterBots duplicate hook_require for %%s", 1))
 	end)
 
 	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()
@@ -156,6 +261,16 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('_debug_log%(%s*"startup:logging"', 1))
 	end)
 
+	it("keeps the startup banner free of hardcoded module counts", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:echo%("BetterBots loaded"%)', 1))
+		assert.is_nil(source:find('mod:echo%("BetterBots loaded %(', 1))
+		assert.is_nil(source:find("local _MODULE_COUNT =", 1, true))
+	end)
+
 	it("emits an install log for the consolidated bt_bot_melee_action hook", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -165,13 +280,8 @@ describe("startup regressions", function()
 	end)
 
 	it("keeps BotBehaviorExtension hook_require consolidated in BetterBots.lua", function()
-		local main_handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local main_source = assert(main_handle:read("*a"))
-		main_handle:close()
-
-		local revive_handle = assert(io.open("scripts/mods/BetterBots/revive_ability.lua", "r"))
-		local revive_source = assert(revive_handle:read("*a"))
-		revive_handle:close()
+		local main_source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local revive_source = read_file("scripts/mods/BetterBots/revive_ability.lua")
 
 		local hook_pattern = 'hook_require%("scripts/extension_systems/behavior/bot_behavior_extension"'
 		local main_count = 0
@@ -186,6 +296,7 @@ describe("startup regressions", function()
 		assert.equals(1, main_count)
 		assert.equals(0, revive_count)
 		assert.is_truthy(main_source:find("ReviveAbility%.install_behavior_ext_hooks", 1))
+		assert.is_truthy(main_source:find("MulePickup%.install_behavior_ext_hooks", 1))
 	end)
 
 	it("persists /bb_reset through DMF instead of the BetterBots mod object", function()
@@ -200,6 +311,39 @@ describe("startup regressions", function()
 		assert.is_nil(source:find("mod:save_unsaved_settings_to_file", 1))
 	end)
 
+	it("refreshes human-likeness BotSettings patch when setting changes", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("function mod%.on_setting_changed%(setting_id%)", 1))
+		assert.is_truthy(source:find("local TIMING_SETTING_IDS = {", 1, true))
+		assert.is_truthy(source:find("human_timing_profile = true", 1, true))
+		assert.is_truthy(source:find("human_timing_opportunistic_jitter_max_ms = true", 1, true))
+		assert.is_truthy(source:find("if TIMING_SETTING_IDS%[setting_id%] then", 1))
+		assert.is_truthy(source:find("HumanLikeness%.patch_bot_settings%(", 1))
+		assert.is_nil(source:find('if setting_id == "enable_human_likeness" then', 1, true))
+	end)
+
+	it("eagerly patches BotSettings in case bot_settings was already required", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:hook_require%("scripts/settings/bot/bot_settings"', 1))
+		assert.is_truthy(source:find('pcall%(require, "scripts/settings/bot/bot_settings"%)', 1))
+	end)
+
+	it("refreshes live mule pickup state when the grimoire setting changes", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('if setting_id == "enable_bot_grimoire_pickup" then', 1, true))
+		assert.is_truthy(source:find("MulePickup%.patch_pickups%(", 1))
+		assert.is_truthy(source:find("MulePickup%.sync_live_bot_groups%(", 1))
+	end)
+
 	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -208,7 +352,7 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5)', 1, true))
 	end)
 
-	it("keeps settings UI organized through widget factories and split behavior groups", function()
+	it("keeps settings UI organized through widget factories and a flat bot team setup group", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))
 		handle:close()
@@ -218,12 +362,19 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('setting_id = "bot_feature_toggles_group"', 1, true))
 		assert.is_truthy(source:find('setting_id = "bot_tuning_group"', 1, true))
 		assert.is_truthy(source:find('setting_id = "healing_deferral_group"', 1, true))
-		assert.is_truthy(source:find('setting_id = "bot_slots_core_group"', 1, true))
-		assert.is_truthy(source:find('setting_id = "bot_slots_tertium_group"', 1, true))
+		assert.is_truthy(source:find('setting_id = "bot_profiles_group"', 1, true))
+		assert.is_truthy(source:find("make_slot_dropdown%(1, DEFAULTS%.bot_slot_1_profile%)"))
+		assert.is_truthy(source:find("make_slot_dropdown%(5, DEFAULTS%.bot_slot_5_profile%)"))
+		assert.is_truthy(source:find('setting_id = "bot_weapon_quality"', 1, true))
+		assert.is_nil(source:find('setting_id = "bot_slots_core_group"', 1, true))
+		assert.is_nil(source:find('setting_id = "bot_slots_tertium_group"', 1, true))
 		assert.is_truthy(source:find('text = "behavior_profile_testing", value = "testing"', 1, true))
 		local loc_handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
 		local localization = assert(loc_handle:read("*a"))
 		loc_handle:close()
+		assert.is_truthy(localization:find('bot_weapon_quality = {%s*en = "Bot weapon quality"', 1))
+		assert.is_nil(localization:find("bot_slots_core_group = {", 1, true))
+		assert.is_nil(localization:find("bot_slots_tertium_group = {", 1, true))
 		assert.is_truthy(localization:find('bot_weapon_quality_max = {%s*en = "Max %(fully upgraded%)"', 1))
 	end)
 
@@ -260,13 +411,6 @@ describe("startup regressions", function()
 	end)
 
 	describe("cross-module category drift guard", function()
-		local function read_file(path)
-			local handle = assert(io.open(path, "r"))
-			local source = assert(handle:read("*a"))
-			handle:close()
-			return source
-		end
-
 		local function extract_table_keys(source, table_name)
 			local block = source:match("local%s+" .. table_name .. "%s*=%s*(%b{})")
 			assert.is_not_nil(block, "could not find '" .. table_name .. "' in source")
@@ -353,12 +497,48 @@ describe("startup regressions", function()
 	end)
 
 	describe("widget parity guard", function()
-		local function read_file(path)
-			local handle = assert(io.open(path, "r"))
-			local source = assert(handle:read("*a"))
-			handle:close()
-			return source
-		end
+		it("surfaces the new human-likeness profile widgets and localization keys", function()
+			local data_source = read_file("scripts/mods/BetterBots/BetterBots_data.lua")
+			local localization_source = read_file("scripts/mods/BetterBots/BetterBots_localization.lua")
+
+			assert.is_truthy(data_source:find('setting_id = "human_timing_profile"', 1, true))
+			assert.is_truthy(data_source:find('setting_id = "pressure_leash_profile"', 1, true))
+			assert.is_truthy(data_source:find('text = "human_timing_profile_auto", value = "auto"', 1, true))
+			assert.is_truthy(data_source:find('text = "pressure_leash_profile_auto", value = "auto"', 1, true))
+			assert.is_nil(data_source:find('setting_id = "enable_human_likeness"', 1, true))
+			assert.is_truthy(data_source:find("show_widgets = { 1, 2, 3, 4, 5, 6 }", 1, true))
+			assert.is_truthy(data_source:find("show_widgets = { 1, 2, 3, 4 }", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_auto = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_fast = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_slow = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_reaction_min_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_reaction_max_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_defensive_jitter_min_ms_description = {", 1, true))
+			assert.is_truthy(localization_source:find("human_timing_defensive_jitter_max_ms_description = {", 1, true))
+			assert.is_truthy(
+				localization_source:find("human_timing_opportunistic_jitter_min_ms_description = {", 1, true)
+			)
+			assert.is_truthy(
+				localization_source:find("human_timing_opportunistic_jitter_max_ms_description = {", 1, true)
+			)
+			assert.is_truthy(localization_source:find("pressure_leash_profile = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_auto = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_off = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_light = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_medium = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_strong = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_profile_custom = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_start_rating_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_full_rating_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_scale_percent_description = {", 1, true))
+			assert.is_truthy(localization_source:find("pressure_leash_floor_m_description = {", 1, true))
+		end)
 
 		it("every widget setting_id has a matching Settings.DEFAULTS entry and vice versa", function()
 			local Settings = dofile("scripts/mods/BetterBots/settings.lua")

@@ -1197,6 +1197,312 @@ Conclusion:
   in production without collision.
 ```
 
+### Run 2026-04-13-v0.11.0-combat-execution-01
+
+```text
+Run ID: 2026-04-13-v0.11.0-combat-execution-01
+Date (local): 2026-04-13
+Date (UTC): 2026-04-13
+Git commit: d80b934 (pre follow-up logging + hook-guard docs)
+Log file: console-2026-04-13-14.10.19-dcbaab88-4b7a-4797-bd74-76e3f399fa32.log
+Bot lineup / abilities: mixed live squad including Veteran krak, Ogryn box, Zealot knives, Psyker smite, flamer, and Purgatus staff
+Map + difficulty: live mission, combat-heavy session (multiple daemonhost spawns reported by the player)
+
+v0.11.0 evidence:
+- #93 grenade ballistic execution: PASS
+  - visual: yes (player-confirmed in session)
+  - charge consumed log: yes
+  - key lines / counts:
+    - 11 `grenade charge consumed for veteran_krak_grenade`
+    - 6 `grenade charge consumed for ogryn_grenade_box_cluster`
+    - 12 `grenade charge consumed for zealot_throwing_knives`
+    - repeated `grenade external action confirmed for psyker_smite`
+- ammo pickup regression: PASS
+  - visual: yes (player-confirmed in session)
+  - pickup success log: yes
+  - key lines / timestamps:
+    - multiple `ammo pickup success: large_clip ...`
+    - multiple `ammo pickup success: small_clip ...`
+- #87 sustained fire: PARTIAL
+  - stream routing log: yes
+  - hold confirmation log: no
+  - key lines / timestamps:
+    - `stream action queued for flamer_p1_m1 via shoot_braced`
+    - `stream action queued for forcestaff_p2_m1 via trigger_charge_flame`
+    - zero `holding sustained fire inputs`
+- #32 mule pickup stability: PARTIAL
+  - crash fix signal: yes
+  - tome/scripture pickup confirmation: no
+  - key lines / timestamps:
+    - `cleared stale mule pickup ref`
+    - zero live tome/scripture carry confirmation lines
+- #89 grenade pickup heuristic: PARTIAL
+  - policy log: yes
+  - pickup success log: no
+  - key lines / timestamps:
+    - `grenade pickup permitted ...`
+    - `grenade pickup bound into ammo slot`
+    - zero `grenade pickup success`
+- #90 target-type hysteresis: UNKNOWN
+  - key lines / timestamps:
+    - zero `type flip ...`
+    - zero `type hold ... over raw ...`
+- #91 weakspot aim MVP: UNKNOWN
+  - key lines / timestamps:
+    - zero `weakspot aim selected ...`
+- #17 daemonhost avoidance: FAIL
+  - dormancy suppression log: no
+  - key lines / timestamps:
+    - `Spawned monster chaos_daemonhost successfully`
+    - repeated `restoring monster weight for boss targeting bot chaos_daemonhost`
+    - `bot 5 pinged chaos_daemonhost (reason: target_enemy)`
+    - zero `dh_suppress_*` lines
+
+Regression checks:
+- revive/rescue: PASS
+- navigation/pathing: PASS
+- basic combat loop: PASS
+- Lua errors: no (error lines = 0)
+
+Conclusion:
+- #93 has live throw/consume evidence and is releasable from logs.
+- Ammo pickup is fixed in live play.
+- #82, #87, #90, #91 remain validation-gated.
+- #17 is not closeable from this session; the run is evidence against closure.
+```
+
+### Run 2026-04-13-v0.11.0-combat-execution-02
+
+```text
+Run ID: 2026-04-13-v0.11.0-combat-execution-02
+Date (local): 2026-04-13
+Date (UTC): 2026-04-13
+Git commit: 2b4574e+ / 4dd9a96+ / 6a4cbe5+ / d80b934 (post sustained-fire hold fix, pickup-success logging, grenade wield unblock)
+Log file: console-2026-04-13-15.20.37-656e5a8c-12cf-40a6-935a-4d044c41a745.log
+Bot lineup / abilities: mixed live squad including flamer, Purgatus, Veteran krak, Ogryn box, Psyker smite, lasgun weakspot routing
+Map + difficulty: live combat-heavy session
+
+v0.11.0 evidence:
+- #87 sustained fire: PASS
+  - stream routing log: yes
+  - hold confirmation log: yes
+  - key lines / timestamps:
+    - `15:27:02.693 ... stream action queued for forcestaff_p2_m1 via trigger_charge_flame`
+    - `15:27:02.693 ... holding sustained fire inputs (bot=2, template=forcestaff_p2_m1, action=trigger_charge_flame)`
+    - `15:27:04.820 ... stream action queued for flamer_p1_m1 via shoot_braced`
+    - `15:27:04.821 ... holding sustained fire inputs (bot=5, template=flamer_p1_m1, action=shoot_braced)`
+  - parser noise:
+    - one stray `zoom_release` parser error on `unarmed`; no flamer or Purgatus parser errors
+- #89 grenade pickup heuristic: PARTIAL
+  - policy log: yes
+  - pickup success log: yes
+  - key lines / timestamps:
+    - `15:32:12.742 ... grenade pickup success: small_clip (bot=5, charges=0->2/12)`
+    - `15:33:02.025 ... grenade pickup success: ammo_cache_deployable (bot=5, charges=0->12/12)`
+    - `15:33:02.750 ... grenade pickup success: ammo_cache_deployable (bot=4, charges=2->3/3)`
+  - remaining gap:
+    - still no unambiguous standalone `small_grenade` world pickup confirmation
+- #91 weakspot aim MVP: PARTIAL
+  - runtime route log: yes
+  - key lines / timestamps:
+    - `15:26:47.045 ... weakspot aim selected j_head (weapon=lasgun_p3_m2, bot=3)`
+  - remaining gap:
+    - issue body asked for stronger in-game weakspot efficacy / breakpoint validation
+- #93 grenade ballistic execution: PASS
+  - key lines / timestamps:
+    - repeated `grenade charge consumed for veteran_krak_grenade`
+    - `15:27:52.327 ... grenade charge consumed for ogryn_grenade_box_cluster`
+    - repeated `grenade external action confirmed for psyker_smite`
+
+Conclusion:
+- #87 is closeable from this run.
+- #89 gained real runtime evidence, but still does not meet its stricter issue text yet.
+- #91 now has live weakspot-routing confirmation and is closeable on the MVP "runtime path proven" standard.
+```
+
+### Run 2026-04-15-v0.11.0-tome-regression
+
+```text
+Run ID: 2026-04-15-v0.11.0-tome-regression
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after the mule-pickup slot-cache fix (post-`24c6e00` local validation run)
+Log file: console-2026-04-15-12.52.04-c4ab46ed-a65e-44d1-9dc4-c3816d070a6b.log
+Bot lineup / abilities: mixed live squad including psyker shout, veteran shout, zealot relic, knives, ogryn frag/charge
+Map + difficulty: `dm_rise`, Heresy/Hunting Grounds, `side_mission_tome`
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PARTIAL
+  - post-fix tome mission crash regression: pass
+  - tome/scripture pickup confirmation: no
+  - key lines / timestamps:
+    - `12:53:17.499 ... side_mission(side_mission_tome)`
+    - `12:55:21.357 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+    - `12:55:21.357 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+    - `bb-log summary`: `Error lines: 0`
+  - remaining gap:
+    - zero positive tome/scripture carry or consume lines, so the issue is still not closeable as a pickup feature
+- #89 grenade pickup heuristic: PARTIAL
+  - pickup success log: yes
+  - key lines / timestamps:
+    - `12:55:27.267 ... grenade pickup success: small_clip (bot=2, charges=4->6/12)`
+    - `12:58:20.743 ... grenade pickup success: small_clip (bot=2, charges=0->2/12)`
+  - remaining gap:
+    - still no standalone `small_grenade` world pickup confirmation
+- #90 target-type hysteresis: UNKNOWN
+  - key lines / timestamps:
+    - zero `type flip ...`
+    - zero `type hold ... over raw ...`
+- #17 daemonhost avoidance: UNKNOWN
+  - key lines / timestamps:
+    - no daemonhost spawn in this run
+
+Conclusion:
+- The mule-pickup slot-cache fix survived a live tome mission without reproducing the 2026-04-15 noon crash.
+- That is only a regression check, not full #32 closure evidence.
+- No additional issue becomes closeable from this run.
+```
+
+### Run 2026-04-15-v0.11.0-book-manual-confirmation
+
+```text
+Run ID: 2026-04-15-v0.11.0-book-manual-confirmation
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after the mule-pickup success-log hook
+Evidence type: direct in-game observation from the operator during live play
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PASS
+  - behavior confirmation: yes
+  - authoritative post-hook log line: no
+  - observed behavior:
+    - a bot picked up the side-mission book
+    - the top-right scripture counter incremented immediately afterward
+  - context:
+    - the confirming run happened after the repo-level mule-assignment override was already in place
+    - BetterBots now also logs `mule pickup success: tome|grimoire (bot=<slot>)`, but that hook landed after the earlier tome-regression run and did not yet have a fresh confirming mission log
+
+Conclusion:
+- #32 is closeable from direct in-game confirmation.
+- Future regressions should use the new `mule pickup success: ...` line as the authoritative log signal instead of relying on assignment logs or memory.
+```
+
+### Run 2026-04-15-v0.11.0-book-success-and-open-gates
+
+```text
+Run ID: 2026-04-15-v0.11.0-book-success-and-open-gates
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after mule-pickup success logging, BT-side target-type debounce, and companion-tag churn fixes
+Log file: console-2026-04-15-18.01.55-f3aa051f-6f95-4c12-afcc-f66d4839fa59.log
+Bot lineup / abilities: mixed live squad including Arbites mastiff, veteran krak grenade, zealot dash, ogryn taunt
+Map + difficulty: live tome mission
+
+v0.11.0 evidence:
+- #32 mule pickup stability: PASS
+  - authoritative success log: yes
+  - key lines / timestamps:
+    - `18:04:53.480 ... assigned proactive mule pickup for tome`
+    - `18:05:16.723 ... mule pickup success: tome (bot=4)`
+    - `18:05:16.883 ... cleared stale mule pickup ref (source=behavior_component.interaction_unit)`
+- #82 perf low-hanging fruit audit: STILL OPEN
+  - key line / timestamp:
+    - `18:09:24.214 ... bb-perf:auto: 124.5 µs/bot/frame total (61576 bot frames, 944763 calls, 7665.000 ms total)`
+  - conclusion:
+    - latest live sample is above the original `<80 µs/bot/frame` target
+- #90 target-type hysteresis: STILL OPEN
+  - key counts:
+    - `92` `switch_melee|switch_ranged entered`
+    - `43` `suppressed opposite-type switch ...`
+    - `0` `type hold ...`
+    - `0` `type flip ...`
+  - conclusion:
+    - BT-side debounce is firing, but visible switch churn remains high
+- #17 daemonhost avoidance: UNKNOWN
+  - key lines / timestamps:
+    - no daemonhost spawn in this run
+    - only debug context probes showed `target_is_dormant_daemonhost = false`
+
+Other confirmations:
+- no crashes:
+  - `bb-log summary`: `Error lines: 0`
+- grenade and ammo pickup regressions stayed green:
+  - `18:05:40.128 ... grenade pickup success: small_grenade (bot=2, charges=2->3/3)`
+  - `18:05:57.468 ... grenade pickup success: small_grenade (bot=5, charges=0->1/1)`
+  - `18:08:35.377 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+  - `18:06:34.661 ... ammo pickup success: ammo_cache_deployable (bot=2, ammo=99%->105%)`
+  - `18:06:35.389 ... ammo pickup success: ammo_cache_deployable (bot=5, ammo=77%->100%)`
+
+Conclusion:
+- #32 is now closed on authoritative runtime log evidence, not only manual observation.
+- #82 remains open.
+- #90 remains open.
+- #17 still needs a real daemonhost encounter.
+```
+
+### Run 2026-04-15-v0.11.0-small-grenade-confirmation
+
+```text
+Run ID: 2026-04-15-v0.11.0-small-grenade-confirmation
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: dev/v0.11.0 working tree after grenade-pickup success logging and sticky reservation fixes
+
+### Run 2026-04-15-v0.11.0-daemonhost-regression-03
+
+```text
+Run ID: 2026-04-15-v0.11.0-daemonhost-regression-03
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: f7b3e18+ (stage-aware daemonhost branch before close-range suppression restore)
+Log file: console-2026-04-15-18.12.45-1f5fb20f-7bff-4a5a-a0b4-ce39ce25b999.log
+Bot lineup / abilities: mixed squad including psyker smite and zealot throwing knives
+Map + difficulty: live daemonhost encounter
+
+#17 daemonhost avoidance: FAIL
+- sleeping daemonhost spawned:
+  - `18:15:26.033 ... Spawned monster chaos_daemonhost successfully`
+- bots still used offensive abilities before reliable daemonhost suppression appeared:
+  - `18:15:31.776 ... grenade queued wield for psyker_smite (rule=grenade_smite_priority_target)`
+  - repeated `grenade charge consumed for zealot_throwing_knives`
+- later evidence showed the branch could identify the daemonhost correctly once state had caught up:
+  - `18:15:51.353 [target_daemonhost_stage] = 6`
+  - `18:15:51.354 [target_is_dormant_daemonhost] = false`
+  - `18:15:59.768 ... melee suppressed (target is dormant daemonhost)`
+  - `18:15:59.768 ... ranged suppressed (target is dormant daemonhost)`
+- conclusion:
+  - the stage-aware target gate was not enough
+  - offensive abilities were still allowed near a sleeping daemonhost before `target_enemy`/target-state suppression converged
+
+Follow-up fix staged after this run:
+- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
+- keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
+```
+Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
+Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
+Map + difficulty: live combat session
+
+v0.11.0 evidence:
+- #89 grenade pickup heuristic: PASS
+  - policy log: yes
+  - standalone `small_grenade` success log: yes
+  - key lines / timestamps:
+    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:46:59.743 ... grenade pickup bound into ammo slot`
+    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:48:20.564 ... grenade pickup bound into ammo slot`
+    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
+  - supporting signals:
+    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
+    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+
+Conclusion:
+- #89 is closeable from this run.
+- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.

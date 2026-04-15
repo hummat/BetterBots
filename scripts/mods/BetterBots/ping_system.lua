@@ -8,6 +8,10 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 local _bot_targeting
+local _is_daemonhost_avoidance_enabled
+local _has_recent_companion_target
+local _daemonhost_breed_names
+local _is_non_aggroed_daemonhost
 
 local PING_FAILURE_BACKOFF_S = 2.0
 local DISTANCE_ESCALATION_RATIO = 0.5
@@ -17,6 +21,10 @@ local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
 local _missing_los_method_warned = false
 local _smart_tag_system_warned = false
 local _ping_call_failed_warned = false
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
 
 -- Fallback; overwritten from bot_targeting.PERCEPTION_SLOTS in init().
 local PING_SLOTS = { "priority_target_enemy", "opportunity_target_enemy", "urgent_target_enemy", "target_enemy" }
@@ -28,6 +36,11 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_bot_targeting = deps.bot_targeting
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	_has_recent_companion_target = deps.has_recent_companion_target
+	local shared_rules = deps.shared_rules
+	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	_is_non_aggroed_daemonhost = shared_rules and shared_rules.is_non_aggroed_daemonhost or nil
 	if _bot_targeting and _bot_targeting.PERCEPTION_SLOTS then
 		PING_SLOTS = _bot_targeting.PERCEPTION_SLOTS
 	end
@@ -45,6 +58,48 @@ local function _is_elite_special_monster(unit)
 		return false
 	end
 	return not not (breed.tags.elite or breed.tags.special or breed.tags.monster)
+end
+
+local function _has_live_companion(companion_spawner_extension)
+	if not (companion_spawner_extension and companion_spawner_extension:should_have_companion()) then
+		return false
+	end
+
+	local companion_units = companion_spawner_extension.companion_units
+			and companion_spawner_extension:companion_units()
+		or nil
+	if not companion_units then
+		return false
+	end
+
+	for i = 1, #companion_units do
+		if Unit.alive(companion_units[i]) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _is_dormant_daemonhost(target_unit)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if not (dh_avoidance and target_unit) then
+		return false
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+	local breed = unit_data_extension and unit_data_extension:breed()
+	if not (breed and _daemonhost_breed_names and _daemonhost_breed_names[breed.name]) then
+		return false
+	end
+
+	if _is_non_aggroed_daemonhost then
+		return _is_non_aggroed_daemonhost(target_unit)
+	end
+
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	return not (target_perception and target_perception.aggro_state == "aggroed")
 end
 
 local function _distance_sq_between_units(unit, target_unit)
@@ -155,6 +210,9 @@ function M.update(unit, blackboard)
 		return
 	end
 
+	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
+	local has_live_companion = _has_live_companion(companion_spawner_extension)
+
 	local target_unit
 	local reason
 	local target_distance_sq
@@ -163,6 +221,21 @@ function M.update(unit, blackboard)
 		local slot_name = PING_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
+			if _is_dormant_daemonhost(candidate) then
+				_log_skip_once(unit, fixed_t, "dormant_daemonhost", candidate)
+				goto continue
+			end
+
+			if has_live_companion then
+				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
+				return
+			end
+
+			if _has_recent_companion_target and _has_recent_companion_target(candidate, fixed_t) then
+				_log_skip_once(unit, fixed_t, "recent_companion_tag", candidate)
+				goto continue
+			end
+
 			-- Candidate found, check if valid for pinging
 			local target_extension = ScriptUnit.has_extension(candidate, "smart_tag_system")
 			local already_tagged = target_extension and target_extension:tag_id()
@@ -196,6 +269,8 @@ function M.update(unit, blackboard)
 				end
 			end
 		end
+
+		::continue::
 	end
 
 	if not target_unit then
@@ -247,13 +322,13 @@ function M.update(unit, blackboard)
 
 		if success then
 			_debug_log(
-				"ping_system",
+				"ping_system:" .. tostring(unit),
 				fixed_t,
 				string.format("bot %s pinged %s (reason: %s)", tostring(bot_slot), target_name, reason)
 			)
 		else
 			_debug_log(
-				"ping_system_fail",
+				"ping_system_fail:" .. tostring(unit),
 				fixed_t,
 				string.format("bot %s ping fail for %s: %s", tostring(bot_slot), target_name, tostring(err))
 			)

@@ -20,6 +20,28 @@ local FRIENDLY_COMPANION_PIN_PENALTY = 100
 -- slot_weight path (runs per-target per-bot per-frame).
 local _cached_chase_range_sq
 local _cached_chase_range_t
+local _cached_frame_t
+local _cached_tag_results
+local _cached_companion_pin_results
+local _cached_slot_ammo_pct
+local _is_daemonhost_avoidance_enabled
+local _daemonhost_breed_names
+local _is_non_aggroed_daemonhost
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
+
+local function _reset_frame_caches(fixed_t)
+	if _cached_frame_t == fixed_t then
+		return
+	end
+
+	_cached_frame_t = fixed_t
+	_cached_tag_results = {}
+	_cached_companion_pin_results = {}
+	_cached_slot_ammo_pct = {}
+end
 
 -- Returns true if target_unit is currently tagged by a human player (not a bot ping).
 local function _has_human_player_tag(target_unit)
@@ -72,11 +94,98 @@ local function _is_friendly_companion_pin(target_unit)
 	return _breed_utils and _breed_utils.is_companion(attacker_breed) or false
 end
 
+local function _has_human_player_tag_cached(target_unit, fixed_t)
+	if target_unit == nil then
+		return false
+	end
+
+	_reset_frame_caches(fixed_t)
+
+	local cached = _cached_tag_results[target_unit]
+	if cached ~= nil then
+		return cached
+	end
+
+	local value = _has_human_player_tag(target_unit)
+	_cached_tag_results[target_unit] = value
+
+	return value
+end
+
+local function _is_friendly_companion_pin_cached(target_unit, fixed_t)
+	if target_unit == nil then
+		return false
+	end
+
+	_reset_frame_caches(fixed_t)
+
+	local cached = _cached_companion_pin_results[target_unit]
+	if cached ~= nil then
+		return cached
+	end
+
+	local value = _is_friendly_companion_pin(target_unit)
+	_cached_companion_pin_results[target_unit] = value
+
+	return value
+end
+
+local function _slot_ammo_pct_cached(Ammo, unit, fixed_t)
+	_reset_frame_caches(fixed_t)
+
+	local cached = _cached_slot_ammo_pct[unit]
+	if cached ~= nil then
+		return cached == false and nil or cached
+	end
+
+	local value = Ammo.current_slot_percentage(unit, "slot_secondary")
+	_cached_slot_ammo_pct[unit] = value == nil and false or value
+
+	return value
+end
+
 local function _is_monster_targeting_unit(target_unit, unit)
 	local enemy_blackboard = BLACKBOARDS and BLACKBOARDS[target_unit] or nil
 	local enemy_perception = enemy_blackboard and enemy_blackboard.perception or nil
+	if _is_non_aggroed_daemonhost and target_unit then
+		local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+		local breed = unit_data_extension and unit_data_extension:breed()
+		if
+			breed
+			and _daemonhost_breed_names
+			and _daemonhost_breed_names[breed.name]
+			and _is_non_aggroed_daemonhost(target_unit)
+		then
+			return false
+		end
+	end
 
 	return enemy_perception and enemy_perception.aggro_state == "aggroed" and enemy_perception.target_unit == unit
+end
+
+local function _is_dormant_daemonhost_target(target_unit, target_breed)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if not (dh_avoidance and target_unit) then
+		return false
+	end
+
+	local breed = target_breed
+	if not breed then
+		local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+		breed = unit_data_extension and unit_data_extension:breed()
+	end
+
+	if not (breed and _daemonhost_breed_names and _daemonhost_breed_names[breed.name]) then
+		return false
+	end
+
+	if _is_non_aggroed_daemonhost then
+		return _is_non_aggroed_daemonhost(target_unit)
+	end
+
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	return not (target_perception and target_perception.aggro_state == "aggroed")
 end
 
 function M.init(deps)
@@ -87,8 +196,16 @@ function M.init(deps)
 	_perf = deps.perf
 	_player_tag_bonus = deps.player_tag_bonus
 	_special_chase_penalty_range = deps.special_chase_penalty_range
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	local shared_rules = deps.shared_rules
+	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	_is_non_aggroed_daemonhost = shared_rules and shared_rules.is_non_aggroed_daemonhost or nil
 	_cached_chase_range_sq = nil
 	_cached_chase_range_t = nil
+	_cached_frame_t = nil
+	_cached_tag_results = {}
+	_cached_companion_pin_results = {}
+	_cached_slot_ammo_pct = {}
 	_logged_companion_pin_melee = {}
 	_logged_companion_pin_ranged = {}
 end
@@ -114,8 +231,9 @@ function M.register_hooks()
 			function(func, unit, target_unit, target_distance_sq, target_breed, target_ally)
 				local perf_t0 = _perf and _perf.begin()
 				local score = func(unit, target_unit, target_distance_sq, target_breed, target_ally)
+				local fixed_t = _fixed_time()
 
-				if target_unit and _is_friendly_companion_pin(target_unit) then
+				if target_unit and _is_friendly_companion_pin_cached(target_unit, fixed_t) then
 					score = score - FRIENDLY_COMPANION_PIN_PENALTY
 					if _debug_enabled() then
 						local log_key = "target_sel_companion_pin:" .. tostring(target_unit) .. ":" .. tostring(unit)
@@ -132,7 +250,20 @@ function M.register_hooks()
 						end
 					end
 				-- Issue #48: Boost score for player-tagged enemies
-				elseif score > 0 and _has_human_player_tag(target_unit) then
+				elseif score > 0 and _has_human_player_tag_cached(target_unit, fixed_t) then
+					if _is_dormant_daemonhost_target(target_unit, target_breed) then
+						if _debug_enabled() then
+							_debug_log(
+								"target_sel_tag_boost_skip:" .. tostring(target_unit) .. ":" .. tostring(unit),
+								_fixed_time(),
+								"skipped player-tag boost for "
+									.. tostring(target_breed.name)
+									.. " (reason: dormant_daemonhost)"
+							)
+						end
+						goto after_tag_boost
+					end
+
 					local tag_bonus = _player_tag_bonus and _player_tag_bonus() or 3
 					if tag_bonus > 0 then
 						score = score + tag_bonus
@@ -145,10 +276,10 @@ function M.register_hooks()
 						end
 					end
 				end
+				::after_tag_boost::
 
 				-- Issue #19: Stop chasing distant specials for melee
 				-- Cache chase_range_sq per frame to avoid per-target settings reads.
-				local fixed_t = _fixed_time()
 				if _cached_chase_range_t ~= fixed_t then
 					local chase_range = _special_chase_penalty_range and _special_chase_penalty_range() or 18
 					_cached_chase_range_sq = chase_range > 0 and chase_range * chase_range or 0
@@ -162,7 +293,7 @@ function M.register_hooks()
 					and tags
 					and tags.special
 				then
-					ammo_percent = Ammo.current_slot_percentage(unit, "slot_secondary")
+					ammo_percent = _slot_ammo_pct_cached(Ammo, unit, fixed_t)
 				end
 
 				if ammo_percent and ammo_percent > 0.5 then
@@ -191,8 +322,9 @@ function M.register_hooks()
 		_mod:hook(BotTargetSelection, "line_of_sight_weight", function(func, unit, target_unit)
 			local perf_t0 = _perf and _perf.begin()
 			local score = func(unit, target_unit)
+			local fixed_t = _fixed_time()
 
-			if target_unit and _is_friendly_companion_pin(target_unit) then
+			if target_unit and _is_friendly_companion_pin_cached(target_unit, fixed_t) then
 				score = score - FRIENDLY_COMPANION_PIN_PENALTY
 				if _debug_enabled() then
 					local log_key = "target_sel_companion_pin_ranged:" .. tostring(target_unit) .. ":" .. tostring(unit)
