@@ -1,32 +1,33 @@
 [size=4][b]BetterBots — Smarter Solo Play Bots for Darktide[/b][/size]
 
-BetterBots makes Solo Play bots act more like real teammates.
+Vanilla Solo Play bots don't use their career abilities. Turns out Fatshark wired up the whole ability activation system — behavior-tree node, condition guard, action-input queue — and then gated it behind a hardcoded whitelist that only allows two abilities. BetterBots lifts that cap and fills in the missing metadata so the rest of the infrastructure does its job.
 
-They use combat abilities, throw grenades and blitzes, protect revives, ping threats, carry scriptures and tomes, manage ammo more sensibly, and generally stop feeling like dead weight.
+The result: bots throw grenades, pop stances, charge into revives, ping specials, carry tomes, and generally stop feeling like dead weight.
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers, so gameplay mods only work when you host locally through [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]. This mod does [b]not[/b] affect public matchmaking.
 
 [size=3][b]Why use this mod?[/b][/size]
 
 [list]
-[*]Bots actually use their career abilities instead of sitting on them all mission
-[*]Grenades and blitzes are supported across all classes
-[*]Bots help more with revives, pressure, poxbursters, and priority targets
-[*]Ammo, healing, and pickup behavior is less selfish
-[*]Class-diverse bot profiles give you more than four copy-pasted veterans
+[*]Bots actually fire their career abilities instead of sitting on them all mission
+[*]Bots throw grenades and blitzes (19 templates across all six classes)
+[*]Bots pre-buff before reviving, ping elites, push poxbursters, and stop chasing specials two rooms away
+[*]Ammo, healing, and pickup policies defer to human players instead of hogging resources
+[*]Bot profiles give you class-diverse loadouts instead of four copy-pasted veterans
 [/list]
 
 [size=3][b]New in v0.11.0 — Combat Execution[/b][/size]
 
-Upgrading from v0.10? Highlights:
+This one is mostly under-the-hood fixes that stop bots tripping over themselves mid-fight.
 
 [list]
-[*][b]Grenade ballistics fixed:[/b] gravity-affected grenades now arc like projectiles instead of flat-lobbing into walls
-[*][b]Book mules:[/b] bots can carry scriptures and tomes; grimoires stay opt-in behind a setting
-[*][b]Held-fire weapons fixed:[/b] flamers, Purgatus, heavy stubbers, recon/autoguns, autopistols, bolter hipfire, and ripperguns now drive the correct sustained-fire input path (regression in v0.10)
-[*][b]Auto timing profiles:[/b] reaction time, ability jitter, and pressure leash now auto-scale with difficulty instead of needing manual tuning
-[*][b]Steadier target type selection:[/b] bots swap less erratically between melee and ranged priorities (hysteresis + momentum)
-[*][b]Pickup arbitration:[/b] bot ammo and grenade pickups honor human-first thresholds; grenade refill support added
+[*][b]Grenade ballistics fixed:[/b] gravity-affected grenades arc like real projectiles again instead of flat-lobbing into the nearest wall
+[*][b]Held-fire weapons restored:[/b] flamer, Purgatus staff, heavy stubber, recon/autoguns, autopistols, bolter hipfire, and ripperguns drive the correct sustained-fire input path again (regression from v0.10)
+[*][b]Book mules:[/b] bots carry scriptures and tomes for the team. Grimoires stay opt-in — I don't want to decide for you whether the corruption is worth it.
+[*][b]Auto timing profiles:[/b] reaction time, ability jitter, and pressure leash auto-scale with difficulty. Manual sliders are still there if you don't trust me.
+[*][b]Steadier target switching:[/b] bots used to flip between melee and ranged priorities every few frames when scores were close. Now they commit.
+[*][b]Smarter pickups:[/b] bots defer ammo and grenade crates to humans below configurable thresholds. Full bots no longer chase an ammo box two rooms away.
+[*][b]Weakspot aim (MVP):[/b] ranged bots aim at heads on common specials. Per-breed map still in progress.
 [/list]
 
 [size=3][b]What bots can use[/b][/size]
@@ -38,7 +39,7 @@ Upgrading from v0.10? Highlights:
 [*]Psyker: Scrier's Gaze, Venting Shriek, Telekine Shield
 [*]Ogryn: Point-Blank Barrage, Bull Rush, Loyal Protector
 [*]Arbites: Castigator's Stance, Break the Line, Nuncio-Aquila
-[*]Hive Scum: Desperado (Focus), Rampage, Stimm Supply field — untested, DLC not owned
+[*]Hive Scum: Desperado (Focus), Rampage, Stimm Supply field — implemented but untested (I don't own the DLC)
 [/list]
 
 [b]Grenades and blitzes[/b]
@@ -47,40 +48,42 @@ Upgrading from v0.10? Highlights:
 [*]Zealot Throwing Knives
 [*]Psyker Assail, Smite, Chain Lightning
 [*]Arbites whistle and shock mine
-[*]Hive Scum Blinder, Chem, and Boom Bringer — untested, DLC not owned
+[*]Hive Scum Blinder, Chem, Boom Bringer — implemented but untested (DLC again)
 [/list]
 
-[size=3][b]What bots do better[/b][/size]
+[size=3][b]What bots do better now[/b][/size]
 
 [list]
-[*]Use abilities when a fight actually calls for them
-[*]Pop defensive abilities before reviving downed allies
-[*]Stagger team cooldowns instead of dumping everything at once
-[*]Protect allies doing objectives and pickups
-[*]Ping elites and specials for the player
-[*]Avoid wasteful poxburster shots and push when needed
-[*]Stay engaged in fights longer without wandering off uselessly
-[*]Use smarter melee attacks into hordes and armor
+[*]Fire abilities when a fight actually calls for them (18 per-template heuristics)
+[*]Pop defensive abilities before reviving a downed ally
+[*]Stagger team cooldowns instead of dumping everything in the same second
+[*]Guard allies doing objectives and pickups
+[*]Ping elites and specials so you can see them
+[*]Push poxbursters at melee range instead of wasting ammo shooting them
+[*]Stay engaged in fights longer without wandering off to heal at 99%
+[*]Pick appropriate melee attacks into hordes vs armor
 [*]Carry scriptures and tomes for the team
-[*]Defer healing and ammo more intelligently to human players
-[*]Steer the Arbites mastiff onto better targets
+[*]Hand healing items and ammo to humans first
+[*]Steer the Arbites Cyber-Mastiff onto higher-priority targets
 [/list]
 
 [size=3][b]Settings you can control[/b][/size]
 
+Everything new is toggleable or tunable. A few highlights:
+
 [list]
 [*]Aggression preset: Testing / Aggressive / Balanced / Conservative
-[*]Toggle ability groups on or off: stances, charges, shouts, stealth, deployables, grenades
-[*]Sprint distance, chase range, player-tag response, and melee horde bias sliders
-[*]Smart blitz targeting toggle
-[*]Daemonhost avoidance toggle
-[*]Poxburster safety toggle
+[*]Per-group ability toggles: stances, charges, shouts, stealth, deployables, grenades
+[*]Sprint distance, chase range, player-tag response, melee horde bias
+[*]Smart blitz targeting
+[*]Daemonhost avoidance
+[*]Poxburster safety
 [*]Ammo reserve thresholds for bots and humans
-[*]Human-likeness timing and pressure profiles
-[*]Healing deferral options
-[*]Bot grimoire pickup toggle
+[*]Human-likeness timing and pressure profiles (manual or auto-by-difficulty)
+[*]Healing deferral
+[*]Grimoire pickup (default off)
 [*]Bot profile class selection and weapon quality
-[*]Debug level, JSONL event log, and `/bb_perf` diagnostics
+[*]Debug level, JSONL event log, and [font=Courier New]/bb_perf[/font] diagnostics
 [/list]
 
 [size=3][b]Requirements[/b][/size]
@@ -88,10 +91,10 @@ Upgrading from v0.10? Highlights:
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/19]Darktide Mod Loader[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/8]Darktide Mod Framework (DMF)[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]
-[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] if you want class-diverse bots based on player profiles
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] for class-diverse bots based on player profiles
 [/list]
 
-[b]Note:[/b] If Tertium 5 crashes with newer classes like Arbites or Hive Scum, switch to [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url].
+[b]Note:[/b] Tertium 5 crashes on Arbites and Hive Scum archetypes. Switch to [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] if that hits you.
 
 [size=3][b]Install[/b][/size]
 [list=1]
@@ -107,18 +110,19 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]Known issues[/b][/size]
 
 [list]
-[*]Daemonhost avoidance has improved, but rare edge cases with dormant daemonhosts are still being watched
-[*]Mods are disabled after every Darktide update — re-patch via the toggle script
-[*]Hive Scum abilities and blitzes are implemented but unvalidated in-game (DLC not owned by the author)
-[*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after game patches until the path is updated
+[*]Daemonhost edge cases (dormant → aggro transitions, close-range suppression) still shake out. If a bot does something dumb near a DH, file an issue.
+[*]Mods get disabled after every Darktide patch — re-run the toggle/patch script to re-enable.
+[*]Hive Scum abilities and blitzes are implemented but unvalidated in-game. I don't own the DLC, so I rely on reports.
+[*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after a Darktide patch until the path is updated.
 [/list]
 
-[size=3][b]Planned next[/b][/size]
+[size=3][b]What I want to fix next[/b][/size]
 
 [list]
-[*]Better weapon-aware ADS vs hip-fire behavior
-[*]Healing item management
-[*]Weapon special actions like parry/bayonet
+[*]Weapon-aware ADS vs hip-fire routing (right now bots ADS more than they should)
+[*]Healing item management (medkits, stims)
+[*]Weapon special actions like parry and bayonet
+[*]Per-breed weakspot map (head isn't always the right target; Mauler prefers spine, Crusher prefers back-of-head)
 [/list]
 
 [size=3][b]Source & feedback[/b][/size]
