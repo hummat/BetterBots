@@ -9,6 +9,7 @@ local _debug_enabled
 local _combat_ability_identity
 local _daemonhost_breed_names
 local _is_daemonhost_avoidance_enabled
+local _daemonhost_state
 local _overlapping_liquids = {}
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
 local SHIELD_INTERACTION_TYPES = {
@@ -261,12 +262,19 @@ local function normalize_grenade_context(unit, context, target_unit)
 	end
 
 	if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
-		local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
-		local target_perception = target_bb and target_bb.perception
-		local aggro_state = target_perception and target_perception.aggro_state or "missing"
-		local is_aggroed = aggro_state == "aggroed"
+		local aggro_state, stage
+		if _daemonhost_state then
+			aggro_state, stage = _daemonhost_state(target_unit)
+		else
+			local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+			local target_perception = target_bb and target_bb.perception
+			aggro_state = target_perception and target_perception.aggro_state or nil
+		end
+		aggro_state = aggro_state or "missing"
+		local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
 		normalized.target_is_dormant_daemonhost = not is_aggroed
 		normalized.target_daemonhost_aggro_state = aggro_state
+		normalized.target_daemonhost_stage = stage
 	end
 
 	return normalized
@@ -306,6 +314,7 @@ local function build_context(unit, blackboard)
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
+		target_daemonhost_stage = nil,
 		target_is_super_armor = false,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
@@ -447,12 +456,19 @@ local function build_context(unit, blackboard)
 			-- vanilla target selection even though no combat action should
 			-- ensue — we must refuse at the heuristic layer.
 			if _daemonhost_breed_names and _daemonhost_breed_names[target_breed.name] then
-				local target_bb = BLACKBOARDS and BLACKBOARDS[context.target_enemy]
-				local target_perception = target_bb and target_bb.perception
-				local aggro_state = target_perception and target_perception.aggro_state or "missing"
-				local is_aggroed = aggro_state == "aggroed"
+				local aggro_state, stage
+				if _daemonhost_state then
+					aggro_state, stage = _daemonhost_state(context.target_enemy)
+				else
+					local target_bb = BLACKBOARDS and BLACKBOARDS[context.target_enemy]
+					local target_perception = target_bb and target_bb.perception
+					aggro_state = target_perception and target_perception.aggro_state or nil
+				end
+				aggro_state = aggro_state or "missing"
+				local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
 				context.target_is_dormant_daemonhost = not is_aggroed
 				context.target_daemonhost_aggro_state = aggro_state
+				context.target_daemonhost_stage = stage
 			end
 		end
 	end
@@ -2124,6 +2140,7 @@ return {
 		-- context.target_is_dormant_daemonhost directly still work without
 		-- wiring shared_rules or the setting lookup.
 		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
+		_daemonhost_state = deps.shared_rules and deps.shared_rules.daemonhost_state
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
 			return true
 		end

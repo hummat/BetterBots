@@ -1,9 +1,11 @@
 local CompanionTag = require("scripts.mods.BetterBots.companion_tag")
 local test_helper = require("tests.test_helper")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 
 describe("companion_tag", function()
 	local mod_mock, debug_log_mock, fixed_time_mock, bot_unit
 	local current_time = 0
+	local game_object_ids, game_object_fields
 
 	local function reinit(opts)
 		opts = opts or {}
@@ -17,6 +19,7 @@ describe("companion_tag", function()
 			bot_slot_for_unit = function()
 				return 1
 			end,
+			shared_rules = SharedRules,
 		})
 	end
 
@@ -56,8 +59,27 @@ describe("companion_tag", function()
 						return nil
 					end,
 				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
 			},
 		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+		game_object_ids = {}
+		game_object_fields = {}
 	end)
 
 	after_each(function()
@@ -66,6 +88,7 @@ describe("companion_tag", function()
 		_G.POSITION_LOOKUP = nil
 		_G.Vector3 = nil
 		_G.Managers = nil
+		_G.GameSession = nil
 	end)
 
 	-- Helper: set up a bot with companion_spawner_extension
@@ -369,6 +392,7 @@ describe("companion_tag", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 
 		local blackboard = {
@@ -410,6 +434,7 @@ describe("companion_tag", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 
 		local blackboard = {
@@ -420,6 +445,50 @@ describe("companion_tag", function()
 
 		CompanionTag.update(bot_unit, blackboard)
 		assert.spy(set_tag_mock).was_called(1)
+	end)
+
+	it("still treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+		game_object_ids[daemonhost] = "daemonhost_go"
+		game_object_fields.daemonhost_go = { stage = 5 }
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
 	end)
 
 	it("follows ping slot priority order", function()

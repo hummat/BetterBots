@@ -26,6 +26,7 @@ local _cached_companion_pin_results
 local _cached_slot_ammo_pct
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_breed_names
+local _is_non_aggroed_daemonhost
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
 	chaos_mutator_daemonhost = true,
@@ -146,6 +147,18 @@ end
 local function _is_monster_targeting_unit(target_unit, unit)
 	local enemy_blackboard = BLACKBOARDS and BLACKBOARDS[target_unit] or nil
 	local enemy_perception = enemy_blackboard and enemy_blackboard.perception or nil
+	if _is_non_aggroed_daemonhost and target_unit then
+		local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+		local breed = unit_data_extension and unit_data_extension:breed()
+		if
+			breed
+			and _daemonhost_breed_names
+			and _daemonhost_breed_names[breed.name]
+			and _is_non_aggroed_daemonhost(target_unit)
+		then
+			return false
+		end
+	end
 
 	return enemy_perception and enemy_perception.aggro_state == "aggroed" and enemy_perception.target_unit == unit
 end
@@ -166,13 +179,13 @@ local function _is_dormant_daemonhost_target(target_unit, target_breed)
 		return false
 	end
 
-	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
-	local target_perception = target_bb and target_bb.perception
-	if target_perception and target_perception.aggro_state == "aggroed" then
-		return false
+	if _is_non_aggroed_daemonhost then
+		return _is_non_aggroed_daemonhost(target_unit)
 	end
 
-	return true
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	return not (target_perception and target_perception.aggro_state == "aggroed")
 end
 
 function M.init(deps)
@@ -186,6 +199,7 @@ function M.init(deps)
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	local shared_rules = deps.shared_rules
 	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	_is_non_aggroed_daemonhost = shared_rules and shared_rules.is_non_aggroed_daemonhost or nil
 	_cached_chase_range_sq = nil
 	_cached_chase_range_t = nil
 	_cached_frame_t = nil

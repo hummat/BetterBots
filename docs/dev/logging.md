@@ -125,8 +125,9 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `patched opportunity reaction times (min=<N>, max=<N>)` (`#44` validation; startup/runtime confirmation that `BotSettings.opportunity_target_reaction_times.normal` was patched from the selected human-likeness timing profile)
 - `HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal; reaction-time patch skipped` (one-shot warning that the engine bot-settings API shape changed and the human-likeness timing patch could not bind)
 - `leash scaled <base> -> <effective> (pressure=<N>)` (`#44` validation; direct confirmation that pressure-based engagement leash scaling fired in combat)
-- `type flip <old> -> <new>` (`#90` validation; hysteresis allowed a real melee/ranged type transition after the opposite mode cleared the margin)
-- `type hold <current> over raw <candidate> (melee=<N>, ranged=<N>)` (`#90` validation; hysteresis actively suppressed a raw flip and kept the current type)
+- `type flip <old> -> <new>` (`#90` math-layer validation; perception hysteresis allowed a real melee/ranged type transition after the opposite mode cleared the margin)
+- `type hold <current> over raw <candidate> (melee=<N>, ranged=<N>)` (`#90` math-layer validation; perception hysteresis actively suppressed a raw flip and kept the current type)
+- `bot <slot> suppressed opposite-type switch <old> -> <new> (elapsed=<N>s)` (`#90` symptom-layer validation; `wrong_slot_for_target_type` wanted an immediate opposite-type reswitch, but the BT-side debounce suppressed it for a non-priority target)
 - `bot <slot> wrong slot for <target_type> target (wielded=<slot>, wanted=<slot>)` (`#90` symptom-layer condition signal; `wrong_slot_for_target_type` fired for the current target type, so the BT wanted a weapon swap)
 - `bot <slot> switch_melee entered (wielded=<slot>, wanted=slot_primary, target_type=melee)` / `bot <slot> switch_ranged entered (wielded=<slot>, wanted=slot_secondary, target_type=ranged)` (`#90` action-layer signal; the inventory-switch node actually executed instead of just evaluating the target-type math)
 - `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active and selected an actual runtime node)
@@ -137,8 +138,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `pushing poxburster (bypassed outnumbered gate)` (poxburster melee hook forced a push; direct validation signal for `#54`)
-- `melee suppressed (target is dormant daemonhost)` (bot refused melee because its current target was a sleeping daemonhost; direct validation signal for `#17`)
-- `ranged suppressed (target is dormant daemonhost)` (bot refused ranged fire because its current target was a sleeping daemonhost; direct validation signal for `#17`)
+- `melee suppressed (target is dormant daemonhost)` (bot refused melee because its current target was a non-aggroed daemonhost; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
+- `ranged suppressed (target is dormant daemonhost)` (bot refused ranged fire because its current target was a non-aggroed daemonhost; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
 - `sprint STOP (daemonhost_nearby)` (bot dropped sprint because it entered daemonhost safety radius; movement-side validation signal for `#17`)
 - `patched visual loadout is_local_unit=false for bot (pre-init)` (spawn-time loadout VFX suppression applied before slot scripts initialized; direct validation signal for `#53`)
 - `patched ability effect context is_local_unit=false for bot` (ability effect VFX suppression applied for bot-owned ability contexts; VFX validation signal)
@@ -147,12 +148,12 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (the shared `hook_require` callback for `bt_bot_melee_action` was installed; startup validation signal for `#67`)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
-- `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag|companion_tag|dormant_daemonhost)` (ping system — meaningful suppression, one-shot per repeated target/reason; `companion_tag` means an Arbites bot yielded enemy tagging to mastiff smart-tagging instead of issuing a normal ping on the same target, and `dormant_daemonhost` means daemonhost avoidance blocked the normal ping path)
+- `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag|companion_tag|dormant_daemonhost)` (ping system — meaningful suppression, one-shot per repeated target/reason; `companion_tag` means an Arbites bot yielded enemy tagging to mastiff smart-tagging instead of issuing a normal ping on the same target, and `dormant_daemonhost` means stage-aware daemonhost avoidance blocked the normal ping path)
 - `bot <slot> skipped pinging (reason: failure_backoff)` (ping system — previous ping failure is still inside the retry backoff window)
 - `bot <slot> companion-tagged <target> (reason: <reason>)` (Arbites mastiff smart-tag — companion command issued on a priority target)
-- `bot <slot> skipped companion tag for <target> (reason: no_los|dormant_daemonhost)` (Arbites mastiff smart-tag — meaningful suppression, one-shot per repeated target/reason; dormant daemonhosts never get mastiff command tags while daemonhost avoidance is enabled)
+- `bot <slot> skipped companion tag for <target> (reason: no_los|dormant_daemonhost)` (Arbites mastiff smart-tag — meaningful suppression, one-shot per repeated target/reason; non-aggroed daemonhosts never get mastiff command tags while daemonhost avoidance is enabled, using daemonhost `stage` when available)
 - `holding existing companion tag on <target> (reason: <reason>)` (Arbites mastiff smart-tag — current companion order preserved through the minimum hold window)
-- `skipped player-tag boost for chaos_daemonhost (reason: dormant_daemonhost)` (target selection — human tag no longer boosts a dormant daemonhost into melee target priority while daemonhost avoidance is enabled)
+- `skipped player-tag boost for chaos_daemonhost (reason: dormant_daemonhost)` (target selection — human tag no longer boosts a non-aggroed daemonhost into melee target priority while daemonhost avoidance is enabled; stage-aware when daemonhost `stage` is available)
 - `suppressed <template> (team_cd:<category>)` (team cooldown staggering — another bot already activated the same category within the suppression window; direct validation signal for `#14`)
 - `<profile> (<interaction_type>) dist=<N>` such as `shield (objective) dist=4.2` or `escort (luggable) dist=2.1` (interaction scan — ally detected in objective interaction; throttle key `interaction_scan:<unit>`, 5s interval; direct validation signal for `#37`)
 - `revive candidate observed: <ability> (template=<template>, need_type=<type>)` (bot selected a rescue destination while carrying a defensive revive ability; this fires before `BtBotInteractAction.enter` and distinguishes selector/path misses from interact-hook misses for `#7`)
@@ -286,10 +287,11 @@ Parallel to debug text logging. Enable via mod setting `Enable event log (JSONL)
 | `blocked` | Item sequence failure | reason, stage, profile, attempt_id |
 | `snapshot` | Every 30s per bot | cooldown_ready, charges, ctx, item_stage |
 
-For daemonhost investigations, `decision.ctx` now preserves both
-`target_is_dormant_daemonhost` and `target_daemonhost_aggro_state` when the
-current target is a daemonhost, so JSONL traces can distinguish dormant
-pre-aggro approvals from active-fight self-defense behavior.
+For daemonhost investigations, `decision.ctx` now preserves
+`target_is_dormant_daemonhost`, `target_daemonhost_aggro_state`, and
+`target_daemonhost_stage` when the current target is a daemonhost, so JSONL
+traces can distinguish stage-aware pre-aggro suppression from active-fight
+self-defense behavior.
 
 ### Hot-reload behavior
 

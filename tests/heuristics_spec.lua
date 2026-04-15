@@ -2207,6 +2207,8 @@ describe("heuristics", function()
 		local current_fixed_t
 		local captured_liquid_results
 		local script_unit_extensions
+		local game_object_ids
+		local game_object_fields
 
 		before_each(function()
 			liquid_results_return_mode = "table"
@@ -2218,6 +2220,8 @@ describe("heuristics", function()
 			saved_script_unit = rawget(_G, "ScriptUnit")
 			saved_alive = rawget(_G, "ALIVE")
 			script_unit_extensions = nil
+			game_object_ids = {}
+			game_object_fields = {}
 
 			_G.Managers = {
 				state = {
@@ -2254,7 +2258,24 @@ describe("heuristics", function()
 							assert.is_true(false, "unexpected system lookup: " .. tostring(system_name))
 						end,
 					},
+					unit_spawner = {
+						game_object_id = function(_, unit)
+							return game_object_ids[unit]
+						end,
+					},
+					game_session = {
+						game_session = function()
+							return "test_game_session"
+						end,
+					},
 				},
+			}
+			_G.GameSession = {
+				game_object_field = function(game_session, game_object_id, field_name)
+					assert.equals("test_game_session", game_session)
+					local fields = game_object_fields[game_object_id]
+					return fields and fields[field_name] or nil
+				end,
 			}
 			_G.POSITION_LOOKUP = {
 				hazard_bot = "hazard_pos",
@@ -2289,6 +2310,7 @@ describe("heuristics", function()
 			_G.POSITION_LOOKUP = saved_position_lookup
 			_G.ScriptUnit = saved_script_unit
 			_G.ALIVE = saved_alive
+			_G.GameSession = nil
 		end)
 
 		it("marks context as hazardous when hostile liquid overlaps the bot position", function()
@@ -2334,6 +2356,44 @@ describe("heuristics", function()
 			assert.equals("mastiff", context.companion_unit)
 			assert.equals("dog_pos", context.companion_position)
 			assert.equals("target_pos", context.target_enemy_position)
+		end)
+
+		it("treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+			game_object_ids.target_enemy = "daemonhost_go"
+			game_object_fields.daemonhost_go = { stage = 5 }
+			script_unit_extensions = {
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_daemonhost",
+						tags = { monster = true },
+					}),
+				},
+			}
+
+			Heuristics.init({
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+				combat_ability_identity = CombatAbilityIdentity,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+			})
+
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.is_true(context.target_is_dormant_daemonhost)
 		end)
 
 		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()

@@ -12,6 +12,7 @@ local _bot_slot_for_unit
 local _bot_targeting
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_breed_names
+local _is_non_aggroed_daemonhost
 
 local TAG_FAILURE_BACKOFF_S = 2.0
 local MIN_TAG_HOLD_S = 2.0
@@ -39,6 +40,7 @@ function M.init(deps)
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	local shared_rules = deps.shared_rules
 	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
+	_is_non_aggroed_daemonhost = shared_rules and shared_rules.is_non_aggroed_daemonhost or nil
 	if _bot_targeting and _bot_targeting.PERCEPTION_SLOTS then
 		TAG_SLOTS = _bot_targeting.PERCEPTION_SLOTS
 	end
@@ -99,13 +101,13 @@ local function _is_dormant_daemonhost(target_unit)
 		return false
 	end
 
-	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
-	local target_perception = target_bb and target_bb.perception
-	if target_perception and target_perception.aggro_state == "aggroed" then
-		return false
+	if _is_non_aggroed_daemonhost then
+		return _is_non_aggroed_daemonhost(target_unit)
 	end
 
-	return true
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	return not (target_perception and target_perception.aggro_state == "aggroed")
 end
 
 local function _log_skip_once(unit, fixed_t, reason, target_unit)

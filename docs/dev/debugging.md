@@ -67,8 +67,9 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `patched opportunity reaction times` | Human-likeness timing patch applied live (#44) |
 | `HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal` | Human-likeness timing patch could not bind because the engine settings shape changed |
 | `leash scaled` | Human-likeness pressure leash scaling fired in combat (#44) |
-| `type flip ` | Target-type hysteresis allowed a real melee/ranged transition (#90) |
-| `type hold ` | Target-type hysteresis actively suppressed a raw type flip (#90) |
+| `type flip ` | Target-type hysteresis allowed a real melee/ranged transition at the perception/math layer (#90) |
+| `type hold ` | Target-type hysteresis actively suppressed a raw type flip at the perception/math layer (#90) |
+| `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
 | `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
 | `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |
@@ -84,6 +85,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
+| `melee suppressed (target is dormant daemonhost)` / `ranged suppressed (target is dormant daemonhost)` | Non-aggroed daemonhost combat suppression fired; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state` (#17) |
+| `skipped ping for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped companion tag for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped player-tag boost for chaos_daemonhost (reason: dormant_daemonhost)` | Stage-aware daemonhost avoidance suppressed pinging, mastiff smart-tagging, or human-tag score boosts on a non-aggroed daemonhost (#17) |
 | `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
 | `revive candidate observed: <ability> (template=<template>, need_type=<type>)` | Bot selected a rescue destination while carrying a defensive revive ability, before `BtBotInteractAction.enter`. Use this to tell selector/path misses from interact-hook misses. Key: `revive_candidate:<ability>:<unit>` (#7) |
 | `revive ability queued: <ability> (interaction=<type>, enemies=<N>)` | Bot fired a defensive ability before starting a rescue interaction. Key: `revive_ability:<ability>:<unit>` (#7) |

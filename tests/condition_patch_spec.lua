@@ -7,6 +7,9 @@ local _extensions = {}
 local _blackboards = {}
 local _debug_logs = {}
 local _debug_enabled_result = false
+local _fixed_time_value = 0
+local _game_object_ids = {}
+local _game_object_fields = {}
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -43,11 +46,32 @@ _G.ALIVE = setmetatable({}, {
 		return _alive[unit]
 	end,
 })
-_G.Managers = { state = { extension = {
-	system = function()
-		return nil
+_G.Managers = {
+	state = {
+		extension = {
+			system = function()
+				return nil
+			end,
+		},
+		unit_spawner = {
+			game_object_id = function(_, unit)
+				return _game_object_ids[unit]
+			end,
+		},
+		game_session = {
+			game_session = function()
+				return "test_game_session"
+			end,
+		},
+	},
+}
+_G.GameSession = {
+	game_object_field = function(game_session, game_object_id, field_name)
+		assert.equals("test_game_session", game_session)
+		local fields = _game_object_fields[game_object_id]
+		return fields and fields[field_name] or nil
 	end,
-} } }
+}
 
 -- Stub require so condition_patch.lua doesn't crash on game modules
 local _orig_require = require
@@ -81,7 +105,7 @@ ConditionPatch.init({
 		return _debug_enabled_result
 	end,
 	fixed_time = function()
-		return 0
+		return _fixed_time_value
 	end,
 	is_suppressed = function()
 		return false
@@ -125,6 +149,21 @@ local function setup_breed(unit, breed_name)
 	_alive[unit] = true
 end
 
+local function setup_daemonhost_state(unit, opts)
+	opts = opts or {}
+	local game_object_id = opts.game_object_id or tostring(unit) .. "_go"
+	_game_object_ids[unit] = game_object_id
+	_game_object_fields[game_object_id] = {
+		stage = opts.stage,
+	}
+	_blackboards[unit] = {
+		perception = {
+			aggro_state = opts.aggro_state,
+			target_unit = opts.target_unit,
+		},
+	}
+end
+
 -- Helper: build a blackboard with a target_enemy
 local function make_blackboard(target_enemy)
 	return {
@@ -148,8 +187,15 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	for k in pairs(_game_object_ids) do
+		_game_object_ids[k] = nil
+	end
+	for k in pairs(_game_object_fields) do
+		_game_object_fields[k] = nil
+	end
 	_debug_logs = {}
 	_debug_enabled_result = false
+	_fixed_time_value = 0
 end
 
 local function find_debug_log(pattern)
@@ -175,6 +221,53 @@ end
 describe("condition_patch", function()
 	before_each(function()
 		reset()
+		ConditionPatch.init({
+			shared_rules = SharedRules,
+			mod = { echo = function() end, hook_require = function() end },
+			debug_log = function(key, fixed_t, message)
+				_debug_logs[#_debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return _debug_enabled_result
+			end,
+			fixed_time = function()
+				return _fixed_time_value
+			end,
+			is_suppressed = function()
+				return false
+			end,
+			equipped_combat_ability_name = function()
+				return "none"
+			end,
+			patched_bt_bot_conditions = {},
+			patched_bt_conditions = {},
+			rescue_intent = {},
+			DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+			CONDITIONS_PATCH_VERSION = "test",
+		})
+		ConditionPatch.wire({
+			Heuristics = {
+				resolve_decision = function()
+					return false
+				end,
+			},
+			MetaData = { inject = function() end },
+			Debug = {
+				log_ability_decision = function() end,
+				bot_slot_for_unit = function()
+					return 1
+				end,
+			},
+			EventLog = {
+				is_enabled = function()
+					return false
+				end,
+			},
+		})
 	end)
 
 	describe("_action_input_is_bot_queueable", function()
@@ -264,6 +357,30 @@ describe("condition_patch", function()
 			_blackboards[target] = { perception = { aggro_state = "alerted" } }
 			local bb = make_blackboard(target)
 			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns true when daemonhost stage is waking_up even if aggro_state already flipped", function()
+			local target = "dh_waking"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "aggroed",
+				stage = 5,
+			})
+			local bb = make_blackboard(target)
+
+			assert.is_true(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
+		end)
+
+		it("returns false when daemonhost stage is aggroed even if aggro_state is stale", function()
+			local target = "dh_stage_aggroed"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "alerted",
+				stage = 6,
+			})
+			local bb = make_blackboard(target)
+
+			assert.is_false(ConditionPatch._is_dormant_daemonhost_target("bot1", bb))
 		end)
 
 		it("returns false when target enemy is dead", function()
@@ -743,6 +860,115 @@ describe("condition_patch", function()
 			assert.is_truthy(find_debug_log("wielded=slot_secondary"))
 			assert.is_truthy(find_debug_log("wanted=slot_primary"))
 			assert.is_not_nil(find_debug_log_by_key("wrong_slot_for_target_type:bot1"))
+		end)
+
+		it("suppresses recent opposite-type switches to cut weapon-swap thrash", function()
+			_debug_enabled_result = true
+			_fixed_time_value = 10
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_debounce")
+
+			local ranged_bb = make_blackboard("gunner1")
+			ranged_bb.perception.target_enemy_type = "ranged"
+			assert.is_true(
+				conditions.wrong_slot_for_target_type(
+					unit,
+					ranged_bb,
+					{},
+					{ target_type = "ranged" },
+					{ wanted_slot = "slot_secondary" },
+					false
+				)
+			)
+
+			_fixed_time_value = 10.3
+			local melee_bb = make_blackboard("poxwalker1")
+			melee_bb.perception.target_enemy_type = "melee"
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				melee_bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_false(result)
+			assert.is_truthy(find_debug_log("suppressed opposite-type switch"))
+		end)
+
+		it("still allows immediate opposite-type switches for elite targets", function()
+			_fixed_time_value = 20
+
+			local unit = "bot1"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = "slot_secondary" },
+				}),
+			}
+			_extensions.elite1 = {
+				unit_data_system = test_helper.make_minion_unit_data_extension({
+					name = "chaos_ogryn_executor",
+					tags = { elite = true },
+				}),
+			}
+			_alive.elite1 = true
+
+			local conditions = {
+				wrong_slot_for_target_type = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_debounce_elite")
+
+			local ranged_bb = make_blackboard("gunner1")
+			ranged_bb.perception.target_enemy_type = "ranged"
+			assert.is_true(
+				conditions.wrong_slot_for_target_type(
+					unit,
+					ranged_bb,
+					{},
+					{ target_type = "ranged" },
+					{ wanted_slot = "slot_secondary" },
+					false
+				)
+			)
+
+			_fixed_time_value = 20.2
+			local melee_bb = make_blackboard("elite1")
+			melee_bb.perception.target_enemy_type = "melee"
+
+			local result = conditions.wrong_slot_for_target_type(
+				unit,
+				melee_bb,
+				{},
+				{ target_type = "melee" },
+				{ wanted_slot = "slot_primary" },
+				false
+			)
+
+			assert.is_true(result)
 		end)
 
 		it("blocks ability activation when team cooldown suppression is active", function()

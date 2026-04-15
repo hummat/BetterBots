@@ -1,10 +1,13 @@
 local test_helper = require("tests.test_helper")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 
 describe("TargetSelection", function()
 	local TargetSelection
 	local _mod
 	local original_slot_weight
 	local original_line_of_sight_weight
+	local game_object_ids
+	local game_object_fields
 
 	local function make_smart_tag_system(target_unit, is_human)
 		return {
@@ -51,8 +54,27 @@ describe("TargetSelection", function()
 						end
 					end,
 				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
 			},
 		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+		game_object_ids = {}
+		game_object_fields = {}
 
 		-- Mock the mod object
 		_mod = {
@@ -77,6 +99,7 @@ describe("TargetSelection", function()
 			fixed_time = function()
 				return 0
 			end,
+			shared_rules = SharedRules,
 		})
 
 		original_slot_weight = function(_unit, _target_unit, _target_distance_sq, _target_breed, _target_ally)
@@ -113,6 +136,7 @@ describe("TargetSelection", function()
 		_G.Managers = nil
 		_G.BLACKBOARDS = nil
 		_G.ScriptUnit = nil
+		_G.GameSession = nil
 	end)
 
 	it("does not penalize normal targets at any distance", function()
@@ -426,6 +450,7 @@ describe("TargetSelection", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 		TargetSelection.register_hooks()
 
@@ -460,6 +485,7 @@ describe("TargetSelection", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 		TargetSelection.register_hooks()
 
@@ -467,6 +493,43 @@ describe("TargetSelection", function()
 		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
 		assert.are.equal(8, score)
+	end)
+
+	it("does not boost score for a waking daemonhost stage even if aggro_state already flipped", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "aggroed",
+			},
+		}
+		game_object_ids[target_unit] = "daemonhost_go"
+		game_object_fields.daemonhost_go = { stage = 5 }
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
 	end)
 
 	it("does not boost score when smart_tag_system is unavailable", function()

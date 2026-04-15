@@ -1,9 +1,11 @@
 local PingSystem = require("scripts.mods.BetterBots.ping_system")
 local test_helper = require("tests.test_helper")
+local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 
 describe("ping_system", function()
 	local mod_mock, debug_log_mock, fixed_time_mock, bot_unit
 	local current_time = 0
+	local game_object_ids, game_object_fields
 
 	local function reinit_with_debug(enabled)
 		PingSystem.init({
@@ -16,6 +18,7 @@ describe("ping_system", function()
 			bot_slot_for_unit = function()
 				return 1
 			end,
+			shared_rules = SharedRules,
 		})
 	end
 
@@ -55,8 +58,27 @@ describe("ping_system", function()
 						return nil
 					end,
 				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
 			},
 		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+		game_object_ids = {}
+		game_object_fields = {}
 	end)
 
 	after_each(function()
@@ -65,6 +87,7 @@ describe("ping_system", function()
 		_G.POSITION_LOOKUP = nil
 		_G.Vector3 = nil
 		_G.Managers = nil
+		_G.GameSession = nil
 	end)
 
 	it("does not crash when Managers.state is nil", function()
@@ -510,6 +533,7 @@ describe("ping_system", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
@@ -570,6 +594,7 @@ describe("ping_system", function()
 			is_daemonhost_avoidance_enabled = function()
 				return true
 			end,
+			shared_rules = SharedRules,
 		})
 
 		_G.ScriptUnit.has_extension = function(_unit, extension_name)
@@ -597,6 +622,68 @@ describe("ping_system", function()
 
 		PingSystem.update(bot_unit, blackboard)
 		assert.spy(set_contextual_unit_tag_mock).was_called(1)
+	end)
+
+	it("still treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+		local daemonhost = { name = "daemonhost" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+		game_object_ids[daemonhost] = "daemonhost_go"
+		game_object_fields.daemonhost_go = { stage = 5 }
+
+		PingSystem.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+			shared_rules = SharedRules,
+		})
+
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "chaos_daemonhost",
+					tags = { monster = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_not_called()
 	end)
 
 	it("pings even if perception_system is missing", function()
