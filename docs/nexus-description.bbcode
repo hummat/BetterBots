@@ -2,7 +2,7 @@
 
 BetterBots makes Solo Play bots act more like real teammates.
 
-They use combat abilities, throw grenades and blitzes, protect revives, ping threats, carry books, manage ammo more sensibly, and generally stop feeling like dead weight.
+They use combat abilities, throw grenades and blitzes, protect revives, ping threats, carry scriptures and tomes, manage ammo more sensibly, and generally stop feeling like dead weight.
 
 [b]Solo Play only.[/b] Darktide uses dedicated servers, so gameplay mods only work when you host locally through [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]. This mod does [b]not[/b] affect public matchmaking.
 
@@ -18,13 +18,15 @@ They use combat abilities, throw grenades and blitzes, protect revives, ping thr
 
 [size=3][b]New in v0.11.0 — Combat Execution[/b][/size]
 
+Upgrading from v0.10? Highlights:
+
 [list]
-[*][b]Better grenade throws:[/b] gravity-affected grenades now aim like actual projectiles instead of lobbing at bad flat angles
-[*][b]Book mules:[/b] bots can carry scriptures and tomes; grimoires stay optional behind a setting
-[*][b]Better stream weapons:[/b] flamers, Purgatus, heavy stubbers, recon/autoguns, autopistols, bolter hipfire, and ripperguns now follow the correct fire path more reliably
-[*][b]More natural bot timing:[/b] human-likeness timing and pressure profiles now default to sensible [i]auto[/i] behavior based on difficulty
-[*][b]Steadier targeting:[/b] bots swap less erratically between melee and ranged priorities
-[*][b]Cleaner pickups:[/b] ammo handling is more reliable again, and grenade refill support is in
+[*][b]Grenade ballistics fixed:[/b] gravity-affected grenades now arc like projectiles instead of flat-lobbing into walls
+[*][b]Book mules:[/b] bots can carry scriptures and tomes; grimoires stay opt-in behind a setting
+[*][b]Held-fire weapons fixed:[/b] flamers, Purgatus, heavy stubbers, recon/autoguns, autopistols, bolter hipfire, and ripperguns now drive the correct sustained-fire input path (regression in v0.10)
+[*][b]Auto timing profiles:[/b] reaction time, ability jitter, and pressure leash now auto-scale with difficulty instead of needing manual tuning
+[*][b]Steadier target type selection:[/b] bots swap less erratically between melee and ranged priorities (hysteresis + momentum)
+[*][b]Pickup arbitration:[/b] bot ammo and grenade pickups honor human-first thresholds; grenade refill support added
 [/list]
 
 [size=3][b]What bots can use[/b][/size]
@@ -35,16 +37,17 @@ They use combat abilities, throw grenades and blitzes, protect revives, ping thr
 [*]Zealot: Fury of the Faithful, Shroudfield, relic
 [*]Psyker: Scrier's Gaze, Venting Shriek, Telekine Shield
 [*]Ogryn: Point-Blank Barrage, Bull Rush, Loyal Protector
-[*]Arbites: Castigator's Stance, Break the Line, Nuncio-Aquila, whistle, shock mine
+[*]Arbites: Castigator's Stance, Break the Line, Nuncio-Aquila
+[*]Hive Scum: Desperado (Focus), Rampage, Stimm Supply field — untested, DLC not owned
 [/list]
 
 [b]Grenades and blitzes[/b]
 [list]
-[*]Frag, krak, smoke, fire, shock, cluster, rock, flash, tox
+[*]Standard grenades: frag, krak, smoke, fire, shock, cluster, rock
 [*]Zealot Throwing Knives
 [*]Psyker Assail, Smite, Chain Lightning
 [*]Arbites whistle and shock mine
-[*]Hive Scum missile launcher support is included, but still needs DLC-side validation
+[*]Hive Scum Blinder, Chem, and Boom Bringer — untested, DLC not owned
 [/list]
 
 [size=3][b]What bots do better[/b][/size]
@@ -104,10 +107,10 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]Known issues[/b][/size]
 
 [list]
-[*]Daemonhost avoidance has improved, but it is still being watched after reports of rare edge cases with dormant daemonhosts
-[*]Mods are disabled after every Darktide update, so you will need to re-patch
-[*]Hive Scum ability support is still partly untested unless you own that DLC
-[*]Some item-style abilities still rely on template-specific handling, so future game patches can occasionally break a path until it is updated
+[*]Daemonhost avoidance has improved, but rare edge cases with dormant daemonhosts are still being watched
+[*]Mods are disabled after every Darktide update — re-patch via the toggle script
+[*]Hive Scum abilities and blitzes are implemented but unvalidated in-game (DLC not owned by the author)
+[*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after game patches until the path is updated
 [/list]
 
 [size=3][b]Planned next[/b][/size]
