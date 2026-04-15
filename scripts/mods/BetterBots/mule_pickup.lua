@@ -43,6 +43,37 @@ local function _pickups_registry()
 	return require("scripts/settings/pickup/pickups")
 end
 
+local function _ensure_mule_pickup_slots(bot_group)
+	if not bot_group then
+		return false
+	end
+
+	local available_mule_pickups = bot_group._available_mule_pickups
+	if not available_mule_pickups then
+		available_mule_pickups = {}
+		bot_group._available_mule_pickups = available_mule_pickups
+	end
+
+	local pickups = _pickups_registry()
+	local pickups_by_name = pickups and pickups.by_name
+	if not pickups_by_name then
+		return false
+	end
+
+	local changed = false
+	for _, pickup_data in pairs(pickups_by_name) do
+		if pickup_data and pickup_data.bots_mule_pickup then
+			local slot_name = pickup_data.slot_name or pickup_data.inventory_slot_name
+			if slot_name and available_mule_pickups[slot_name] == nil then
+				available_mule_pickups[slot_name] = {}
+				changed = true
+			end
+		end
+	end
+
+	return changed
+end
+
 local function _default_get_live_bot_groups()
 	local extension_manager = Managers and Managers.state and Managers.state.extension
 	if not extension_manager or type(extension_manager.system) ~= "function" then
@@ -329,7 +360,10 @@ function M.sync_live_bot_group(bot_group)
 		return false
 	end
 
-	local changed = _clear_cached_grimoire_pickups(bot_group)
+	local changed = _ensure_mule_pickup_slots(bot_group)
+	if _clear_cached_grimoire_pickups(bot_group) then
+		changed = true
+	end
 	local bot_data = (bot_group.data and bot_group:data()) or bot_group._bot_data
 	if not bot_data then
 		return changed
@@ -410,6 +444,11 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 end
 
 function M.install_bot_group_hooks(BotGroup)
+	_mod:hook_safe(BotGroup, "init", function(self)
+		M.patch_pickups()
+		_ensure_mule_pickup_slots(self)
+	end)
+
 	_mod:hook_safe(BotGroup, "_update_mule_pickups", function(self)
 		M.sync_live_bot_group(self)
 	end)

@@ -324,6 +324,37 @@ describe("mule_pickup", function()
 		assert.is_truthy(find_debug_log("cleared stale mule pickup ref"))
 	end)
 
+	it("backfills missing mule pickup slot tables during live sync", function()
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {},
+				data = function()
+					return {}
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.is_table(live_bot_groups.side_a._available_mule_pickups.slot_pocketable)
+	end)
+
+	it("backfills mule pickup slot tables after BotGroup init", function()
+		local BotGroup = {
+			init = function(self)
+				self._available_mule_pickups = {}
+			end,
+			_update_mule_pickups = function() end,
+		}
+		local instance = {}
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		BotGroup.init(instance)
+
+		assert.is_table(instance._available_mule_pickups.slot_pocketable)
+	end)
+
 	it("warns when the group system cannot be resolved", function()
 		_G.Managers = {
 			state = {
