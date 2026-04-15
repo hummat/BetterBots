@@ -322,13 +322,13 @@ function M.update(unit, blackboard)
 
 		if success then
 			_debug_log(
-				"ping_system",
+				"ping_system:" .. tostring(unit),
 				fixed_t,
 				string.format("bot %s pinged %s (reason: %s)", tostring(bot_slot), target_name, reason)
 			)
 		else
 			_debug_log(
-				"ping_system_fail",
+				"ping_system_fail:" .. tostring(unit),
 				fixed_t,
 				string.format("bot %s ping fail for %s: %s", tostring(bot_slot), target_name, tostring(err))
 			)

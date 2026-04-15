@@ -183,11 +183,9 @@ function M.make_player_locomotion_extension(overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_player_locomotion_extension", ext, overrides, {
+		current_velocity = true,
+	})
 
 	return ext
 end
@@ -199,11 +197,9 @@ function M.make_minion_locomotion_extension(current_velocity, overrides)
 		end,
 	}
 
-	if overrides then
-		for k, v in pairs(overrides) do
-			ext[k] = v
-		end
-	end
+	_apply_audited_overrides("make_minion_locomotion_extension", ext, overrides, {
+		current_velocity = true,
+	})
 
 	return ext
 end

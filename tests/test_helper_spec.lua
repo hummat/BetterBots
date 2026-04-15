@@ -17,6 +17,12 @@ describe("test_helper audited builders", function()
 				test_helper.make_minion_unit_data_extension(nil, { invented_api = function() end })
 			end,
 			function()
+				test_helper.make_player_locomotion_extension({ invented_api = function() end })
+			end,
+			function()
+				test_helper.make_minion_locomotion_extension(nil, { invented_api = function() end })
+			end,
+			function()
 				test_helper.make_player_ability_extension({
 					overrides = { invented_api = function() end },
 				})

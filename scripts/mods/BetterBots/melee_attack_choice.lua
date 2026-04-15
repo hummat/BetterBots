@@ -222,7 +222,10 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			and chosen == (weapon_template.attack_meta_data or {}).light_attack
 		then
 			_debug_log(
-				"melee_light_bias:" .. tostring(weapon_template.name or weapon_template.display_name or "weapon"),
+				"melee_light_bias:"
+					.. tostring(weapon_template.name or weapon_template.display_name or "weapon")
+					.. ":"
+					.. tostring(scratchpad),
 				_fixed_time(),
 				"melee light-bias selected light attack for unarmored horde target"
 			)
