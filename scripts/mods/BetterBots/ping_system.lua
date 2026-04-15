@@ -47,6 +47,12 @@ local function _is_elite_special_monster(unit)
 	return not not (breed.tags.elite or breed.tags.special or breed.tags.monster)
 end
 
+local function _has_live_companion(unit)
+	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
+
+	return companion_spawner_extension and companion_spawner_extension:should_have_companion() or false
+end
+
 local function _distance_sq_between_units(unit, target_unit)
 	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
 	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
@@ -163,6 +169,11 @@ function M.update(unit, blackboard)
 		local slot_name = PING_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
+			if _has_live_companion(unit) then
+				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
+				return
+			end
+
 			-- Candidate found, check if valid for pinging
 			local target_extension = ScriptUnit.has_extension(candidate, "smart_tag_system")
 			local already_tagged = target_extension and target_extension:tag_id()

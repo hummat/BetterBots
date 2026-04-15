@@ -18,8 +18,10 @@ local TAG_TEMPLATE = "enemy_companion_target"
 local TAG_SLOTS = { "priority_target_enemy", "opportunity_target_enemy", "urgent_target_enemy", "target_enemy" }
 local _last_tag_failure_t_by_bot = setmetatable({}, { __mode = "k" })
 local _last_tagged_target_by_bot = setmetatable({}, { __mode = "k" })
+local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
 local _smart_tag_system_warned = false
 local _tag_call_failed_warned = false
+local _missing_los_method_warned = false
 
 function M.init(deps)
 	_mod = deps.mod
@@ -33,6 +35,7 @@ function M.init(deps)
 	end
 	_smart_tag_system_warned = false
 	_tag_call_failed_warned = false
+	_missing_los_method_warned = false
 end
 
 local function _is_elite_special_monster(unit)
@@ -54,6 +57,45 @@ local function _target_name(target_unit)
 	local unit_data_ext = target_unit and ScriptUnit.has_extension(target_unit, "unit_data_system")
 	local breed = unit_data_ext and unit_data_ext:breed()
 	return breed and breed.name or tostring(target_unit)
+end
+
+local function _log_skip_once(unit, fixed_t, reason, target_unit)
+	if not _debug_enabled() then
+		return
+	end
+
+	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
+	local target_name = _target_name(target_unit)
+	local skip_key = reason .. ":" .. target_name
+
+	if _last_skip_log_key_by_bot[unit] == skip_key then
+		return
+	end
+
+	_last_skip_log_key_by_bot[unit] = skip_key
+	_debug_log(
+		"companion_tag_skip:" .. skip_key,
+		fixed_t,
+		string.format("bot %s skipped companion tag for %s (reason: %s)", tostring(bot_slot), target_name, reason)
+	)
+end
+
+local function _has_line_of_sight_to_candidate(unit, target_unit)
+	local target_perception_extension = ScriptUnit.has_extension(target_unit, "perception_system")
+	if not target_perception_extension then
+		return true
+	end
+
+	if target_perception_extension.has_line_of_sight then
+		return target_perception_extension:has_line_of_sight(unit)
+	end
+
+	if not _missing_los_method_warned and _mod and _mod.warning then
+		_missing_los_method_warned = true
+		_mod:warning("BetterBots: perception_system missing has_line_of_sight method for companion tagging")
+	end
+
+	return true
 end
 
 -- Check if target already has a companion-command tag from any Arbites bot.
@@ -166,6 +208,11 @@ function M.update(unit, blackboard)
 		local slot_name = TAG_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
+			if not _has_line_of_sight_to_candidate(unit, candidate) then
+				_log_skip_once(unit, fixed_t, "no_los", candidate)
+				goto continue
+			end
+
 			if hold_active and held_target and candidate == held_target then
 				hold_reason = slot_name
 				break
@@ -226,6 +273,7 @@ function M.update(unit, blackboard)
 			tagged_t = fixed_t,
 		}
 		_last_tag_failure_t_by_bot[unit] = nil
+		_last_skip_log_key_by_bot[unit] = nil
 	else
 		_last_tag_failure_t_by_bot[unit] = fixed_t
 		if not _tag_call_failed_warned and _mod and _mod.warning then

@@ -106,8 +106,12 @@ describe("companion_tag", function()
 				return test_helper.make_smart_tag_extension(existing_companion_tags[unit] or nil)
 			end
 			if ext == "perception_system" then
+				local has_los = opts.has_los
+				if opts.has_los_by_unit and opts.has_los_by_unit[unit] ~= nil then
+					has_los = opts.has_los_by_unit[unit]
+				end
 				return test_helper.make_minion_perception_extension({
-					has_line_of_sight = opts.has_los ~= false,
+					has_line_of_sight = has_los ~= false,
 				})
 			end
 			return nil
@@ -193,6 +197,27 @@ describe("companion_tag", function()
 		local blackboard = {
 			perception = {
 				priority_target_enemy = trash,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("does not companion-tag a target without line of sight", function()
+		local gunner = { name = "gunner_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[gunner] = { name = "chaos_ogryn_gunner", tags = { elite = true } },
+			},
+			has_los_by_unit = {
+				[gunner] = false,
+			},
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = gunner,
 			},
 		}
 
