@@ -34,6 +34,8 @@ local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
 local _bot_settings
 local PERF_SETTING_ID = "enable_perf_timing"
+local Settings
+local Sprint
 local TIMING_SETTING_IDS = {
 	human_timing_profile = true,
 	human_timing_reaction_min = true,
@@ -168,10 +170,16 @@ local function _is_suppressed(unit)
 		return remember(true, "moving_platform")
 	end
 
-	-- #17: daemonhost combat suppression is handled target-specifically in
-	-- condition_patch.lua (melee/ranged suppression when targeting a dormant DH).
-	-- Blanket proximity suppression was removed — it blocked abilities in mixed
-	-- encounters where bots fight other enemies near a sleeping daemonhost.
+	-- #17: keep offensive abilities and blitzes quiet when the bot is actually
+	-- inside the close daemonhost safety radius. This is intentionally tighter
+	-- than the sprint safety radius so bots still fight mixed encounters unless
+	-- they are crowding the sleeping daemonhost.
+	if
+		Settings.is_feature_enabled("daemonhost_avoidance")
+		and Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+	then
+		return remember(true, "daemonhost_nearby")
+	end
 
 	return remember(false)
 end
@@ -201,7 +209,7 @@ end
 local MetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/meta_data")
 assert(MetaData, "BetterBots: failed to load meta_data module")
 
-local Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
+Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
 assert(Settings, "BetterBots: failed to load settings module")
 
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
@@ -219,7 +227,7 @@ assert(EventLog, "BetterBots: failed to load event_log module")
 local Perf = mod:io_dofile("BetterBots/scripts/mods/BetterBots/perf")
 assert(Perf, "BetterBots: failed to load perf module")
 
-local Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
+Sprint = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sprint")
 assert(Sprint, "BetterBots: failed to load sprint module")
 
 local MeleeMetaData = mod:io_dofile("BetterBots/scripts/mods/BetterBots/melee_meta_data")
@@ -548,6 +556,9 @@ ConditionPatch.init({
 	shared_rules = SharedRules,
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
+	is_near_daemonhost = function(unit)
+		return Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
 	end,
 })
 

@@ -1448,6 +1448,37 @@ Run ID: 2026-04-15-v0.11.0-small-grenade-confirmation
 Date (local): 2026-04-15
 Date (UTC): 2026-04-15
 Git commit: dev/v0.11.0 working tree after grenade-pickup success logging and sticky reservation fixes
+
+### Run 2026-04-15-v0.11.0-daemonhost-regression-03
+
+```text
+Run ID: 2026-04-15-v0.11.0-daemonhost-regression-03
+Date (local): 2026-04-15
+Date (UTC): 2026-04-15
+Git commit: f7b3e18+ (stage-aware daemonhost branch before close-range suppression restore)
+Log file: console-2026-04-15-18.12.45-1f5fb20f-7bff-4a5a-a0b4-ce39ce25b999.log
+Bot lineup / abilities: mixed squad including psyker smite and zealot throwing knives
+Map + difficulty: live daemonhost encounter
+
+#17 daemonhost avoidance: FAIL
+- sleeping daemonhost spawned:
+  - `18:15:26.033 ... Spawned monster chaos_daemonhost successfully`
+- bots still used offensive abilities before reliable daemonhost suppression appeared:
+  - `18:15:31.776 ... grenade queued wield for psyker_smite (rule=grenade_smite_priority_target)`
+  - repeated `grenade charge consumed for zealot_throwing_knives`
+- later evidence showed the branch could identify the daemonhost correctly once state had caught up:
+  - `18:15:51.353 [target_daemonhost_stage] = 6`
+  - `18:15:51.354 [target_is_dormant_daemonhost] = false`
+  - `18:15:59.768 ... melee suppressed (target is dormant daemonhost)`
+  - `18:15:59.768 ... ranged suppressed (target is dormant daemonhost)`
+- conclusion:
+  - the stage-aware target gate was not enough
+  - offensive abilities were still allowed near a sleeping daemonhost before `target_enemy`/target-state suppression converged
+
+Follow-up fix staged after this run:
+- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
+- keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
+```
 Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
 Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
 Map + difficulty: live combat session

@@ -1,6 +1,7 @@
 -- Tests for condition_patch.lua daemonhost combat suppression wrappers (#17).
--- Verifies that melee/ranged combat is suppressed only when the bot's
--- current target IS a dormant daemonhost, not when any DH is nearby.
+-- Verifies that melee/ranged combat is suppressed when the bot is inside the
+-- close daemonhost safety radius, or when the current target IS a dormant
+-- daemonhost outside that radius.
 local test_helper = require("tests.test_helper")
 
 local _extensions = {}
@@ -10,6 +11,7 @@ local _debug_enabled_result = false
 local _fixed_time_value = 0
 local _game_object_ids = {}
 local _game_object_fields = {}
+local _is_near_daemonhost_result = false
 
 _G.ScriptUnit = {
 	has_extension = function(unit, system_name)
@@ -107,6 +109,9 @@ ConditionPatch.init({
 	fixed_time = function()
 		return _fixed_time_value
 	end,
+	is_near_daemonhost = function()
+		return _is_near_daemonhost_result
+	end,
 	is_suppressed = function()
 		return false
 	end,
@@ -196,6 +201,7 @@ local function reset()
 	_debug_logs = {}
 	_debug_enabled_result = false
 	_fixed_time_value = 0
+	_is_near_daemonhost_result = false
 end
 
 local function find_debug_log(pattern)
@@ -236,6 +242,9 @@ describe("condition_patch", function()
 			end,
 			fixed_time = function()
 				return _fixed_time_value
+			end,
+			is_near_daemonhost = function()
+				return _is_near_daemonhost_result
 			end,
 			is_suppressed = function()
 				return false
@@ -402,12 +411,10 @@ describe("condition_patch", function()
 	end)
 
 	describe("combat wrapper integration", function()
-		it("allows melee against non-DH target with sleeping DH nearby", function()
-			-- Bot targets a poxwalker. A sleeping DH is nearby but not the target.
+		it("suppresses melee against non-DH target when inside daemonhost safety radius", function()
 			local target = "poxwalker1"
-			local dh = "dh_sleeping"
 			setup_breed(target, "chaos_poxwalker")
-			setup_breed(dh, "chaos_daemonhost")
+			_is_near_daemonhost_result = true
 
 			local bb = make_blackboard(target)
 			local melee_called = false
@@ -424,8 +431,8 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
-			assert.is_true(result)
-			assert.is_true(melee_called)
+			assert.is_false(result)
+			assert.is_false(melee_called)
 		end)
 
 		it("suppresses melee against dormant daemonhost target", function()
@@ -514,6 +521,9 @@ describe("condition_patch", function()
 				fixed_time = function()
 					return 0
 				end,
+				is_near_daemonhost = function()
+					return true
+				end,
 				is_suppressed = function()
 					return false
 				end,
@@ -568,6 +578,9 @@ describe("condition_patch", function()
 				fixed_time = function()
 					return 0
 				end,
+				is_near_daemonhost = function()
+					return _is_near_daemonhost_result
+				end,
 				is_suppressed = function()
 					return false
 				end,
@@ -606,9 +619,10 @@ describe("condition_patch", function()
 			assert.is_false(orig_called)
 		end)
 
-		it("allows ranged against non-DH target near sleeping DH", function()
+		it("suppresses ranged against non-DH target when inside daemonhost safety radius", function()
 			local target = "gunner1"
 			setup_breed(target, "renegade_gunner")
+			_is_near_daemonhost_result = true
 
 			local bb = make_blackboard(target)
 			bb.perception.target_enemy_type = "ranged"
@@ -626,8 +640,8 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, {}, {}, false)
-			assert.is_true(result)
-			assert.is_true(orig_called)
+			assert.is_false(result)
+			assert.is_false(orig_called)
 		end)
 
 		it("uses the configured ammo threshold for opportunistic ranged fire", function()

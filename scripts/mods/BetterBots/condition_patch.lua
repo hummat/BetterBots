@@ -29,6 +29,7 @@ local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local _bot_ranged_ammo_threshold
 local _is_non_aggroed_daemonhost
+local _is_near_daemonhost
 
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
@@ -58,6 +59,11 @@ local function _is_dormant_daemonhost_target(_unit, blackboard) -- luacheck: ign
 	local target_bb = BLACKBOARDS and BLACKBOARDS[target_enemy]
 	local target_perception = target_bb and target_bb.perception
 	return not (target_perception and target_perception.aggro_state == "aggroed")
+end
+
+local function _is_close_to_dormant_daemonhost(unit)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	return dh_avoidance and _is_near_daemonhost and _is_near_daemonhost(unit) or false
 end
 
 local RESCUE_CHARGE_RULES = {
@@ -406,10 +412,11 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat when the bot's current target IS a
-	-- non-aggroed daemonhost. Target-specific (not proximity-based) so bots
-	-- can still fight hordes/specials in mixed encounters near a sleeping DH.
-	-- Gated by daemonhost_avoidance setting (#81).
+	-- #17: suppress melee/ranged combat when the bot is inside the close
+	-- daemonhost safety radius, or when its current target IS a non-aggroed
+	-- daemonhost outside that radius. The proximity gate is intentionally
+	-- tight (Sprint.DAEMONHOST_COMBAT_RANGE_SQ) so bots still fight mixed
+	-- encounters unless they are actually crowding the sleeping DH.
 	local orig_bot_in_melee_range = conditions.bot_in_melee_range
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -423,6 +430,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					nil,
 					"info"
 				)
+			end
+			if _is_close_to_dormant_daemonhost(unit) then
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_melee_nearby:" .. tostring(unit),
+						_fixed_time(),
+						"melee suppressed (daemonhost nearby)"
+					)
+				end
+				return false
 			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
@@ -449,6 +466,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			is_running
 		)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+			if _is_close_to_dormant_daemonhost(unit) then
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_ranged_nearby:" .. tostring(unit),
+						_fixed_time(),
+						"ranged suppressed (daemonhost nearby)"
+					)
+				end
+				return false
+			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
 					_debug_log(
@@ -583,6 +610,7 @@ function M.init(deps)
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	_is_near_daemonhost = deps.is_near_daemonhost
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES

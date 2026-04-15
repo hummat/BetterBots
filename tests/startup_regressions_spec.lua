@@ -165,6 +165,17 @@ describe("startup regressions", function()
 		assert.is_truthy(init_block:find("perf%s*=%s*Perf", 1))
 	end)
 
+	it("restores close-range daemonhost suppression for ability activation", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local condition_init_block = assert(source:match("ConditionPatch%.init%(%{%s*(.-)%s*%}%)"))
+
+		assert.is_truthy(source:find("Sprint%.is_near_daemonhost%(unit, Sprint%.DAEMONHOST_COMBAT_RANGE_SQ%)", 1))
+		assert.is_truthy(condition_init_block:find("is_near_daemonhost%s*=%s*function%(unit%)", 1))
+		assert.is_truthy(
+			condition_init_block:find("Sprint%.is_near_daemonhost%(unit, Sprint%.DAEMONHOST_COMBAT_RANGE_SQ%)", 1)
+		)
+	end)
+
 	it("suppresses auto perf dumps when no bot frames were sampled", function()
 		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 		local auto_dump = assert(source:match("local function _auto_dump_perf_report%(%)%s*(.-)%s*end"))
