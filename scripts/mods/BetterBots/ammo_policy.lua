@@ -13,6 +13,7 @@ local _nearby_grenade_pickups
 local _is_enabled
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
+local _last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local PICKUP_BROADPHASE_CATEGORY = {
@@ -60,6 +61,20 @@ end
 
 local function _clear_grenade_skip_log_state(unit)
 	_last_grenade_skip_log_state_by_unit[unit] = nil
+end
+
+local function _clear_ammo_pickup_log_state(unit)
+	_last_ammo_pickup_log_state_by_unit[unit] = nil
+end
+
+local function _ammo_pickup_log_state_changed(unit, state)
+	if _last_ammo_pickup_log_state_by_unit[unit] == state then
+		return false
+	end
+
+	_last_ammo_pickup_log_state_by_unit[unit] = state
+
+	return true
 end
 
 local function _log_grenade_skip_once(unit, reason, message, ability_extension)
@@ -438,6 +453,7 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
+	_last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 	_last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 	_last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 end
@@ -490,6 +506,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local pickup_component = self._pickup_component
 		local bot_group = self._bot_group
 		if _is_enabled and not _is_enabled() then
+			_clear_ammo_pickup_log_state(unit)
 			_clear_grenade_skip_log_state(unit)
 			if _clear_reserved_grenade_pickup_if_present(bot_group, unit, pickup_component) then
 				_clear_grenade_pickup_log_state(unit)
@@ -503,6 +520,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		local perf_t0 = _perf and _perf.begin()
 		if not pickup_component then
+			_clear_ammo_pickup_log_state(unit)
 			_clear_grenade_skip_log_state(unit)
 			_clear_grenade_pickup_log_state(unit)
 			_log("ammo_pickup_skip_no_component:" .. tostring(unit), "ammo policy skipped: no pickup_component")
@@ -517,6 +535,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local has_external_ammo_pickup_order = pickup_order_unit ~= nil and pickup_order_unit ~= reserved_grenade_pickup
 
 		if has_external_ammo_pickup_order then
+			_clear_ammo_pickup_log_state(unit)
 			_clear_grenade_skip_log_state(unit)
 			_clear_grenade_pickup_log_state(unit)
 			pickup_component.needs_ammo = true
@@ -527,25 +546,32 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
+		local bot_ammo_percentage = _current_ammo_percentage(unit)
+		local bot_needs_grenade_refill = _needs_ammo_pickup_for_grenade_refill(unit)
+		local bot_needs_ammo = (bot_ammo_percentage ~= nil and bot_ammo_percentage < 1) or bot_needs_grenade_refill
 		local humans_ok =
 			_all_eligible_humans_above_threshold(self._side and self._side.valid_human_units, _human_threshold())
 
-		if humans_ok then
+		if not bot_needs_ammo then
+			pickup_component.needs_ammo = false
+			_clear_ammo_pickup_log_state(unit)
+		elseif humans_ok then
 			pickup_component.needs_ammo = true
-			_log("ammo_pickup_allow:" .. tostring(unit), "ammo pickup permitted: all eligible humans above reserve")
+			if _ammo_pickup_log_state_changed(unit, "allow") then
+				_log("ammo_pickup_allow:" .. tostring(unit), "ammo pickup permitted: all eligible humans above reserve")
+			end
 		else
-			local bot_ammo_percentage = _Ammo.current_total_percentage(unit)
 			local bot_threshold = _bot_threshold()
-			local bot_desperate = bot_ammo_percentage <= bot_threshold
+			local bot_desperate = bot_ammo_percentage ~= nil and bot_ammo_percentage <= bot_threshold
 			pickup_component.needs_ammo = bot_desperate
-			if bot_desperate then
+			if bot_desperate and _ammo_pickup_log_state_changed(unit, "desperate") then
 				_log(
 					"ammo_pickup_desperate:" .. tostring(unit),
 					"ammo pickup permitted: bot desperate ("
 						.. string.format("%.0f%% <= %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
 						.. ") despite human reserve low"
 				)
-			else
+			elseif not bot_desperate and _ammo_pickup_log_state_changed(unit, "defer") then
 				_log(
 					"ammo_pickup_defer:" .. tostring(unit),
 					"ammo pickup deferred to human ("

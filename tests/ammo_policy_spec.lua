@@ -43,7 +43,7 @@ describe("ammo_policy", function()
 			debug_enabled = function()
 				return overrides and overrides.debug_enabled or false
 			end,
-			fixed_time = function()
+			fixed_time = overrides and overrides.fixed_time or function()
 				return 100
 			end,
 			perf = nil,
@@ -402,14 +402,16 @@ describe("ammo_policy", function()
 	end)
 
 	it("reuses human ammo scan for bots on the same side in the same frame", function()
-		local uses_ammo_calls = 0
+		local human_uses_ammo_calls = 0
 		install_module({
 			ammo_module = {
 				current_total_percentage = function()
 					return 0.95
 				end,
-				uses_ammo = function()
-					uses_ammo_calls = uses_ammo_calls + 1
+				uses_ammo = function(unit)
+					if unit == "human1" then
+						human_uses_ammo_calls = human_uses_ammo_calls + 1
+					end
 					return true
 				end,
 			},
@@ -447,7 +449,7 @@ describe("ammo_policy", function()
 		update_hook(self_a, "bot1")
 		update_hook(self_b, "bot2")
 
-		assert.equals(1, uses_ammo_calls)
+		assert.equals(1, human_uses_ammo_calls)
 	end)
 
 	it("allows bot to top off when all humans are above reserve", function()
@@ -706,6 +708,171 @@ describe("ammo_policy", function()
 
 		assert.is_true(self._pickup_component.needs_ammo)
 		assert.is_truthy(find_debug_log("ammo pickup permitted: all eligible humans above reserve"))
+	end)
+
+	it("does not keep requesting ammo when the bot is already full", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function()
+					return 1.05
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						get_current_grenade_ability_name = function()
+							return "frag_grenade"
+						end,
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+					}
+				end
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = true },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_false(self._pickup_component.needs_ammo)
+		assert.is_nil(find_debug_log("ammo pickup permitted: all eligible humans above reserve"))
+	end)
+
+	it("still allows ammo pickups for bot knife refills when ranged ammo is full", function()
+		install_module({
+			debug_enabled = true,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 1.0 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						get_current_grenade_ability_name = function()
+							return "zealot_throwing_knives"
+						end,
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 4
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 12
+						end,
+					}
+				end
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_true(self._pickup_component.needs_ammo)
+		assert.is_truthy(find_debug_log("ammo pickup permitted: all eligible humans above reserve"))
+	end)
+
+	it("dedupes stable ammo pickup state logs until the state changes", function()
+		local human_ammo_pct = 0.95
+		local fixed_t = 100
+
+		install_module({
+			debug_enabled = true,
+			fixed_time = function()
+				return fixed_t
+			end,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					if unit == "bot1" then
+						return 0.50
+					end
+
+					return human_ammo_pct
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+		update_hook(self, "bot1")
+
+		assert.equals(1, count_debug_logs("ammo pickup permitted: all eligible humans above reserve"))
+
+		human_ammo_pct = 0.75
+		fixed_t = 101
+		update_hook(self, "bot1")
+		update_hook(self, "bot1")
+
+		assert.equals(1, count_debug_logs("ammo pickup deferred to human"))
 	end)
 
 	it("binds nearby grenade pickup when bot is empty and eligible humans are stocked", function()
