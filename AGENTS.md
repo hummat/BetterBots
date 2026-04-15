@@ -219,6 +219,8 @@ gh repo clone Aussiemon/Darktide-Source-Code ../Darktide-Source-Code -- --depth 
 
 **GitHub issues:** When asked to work on a GitHub issue (e.g. "implement #X", "fix #X"), always read the full issue including ALL comments before starting — not just the issue body. Comments accumulate design decisions, code review feedback, and implementation notes over time.
 
+**CLI failure handling:** If a critical CLI command fails in a way that looks like sandbox/network/auth-context breakage, retry it once with escalation before declaring the tool unavailable. This especially applies to `gh`: a sandboxed auth failure or API connection error is not evidence that GitHub is actually unreachable from the host.
+
 **Update after:** When your code change affects a documented fact, update the docs in the same commit. `make doc-check` catches stale heuristic function counts, module/spec inventory parity, and closed-issue references automatically, but semantic claims (tier status, capability descriptions, template names) require manual updates. Common triggers:
 
 | You just... | Update |
