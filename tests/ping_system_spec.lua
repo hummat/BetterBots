@@ -7,7 +7,8 @@ describe("ping_system", function()
 	local current_time = 0
 	local game_object_ids, game_object_fields
 
-	local function reinit_with_debug(enabled)
+	local function reinit_with_debug(enabled, opts)
+		opts = opts or {}
 		PingSystem.init({
 			mod = mod_mock,
 			debug_log = debug_log_mock,
@@ -18,6 +19,7 @@ describe("ping_system", function()
 			bot_slot_for_unit = function()
 				return 1
 			end,
+			has_recent_companion_target = opts.has_recent_companion_target,
 			shared_rules = SharedRules,
 		})
 	end
@@ -303,6 +305,48 @@ describe("ping_system", function()
 
 		PingSystem.update(bot_unit, blackboard)
 		assert.spy(set_contextual_unit_tag_mock).was_called(1)
+	end)
+
+	it("does not normal-ping a target that was recently companion-tagged", function()
+		local target = { name = "mutant" }
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		reinit_with_debug(false, {
+			has_recent_companion_target = function(candidate, fixed_t)
+				return candidate == target and fixed_t <= 2.0
+			end,
+		})
+
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "cultist_mutant",
+					tags = { special = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, {
+			perception = {
+				priority_target_enemy = target,
+			},
+		})
+
+		assert.spy(set_contextual_unit_tag_mock).was_not_called()
 	end)
 
 	it("holds the current tagged target instead of flipping to a new one", function()

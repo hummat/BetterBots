@@ -9,6 +9,7 @@ local _fixed_time
 local _bot_slot_for_unit
 local _bot_targeting
 local _is_daemonhost_avoidance_enabled
+local _has_recent_companion_target
 local _daemonhost_breed_names
 local _is_non_aggroed_daemonhost
 
@@ -36,6 +37,7 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_bot_targeting = deps.bot_targeting
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	_has_recent_companion_target = deps.has_recent_companion_target
 	local shared_rules = deps.shared_rules
 	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	_is_non_aggroed_daemonhost = shared_rules and shared_rules.is_non_aggroed_daemonhost or nil
@@ -227,6 +229,11 @@ function M.update(unit, blackboard)
 			if has_live_companion then
 				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
 				return
+			end
+
+			if _has_recent_companion_target and _has_recent_companion_target(candidate, fixed_t) then
+				_log_skip_once(unit, fixed_t, "recent_companion_tag", candidate)
+				goto continue
 			end
 
 			-- Candidate found, check if valid for pinging

@@ -599,6 +599,7 @@ PingSystem.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	bot_targeting = BotTargeting,
+	has_recent_companion_target = CompanionTag.is_recent_command_target,
 	shared_rules = SharedRules,
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")

@@ -85,6 +85,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
+| `skipped ping for <target> (reason: recent_companion_tag)` | Generic pinging backed off because an Arbites bot had just issued a mastiff smart-tag on the same target; use this when checking remaining tag-spam reports |
 | `melee suppressed (target is dormant daemonhost)` / `ranged suppressed (target is dormant daemonhost)` | Non-aggroed daemonhost combat suppression fired; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state` (#17) |
 | `skipped ping for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped companion tag for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped player-tag boost for chaos_daemonhost (reason: dormant_daemonhost)` | Stage-aware daemonhost avoidance suppressed pinging, mastiff smart-tagging, or human-tag score boosts on a non-aggroed daemonhost (#17) |
 | `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |

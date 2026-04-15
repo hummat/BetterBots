@@ -22,6 +22,7 @@ local TAG_SLOTS = { "priority_target_enemy", "opportunity_target_enemy", "urgent
 local _last_tag_failure_t_by_bot = setmetatable({}, { __mode = "k" })
 local _last_tagged_target_by_bot = setmetatable({}, { __mode = "k" })
 local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
+local _recent_command_target_until = setmetatable({}, { __mode = "k" })
 local _smart_tag_system_warned = false
 local _tag_call_failed_warned = false
 local _missing_los_method_warned = false
@@ -47,6 +48,7 @@ function M.init(deps)
 	_smart_tag_system_warned = false
 	_tag_call_failed_warned = false
 	_missing_los_method_warned = false
+	_recent_command_target_until = setmetatable({}, { __mode = "k" })
 end
 
 local function _is_elite_special_monster(unit)
@@ -129,6 +131,21 @@ local function _log_skip_once(unit, fixed_t, reason, target_unit)
 		fixed_t,
 		string.format("bot %s skipped companion tag for %s (reason: %s)", tostring(bot_slot), target_name, reason)
 	)
+end
+
+local function _mark_recent_command_target(target_unit, fixed_t)
+	if target_unit then
+		_recent_command_target_until[target_unit] = fixed_t + MIN_TAG_HOLD_S
+	end
+end
+
+function M.is_recent_command_target(target_unit, fixed_t)
+	if not target_unit then
+		return false
+	end
+
+	local hold_until_t = _recent_command_target_until[target_unit]
+	return hold_until_t ~= nil and fixed_t <= hold_until_t
 end
 
 local function _has_line_of_sight_to_candidate(unit, target_unit)
@@ -250,6 +267,10 @@ function M.update(unit, blackboard)
 	local held_target = current_tag and current_tag.target or nil
 	local held_slot_index = current_tag and current_tag.slot_index or nil
 
+	if hold_active and held_target then
+		_mark_recent_command_target(held_target, fixed_t)
+	end
+
 	-- Find highest-priority taggable target not already companion-tagged
 	local target_unit
 	local reason
@@ -328,6 +349,7 @@ function M.update(unit, blackboard)
 			target = target_unit,
 			tagged_t = fixed_t,
 		}
+		_mark_recent_command_target(target_unit, fixed_t)
 		_last_tag_failure_t_by_bot[unit] = nil
 		_last_skip_log_key_by_bot[unit] = nil
 	else

@@ -304,6 +304,27 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_not_called()
 	end)
 
+	it("marks a successfully commanded target as recently companion-tagged", function()
+		local mutant = { name = "mutant_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[mutant] = { name = "cultist_mutant", tags = { special = true } },
+			},
+		})
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = mutant,
+			},
+		})
+
+		assert.spy(set_tag_mock).was_called(1)
+		assert.is_true(CompanionTag.is_recent_command_target(mutant, current_time))
+
+		current_time = current_time + 2.1
+		assert.is_false(CompanionTag.is_recent_command_target(mutant, current_time))
+	end)
+
 	-- ── Target selection ──────────────────────────────────────────
 
 	it("tags highest-priority elite target with companion-command tag", function()
