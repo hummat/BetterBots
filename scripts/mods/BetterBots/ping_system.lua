@@ -47,10 +47,25 @@ local function _is_elite_special_monster(unit)
 	return not not (breed.tags.elite or breed.tags.special or breed.tags.monster)
 end
 
-local function _has_live_companion(unit)
-	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
+local function _has_live_companion(companion_spawner_extension)
+	if not (companion_spawner_extension and companion_spawner_extension:should_have_companion()) then
+		return false
+	end
 
-	return companion_spawner_extension and companion_spawner_extension:should_have_companion() or false
+	local companion_units = companion_spawner_extension.companion_units
+			and companion_spawner_extension:companion_units()
+		or nil
+	if not companion_units then
+		return false
+	end
+
+	for i = 1, #companion_units do
+		if Unit.alive(companion_units[i]) then
+			return true
+		end
+	end
+
+	return false
 end
 
 local function _distance_sq_between_units(unit, target_unit)
@@ -161,6 +176,9 @@ function M.update(unit, blackboard)
 		return
 	end
 
+	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
+	local has_live_companion = _has_live_companion(companion_spawner_extension)
+
 	local target_unit
 	local reason
 	local target_distance_sq
@@ -169,7 +187,7 @@ function M.update(unit, blackboard)
 		local slot_name = PING_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
-			if _has_live_companion(unit) then
+			if has_live_companion then
 				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
 				return
 			end

@@ -59,6 +59,25 @@ local function _target_name(target_unit)
 	return breed and breed.name or tostring(target_unit)
 end
 
+local function _has_live_companion(companion_ext)
+	if not (companion_ext and companion_ext:should_have_companion()) then
+		return false
+	end
+
+	local companion_units = companion_ext.companion_units and companion_ext:companion_units() or nil
+	if not companion_units then
+		return false
+	end
+
+	for i = 1, #companion_units do
+		if Unit.alive(companion_units[i]) then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function _log_skip_once(unit, fixed_t, reason, target_unit)
 	if not _debug_enabled() then
 		return
@@ -161,8 +180,8 @@ function M.update(unit, blackboard)
 		return
 	end
 
-	-- Guard: companion must be alive
-	if not companion_ext:should_have_companion() then
+	-- Guard: Arbites bot must currently have a live companion unit
+	if not _has_live_companion(companion_ext) then
 		return
 	end
 

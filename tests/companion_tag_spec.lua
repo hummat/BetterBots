@@ -225,6 +225,62 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_not_called()
 	end)
 
+	it("does not companion-tag while waiting for companion respawn", function()
+		local elite = { name = "elite_unit" }
+		local dead_companion = { name = "dead_mastiff" }
+		local set_tag_mock = spy.new(function() end)
+		local original_unit_alive = _G.Unit.alive
+		_G.Unit.alive = function(unit)
+			if unit == dead_companion then
+				return false
+			end
+			return original_unit_alive(unit)
+		end
+
+		_G.ScriptUnit.has_extension = function(unit, ext)
+			if unit == bot_unit and ext == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { dead_companion },
+				})
+			end
+			if ext == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_captain",
+					tags = { elite = true },
+				})
+			end
+			if ext == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			end
+			if ext == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return {
+					set_tag = set_tag_mock,
+					unit_tag = function()
+						return nil
+					end,
+				}
+			end
+			return nil
+		end
+
+		CompanionTag.update(bot_unit, {
+			perception = {
+				priority_target_enemy = elite,
+			},
+		})
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
 	-- ── Target selection ──────────────────────────────────────────
 
 	it("tags highest-priority elite target with companion-command tag", function()

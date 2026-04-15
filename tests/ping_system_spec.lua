@@ -232,6 +232,56 @@ describe("ping_system", function()
 		assert.spy(set_contextual_unit_tag_mock).was_not_called()
 	end)
 
+	it("still normal-pings when an Arbites bot is waiting for companion respawn", function()
+		local priority_target = { name = "priority" }
+		local dead_companion = { name = "dead_mastiff" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = priority_target,
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+		local original_unit_alive = _G.Unit.alive
+		_G.Unit.alive = function(unit)
+			if unit == dead_companion then
+				return false
+			end
+			return original_unit_alive(unit)
+		end
+
+		_G.ScriptUnit.has_extension = function(unit, extension_name)
+			if unit == bot_unit and extension_name == "companion_spawner_system" then
+				return test_helper.make_companion_spawner_extension({
+					should_have_companion = true,
+					companion_units = { dead_companion },
+				})
+			elseif extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_grenadier",
+					tags = { elite = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_called(1)
+	end)
+
 	it("holds the current tagged target instead of flipping to a new one", function()
 		local priority_target = { name = "priority" }
 		local opportunity_target = { name = "opportunity" }
