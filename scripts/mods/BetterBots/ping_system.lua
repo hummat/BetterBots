@@ -8,6 +8,8 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 local _bot_targeting
+local _is_daemonhost_avoidance_enabled
+local _daemonhost_breed_names
 
 local PING_FAILURE_BACKOFF_S = 2.0
 local DISTANCE_ESCALATION_RATIO = 0.5
@@ -17,6 +19,10 @@ local _last_skip_log_key_by_bot = setmetatable({}, { __mode = "k" })
 local _missing_los_method_warned = false
 local _smart_tag_system_warned = false
 local _ping_call_failed_warned = false
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
 
 -- Fallback; overwritten from bot_targeting.PERCEPTION_SLOTS in init().
 local PING_SLOTS = { "priority_target_enemy", "opportunity_target_enemy", "urgent_target_enemy", "target_enemy" }
@@ -28,6 +34,9 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_bot_targeting = deps.bot_targeting
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	local shared_rules = deps.shared_rules
+	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	if _bot_targeting and _bot_targeting.PERCEPTION_SLOTS then
 		PING_SLOTS = _bot_targeting.PERCEPTION_SLOTS
 	end
@@ -66,6 +75,27 @@ local function _has_live_companion(companion_spawner_extension)
 	end
 
 	return false
+end
+
+local function _is_dormant_daemonhost(target_unit)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if not (dh_avoidance and target_unit) then
+		return false
+	end
+
+	local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+	local breed = unit_data_extension and unit_data_extension:breed()
+	if not (breed and _daemonhost_breed_names and _daemonhost_breed_names[breed.name]) then
+		return false
+	end
+
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	if target_perception and target_perception.aggro_state == "aggroed" then
+		return false
+	end
+
+	return true
 end
 
 local function _distance_sq_between_units(unit, target_unit)
@@ -187,6 +217,11 @@ function M.update(unit, blackboard)
 		local slot_name = PING_SLOTS[i]
 		local candidate = perception[slot_name]
 		if candidate and Unit.alive(candidate) and _is_elite_special_monster(candidate) then
+			if _is_dormant_daemonhost(candidate) then
+				_log_skip_once(unit, fixed_t, "dormant_daemonhost", candidate)
+				goto continue
+			end
+
 			if has_live_companion then
 				_log_skip_once(unit, fixed_t, "companion_tag", candidate)
 				return
@@ -225,6 +260,8 @@ function M.update(unit, blackboard)
 				end
 			end
 		end
+
+		::continue::
 	end
 
 	if not target_unit then

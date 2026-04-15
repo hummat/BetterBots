@@ -479,6 +479,126 @@ describe("ping_system", function()
 		assert.spy(set_contextual_unit_tag_mock).was_not_called()
 	end)
 
+	it("does not ping a dormant daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "passive",
+				},
+			},
+		}
+
+		PingSystem.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "chaos_daemonhost",
+					tags = { monster = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_not_called()
+	end)
+
+	it("still pings an aggroed daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+
+		PingSystem.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+
+		_G.ScriptUnit.has_extension = function(_unit, extension_name)
+			if extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(nil)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "chaos_daemonhost",
+					tags = { monster = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+		assert.spy(set_contextual_unit_tag_mock).was_called(1)
+	end)
+
 	it("pings even if perception_system is missing", function()
 		local priority_target = { name = "priority" }
 		local blackboard = {

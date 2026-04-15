@@ -161,7 +161,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 ## Next Steps
 
-- **v0.11.0 is not ready to tag yet** — `make check` is green (`981 successes / 0 failures / 0 errors`), but the release still has open validation gates: `#32`, `#82`, `#90`, plus daemonhost re-validation on `#17`. `#82` no longer lacks live profiling data; it stays open because the latest real mission-end captures are still `99.1 us/bot/frame` and `109.3 us/bot/frame`, above the original `<80 us/bot/frame` target.
+- **v0.11.0 is not ready to tag yet** — `make check` is green (`987 successes / 0 failures / 0 errors`), but the release still has open validation gates: `#32`, `#82`, `#90`, plus daemonhost re-validation on `#17`. `#82` no longer lacks live profiling data; it stays open because the latest real mission-end captures are still `99.1 us/bot/frame` and `109.3 us/bot/frame`, above the original `<80 us/bot/frame` target.
 - **v0.10.0 released 2026-04-11** — all 6 issues validated, tagged, pushed, GitHub release + Nexus package ready.
 - **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 

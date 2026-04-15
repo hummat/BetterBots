@@ -340,6 +340,88 @@ describe("companion_tag", function()
 		assert.spy(set_tag_mock).was_called(1)
 	end)
 
+	it("does not companion-tag a dormant daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "passive",
+				},
+			},
+		}
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_not_called()
+	end)
+
+	it("still companion-tags an aggroed daemonhost when avoidance is enabled", function()
+		local daemonhost = { name = "daemonhost_unit" }
+		local set_tag_mock = setup_full_env({
+			breeds = {
+				[daemonhost] = { name = "chaos_daemonhost", tags = { monster = true } },
+			},
+		})
+
+		_G.BLACKBOARDS = {
+			[daemonhost] = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		}
+
+		CompanionTag.init({
+			mod = mod_mock,
+			debug_log = debug_log_mock,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = fixed_time_mock,
+			bot_slot_for_unit = function()
+				return 1
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+
+		local blackboard = {
+			perception = {
+				priority_target_enemy = daemonhost,
+			},
+		}
+
+		CompanionTag.update(bot_unit, blackboard)
+		assert.spy(set_tag_mock).was_called(1)
+	end)
+
 	it("follows ping slot priority order", function()
 		local low = { name = "low_priority" }
 		local high = { name = "high_priority" }

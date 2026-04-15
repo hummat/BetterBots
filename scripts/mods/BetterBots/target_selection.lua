@@ -24,6 +24,12 @@ local _cached_frame_t
 local _cached_tag_results
 local _cached_companion_pin_results
 local _cached_slot_ammo_pct
+local _is_daemonhost_avoidance_enabled
+local _daemonhost_breed_names
+local DAEMONHOST_BREED_NAMES = {
+	chaos_daemonhost = true,
+	chaos_mutator_daemonhost = true,
+}
 
 local function _reset_frame_caches(fixed_t)
 	if _cached_frame_t == fixed_t then
@@ -144,6 +150,31 @@ local function _is_monster_targeting_unit(target_unit, unit)
 	return enemy_perception and enemy_perception.aggro_state == "aggroed" and enemy_perception.target_unit == unit
 end
 
+local function _is_dormant_daemonhost_target(target_unit, target_breed)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if not (dh_avoidance and target_unit) then
+		return false
+	end
+
+	local breed = target_breed
+	if not breed then
+		local unit_data_extension = ScriptUnit.has_extension(target_unit, "unit_data_system")
+		breed = unit_data_extension and unit_data_extension:breed()
+	end
+
+	if not (breed and _daemonhost_breed_names and _daemonhost_breed_names[breed.name]) then
+		return false
+	end
+
+	local target_bb = BLACKBOARDS and BLACKBOARDS[target_unit]
+	local target_perception = target_bb and target_bb.perception
+	if target_perception and target_perception.aggro_state == "aggroed" then
+		return false
+	end
+
+	return true
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -152,6 +183,9 @@ function M.init(deps)
 	_perf = deps.perf
 	_player_tag_bonus = deps.player_tag_bonus
 	_special_chase_penalty_range = deps.special_chase_penalty_range
+	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	local shared_rules = deps.shared_rules
+	_daemonhost_breed_names = shared_rules and shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	_cached_chase_range_sq = nil
 	_cached_chase_range_t = nil
 	_cached_frame_t = nil
@@ -203,6 +237,19 @@ function M.register_hooks()
 					end
 				-- Issue #48: Boost score for player-tagged enemies
 				elseif score > 0 and _has_human_player_tag_cached(target_unit, fixed_t) then
+					if _is_dormant_daemonhost_target(target_unit, target_breed) then
+						if _debug_enabled() then
+							_debug_log(
+								"target_sel_tag_boost_skip:" .. tostring(target_unit) .. ":" .. tostring(unit),
+								_fixed_time(),
+								"skipped player-tag boost for "
+									.. tostring(target_breed.name)
+									.. " (reason: dormant_daemonhost)"
+							)
+						end
+						goto after_tag_boost
+					end
+
 					local tag_bonus = _player_tag_bonus and _player_tag_bonus() or 3
 					if tag_bonus > 0 then
 						score = score + tag_bonus
@@ -215,6 +262,7 @@ function M.register_hooks()
 						end
 					end
 				end
+				::after_tag_boost::
 
 				-- Issue #19: Stop chasing distant specials for melee
 				-- Cache chase_range_sq per frame to avoid per-target settings reads.

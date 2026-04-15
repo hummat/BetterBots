@@ -401,6 +401,74 @@ describe("TargetSelection", function()
 		assert.are.equal(5, score)
 	end)
 
+	it("does not boost score for a human-tagged dormant daemonhost when avoidance is enabled", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "passive",
+			},
+		}
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("still boosts score for a human-tagged aggroed daemonhost when avoidance is enabled", function()
+		local target_unit = {}
+		_G.BLACKBOARDS[target_unit] = {
+			perception = {
+				aggro_state = "aggroed",
+			},
+		}
+		_G.Managers.state.extension.system = function(_self, name)
+			if name == "smart_tag_system" then
+				return make_smart_tag_system(target_unit, true)
+			end
+		end
+
+		TargetSelection.init({
+			mod = _mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			is_daemonhost_avoidance_enabled = function()
+				return true
+			end,
+		})
+		TargetSelection.register_hooks()
+
+		local unit = { has_ammo = true }
+		local breed = { tags = { monster = true }, name = "chaos_daemonhost" }
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, target_unit, 100, breed, nil)
+		assert.are.equal(8, score)
+	end)
+
 	it("does not boost score when smart_tag_system is unavailable", function()
 		_G.Managers.state.extension.system = function()
 			return nil

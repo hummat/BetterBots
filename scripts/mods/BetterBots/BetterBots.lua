@@ -460,6 +460,10 @@ TargetSelection.init({
 	perf = Perf,
 	player_tag_bonus = Settings.player_tag_bonus,
 	special_chase_penalty_range = Settings.special_chase_penalty_range,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 Poxburster.init({
@@ -594,6 +598,10 @@ PingSystem.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	bot_targeting = BotTargeting,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 CompanionTag.init({
@@ -603,6 +611,10 @@ CompanionTag.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	bot_targeting = BotTargeting,
+	shared_rules = SharedRules,
+	is_daemonhost_avoidance_enabled = function()
+		return Settings.is_feature_enabled("daemonhost_avoidance")
+	end,
 })
 
 HealingDeferral.init({
