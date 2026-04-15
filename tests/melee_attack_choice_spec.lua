@@ -13,7 +13,10 @@ local function attack_meta(opts)
 		penetrating = opts.penetrating or false,
 		no_damage = opts.no_damage or false,
 		max_range = 2.5,
-		action_inputs = {},
+		action_inputs = opts.action_inputs or {
+			{ action_input = "start_attack", timing = 0 },
+			{ action_input = "light_attack", timing = 0 },
+		},
 	}
 end
 
@@ -78,7 +81,10 @@ describe("melee_attack_choice", function()
 		local MeleeAttackChoice = load_module()
 		local weapon_meta_data = {
 			light_attack = {
-				action_inputs = {},
+				action_inputs = {
+					{ action_input = "start_attack", timing = 0 },
+					{ action_input = "light_attack", timing = 0 },
+				},
 			},
 			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
 		}
@@ -86,6 +92,38 @@ describe("melee_attack_choice", function()
 		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, 1, 4, ARMORED)
 
 		assert.equals(weapon_meta_data.light_attack, chosen)
+	end)
+
+	it("backfills chosen attack entries with a safe max_range default", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			light_attack = {
+				action_inputs = {
+					{ action_input = "start_attack", timing = 0 },
+					{ action_input = "light_attack", timing = 0 },
+				},
+			},
+			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, 1, 4, ARMORED)
+
+		assert.equals(weapon_meta_data.light_attack, chosen)
+		assert.equals(2.5, chosen.max_range)
+	end)
+
+	it("skips malformed attack entries that cannot drive a bot attack", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			light_attack = {
+				max_range = 2.5,
+			},
+			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, 1, 4, ARMORED)
+
+		assert.equals(weapon_meta_data.heavy_attack, chosen)
 	end)
 
 	it("installs a _choose_attack hook via install_melee_hooks", function()
