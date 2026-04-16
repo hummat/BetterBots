@@ -839,16 +839,16 @@ ReviveAbility.register_hooks()
 -- and silently discards duplicates, so both handlers dispatch from a single
 -- hook here. One wrapper captures the pre-state (used by hysteresis) and then
 -- calls both post-process functions (#90).
-local _bot_perception_installed = setmetatable({}, { __mode = "k" })
+local PERCEPTION_DISPATCHER_SENTINEL = "__bb_perception_dispatcher_installed"
 local function _install_bot_perception_extension_hooks(BotPerceptionExtension)
-	if not BotPerceptionExtension or _bot_perception_installed[BotPerceptionExtension] then
+	if not BotPerceptionExtension or rawget(BotPerceptionExtension, PERCEPTION_DISPATCHER_SENTINEL) then
 		return
 	end
 	local original = BotPerceptionExtension._update_target_enemy
 	if type(original) ~= "function" then
 		return
 	end
-	_bot_perception_installed[BotPerceptionExtension] = true
+	BotPerceptionExtension[PERCEPTION_DISPATCHER_SENTINEL] = true
 
 	mod:hook(
 		BotPerceptionExtension,
@@ -1270,7 +1270,12 @@ mod:hook_require(
 -- BotBehaviorExtension: ADS gestalt injection (#35) + healing deferral (#39)
 -- + revive-candidate diagnostics (#7) + main update tick.
 -- Consolidated: multiple modules hook this path (#67).
+local BEHAVIOR_DISPATCHER_SENTINEL = "__bb_behavior_dispatcher_installed"
 mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_DISPATCHER_SENTINEL) then
+		return
+	end
+	BotBehaviorExtension[BEHAVIOR_DISPATCHER_SENTINEL] = true
 	local ok, err
 	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then

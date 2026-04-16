@@ -849,6 +849,55 @@ describe("startup regressions", function()
 		assert.equals(1, count)
 	end)
 
+	it("is idempotent on _update_target_enemy install across hot-reload (file re-execution)", function()
+		-- Simulates Ctrl+Shift+R: BetterBots.lua re-executes, module-level
+		-- locals reset, but BotPerceptionExtension class table persists.
+		-- Sentinel must live on the class, not in a module-level local.
+		local perception_ext = { _update_target_enemy = function() end }
+
+		local harness1 = make_bootstrap_harness()
+		harness1:load()
+		harness1:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", perception_ext)
+
+		local harness2 = make_bootstrap_harness()
+		harness2:load()
+		harness2:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", perception_ext)
+
+		local count = 0
+		for _, reg in ipairs(harness2.hook_registrations) do
+			if reg.target == perception_ext and reg.method == "_update_target_enemy" then
+				count = count + 1
+			end
+		end
+
+		assert.equals(0, count)
+	end)
+
+	it("is idempotent on _refresh_destination install across hot-reload (file re-execution)", function()
+		local behavior_ext = {
+			_refresh_destination = function() end,
+			_init_blackboard_components = function() end,
+			update = function() end,
+		}
+
+		local harness1 = make_bootstrap_harness()
+		harness1:load()
+		harness1:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
+
+		local harness2 = make_bootstrap_harness()
+		harness2:load()
+		harness2:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
+
+		local count = 0
+		for _, reg in ipairs(harness2.hook_registrations) do
+			if reg.target == behavior_ext and reg.method == "_refresh_destination" then
+				count = count + 1
+			end
+		end
+
+		assert.equals(0, count)
+	end)
+
 	it("fails bootstrap when a required module API is missing", function()
 		local harness = make_bootstrap_harness({
 			WeaponAction = {
