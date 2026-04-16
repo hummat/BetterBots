@@ -39,9 +39,11 @@ This mod targets bot ability activation in three paths:
    - prevents crash when bots wield plasma guns with nested threshold config
 9. Guards against perils achievement crash (via `weapon_action.lua`):
    - skips `WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement` when `account_id` is nil (bot crash guard)
-10. Per-template heuristics (via `heuristics.lua`):
+10. Per-template heuristics (via thin `heuristics.lua` dispatcher + split heuristic modules):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
+    - `heuristics_context.lua` owns `build_context()` and shared target/breed/resource helper functions
+    - `heuristics_veteran.lua`, `heuristics_zealot.lua`, `heuristics_psyker.lua`, `heuristics_ogryn.lua`, `heuristics_arbites.lua`, `heuristics_hive_scum.lua`, and `heuristics_grenade.lua` own the per-career and grenade/blitz trigger rules
     - `combat_ability_identity.lua` separates engine template identity (`ability_component.template_name`) from semantic ability identity (`ability_name` / `semantic_key`) so shared templates such as Veteran shout vs stance can route to different heuristics/settings without changing template-based engine lookups
     - `testing/aggressive/balanced/conservative` behavior presets: per-template threshold tables control when abilities fire (aggressive = early, conservative = emergency-only). Testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing hard safety/resource guards
     - `enemy_breed` export for breed classification

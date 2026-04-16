@@ -1101,14 +1101,14 @@ Map + difficulty: live mission, chaos_daemonhost spawned via monster pacing
     and can_activate_ability, bypassing those wrappers entirely.
 
 Root cause:
-- heuristics.lua:370-378 build_context set target_is_monster=true for DH
+- heuristics_context.lua `build_context()` set `target_is_monster=true` for DH
   (vanilla breed tag) with no daemonhost awareness.
-- heuristics.lua:1491 _grenade_priority_target used target_is_monster as a
+- heuristics_grenade.lua `_grenade_priority_target` used `target_is_monster` as a
   green-light priority-target signal without a DH carve-out. Fires for
   smite / psyker knives / vet krak / zealot knives / ogryn rock / broker missile.
-- heuristics.lua:1602 _grenade_assail monster fast-path same issue.
-- heuristics.lua:1052 _can_activate_adamant_stance monster_pressure same.
-- heuristics.lua:1314 _can_activate_drone monster_fight same.
+- heuristics_grenade.lua `_grenade_assail` monster fast-path same issue.
+- heuristics_arbites.lua `_can_activate_adamant_stance` monster_pressure same.
+- heuristics_arbites.lua `_can_activate_drone` monster_fight same.
 
 Fix staged (local, not yet pushed, not yet re-validated):
 - 03ce4fd fix(heuristics): refuse dormant daemonhost via target_is_dormant_daemonhost (#17)

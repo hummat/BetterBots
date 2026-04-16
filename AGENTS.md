@@ -187,7 +187,7 @@ The BT already has nodes for `activate_combat_ability` and `activate_grenade_abi
 
 1. **Tier 1 (whitelist removal):** Templates that already have `ability_meta_data` — just need the `else return false` removed. These work end-to-end with no other changes.
 2. **Tier 2 (meta_data injection):** Templates that exist but lack `ability_meta_data`. We inject it at load time (same pattern Tertium4Or5 uses for `attack_meta_data`).
-3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` with per-template heuristics (18 functions in `heuristics.lua`). Each ability has specific activate/block conditions based on health, toughness, peril, enemy composition, distance, and ally state. Unknown templates fall back to `enemies_in_proximity() > 0`.
+3. **Condition hook:** Replaces `bt_bot_conditions.can_activate_ability` with 18 per-template heuristics split across `heuristics_context.lua`, career-specific `heuristics_*.lua` modules, and `heuristics_grenade.lua`, with `heuristics.lua` as the thin public dispatcher. Each ability has specific activate/block conditions based on health, toughness, peril, enemy composition, distance, and ally state. Unknown templates fall back to `enemies_in_proximity() > 0`.
 
 ### Ability tiers
 
@@ -390,7 +390,15 @@ scripts/mods/BetterBots/
   condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
   ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
   combat_ability_identity.lua               # Semantic ability identity: shout vs stance routing for shared templates
-  heuristics.lua                            # 18 per-template heuristic functions + build_context()
+  heuristics.lua                            # Thin public API + dispatcher for split heuristic modules
+  heuristics_context.lua                    # Shared build_context() + target/breed helper functions
+  heuristics_veteran.lua                    # Veteran ability heuristics
+  heuristics_zealot.lua                     # Zealot ability heuristics
+  heuristics_psyker.lua                     # Psyker ability heuristics
+  heuristics_ogryn.lua                      # Ogryn ability heuristics
+  heuristics_arbites.lua                    # Arbites ability heuristics
+  heuristics_hive_scum.lua                  # Hive Scum ability heuristics
+  heuristics_grenade.lua                    # Grenade/blitz tactical evaluators
   meta_data.lua                             # ability_meta_data injection (Tier 2 templates + Veteran overrides)
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua                      # Grenade throw state machine (wield/aim/throw/unwield)

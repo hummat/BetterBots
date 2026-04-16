@@ -10,7 +10,7 @@
 - Published on Nexus Mods
 
 ### v0.2.0 (2026-03-06)
-- **Refactored** into sub-modules: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25/#26)
+- **Refactored** into sub-modules: thin `heuristics.lua` dispatcher + split `heuristics_context.lua` / `heuristics_*.lua`, plus `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25/#26)
 - **Per-career threat heuristics** (#2): 18 per-template heuristic functions (14 combat + 4 item)
 - **Rich context**: `build_context()` reads health, toughness, peril, challenge_rating_sum, breed tags, ally state, super armor
 

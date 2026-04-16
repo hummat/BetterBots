@@ -58,7 +58,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Hive Scum: Missile Launcher (DLC-blocked for validation)
 
 **Smart trigger conditions:**
-Bots use 18 per-ability heuristic functions to decide when to activate — based on enemy count, threat level, health/toughness, distance, ally state, and more. Each ability has specific activate/block conditions tuned per preset.
+Bots use 18 per-ability heuristic functions split across class-specific modules plus dedicated grenade/blitz evaluators — based on enemy count, threat level, health/toughness, distance, ally state, and more. Each ability has specific activate/block conditions tuned per preset.
 
 **Bot combat behavior:**
 - Sprint to catch up, rescue allies, and traverse
@@ -279,7 +279,15 @@ scripts/mods/BetterBots/          # Mod source
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
   combat_ability_identity.lua     #   Semantic ability identity (shout vs stance, etc.)
-  heuristics.lua                  #   18 per-ability trigger functions + context builder
+  heuristics.lua                  #   Thin public API + dispatcher for split heuristic modules
+  heuristics_context.lua          #   Shared context builder + target/breed helper functions
+  heuristics_veteran.lua          #   Veteran ability heuristics
+  heuristics_zealot.lua           #   Zealot ability heuristics
+  heuristics_psyker.lua           #   Psyker ability heuristics
+  heuristics_ogryn.lua            #   Ogryn ability heuristics
+  heuristics_arbites.lua          #   Arbites ability heuristics
+  heuristics_hive_scum.lua        #   Hive Scum ability heuristics
+  heuristics_grenade.lua          #   Grenade/blitz tactical evaluators
   meta_data.lua                   #   ability_meta_data injection at load time
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua            #   Grenade throw state machine (wield/aim/throw/unwield)

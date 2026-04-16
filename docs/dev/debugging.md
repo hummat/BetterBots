@@ -229,7 +229,7 @@ When debug logging is enabled, BetterBots emits a **one-shot context dump** the 
 
 ### What's testable outside the game
 
-The sub-module split (heuristics.lua, meta_data.lua, event_log.lua, etc.) created clean test seams. The 18 `_can_activate_*` heuristic functions (14 combat + 4 item) are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature. The `event_log` module is independently testable (buffer, flush, lifecycle, false-decision compression).
+The sub-module split (`heuristics.lua` dispatcher, `heuristics_context.lua`, the career-specific `heuristics_*.lua` files, `meta_data.lua`, `event_log.lua`, etc.) created clean test seams. The 18 `_can_activate_*` heuristic functions (14 combat + 4 item) are **pure functions** — they take a context table and return `(bool, string)` with zero engine dependencies. The `evaluate_heuristic(template_name, context, opts)` public API exposes them for testing without the ugly internal 10-param dispatch signature. The `event_log` module is independently testable (buffer, flush, lifecycle, false-decision compression).
 
 ### Test structure
 

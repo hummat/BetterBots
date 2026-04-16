@@ -13,7 +13,7 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Generic trigger: `enemies_in_proximity() > 0`
 
 ### v0.2.0 (2026-03-06)
-- Sub-module refactor: `heuristics.lua`, `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25)
+- Sub-module refactor: thin `heuristics.lua` dispatcher + split `heuristics_context.lua` / `heuristics_*.lua`, plus `meta_data.lua`, `item_fallback.lua`, `debug.lua` (#25)
 - Per-career threat heuristics (#2): 18 functions (14 combat + 4 item) with per-ability activate/hold rules
 - 142 unit tests via busted
 
