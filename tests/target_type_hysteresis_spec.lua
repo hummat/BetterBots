@@ -11,6 +11,62 @@ local function find_debug_log(logs, fragment)
 	return nil
 end
 
+local function with_global_overrides(overrides, callback)
+	local saved = {}
+	local keys = {}
+
+	for key, value in pairs(overrides) do
+		saved[key] = rawget(_G, key)
+		keys[#keys + 1] = key
+		rawset(_G, key, value)
+	end
+
+	local ok, result_or_err = xpcall(callback, debug.traceback)
+
+	for i = 1, #keys do
+		local key = keys[i]
+		rawset(_G, key, saved[key])
+	end
+
+	if not ok then
+		error(result_or_err, 0)
+	end
+
+	return result_or_err
+end
+
+describe("target_type_hysteresis test helpers", function()
+	it("restores globals after the callback throws", function()
+		local original_require = require
+		local original_script_unit = _G.ScriptUnit
+		local original_vector3 = _G.Vector3
+		local original_position_lookup = _G.POSITION_LOOKUP
+		local original_health_alive = _G.HEALTH_ALIVE
+
+		local ok, err = pcall(function()
+			with_global_overrides({
+				require = function()
+					return nil
+				end,
+				ScriptUnit = { fake = true },
+				Vector3 = { fake = true },
+				POSITION_LOOKUP = { fake = true },
+				HEALTH_ALIVE = { fake = true },
+			}, function()
+				error("boom")
+			end)
+		end)
+
+		assert.is_false(ok)
+		assert.matches("boom", tostring(err))
+		assert.equals(original_require, require)
+		assert.equals(original_script_unit, _G.ScriptUnit)
+		assert.equals(original_vector3, _G.Vector3)
+		assert.equals(original_position_lookup, _G.POSITION_LOOKUP)
+		assert.equals(original_health_alive, _G.HEALTH_ALIVE)
+	end)
+end)
+
 local function run_hooked_selection(opts)
 	opts = opts or {}
 
@@ -518,6 +574,147 @@ describe("target_type_hysteresis", function()
 		assert.equals(2, result.perception_component.target_enemy_distance)
 		assert.equals(1.3, result.perception_component.target_enemy_reevaluation_t)
 		assert.is_truthy(find_debug_log(result.debug_logs, "type hold melee over raw ranged"))
+	end)
+
+	it("eagerly patches an already-loaded target selection template", function()
+		local RuntimeHysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
+		local saved_require = require
+		local target_selection_template = {
+			bot_default = function(
+				_unit,
+				_unit_position,
+				_side,
+				perception_component,
+				_behavior_component,
+				_breed,
+				_target_units,
+				t
+			)
+				perception_component.target_enemy = "target_1"
+				perception_component.target_enemy_distance = 2
+				perception_component.target_enemy_type = "ranged"
+				perception_component.target_enemy_reevaluation_t = t
+			end,
+		}
+
+		with_global_overrides({
+			require = function(path)
+				if
+					path
+					== "scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template"
+				then
+					return target_selection_template
+				end
+
+				if path == "scripts/utilities/bot_target_selection" then
+					return {
+						opportunity_weight = function()
+							return 0
+						end,
+						priority_weight = function()
+							return 0
+						end,
+						monster_weight = function()
+							return 0
+						end,
+						current_target_weight = function()
+							return 0
+						end,
+						gestalt_weight = function()
+							return 0
+						end,
+						slot_weight = function()
+							return 10
+						end,
+						melee_distance_weight = function()
+							return 0
+						end,
+						ranged_distance_weight = function()
+							return 10.4
+						end,
+						line_of_sight_weight = function()
+							return 0
+						end,
+					}
+				end
+
+				if path == "scripts/utilities/breed" then
+					return {
+						is_player = function()
+							return false
+						end,
+					}
+				end
+
+				return saved_require(path)
+			end,
+			ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "target_1" and system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension({
+							name = "renegade_gunner",
+							not_bot_target = false,
+						})
+					end
+				end,
+			},
+			Vector3 = {
+				distance_squared = function()
+					return 4
+				end,
+			},
+			POSITION_LOOKUP = {
+				target_1 = { x = 1, y = 0, z = 0 },
+			},
+			HEALTH_ALIVE = {
+				target_1 = true,
+			},
+		}, function()
+			RuntimeHysteresis.init({
+				mod = {
+					hook_require = function() end,
+					warning = function() end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 1
+				end,
+				is_enabled = function()
+					return true
+				end,
+			})
+
+			RuntimeHysteresis.register_hooks()
+
+			local perception_component = {
+				target_enemy = nil,
+				target_enemy_type = "melee",
+				target_enemy_reevaluation_t = 0,
+				target_ally = nil,
+			}
+
+			target_selection_template.bot_default(
+				"bot_1",
+				{ x = 0, y = 0, z = 0 },
+				{ aggroed_minion_target_units = { target_1 = true } },
+				perception_component,
+				{
+					melee_gestalt = "linesman",
+					ranged_gestalt = "killshot",
+				},
+				nil,
+				{ "target_1" },
+				1,
+				{},
+				{},
+				nil
+			)
+
+			assert.equals("melee", perception_component.target_enemy_type)
+		end)
 	end)
 
 	it("warns once when post-process scoring fails and leaves the vanilla result intact", function()
