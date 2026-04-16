@@ -148,7 +148,7 @@ This mod targets bot ability activation in three paths:
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
 29. Target-type hysteresis (#90, via `target_type_hysteresis.lua`):
-    - wraps `bot_target_selection_template.bot_default` after vanilla scoring, leaving BT and weapon actions untouched
+    - hooks `BotPerceptionExtension._update_target_enemy` after vanilla target selection writes `perception_component`, leaving BT and weapon actions untouched
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip

@@ -1503,6 +1503,46 @@ Conclusion:
 - The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
 ```
 
+### Run 2026-04-16-v0.11.0-target-type-hysteresis-closure
+
+```text
+Run ID: 2026-04-16-v0.11.0-target-type-hysteresis-closure
+Date (local): 2026-04-16
+Date (UTC): 2026-04-16
+Git commit: main working tree after the BotPerceptionExtension._update_target_enemy hook fix and consolidated bot_perception_extension install
+Log file: console-2026-04-16-17.51.56-7d4a2e9c-1ea7-4dbf-a4f0-0337a9f5cd8a.log
+Bot lineup / abilities: mixed live squad including zealot relic, veteran shout, psyker shout, knives, frag grenades
+Map + difficulty: live combat session
+
+v0.11.0 evidence:
+- #90 target-type hysteresis: PASS
+  - math-layer runtime proof: yes
+  - perf row: yes
+  - key counts:
+    - `32` `type flip ...`
+    - `46` `type hold ...`
+    - `4` `suppressed opposite-type switch ...`
+    - `72` `wrong slot ...`
+  - key lines / timestamps:
+    - `17:55:47.689 ... type hold ranged over raw melee (melee=7.01, ranged=7.00)`
+    - `17:55:54.213 ... type flip ranged -> melee`
+    - `17:56:39.709 ... bot 3 suppressed opposite-type switch ranged -> melee (elapsed=0.02s)`
+    - `18:01:05.447 ... bb-perf:auto: target_type_hysteresis.post_process 143.000 ms total (11473 calls, 12.5 us/call)`
+  - conclusion:
+    - the hysteresis hook is now running on the correct live path
+    - raw melee/ranged flips are being both suppressed and allowed in real play
+    - the earlier startup-order / dead-hook failure mode is no longer present
+
+Other confirmations:
+- no crashes:
+  - `bb-log summary`: `Error lines: 0`
+- general perf snapshot:
+  - `18:01:05.447 ... bb-perf:auto: 113.8 µs/bot/frame total (80076 bot frames, 1022369 calls, 9111.000 ms total)`
+
+Conclusion:
+- #90 is closeable from this run.
+```
+
 ## Decision Rules
 
 1. Close `#1` only when every Tier 2 row that is not `N/A` is `PASS` in at least one documented run.

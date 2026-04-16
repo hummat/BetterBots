@@ -26,6 +26,8 @@ local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _resolve_decision_cache_by_unit = setmetatable({}, { __mode = "k" })
+local _resolve_decision_cache_hits_logged_by_unit = setmetatable({}, { __mode = "k" })
 local _suppression_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_emitted = false
 local _SNAPSHOT_INTERVAL_S = 30
@@ -388,6 +390,8 @@ MetaData.init({
 Heuristics.init({
 	fixed_time = _fixed_time,
 	decision_context_cache = _decision_context_cache_by_unit,
+	resolve_decision_cache = _resolve_decision_cache_by_unit,
+	resolve_decision_cache_hits_logged = _resolve_decision_cache_hits_logged_by_unit,
 	super_armor_breed_cache = _super_armor_breed_flag_by_name,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_testing_profile = Settings.is_testing_profile,
@@ -829,6 +833,42 @@ MulePickup.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()
+
+-- Consolidated bot_perception_extension hook_require: two modules hook this path.
+-- Keep one owner in BetterBots.lua so DMF doesn't silently clobber one callback
+-- with the other (#90).
+local function _install_bot_perception_extension_hooks(BotPerceptionExtension)
+	local ok, err
+	ok, err = pcall(TargetTypeHysteresis.install_bot_perception_hooks, BotPerceptionExtension)
+	if not ok then
+		mod:echo("BetterBots: target_type_hysteresis hook install failed: " .. tostring(err))
+	end
+	ok, err = pcall(Poxburster.install_bot_perception_hooks, BotPerceptionExtension)
+	if not ok then
+		mod:echo("BetterBots: poxburster perception hook install failed: " .. tostring(err))
+	end
+	if _debug_enabled() then
+		_debug_log(
+			"hook_require:bot_perception_extension",
+			0,
+			"installed consolidated bot_perception_extension hooks (target_type_hysteresis, poxburster)",
+			nil,
+			"info"
+		)
+	end
+end
+
+mod:hook_require(
+	"scripts/extension_systems/perception/bot_perception_extension",
+	_install_bot_perception_extension_hooks
+)
+
+do
+	local ok, BotPerceptionExtension = pcall(require, "scripts/extension_systems/perception/bot_perception_extension")
+	if ok and BotPerceptionExtension then
+		_install_bot_perception_extension_hooks(BotPerceptionExtension)
+	end
+end
 
 -- Consolidated bt_bot_melee_action hook_require: three modules hook this path.
 -- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod
@@ -1370,6 +1410,12 @@ function mod.on_game_state_changed(status, state)
 		end
 		for unit in pairs(_decision_context_cache_by_unit) do
 			_decision_context_cache_by_unit[unit] = nil
+		end
+		for unit in pairs(_resolve_decision_cache_by_unit) do
+			_resolve_decision_cache_by_unit[unit] = nil
+		end
+		for unit in pairs(_resolve_decision_cache_hits_logged_by_unit) do
+			_resolve_decision_cache_hits_logged_by_unit[unit] = nil
 		end
 		for unit in pairs(_suppression_cache_by_unit) do
 			_suppression_cache_by_unit[unit] = nil

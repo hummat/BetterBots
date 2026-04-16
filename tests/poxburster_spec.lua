@@ -65,7 +65,6 @@ describe("poxburster", function()
 		local saved_script_unit
 		local saved_position_lookup
 		local saved_vector3
-		local captured_hook_require
 		local captured_hook_safe
 		local debug_logs
 
@@ -74,7 +73,6 @@ describe("poxburster", function()
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_vector3 = rawget(_G, "Vector3")
 			debug_logs = {}
-			captured_hook_require = {}
 			captured_hook_safe = nil
 
 			_G.Vector3 = {
@@ -102,9 +100,6 @@ describe("poxburster", function()
 
 			Poxburster.init({
 				mod = {
-					hook_require = function(_self, path, callback)
-						captured_hook_require[path] = callback
-					end,
 					hook_safe = function(_self, _target, method_name, callback)
 						assert.equals("_update_target_enemy", method_name)
 						captured_hook_safe = callback
@@ -135,10 +130,9 @@ describe("poxburster", function()
 		end)
 
 		local function run_hook_with_target(slot_name)
-			Poxburster.register_hooks()
-			assert.is_not_nil(captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"])
-
-			captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"]({})
+			Poxburster.install_bot_perception_hooks({
+				_update_target_enemy = function() end,
+			})
 			assert.is_not_nil(captured_hook_safe)
 
 			local perception_component = {
@@ -458,20 +452,15 @@ describe("poxburster", function()
 		end)
 
 		describe("perception hook", function()
-			local captured_hook_require
 			local captured_hook_safe
 			local debug_logs
 
 			before_each(function()
 				debug_logs = {}
-				captured_hook_require = {}
 				captured_hook_safe = nil
 
 				Poxburster.init({
 					mod = {
-						hook_require = function(_self, path, callback)
-							captured_hook_require[path] = callback
-						end,
 						hook_safe = function(_self, _target, _method_name, callback)
 							captured_hook_safe = callback
 						end,
@@ -488,8 +477,9 @@ describe("poxburster", function()
 					end,
 				})
 
-				Poxburster.register_hooks()
-				captured_hook_require["scripts/extension_systems/perception/bot_perception_extension"]({})
+				Poxburster.install_bot_perception_hooks({
+					_update_target_enemy = function() end,
+				})
 			end)
 
 			it("does not suppress target_enemy when poxburster is in push range", function()

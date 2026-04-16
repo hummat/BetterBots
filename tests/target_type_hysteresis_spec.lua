@@ -76,23 +76,24 @@ local function run_hooked_selection(opts)
 	local saved_vector3 = _G.Vector3
 	local saved_position_lookup = _G.POSITION_LOOKUP
 	local saved_health_alive = _G.HEALTH_ALIVE
-	local target_selection_template
 	local warnings = {}
 	local debug_logs = {}
 	local perf_tags = {}
 	local perf_token = 0
 	local bot_selection = opts.bot_selection or {}
 	local enabled = opts.is_enabled
-
-	target_selection_template = {
-		bot_default = function(
-			_unit,
-			_unit_position,
-			_side,
+	local bot_perception_extension = {
+		_threat_units = opts.threat_units or {},
+		_update_target_enemy = function(
+			_self,
+			_self_unit,
+			_self_position,
 			perception_component,
 			_behavior_component,
-			_breed,
-			_target_units,
+			_enemies_in_proximity,
+			_side,
+			_bot_group,
+			_dt,
 			t
 		)
 			perception_component.target_enemy = opts.vanilla_target_enemy or "target_1"
@@ -170,14 +171,14 @@ local function run_hooked_selection(opts)
 
 	RuntimeHysteresis.init({
 		mod = {
-			hook_require = function(_, path, callback)
-				if
-					path
-					== "scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template"
-				then
-					callback(target_selection_template)
+			hook_require = function() end,
+			hook = function(_, target, method_name, handler)
+				local original = assert(target[method_name], "missing hook target method")
+				target[method_name] = function(...)
+					return handler(original, ...)
 				end
 			end,
+			hook_safe = function() end,
 			warning = function(_, message)
 				warnings[#warnings + 1] = message
 			end,
@@ -209,7 +210,7 @@ local function run_hooked_selection(opts)
 		},
 	})
 
-	RuntimeHysteresis.register_hooks()
+	RuntimeHysteresis.install_bot_perception_hooks(bot_perception_extension)
 
 	local perception_component = {
 		target_enemy = opts.previous_target_enemy,
@@ -218,24 +219,16 @@ local function run_hooked_selection(opts)
 		target_ally = nil,
 	}
 	local invoke_count = opts.repeat_calls or 1
+	local side = {
+		aggroed_minion_target_units = { target_1 = true },
+		ai_target_units = { "target_1" },
+	}
 
 	for _ = 1, invoke_count do
-		target_selection_template.bot_default(
-			"bot_1",
-			{ x = 0, y = 0, z = 0 },
-			{ aggroed_minion_target_units = { target_1 = true } },
-			perception_component,
-			{
-				melee_gestalt = "linesman",
-				ranged_gestalt = "killshot",
-			},
-			nil,
-			{ "target_1" },
-			opts.t or 1,
-			{},
-			{},
-			nil
-		)
+		bot_perception_extension:_update_target_enemy("bot_1", { x = 0, y = 0, z = 0 }, perception_component, {
+			melee_gestalt = "linesman",
+			ranged_gestalt = "killshot",
+		}, {}, side, {}, 0, opts.t or 1)
 	end
 
 	rawset(_G, "require", saved_require)
@@ -378,164 +371,42 @@ describe("target_type_hysteresis", function()
 	end)
 
 	it("records perf timing around post-process target-type stabilization", function()
-		local saved_require = require
-		local saved_script_unit = _G.ScriptUnit
-		local saved_vector3 = _G.Vector3
-		local saved_position_lookup = _G.POSITION_LOOKUP
-		local saved_health_alive = _G.HEALTH_ALIVE
-		local target_selection_template
-		local perf_tags = {}
-		local perf_token = 0
-
-		target_selection_template = {
-			bot_default = function(
-				_unit,
-				_unit_position,
-				_side,
-				perception_component,
-				_behavior_component,
-				_breed,
-				_target_units,
-				t
-			)
-				perception_component.target_enemy = "target_1"
-				perception_component.target_enemy_distance = 2
-				perception_component.target_enemy_type = "ranged"
-				perception_component.target_enemy_reevaluation_t = t
-			end,
-		}
-
-		rawset(_G, "require", function(path)
-			if path == "scripts/utilities/bot_target_selection" then
-				return {
-					opportunity_weight = function()
-						return 3
-					end,
-					priority_weight = function()
-						return 2
-					end,
-					monster_weight = function()
-						return 0
-					end,
-					current_target_weight = function()
-						return 1
-					end,
-					gestalt_weight = function(_, _, breed)
-						return breed.name == "renegade_gunner" and 10 or 0
-					end,
-					slot_weight = function()
-						return 1
-					end,
-					melee_distance_weight = function()
-						return 3
-					end,
-					ranged_distance_weight = function()
-						return 9
-					end,
-					line_of_sight_weight = function()
-						return 4
-					end,
-				}
-			end
-
-			if path == "scripts/utilities/breed" then
-				return {
-					is_player = function()
-						return false
-					end,
-				}
-			end
-
-			return saved_require(path)
-		end)
-
-		_G.ScriptUnit = {
-			has_extension = function(unit, system_name)
-				if unit == "target_1" and system_name == "unit_data_system" then
-					return test_helper.make_minion_unit_data_extension({
-						name = "renegade_gunner",
-						not_bot_target = false,
-					})
-				end
-			end,
-		}
-		_G.Vector3 = {
-			distance_squared = function()
-				return 4
-			end,
-		}
-		_G.POSITION_LOOKUP = {
-			target_1 = { x = 1, y = 0, z = 0 },
-		}
-		_G.HEALTH_ALIVE = {
-			target_1 = true,
-		}
-
-		Hysteresis.init({
-			mod = {
-				hook_require = function(_, path, callback)
-					if
-						path
-						== "scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template"
-					then
-						callback(target_selection_template)
-					end
+		local result = run_hooked_selection({
+			t = 1,
+			bot_selection = {
+				opportunity_weight = function()
+					return 3
 				end,
-				warning = function() end,
-			},
-			debug_log = function() end,
-			debug_enabled = function()
-				return false
-			end,
-			fixed_time = function()
-				return 5
-			end,
-			is_enabled = function()
-				return true
-			end,
-			perf = {
-				begin = function()
-					perf_token = perf_token + 1
-					return perf_token
+				priority_weight = function()
+					return 2
 				end,
-				finish = function(tag, token)
-					perf_tags[#perf_tags + 1] = { tag = tag, token = token }
+				monster_weight = function()
+					return 0
+				end,
+				current_target_weight = function()
+					return 1
+				end,
+				gestalt_weight = function(_, _, breed)
+					return breed.name == "renegade_gunner" and 10 or 0
+				end,
+				slot_weight = function()
+					return 1
+				end,
+				melee_distance_weight = function()
+					return 3
+				end,
+				ranged_distance_weight = function()
+					return 9
+				end,
+				line_of_sight_weight = function()
+					return 4
 				end,
 			},
 		})
 
-		Hysteresis.register_hooks()
-		target_selection_template.bot_default(
-			"bot_1",
-			{ x = 0, y = 0, z = 0 },
-			{ aggroed_minion_target_units = { target_1 = true } },
-			{
-				target_enemy = nil,
-				target_enemy_type = "melee",
-				target_enemy_reevaluation_t = 0,
-				target_ally = nil,
-			},
-			{
-				melee_gestalt = "linesman",
-				ranged_gestalt = "killshot",
-			},
-			nil,
-			{ "target_1" },
-			1,
-			{},
-			{},
-			nil
-		)
-
-		rawset(_G, "require", saved_require)
-		_G.ScriptUnit = saved_script_unit
-		_G.Vector3 = saved_vector3
-		_G.POSITION_LOOKUP = saved_position_lookup
-		_G.HEALTH_ALIVE = saved_health_alive
-
-		assert.equals(1, #perf_tags)
-		assert.equals("target_type_hysteresis.post_process", perf_tags[1].tag)
-		assert.equals(1, perf_tags[1].token)
+		assert.equals(1, #result.perf_tags)
+		assert.equals("target_type_hysteresis.post_process", result.perf_tags[1].tag)
+		assert.equals(1, result.perf_tags[1].token)
 	end)
 
 	it("handles near-zero and asymmetric score pairs", function()
@@ -576,18 +447,21 @@ describe("target_type_hysteresis", function()
 		assert.is_truthy(find_debug_log(result.debug_logs, "type hold melee over raw ranged"))
 	end)
 
-	it("eagerly patches an already-loaded target selection template", function()
+	it("eagerly patches an already-loaded BotPerceptionExtension", function()
 		local RuntimeHysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
 		local saved_require = require
-		local target_selection_template = {
-			bot_default = function(
-				_unit,
-				_unit_position,
-				_side,
+		local bot_perception_extension = {
+			_threat_units = {},
+			_update_target_enemy = function(
+				_self,
+				_self_unit,
+				_self_position,
 				perception_component,
 				_behavior_component,
-				_breed,
-				_target_units,
+				_enemies_in_proximity,
+				_side,
+				_bot_group,
+				_dt,
 				t
 			)
 				perception_component.target_enemy = "target_1"
@@ -599,11 +473,8 @@ describe("target_type_hysteresis", function()
 
 		with_global_overrides({
 			require = function(path)
-				if
-					path
-					== "scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template"
-				then
-					return target_selection_template
+				if path == "scripts/extension_systems/perception/bot_perception_extension" then
+					return bot_perception_extension
 				end
 
 				if path == "scripts/utilities/bot_target_selection" then
@@ -673,6 +544,13 @@ describe("target_type_hysteresis", function()
 			RuntimeHysteresis.init({
 				mod = {
 					hook_require = function() end,
+					hook = function(_, target, method_name, handler)
+						local original = assert(target[method_name], "missing hook target method")
+						target[method_name] = function(...)
+							return handler(original, ...)
+						end
+					end,
+					hook_safe = function() end,
 					warning = function() end,
 				},
 				debug_log = function() end,
@@ -687,7 +565,7 @@ describe("target_type_hysteresis", function()
 				end,
 			})
 
-			RuntimeHysteresis.register_hooks()
+			RuntimeHysteresis.install_bot_perception_hooks(bot_perception_extension)
 
 			local perception_component = {
 				target_enemy = nil,
@@ -696,22 +574,153 @@ describe("target_type_hysteresis", function()
 				target_ally = nil,
 			}
 
-			target_selection_template.bot_default(
-				"bot_1",
-				{ x = 0, y = 0, z = 0 },
-				{ aggroed_minion_target_units = { target_1 = true } },
+			bot_perception_extension:_update_target_enemy("bot_1", { x = 0, y = 0, z = 0 }, perception_component, {
+				melee_gestalt = "linesman",
+				ranged_gestalt = "killshot",
+			}, {}, {
+				aggroed_minion_target_units = { target_1 = true },
+				ai_target_units = { "target_1" },
+			}, {}, 0, 1)
+
+			assert.equals("melee", perception_component.target_enemy_type)
+		end)
+	end)
+
+	it("hooks BotPerceptionExtension._update_target_enemy for post-process stabilization", function()
+		local RuntimeHysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
+		local saved_require = require
+		local bot_perception_extension = {
+			_update_target_enemy = function(
+				_self,
+				_self_unit,
+				_self_position,
 				perception_component,
-				{
-					melee_gestalt = "linesman",
-					ranged_gestalt = "killshot",
-				},
-				nil,
-				{ "target_1" },
-				1,
-				{},
-				{},
-				nil
+				_behavior_component,
+				_enemies_in_proximity,
+				_side,
+				_bot_group,
+				_dt,
+				t
 			)
+				perception_component.target_enemy = "target_1"
+				perception_component.target_enemy_distance = 2
+				perception_component.target_enemy_type = "ranged"
+				perception_component.target_enemy_reevaluation_t = t
+			end,
+		}
+
+		with_global_overrides({
+			require = function(path)
+				if path == "scripts/utilities/bot_target_selection" then
+					return {
+						opportunity_weight = function()
+							return 0
+						end,
+						priority_weight = function()
+							return 0
+						end,
+						monster_weight = function()
+							return 0
+						end,
+						current_target_weight = function()
+							return 0
+						end,
+						gestalt_weight = function()
+							return 0
+						end,
+						slot_weight = function()
+							return 10
+						end,
+						melee_distance_weight = function()
+							return 0
+						end,
+						ranged_distance_weight = function()
+							return 10.4
+						end,
+						line_of_sight_weight = function()
+							return 0
+						end,
+					}
+				end
+
+				if path == "scripts/utilities/breed" then
+					return {
+						is_player = function()
+							return false
+						end,
+					}
+				end
+
+				return saved_require(path)
+			end,
+			ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "target_1" and system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension({
+							name = "renegade_gunner",
+							not_bot_target = false,
+						})
+					end
+				end,
+			},
+			Vector3 = {
+				distance_squared = function()
+					return 4
+				end,
+			},
+			POSITION_LOOKUP = {
+				target_1 = { x = 1, y = 0, z = 0 },
+			},
+			HEALTH_ALIVE = {
+				target_1 = true,
+			},
+		}, function()
+			RuntimeHysteresis.init({
+				mod = {
+					hook_require = function() end,
+					hook = function(_, target, method_name, handler)
+						local original = assert(target[method_name], "missing hook target method")
+						target[method_name] = function(...)
+							return handler(original, ...)
+						end
+					end,
+					hook_safe = function() end,
+					warning = function() end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 1
+				end,
+				is_enabled = function()
+					return true
+				end,
+				perf = {
+					begin = function()
+						return 1
+					end,
+					finish = function() end,
+				},
+			})
+
+			RuntimeHysteresis.install_bot_perception_hooks(bot_perception_extension)
+
+			local perception_component = {
+				target_enemy = nil,
+				target_enemy_type = "melee",
+				target_enemy_reevaluation_t = 0,
+				target_ally = nil,
+			}
+
+			bot_perception_extension:_update_target_enemy("bot_1", { x = 0, y = 0, z = 0 }, perception_component, {
+				melee_gestalt = "linesman",
+				ranged_gestalt = "killshot",
+			}, {}, {
+				aggroed_minion_target_units = { target_1 = true },
+				ai_target_units = { "target_1" },
+			}, {}, 0, 1)
 
 			assert.equals("melee", perception_component.target_enemy_type)
 		end)

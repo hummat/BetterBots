@@ -1193,5 +1193,109 @@ describe("condition_patch", function()
 			assert.equals("veteran_combat_ability_shout", recorded_team_key)
 			assert.is_true(result)
 		end)
+
+		it("loads and injects ability templates only once across repeated BT checks", function()
+			local unit = "bt_bot"
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "ogryn_taunt_shout" },
+				}),
+				ability_system = test_helper.make_player_ability_extension({
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								ogryn_taunt_shout = {
+									shout_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				}),
+			}
+
+			local inject_calls = 0
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return false, "hold", {}
+					end,
+				},
+				MetaData = {
+					inject = function()
+						inject_calls = inject_calls + 1
+					end,
+				},
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+
+			local ability_templates = {
+				ogryn_taunt_shout = {
+					ability_meta_data = {
+						activation = {
+							action_input = "shout_pressed",
+						},
+					},
+				},
+			}
+			local require_calls = 0
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					require_calls = require_calls + 1
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local blackboard = { behavior = {}, perception = {} }
+			local action_data = { ability_component_name = "combat_ability_action" }
+			local ok_first, first_result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				blackboard,
+				{},
+				{},
+				action_data,
+				false
+			)
+			local ok_second, second_result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				blackboard,
+				{},
+				{},
+				action_data,
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			assert.is_true(ok_first, "first can_activate_ability threw: " .. tostring(first_result))
+			assert.is_true(ok_second, "second can_activate_ability threw: " .. tostring(second_result))
+			assert.is_false(first_result)
+			assert.is_false(second_result)
+			assert.equals(1, require_calls)
+			assert.equals(1, inject_calls)
+		end)
 	end)
 end)

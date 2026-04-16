@@ -14,8 +14,7 @@ local _bot_slot_for_unit
 local _bot_target_selection
 local _breed
 local _warned_errors = {}
-local _patched_target_selection_templates = setmetatable({}, { __mode = "k" })
-local TARGET_SELECTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
+local BOT_PERCEPTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
 
 local function _load_runtime_deps()
 	if not _bot_target_selection then
@@ -320,152 +319,157 @@ function M.choose_target_type(current_type, melee_score, ranged_score)
 	return M.analyze_target_type_choice(current_type, melee_score, ranged_score).chosen_type
 end
 
-local function _install_target_selection_hook(target_selection_template)
-	if
-		_patched_target_selection_templates[target_selection_template]
-		or rawget(target_selection_template, TARGET_SELECTION_PATCH_SENTINEL)
-	then
+function M.install_bot_perception_hooks(BotPerceptionExtension)
+	if not BotPerceptionExtension or rawget(BotPerceptionExtension, BOT_PERCEPTION_PATCH_SENTINEL) then
 		return
 	end
 
-	local original = target_selection_template and target_selection_template.bot_default
+	local original = BotPerceptionExtension._update_target_enemy
 	if type(original) ~= "function" then
 		return
 	end
 
-	_patched_target_selection_templates[target_selection_template] = true
-	target_selection_template[TARGET_SELECTION_PATCH_SENTINEL] = true
+	BotPerceptionExtension[BOT_PERCEPTION_PATCH_SENTINEL] = true
 
-	target_selection_template.bot_default = function(
-		unit,
-		unit_position,
-		side,
-		perception_component,
-		behavior_component,
-		breed,
-		target_units,
-		t,
-		threat_units,
-		bot_group,
-		target_selection_debug_info_or_nil
-	)
-		local previous_target_enemy = perception_component.target_enemy
-		previous_target_enemy = HEALTH_ALIVE[previous_target_enemy] and previous_target_enemy or nil
-		local previous_target_type = perception_component.target_enemy_type
-		local previous_reevaluation_t = perception_component.target_enemy_reevaluation_t
-
-		original(
-			unit,
-			unit_position,
-			side,
+	_mod:hook(
+		BotPerceptionExtension,
+		"_update_target_enemy",
+		function(
+			func,
+			self,
+			self_unit,
+			self_position,
 			perception_component,
 			behavior_component,
-			breed,
-			target_units,
-			t,
-			threat_units,
+			enemies_in_proximity,
+			side,
 			bot_group,
-			target_selection_debug_info_or_nil
+			dt,
+			t
 		)
+			local previous_target_enemy = perception_component.target_enemy
+			previous_target_enemy = HEALTH_ALIVE[previous_target_enemy] and previous_target_enemy or nil
+			local previous_target_type = perception_component.target_enemy_type
+			local previous_reevaluation_t = perception_component.target_enemy_reevaluation_t
 
-		local perf_t0 = _perf and _perf.begin() or nil
-		local ok, err = pcall(function()
+			func(
+				self,
+				self_unit,
+				self_position,
+				perception_component,
+				behavior_component,
+				enemies_in_proximity,
+				side,
+				bot_group,
+				dt,
+				t
+			)
+
 			if _is_enabled and not _is_enabled() then
 				return
 			end
 
-			local reevaluation_view = {
-				target_enemy = previous_target_enemy,
-				target_enemy_type = previous_target_type,
-				target_enemy_reevaluation_t = previous_reevaluation_t,
-				target_ally = perception_component.target_ally,
-			}
-			local stabilized = _collect_stabilized_choice(
-				unit,
-				unit_position,
-				side,
-				reevaluation_view,
-				behavior_component,
-				target_units,
-				t,
-				threat_units,
-				bot_group,
-				previous_target_enemy
-			)
-
-			if not stabilized then
+			if
+				previous_target_type
+				and perception_component.target_enemy_type == previous_target_type
+				and previous_target_enemy
+				and perception_component.target_enemy == previous_target_enemy
+			then
 				return
 			end
 
-			perception_component.target_enemy = stabilized.target_enemy
-			perception_component.target_enemy_distance = stabilized.target_enemy_distance
-			perception_component.target_enemy_type = stabilized.target_enemy_type
+			local perf_t0 = _perf and _perf.begin() or nil
+			local ok, err = pcall(function()
+				local reevaluation_view = {
+					target_enemy = previous_target_enemy,
+					target_enemy_type = previous_target_type,
+					target_enemy_reevaluation_t = previous_reevaluation_t,
+					target_ally = perception_component.target_ally,
+				}
+				local stabilized = _collect_stabilized_choice(
+					self_unit,
+					self_position,
+					side,
+					reevaluation_view,
+					behavior_component,
+					side.ai_target_units,
+					t,
+					self._threat_units,
+					bot_group,
+					previous_target_enemy
+				)
 
-			if previous_target_type ~= stabilized.target_enemy_type and _debug_enabled and _debug_enabled() then
-				_debug_log(
-					"target_type_flip:" .. tostring(unit),
-					_fixed_time and _fixed_time() or t or 0,
-					"type flip " .. tostring(previous_target_type) .. " -> " .. tostring(stabilized.target_enemy_type),
-					nil,
-					"debug"
-				)
-			elseif stabilized.suppressed_raw_flip and previous_target_type and _debug_enabled and _debug_enabled() then
-				_debug_log(
-					"target_type_hold:" .. tostring(unit),
-					_fixed_time and _fixed_time() or t or 0,
-					"type hold "
-						.. tostring(previous_target_type)
-						.. " over raw "
-						.. tostring(stabilized.raw_target_enemy_type)
-						.. " (melee="
-						.. string.format("%.2f", stabilized.melee_score or 0)
-						.. ", ranged="
-						.. string.format("%.2f", stabilized.ranged_score or 0)
-						.. ")",
-					nil,
-					"debug"
-				)
+				if not stabilized then
+					return
+				end
+
+				perception_component.target_enemy = stabilized.target_enemy
+				perception_component.target_enemy_distance = stabilized.target_enemy_distance
+				perception_component.target_enemy_type = stabilized.target_enemy_type
+
+				if previous_target_type ~= stabilized.target_enemy_type and _debug_enabled and _debug_enabled() then
+					_debug_log(
+						"target_type_flip:" .. tostring(self_unit),
+						_fixed_time and _fixed_time() or t or 0,
+						"type flip "
+							.. tostring(previous_target_type)
+							.. " -> "
+							.. tostring(stabilized.target_enemy_type),
+						nil,
+						"debug"
+					)
+				elseif
+					stabilized.suppressed_raw_flip
+					and previous_target_type
+					and _debug_enabled
+					and _debug_enabled()
+				then
+					_debug_log(
+						"target_type_hold:" .. tostring(self_unit),
+						_fixed_time and _fixed_time() or t or 0,
+						"type hold "
+							.. tostring(previous_target_type)
+							.. " over raw "
+							.. tostring(stabilized.raw_target_enemy_type)
+							.. " (melee="
+							.. string.format("%.2f", stabilized.melee_score or 0)
+							.. ", ranged="
+							.. string.format("%.2f", stabilized.ranged_score or 0)
+							.. ")",
+						nil,
+						"debug"
+					)
+				end
+
+				if previous_target_enemy == nil or t > previous_reevaluation_t then
+					perception_component.target_enemy_reevaluation_t = t + REEVALUATION_INTERVAL_S
+				end
+			end)
+			if perf_t0 and _perf then
+				_perf.finish("target_type_hysteresis.post_process", perf_t0)
 			end
 
-			if previous_target_enemy == nil or t > previous_reevaluation_t then
-				perception_component.target_enemy_reevaluation_t = t + REEVALUATION_INTERVAL_S
+			if not ok then
+				local key = tostring(err)
+				if not _warned_errors[key] then
+					_warned_errors[key] = true
+					_mod:warning("TargetTypeHysteresis hook error (reported once per unique error): " .. key)
+				end
+				if _debug_enabled and _debug_enabled() then
+					_debug_log(
+						"target_type_hysteresis_error:" .. tostring(self_unit),
+						_fixed_time and _fixed_time() or t or 0,
+						key,
+						nil,
+						"debug"
+					)
+				end
 			end
-		end)
-		if perf_t0 and _perf then
-			_perf.finish("target_type_hysteresis.post_process", perf_t0)
 		end
-
-		if not ok then
-			local key = tostring(err)
-			if not _warned_errors[key] then
-				_warned_errors[key] = true
-				_mod:warning("TargetTypeHysteresis hook error (reported once per unique error): " .. key)
-			end
-			if _debug_enabled and _debug_enabled() then
-				_debug_log(
-					"target_type_hysteresis_error:" .. tostring(unit),
-					_fixed_time and _fixed_time() or t or 0,
-					key,
-					nil,
-					"debug"
-				)
-			end
-		end
-	end
+	)
 end
 
 function M.register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template",
-		_install_target_selection_hook
-	)
-
-	local ok, target_selection_template =
-		pcall(require, "scripts/extension_systems/perception/target_selection_templates/bot_target_selection_template")
-	if ok and target_selection_template then
-		_install_target_selection_hook(target_selection_template)
-	end
-
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_inventory_switch_action",
 		function(BtBotInventorySwitchAction)

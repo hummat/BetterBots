@@ -112,6 +112,8 @@ function M.make_split_heuristics_deps(overrides)
 			return 0
 		end,
 		decision_context_cache = {},
+		resolve_decision_cache = {},
+		resolve_decision_cache_hits_logged = {},
 		super_armor_breed_cache = {},
 		ARMOR_TYPE_SUPER_ARMOR = 6,
 		is_testing_profile = function()

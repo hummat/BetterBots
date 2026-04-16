@@ -324,6 +324,9 @@ local function make_bootstrap_harness(module_overrides)
 	})
 	modules.TargetSelection = make_runtime_module("TargetSelection", install_calls)
 	modules.Poxburster = make_runtime_module("Poxburster", install_calls, {
+		install_bot_perception_hooks = function(target)
+			record_install("Poxburster", "install_bot_perception_hooks", target)
+		end,
 		install_melee_hooks = function(target)
 			record_install("Poxburster", "install_melee_hooks", target)
 		end,
@@ -409,7 +412,11 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("HumanLikeness", "patch_bot_settings", target)
 		end,
 	})
-	modules.TargetTypeHysteresis = make_runtime_module("TargetTypeHysteresis", install_calls)
+	modules.TargetTypeHysteresis = make_runtime_module("TargetTypeHysteresis", install_calls, {
+		install_bot_perception_hooks = function(target)
+			record_install("TargetTypeHysteresis", "install_bot_perception_hooks", target)
+		end,
+	})
 	modules.EngagementLeash = make_runtime_module("EngagementLeash", install_calls, {
 		install_melee_hooks = function(target)
 			record_install("EngagementLeash", "install_melee_hooks", target)
@@ -780,17 +787,24 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
 			attack = function() end,
 		})
+		harness:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", {
+			_update_target_enemy = function() end,
+		})
 		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
 		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
 		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
 
 		assert.is_truthy(find_install_call(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Poxburster", "install_melee_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "Poxburster", "install_bot_perception_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "EngagementLeash", "install_melee_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "SustainedFire", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Sprint", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
+		assert.is_truthy(
+			find_install_call(harness.install_calls, "TargetTypeHysteresis", "install_bot_perception_hooks")
+		)
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
@@ -807,6 +821,7 @@ describe("startup regressions", function()
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
 			"scripts/extension_systems/group/bot_group",
 			"scripts/extension_systems/input/bot_unit_input",
+			"scripts/extension_systems/perception/bot_perception_extension",
 			"scripts/settings/ability/ability_templates/ability_templates",
 			"scripts/settings/bot/bot_settings",
 			"scripts/settings/equipment/weapon_templates/weapon_templates",

@@ -196,6 +196,107 @@ describe("resolve_decision", function()
 		end)
 	end)
 
+	describe("same-frame decision caching", function()
+		it("reuses veteran stance decisions for the same unit/template within one frame", function()
+			local vanilla_calls = 0
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					vanilla_calls = vanilla_calls + 1
+					return true
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability_stance")
+
+			local first_ok, first_rule =
+				resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+			local second_ok, second_rule =
+				resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+
+			assert.is_true(first_ok)
+			assert.is_true(second_ok)
+			assert.equals(first_rule, second_rule)
+			assert.equals(1, vanilla_calls)
+		end)
+
+		it("refreshes the cached decision when fixed_t advances", function()
+			local vanilla_calls = 0
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					vanilla_calls = vanilla_calls + 1
+					return true
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability_stance")
+
+			resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+			fixed_t = fixed_t + 1
+			resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+
+			assert.equals(2, vanilla_calls)
+		end)
+
+		it("does not reuse cached results across different templates in the same frame", function()
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					return true
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability_stance")
+
+			local veteran_ok, veteran_rule =
+				resolve("veteran_combat_ability", conditions, "shared_bot", nil, nil, nil, nil, false, ability_ext)
+			local psyker_ok, psyker_rule = resolve("psyker_shout", {}, "shared_bot", nil, nil, nil, nil, false, nil)
+
+			assert.is_true(veteran_ok)
+			assert.matches("veteran_stance", veteran_rule)
+			assert.is_false(psyker_ok)
+			assert.equals("psyker_shout_block_no_enemies", psyker_rule)
+		end)
+
+		it("logs a one-shot cache-hit signal when debug logging is enabled", function()
+			local debug_logs = {}
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return fixed_t
+				end,
+				decision_context_cache = {},
+				resolve_decision_cache = {},
+				resolve_decision_cache_hits_logged = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_enabled = function()
+					return true
+				end,
+				debug_log = function(key, log_fixed_t, message, _min_interval_s, level)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = log_fixed_t,
+						message = message,
+						level = level,
+					}
+				end,
+			})
+
+			local conditions = {
+				_can_activate_veteran_ranger_ability = function()
+					return true
+				end,
+			}
+			local ability_ext = helper.make_veteran_ability_extension("ranger", "veteran_combat_ability_stance")
+
+			resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+			resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+			resolve("veteran_combat_ability", conditions, "vet_bot", nil, nil, nil, nil, false, ability_ext)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("resolve_decision_cache_hit:veteran_combat_ability:vet_bot", debug_logs[1].key)
+			assert.equals(fixed_t, debug_logs[1].fixed_t)
+			assert.equals("debug", debug_logs[1].level)
+			assert.matches("resolve_decision cache hit veteran_combat_ability", debug_logs[1].message)
+		end)
+	end)
+
 	-- Issue #17: Verify build_context actually populates the
 	-- target_is_dormant_daemonhost flag from the target perception blackboard.
 	-- The heuristic carve-out tests in heuristics_spec.lua inject the flag

@@ -2,6 +2,11 @@ local _is_testing_profile
 local _context_module
 local _veteran_module
 local _is_monster_signal_allowed
+local _fixed_time
+local _debug_log
+local _debug_enabled
+local _resolve_decision_cache
+local _resolve_decision_cache_hits_logged
 local _template_heuristics = {}
 local _heuristic_thresholds = {}
 local _item_heuristics = {}
@@ -96,6 +101,31 @@ local function _apply_behavior_profile(can_activate, rule, context, opts)
 	return true, override_rule
 end
 
+local function _log_resolve_decision_cache_hit(unit, ability_template_name, fixed_t)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local logged_for_unit = _resolve_decision_cache_hits_logged and _resolve_decision_cache_hits_logged[unit]
+	if not logged_for_unit then
+		logged_for_unit = {}
+		_resolve_decision_cache_hits_logged[unit] = logged_for_unit
+	end
+
+	if logged_for_unit[ability_template_name] then
+		return
+	end
+
+	logged_for_unit[ability_template_name] = true
+	_debug_log(
+		"resolve_decision_cache_hit:" .. ability_template_name .. ":" .. tostring(unit),
+		fixed_t or 0,
+		"resolve_decision cache hit " .. tostring(ability_template_name) .. " (unit=" .. tostring(unit) .. ")",
+		nil,
+		"debug"
+	)
+end
+
 local function _evaluate_template_heuristic(
 	ability_template_name,
 	conditions,
@@ -147,6 +177,29 @@ local function resolve_decision(
 	is_running,
 	ability_extension
 )
+	local fixed_t = _fixed_time and _fixed_time() or nil
+	if fixed_t ~= nil and _resolve_decision_cache then
+		local cache_entry = _resolve_decision_cache[unit]
+		if not cache_entry or cache_entry.fixed_t ~= fixed_t then
+			cache_entry = {
+				fixed_t = fixed_t,
+				results = {},
+			}
+			_resolve_decision_cache[unit] = cache_entry
+		end
+
+		-- Cache at template granularity only. That is sufficient for the current
+		-- BT/fallback duplication because the heuristic dispatch is driven by the
+		-- template plus the per-frame build_context result. If future heuristics
+		-- start depending on scratchpad/condition_args/action_data/is_running in a
+		-- material way, this key must be widened or removed.
+		local cached = cache_entry.results[ability_template_name]
+		if cached then
+			_log_resolve_decision_cache_hit(unit, ability_template_name, fixed_t)
+			return cached.can_activate, cached.rule, cached.context
+		end
+	end
+
 	local context = _context_module.build_context(unit, blackboard)
 	local can_activate, rule = _evaluate_template_heuristic(
 		ability_template_name,
@@ -179,6 +232,15 @@ local function resolve_decision(
 	end
 
 	local profiled_can_activate, profiled_rule = _apply_behavior_profile(can_activate, rule, context)
+
+	if fixed_t ~= nil and _resolve_decision_cache then
+		local cache_entry = _resolve_decision_cache[unit]
+		cache_entry.results[ability_template_name] = {
+			can_activate = profiled_can_activate,
+			rule = profiled_rule,
+			context = context,
+		}
+	end
 
 	return profiled_can_activate, profiled_rule, context
 end
@@ -282,6 +344,11 @@ return {
 		_is_testing_profile = deps.is_testing_profile
 		_context_module = deps.context_module
 		_veteran_module = deps.veteran_module
+		_fixed_time = deps.fixed_time
+		_debug_log = deps.debug_log
+		_debug_enabled = deps.debug_enabled
+		_resolve_decision_cache = deps.resolve_decision_cache or {}
+		_resolve_decision_cache_hits_logged = deps.resolve_decision_cache_hits_logged or {}
 
 		_context_module.init({
 			fixed_time = deps.fixed_time,

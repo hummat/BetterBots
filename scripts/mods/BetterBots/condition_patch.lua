@@ -19,6 +19,8 @@ local _perf
 local _TeamCooldown
 local _combat_ability_identity
 local _is_team_cooldown_enabled
+local _ability_templates
+local _ability_templates_injected
 
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
@@ -136,6 +138,19 @@ local function _return_with_perf(perf_t0, ...)
 	return ...
 end
 
+local function _ability_templates_once()
+	if not _ability_templates then
+		_ability_templates = require("scripts/settings/ability/ability_templates/ability_templates")
+	end
+
+	if not _ability_templates_injected then
+		_MetaData.inject(_ability_templates)
+		_ability_templates_injected = true
+	end
+
+	return _ability_templates
+end
+
 local function _override_ranged_ammo_condition_args(unit, condition_args)
 	if not condition_args or condition_args.ammo_percentage ~= NORMAL_RANGED_AMMO_THRESHOLD then
 		return condition_args
@@ -233,8 +248,7 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return _return_with_perf(perf_t0, false)
 	end
 
-	local AbilityTemplates = require("scripts/settings/ability/ability_templates/ability_templates")
-	_MetaData.inject(AbilityTemplates)
+	local AbilityTemplates = _ability_templates_once()
 
 	local ability_template = rawget(AbilityTemplates, ability_template_name)
 	if not ability_template then
@@ -617,6 +631,8 @@ function M.init(deps)
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost
 	_last_target_type_switch_by_unit = setmetatable({}, { __mode = "k" })
+	_ability_templates = nil
+	_ability_templates_injected = false
 end
 
 function M.wire(deps)
