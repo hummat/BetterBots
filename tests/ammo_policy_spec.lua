@@ -2226,4 +2226,43 @@ describe("ammo_policy", function()
 
 		assert.is_truthy(find_debug_log("grenade pickup success: small_grenade (bot=4, charges=0->1/1)"))
 	end)
+
+	it("is idempotent against repeated install_interaction_hooks calls on the same target", function()
+		local ammo_percentage = { bot1 = 0.10 }
+
+		install_module({
+			debug_enabled = true,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot1" and 2 or nil
+			end,
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return ammo_percentage[unit] or 0
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function()
+				return nil
+			end,
+		})
+
+		local AmmunitionInteraction = {
+			stop = function(_self, _world, interactor_unit)
+				ammo_percentage[interactor_unit] = 0.55
+			end,
+		}
+		_G.Unit = {
+			get_data = function()
+				return "small_clip"
+			end,
+		}
+
+		AmmoPolicy.install_interaction_hooks(AmmunitionInteraction)
+		AmmoPolicy.install_interaction_hooks(AmmunitionInteraction)
+		AmmunitionInteraction.stop({}, nil, "bot1", { target_unit = "pickup_clip" }, 100, "success", true)
+
+		assert.equals(1, count_debug_logs("ammo pickup success"))
+	end)
 end)

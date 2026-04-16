@@ -669,5 +669,82 @@ describe("revive_ability", function()
 				assert.equals("_refresh_destination", _hook_safe_calls[1].method)
 			end
 		)
+
+		it("is idempotent when the hook_require callback fires twice on the same BtBotInteractAction", function()
+			local unit = make_unit("bot_1")
+			local blackboard = make_blackboard()
+			local fake_mod = {
+				echo = function() end,
+				hook = function() end,
+				hook_safe = function(_, target, method, handler)
+					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
+				end,
+				hook_require = function(_, path, callback)
+					_hook_require_callbacks[path] = callback
+				end,
+			}
+
+			ReviveAbility.init({
+				mod = fake_mod,
+				debug_log = function(key, fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 100
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "test_ability"
+				end,
+				fallback_state_by_unit = _fallback_state,
+				perf = nil,
+				shared_rules = SharedRules,
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+			ReviveAbility.wire({
+				MetaData = { inject = function() end },
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+			setup_unit(unit, "ogryn_taunt_shout")
+			_ability_templates.ogryn_taunt_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+
+			ReviveAbility.register_hooks()
+			local interact_require =
+				_hook_require_callbacks["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action"]
+			local fake_action = {
+				enter = function()
+					return "orig_enter"
+				end,
+			}
+
+			interact_require(fake_action)
+			interact_require(fake_action)
+
+			fake_action.enter(fake_action, unit, nil, blackboard, {}, { interaction_type = "revive" }, 0)
+
+			assert.equals(1, #_recorded_inputs)
+		end)
 	end)
 end)

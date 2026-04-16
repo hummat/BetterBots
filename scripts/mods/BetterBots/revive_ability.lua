@@ -18,6 +18,8 @@ local _is_combat_template_enabled
 local _action_input_is_bot_queueable
 local _combat_ability_identity
 
+local INTERACT_ACTION_PATCH_SENTINEL = "__bb_revive_ability_installed"
+
 local RESCUE_INTERACTION_TYPES = {
 	revive = true,
 	rescue = true,
@@ -368,6 +370,11 @@ function M.register_hooks()
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action",
 		function(BtBotInteractAction)
+			if not BtBotInteractAction or rawget(BtBotInteractAction, INTERACT_ACTION_PATCH_SENTINEL) then
+				return
+			end
+			BtBotInteractAction[INTERACT_ACTION_PATCH_SENTINEL] = true
+
 			local orig_enter = BtBotInteractAction.enter
 			BtBotInteractAction.enter = function(self, unit, breed, blackboard, scratchpad, action_data, t)
 				local perf_t0 = _perf and _perf.begin()

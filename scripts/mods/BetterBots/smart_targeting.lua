@@ -10,6 +10,8 @@ local _logged_disabled = false
 local _last_logged_target_by_component = setmetatable({}, { __mode = "k" })
 local _resolve_bot_target_unit_fn
 
+local SMART_TARGETING_PATCH_SENTINEL = "__bb_smart_targeting_installed"
+
 local function resolve_bot_target_unit(perception_component)
 	if _resolve_bot_target_unit_fn then
 		return _resolve_bot_target_unit_fn(perception_component)
@@ -29,6 +31,11 @@ local function register_hooks()
 	_mod:hook_require(
 		"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
 		function(SmartTargetingActionModule)
+			if not SmartTargetingActionModule or rawget(SmartTargetingActionModule, SMART_TARGETING_PATCH_SENTINEL) then
+				return
+			end
+			SmartTargetingActionModule[SMART_TARGETING_PATCH_SENTINEL] = true
+
 			_mod:hook(SmartTargetingActionModule, "fixed_update", function(func, self, dt, t)
 				if _is_enabled and not _is_enabled() then
 					if _debug_enabled() and not _logged_disabled then

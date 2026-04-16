@@ -16,6 +16,8 @@ local _human_grenade_scan_cache = {}
 local _last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
+local INTERACTION_PATCH_SENTINEL = "__bb_ammo_policy_stop_installed"
+
 local PICKUP_BROADPHASE_CATEGORY = {
 	"pickups",
 }
@@ -459,6 +461,11 @@ function M.init(deps)
 end
 
 function M.install_interaction_hooks(AmmunitionInteraction)
+	if not AmmunitionInteraction or rawget(AmmunitionInteraction, INTERACTION_PATCH_SENTINEL) then
+		return
+	end
+	AmmunitionInteraction[INTERACTION_PATCH_SENTINEL] = true
+
 	_mod:hook(
 		AmmunitionInteraction,
 		"stop",

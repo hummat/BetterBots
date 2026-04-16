@@ -596,6 +596,53 @@ describe("weapon_action", function()
 		assert.equals(1, original_calls)
 	end)
 
+	it("is idempotent when the Overheat hook_require callback fires twice", function()
+		local unit = "bot_1"
+		local configuration_calls = 0
+		local Overheat = {
+			slot_percentage = function()
+				return 0.41
+			end,
+			configuration = function()
+				configuration_calls = configuration_calls + 1
+				return { venting = true }
+			end,
+		}
+
+		local double_fire_mod = {
+			hook_require = function(_, path, callback)
+				if path == "scripts/utilities/overheat" then
+					callback(Overheat)
+					callback(Overheat)
+				end
+			end,
+			hook = function() end,
+			hook_safe = function() end,
+			echo = function() end,
+			warning = function() end,
+		}
+
+		reset({ mod = double_fire_mod })
+		_extensions[unit] = { visual_loadout_system = {} }
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		Overheat.slot_percentage(unit, "slot_secondary", "venting")
+
+		assert.equals(1, configuration_calls)
+	end)
+
 	it("blocks non-vent warp actions at critical peril", function()
 		local forwarded_calls = 0
 		local PlayerUnitActionInputExtension = {

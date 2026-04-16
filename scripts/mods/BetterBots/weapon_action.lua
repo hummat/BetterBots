@@ -16,6 +16,8 @@ local _missing_shoot_extension_warned = {}
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
+local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
+
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
 local _weapon_logged_combos = {}
@@ -370,6 +372,11 @@ function M.register_hooks(deps)
 	-- warp_charge.current_percentage so should_vent_overheat triggers for peril.
 	-- Also guards against plasma-style nested thresholds that crash vanilla.
 	_mod:hook_require("scripts/utilities/overheat", function(Overheat)
+		if not Overheat or rawget(Overheat, OVERHEAT_PATCH_SENTINEL) then
+			return
+		end
+		Overheat[OVERHEAT_PATCH_SENTINEL] = true
+
 		local _orig_slot_percentage = Overheat.slot_percentage
 		Overheat.slot_percentage = function(unit, slot_name, threshold_type)
 			local vis_ext = ScriptUnit.has_extension(unit, "visual_loadout_system")

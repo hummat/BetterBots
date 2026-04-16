@@ -258,4 +258,36 @@ describe("smart_targeting", function()
 		-- targeting_data.unit should remain unchanged (vanilla passthrough)
 		assert.equals("vanilla_target", targeting_data.unit)
 	end)
+
+	it("is idempotent when the hook_require callback fires twice on the same SmartTargetingActionModule", function()
+		local SmartTargeting = load_smart_targeting()
+		local hook_calls = 0
+		local captured_callback
+		local shared_module = {}
+		local stub_mod = {
+			hook_require = function(_, _, callback)
+				captured_callback = callback
+			end,
+			hook = function(_, _, _, _)
+				hook_calls = hook_calls + 1
+			end,
+		}
+
+		SmartTargeting.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+		})
+		SmartTargeting.register_hooks()
+
+		captured_callback(shared_module)
+		captured_callback(shared_module)
+
+		assert.equals(1, hook_calls)
+	end)
 end)
