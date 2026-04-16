@@ -101,7 +101,7 @@ local function make_runtime_module(module_name, install_calls, extra)
 	return module
 end
 
-local function make_bootstrap_harness()
+local function make_bootstrap_harness(module_overrides)
 	local saved_get_mod = rawget(_G, "get_mod")
 	local saved_require = require
 	local saved_script_unit = rawget(_G, "ScriptUnit")
@@ -121,6 +121,7 @@ local function make_bootstrap_harness()
 		enable_event_log = false,
 		enable_perf_timing = false,
 	}
+	module_overrides = module_overrides or {}
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -398,6 +399,17 @@ local function make_bootstrap_harness()
 		end,
 	})
 
+	for module_name, override in pairs(module_overrides) do
+		if override.__strict then
+			modules[module_name] = override
+		else
+			local module = assert(modules[module_name], "unknown fake module override: " .. tostring(module_name))
+			for key, value in pairs(override) do
+				module[key] = value
+			end
+		end
+	end
+
 	local module_path_map = {
 		["BetterBots/scripts/mods/BetterBots/log_levels"] = modules.LogLevels,
 		["BetterBots/scripts/mods/BetterBots/shared_rules"] = modules.SharedRules,
@@ -455,13 +467,15 @@ local function make_bootstrap_harness()
 			hook_require_callbacks[path] = callback
 		end,
 		hook = function(_, target, method_name, handler)
-			local original = target[method_name] or function() end
+			local original = assert(target[method_name], "missing hook target method: " .. tostring(method_name))
+			assert.equals("function", type(original), "hook target must be callable: " .. tostring(method_name))
 			target[method_name] = function(...)
 				return handler(original, ...)
 			end
 		end,
 		hook_safe = function(_, target, method_name, handler)
-			local original = target[method_name] or function() end
+			local original = assert(target[method_name], "missing hook target method: " .. tostring(method_name))
+			assert.equals("function", type(original), "hook target must be callable: " .. tostring(method_name))
 			target[method_name] = function(...)
 				local results = { original(...) }
 				handler(...)
@@ -699,6 +713,33 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
+	end)
+
+	it("fails bootstrap when a required module API is missing", function()
+		local harness = make_bootstrap_harness({
+			WeaponAction = {
+				__strict = true,
+				init = function() end,
+			},
+		})
+
+		local ok, err = pcall(function()
+			harness:load()
+		end)
+
+		assert.is_false(ok)
+		assert.matches("register_hooks", tostring(err))
+	end)
+
+	it("fails when fake hook wrappers target a missing method", function()
+		local harness = make_bootstrap_harness()
+
+		local ok, err = pcall(function()
+			harness.mod:hook({}, "extensions_ready", function() end)
+		end)
+
+		assert.is_false(ok)
+		assert.matches("extensions_ready", tostring(err))
 	end)
 
 	it("wires Perf into AbilityQueue initialization", function()
