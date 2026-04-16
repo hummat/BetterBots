@@ -17,6 +17,32 @@ describe("bot_targeting", function()
 		assert.equals("target", target)
 	end)
 
+	it("falls back through lower-priority perception slots when target_enemy is missing", function()
+		assert.equals(
+			"priority",
+			BotTargeting.resolve_bot_target_unit({
+				urgent_target_enemy = "urgent",
+				opportunity_target_enemy = "opportunity",
+				priority_target_enemy = "priority",
+			})
+		)
+
+		assert.equals(
+			"opportunity",
+			BotTargeting.resolve_bot_target_unit({
+				urgent_target_enemy = "urgent",
+				opportunity_target_enemy = "opportunity",
+			})
+		)
+
+		assert.equals(
+			"urgent",
+			BotTargeting.resolve_bot_target_unit({
+				urgent_target_enemy = "urgent",
+			})
+		)
+	end)
+
 	it("detects elite/special/monster tags", function()
 		_G.ScriptUnit = {
 			has_extension = function()

@@ -68,6 +68,18 @@ local function find_echo(echoes, pattern)
 	return nil
 end
 
+local function sorted_keys(map)
+	local keys = {}
+
+	for key in pairs(map) do
+		keys[#keys + 1] = key
+	end
+
+	table.sort(keys)
+
+	return keys
+end
+
 local function make_runtime_module(module_name, install_calls, extra)
 	local module = extra or {}
 
@@ -156,6 +168,9 @@ local function make_bootstrap_harness(module_overrides)
 		record = function() end,
 		reset = function() end,
 	})
+	modules.MetaData = make_runtime_module("MetaData", install_calls, {
+		inject = function() end,
+	})
 	modules.Settings = make_runtime_module("Settings", install_calls, {
 		resolve_human_timing_config = function()
 			return {}
@@ -180,6 +195,9 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 		special_chase_penalty_range = function()
 			return 8
+		end,
+		bot_ranged_ammo_threshold = function()
+			return 20
 		end,
 		melee_horde_light_bias = function()
 			return 0.5
@@ -416,10 +434,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/combat_ability_identity"] = modules.CombatAbilityIdentity,
 		["BetterBots/scripts/mods/BetterBots/bot_targeting"] = modules.BotTargeting,
 		["BetterBots/scripts/mods/BetterBots/team_cooldown"] = modules.TeamCooldown,
-		["BetterBots/scripts/mods/BetterBots/meta_data"] = modules.MetaData
-			or make_runtime_module("MetaData", install_calls, {
-				inject = function() end,
-			}),
+		["BetterBots/scripts/mods/BetterBots/meta_data"] = modules.MetaData,
 		["BetterBots/scripts/mods/BetterBots/settings"] = modules.Settings,
 		["BetterBots/scripts/mods/BetterBots/heuristics"] = modules.Heuristics,
 		["BetterBots/scripts/mods/BetterBots/item_fallback"] = modules.ItemFallback,
@@ -499,6 +514,7 @@ local function make_bootstrap_harness(module_overrides)
 		echoes = echoes,
 		warnings = warnings,
 		commands = commands,
+		hook_require_callbacks = hook_require_callbacks,
 		init_calls = install_calls.init_calls,
 		wire_calls = install_calls.wire_calls,
 		register_calls = install_calls.register_calls,
@@ -692,6 +708,41 @@ describe("startup regressions", function()
 		assert.equals(harness.modules.Heuristics.build_context, item_wire.refs.build_context)
 		assert.equals(harness.modules.Settings.is_item_ability_enabled, item_wire.refs.is_item_ability_enabled)
 
+		local debug_wire = find_named_call(harness.wire_calls, "Debug")
+		assert.equals(harness.modules.Heuristics.build_context, debug_wire.refs.build_context)
+		assert.equals(harness.modules.Heuristics.resolve_decision, debug_wire.refs.resolve_decision)
+		assert.equals(harness.modules.ItemFallback.can_use_item_fallback, debug_wire.refs.can_use_item_fallback)
+
+		local condition_wire = find_named_call(harness.wire_calls, "ConditionPatch")
+		assert.equals(harness.modules.Heuristics, condition_wire.refs.Heuristics)
+		assert.equals(harness.modules.MetaData, condition_wire.refs.MetaData)
+		assert.equals(harness.modules.Debug, condition_wire.refs.Debug)
+		assert.equals(harness.modules.TeamCooldown, condition_wire.refs.TeamCooldown)
+		assert.equals(harness.modules.CombatAbilityIdentity, condition_wire.refs.combat_ability_identity)
+		assert.equals(harness.modules.Settings.bot_ranged_ammo_threshold, condition_wire.refs.bot_ranged_ammo_threshold)
+
+		local ability_wire = find_named_call(harness.wire_calls, "AbilityQueue")
+		assert.equals(harness.modules.ItemFallback, ability_wire.refs.ItemFallback)
+		assert.equals(harness.modules.EngagementLeash, ability_wire.refs.EngagementLeash)
+		assert.equals(harness.modules.CombatAbilityIdentity, ability_wire.refs.CombatAbilityIdentity)
+		assert.equals(harness.modules.HumanLikeness, ability_wire.refs.HumanLikeness)
+
+		local revive_wire = find_named_call(harness.wire_calls, "ReviveAbility")
+		assert.equals(harness.modules.MetaData, revive_wire.refs.MetaData)
+		assert.equals(harness.modules.EventLog, revive_wire.refs.EventLog)
+		assert.equals(harness.modules.Debug, revive_wire.refs.Debug)
+		assert.equals(harness.modules.Settings.is_combat_template_enabled, revive_wire.refs.is_combat_template_enabled)
+
+		local grenade_wire = find_named_call(harness.wire_calls, "GrenadeFallback")
+		assert.equals(harness.modules.Heuristics.build_context, grenade_wire.refs.build_context)
+		assert.equals(harness.modules.Heuristics.normalize_grenade_context, grenade_wire.refs.normalize_grenade_context)
+		assert.equals(
+			harness.modules.Heuristics.evaluate_grenade_heuristic,
+			grenade_wire.refs.evaluate_grenade_heuristic
+		)
+		assert.equals(harness.modules.Settings.is_grenade_enabled, grenade_wire.refs.is_grenade_enabled)
+		assert.equals(harness.modules.BotTargeting, grenade_wire.refs.bot_targeting)
+
 		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
 		assert.is_function(weapon_register.args[1].should_block_wield_input)
@@ -713,6 +764,24 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
+	end)
+
+	it("registers every hook_require path declared in BetterBots.lua", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		assert.same({
+			"scripts/extension_systems/ability/actions/action_character_state_change",
+			"scripts/extension_systems/ability/player_unit_ability_extension",
+			"scripts/extension_systems/behavior/bot_behavior_extension",
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
+			"scripts/extension_systems/group/bot_group",
+			"scripts/extension_systems/input/bot_unit_input",
+			"scripts/settings/ability/ability_templates/ability_templates",
+			"scripts/settings/bot/bot_settings",
+			"scripts/settings/equipment/weapon_templates/weapon_templates",
+		}, sorted_keys(harness.hook_require_callbacks))
 	end)
 
 	it("fails bootstrap when a required module API is missing", function()
