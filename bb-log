@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bb-log — BetterBots log analysis tool
 # Usage: bb-log [command] [log-index]
-#   commands: activations, rules, holds, summary, errors, tail, list, raw <pattern>, events
+#   commands: activations, rules, holds, summary, errors, warnings, tail, list, raw <pattern>, events
 #   log-index: 0=latest (default), 1=second-latest, etc.
 set -euo pipefail
 
@@ -13,7 +13,8 @@ require_jq() {
 }
 
 LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
-ERROR_LINE_PATTERN="<<Script Error>>|<<Lua Stack>>|<<Crash>>"
+ERROR_LINE_PATTERN="<<Script Error>>|<<Lua Stack>>|<<Crash>>|\[Script Error\]|\[ERROR\]|Lua Stack:"
+BB_WARNING_PATTERN="\[MOD\]\[BetterBots\]\[WARNING\]"
 
 EVENTS_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/common/Warhammer 40,000 DARKTIDE/binaries/dump"
 
@@ -175,6 +176,10 @@ case "$cmd" in
     errors)
         rg "${ERROR_LINE_PATTERN}" "$log" || echo "(no errors found)"
         ;;
+    warnings)
+        echo "=== BetterBots warnings ==="
+        rg "${BB_WARNING_PATTERN}" "$log" | sed 's/.*\[WARNING\] //' | sort | uniq -c | sort -rn || echo "(none)"
+        ;;
     summary)
         total_fallback_queued=$(rg -c "fallback queued" "$log" 2>/dev/null || echo 0)
         total_item_queued=$(rg -c "fallback item queued" "$log" 2>/dev/null || echo 0)
@@ -185,9 +190,16 @@ case "$cmd" in
         total_held_idle=$(rg "fallback held" "$log" 2>/dev/null | grep -c "nearby=0)" 2>/dev/null || true)
         total_held_idle="${total_held_idle:-0}"
         total_error_lines=$(rg -c "${ERROR_LINE_PATTERN}" "$log" 2>/dev/null || echo 0)
+        total_bb_warnings=$(rg -c "${BB_WARNING_PATTERN}" "$log" 2>/dev/null || echo 0)
 
-        echo "Fallback queued: $total_fallback_queued | Item queued: $total_item_queued | Item blocked: $total_item_blocked | Consumed: $total_consumed | Held (combat): $total_held_active | Held (idle): $total_held_idle | Error lines: $total_error_lines"
+        echo "Fallback queued: $total_fallback_queued | Item queued: $total_item_queued | Item blocked: $total_item_blocked | Consumed: $total_consumed | Held (combat): $total_held_active | Held (idle): $total_held_idle | Error lines: $total_error_lines | BB warnings: $total_bb_warnings"
         echo ""
+
+        if [[ "$total_bb_warnings" -gt 0 ]]; then
+            echo "=== BetterBots warnings ==="
+            rg "${BB_WARNING_PATTERN}" "$log" 2>/dev/null | sed 's/.*\[WARNING\] //' | sort | uniq -c | sort -rn
+            echo ""
+        fi
 
         echo "=== Activations by rule ==="
         rg "fallback queued" "$log" 2>/dev/null | sed 's/.*rule=\([^,]*\),.*/\1/' | sort | uniq -c | sort -rn || echo "(none)"
@@ -213,7 +225,7 @@ case "$cmd" in
         ;;
     *)
         echo "Unknown command: $cmd"
-        echo "Usage: bb-log [activations|rules|holds|summary|errors|tail|list|raw|events] [log-index]"
+        echo "Usage: bb-log [activations|rules|holds|summary|errors|warnings|tail|list|raw|events] [log-index]"
         echo "       bb-log raw <pattern> [log-index]"
         echo "       bb-log events [summary|rules|trace|holds|items|raw] [file-index]"
         exit 1

@@ -45,7 +45,7 @@ Every new feature must include enough `_debug_log` calls to verify correctness f
 - **Don't log no-ops**: idle paths, false conditions, and expected skips produce no output. Only log when something interesting happened.
 
 See `docs/dev/logging.md` for the full logging architecture, output channels, log line catalog, and analysis tools. See `docs/dev/debugging.md` for debug tool reference. Key tools:
-- **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview, `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
+- **`bb-log`** (project root) — primary log analysis tool. Use `bb-log summary` for overview (includes DMF warning counter), `bb-log activations` for raw events, `bb-log rules` for counts, `bb-log warnings` for the full BetterBots warning breakdown (rehook attempts, hook install failures), `bb-log events summary` for JSONL event analysis. **Always use this instead of raw rg/grep on log files.**
 - `mod:echo(msg)` — print to chat + log (current approach)
 - `mod:dump(table, name, depth)` — recursively dump tables to log
 - `mod:dtf(table, name, depth)` — export table as JSON to `./dump/`
