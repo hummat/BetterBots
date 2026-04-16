@@ -1061,5 +1061,55 @@ describe("ranged_meta_data", function()
 			assert.equals("shoot_charge", meta.aim_fire_action_input)
 			assert.is_nil(meta.aim_fire_action_name)
 		end)
+
+		it(
+			"does not crash when a replace-injected template also hits charge-override (#v0.11.0 startup crash)",
+			function()
+				-- Regression: template with no attack_meta_data is replace-injected by
+				-- the main loop (mode = "replace"), then matched again by the charge
+				-- override loop. ensure_change preserves replace mode and does not
+				-- initialize original_fields; record_original_field must no-op rather
+				-- than nil-index. Double-inject mirrors Tertium4Or5's require hook
+				-- re-firing inject() with persistent state.changes.
+				local template = make_ranged_template({
+					action_inputs = {
+						shoot_charge = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true },
+							},
+						},
+						charge = { input_sequence = {
+							{ input = "action_two_hold", value = true },
+						} },
+						trigger_explosion = {
+							input_sequence = {
+								{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+							},
+						},
+					},
+					actions = {
+						rapid_left = { start_input = "shoot_charge" },
+						action_charge = {
+							start_input = "charge",
+							allowed_chain_actions = {
+								trigger_explosion = { action_name = "action_explode" },
+							},
+						},
+						action_explode = { start_input = "trigger_explosion" },
+					},
+				})
+				local templates = { forcestaff = template }
+
+				assert.has_no.errors(function()
+					RangedMetaData.inject(templates)
+				end)
+				assert.has_no.errors(function()
+					RangedMetaData.inject(templates)
+				end)
+
+				assert.is_table(template.attack_meta_data)
+				assert.equals("trigger_explosion", template.attack_meta_data.aim_fire_action_input)
+			end
+		)
 	end)
 end)

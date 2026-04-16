@@ -338,7 +338,13 @@ local function inject(WeaponTemplates)
 	end
 
 	local function record_original_field(change, meta, key)
+		-- Replace-mode changes nil the whole attack_meta_data on disable,
+		-- so field-level originals are irrelevant. original_fields is only
+		-- populated for mode == "fields".
 		local original_fields = change.original_fields
+		if original_fields == nil then
+			return
+		end
 		if original_fields[key] ~= nil then
 			return
 		end
