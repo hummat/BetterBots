@@ -18,10 +18,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build mod package
-        run: |
-          zip -9 BetterBots.zip \
-            BetterBots.mod \
-            scripts/mods/BetterBots/*.lua
+        run: make package
 
       - name: Generate changelog
         uses: orhun/git-cliff-action@v4
