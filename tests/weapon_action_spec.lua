@@ -3,6 +3,7 @@ local test_helper = require("tests.test_helper")
 local _extensions = {}
 local _blackboards = {}
 local _debug_logs = {}
+local _echoes = {}
 local _warnings = {}
 
 _G.ScriptUnit = {
@@ -31,6 +32,7 @@ local function reset(opts)
 		_blackboards[unit] = nil
 	end
 	_debug_logs = {}
+	_echoes = {}
 	_warnings = {}
 	if ammo == nil and not opts.no_ammo then
 		ammo = {
@@ -45,7 +47,9 @@ local function reset(opts)
 			hook_require = function() end,
 			hook = function() end,
 			hook_safe = function() end,
-			echo = function() end,
+			echo = function(_, message)
+				_echoes[#_echoes + 1] = message
+			end,
 			warning = function(_, message)
 				_warnings[#_warnings + 1] = message
 			end,
@@ -92,7 +96,9 @@ local function make_hooking_mod(hook_targets)
 				return result
 			end
 		end,
-		echo = function() end,
+		echo = function(_, message)
+			_echoes[#_echoes + 1] = message
+		end,
 		warning = function(_, message)
 			_warnings[#_warnings + 1] = message
 		end,
@@ -113,6 +119,16 @@ local function find_warning(pattern)
 	for i = 1, #_warnings do
 		if string.find(_warnings[i], pattern, 1, true) then
 			return _warnings[i]
+		end
+	end
+
+	return nil
+end
+
+local function find_echo(pattern)
+	for i = 1, #_echoes do
+		if string.find(_echoes[i], pattern, 1, true) then
+			return _echoes[i]
 		end
 	end
 
@@ -495,5 +511,178 @@ describe("weapon_action", function()
 		}, "weapon_action", "reload", nil)
 
 		assert.equals("vent", forwarded_action_input)
+	end)
+
+	it("bridges warp peril into Overheat.slot_percentage when config is missing", function()
+		local saved_require = require
+		local unit = "bot_1"
+		local Overheat = {
+			slot_percentage = function()
+				return 0
+			end,
+			configuration = function()
+				return nil
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/utilities/overheat"] = Overheat,
+			}),
+		})
+
+		_extensions[unit] = {
+			visual_loadout_system = {},
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+				warp_charge = { current_percentage = 0.72 },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		assert.equals(0.72, Overheat.slot_percentage(unit, "slot_secondary", "venting"))
+
+		rawset(_G, "require", saved_require)
+	end)
+
+	it("blocks non-vent warp actions at critical peril", function()
+		local forwarded_calls = 0
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function()
+				forwarded_calls = forwarded_calls + 1
+				return 1
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+				warp_charge = { current_percentage = 0.99 },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		local result = PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", nil)
+
+		assert.is_nil(result)
+		assert.equals(0, forwarded_calls)
+		assert.is_truthy(find_debug_log("blocked shoot_pressed"))
+	end)
+
+	it("logs ADS confirmation on _start_aiming once per scratchpad", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local scratchpad = { ranged_gestalt = "killshot" }
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction._start_aiming({}, 0, scratchpad)
+		BtBotShootAction._start_aiming({}, 0, scratchpad)
+
+		rawset(_G, "require", saved_require)
+
+		assert.is_truthy(find_echo("bot ADS confirmed"))
+	end)
+
+	it("redirects wield_slot to slot_combat_ability while lock is active", function()
+		local wielded_slot
+		local PlayerUnitVisualLoadout = {
+			wield_slot = function(slot_to_wield)
+				wielded_slot = slot_to_wield
+				return slot_to_wield
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout"] = PlayerUnitVisualLoadout,
+			}),
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return true, "zealot_relic", "sequence", "slot_combat_ability"
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		PlayerUnitVisualLoadout.wield_slot("slot_secondary", "bot_1", 0, false)
+
+		assert.equals("slot_combat_ability", wielded_slot)
 	end)
 end)
