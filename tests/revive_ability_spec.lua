@@ -603,72 +603,62 @@ describe("revive_ability", function()
 			assert.equals("shout_pressed", _recorded_inputs[1].input)
 		end)
 
-		it(
-			"installs the revive candidate hook without registering a second BotBehaviorExtension hook_require",
-			function()
-				local fake_mod = {
-					echo = function() end,
-					hook = function() end,
-					hook_safe = function(_, target, method, handler)
-						_hook_safe_calls[#_hook_safe_calls + 1] =
-							{ target = target, method = method, handler = handler }
-					end,
-					hook_require = function(_, path, callback)
-						_hook_require_callbacks[path] = callback
-					end,
-				}
+		it("does not register a BotBehaviorExtension hook_require via register_hooks", function()
+			local fake_mod = {
+				echo = function() end,
+				hook = function() end,
+				hook_safe = function(_, target, method, handler)
+					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
+				end,
+				hook_require = function(_, path, callback)
+					_hook_require_callbacks[path] = callback
+				end,
+			}
 
-				ReviveAbility.init({
-					mod = fake_mod,
-					debug_log = function(key, fixed_t, message)
-						_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
-					end,
-					debug_enabled = function()
-						return true
-					end,
-					fixed_time = function()
-						return 100
-					end,
-					is_suppressed = function()
+			ReviveAbility.init({
+				mod = fake_mod,
+				debug_log = function(key, fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 100
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				equipped_combat_ability_name = function()
+					return "test_ability"
+				end,
+				fallback_state_by_unit = _fallback_state,
+				perf = nil,
+				shared_rules = SharedRules,
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+			ReviveAbility.wire({
+				MetaData = { inject = function() end },
+				EventLog = {
+					is_enabled = function()
 						return false
 					end,
-					equipped_combat_ability_name = function()
-						return "test_ability"
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
 					end,
-					fallback_state_by_unit = _fallback_state,
-					perf = nil,
-					shared_rules = SharedRules,
-					combat_ability_identity = CombatAbilityIdentity,
-				})
-				ReviveAbility.wire({
-					MetaData = { inject = function() end },
-					EventLog = {
-						is_enabled = function()
-							return false
-						end,
-					},
-					Debug = {
-						bot_slot_for_unit = function()
-							return 1
-						end,
-					},
-					is_combat_template_enabled = function()
-						return true
-					end,
-				})
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
 
-				ReviveAbility.register_hooks()
+			ReviveAbility.register_hooks()
 
-				assert.is_nil(_hook_require_callbacks["scripts/extension_systems/behavior/bot_behavior_extension"])
-
-				local fake_behavior_extension = {}
-				ReviveAbility.install_behavior_ext_hooks(fake_behavior_extension)
-
-				assert.equals(1, #_hook_safe_calls)
-				assert.equals(fake_behavior_extension, _hook_safe_calls[1].target)
-				assert.equals("_refresh_destination", _hook_safe_calls[1].method)
-			end
-		)
+			assert.is_nil(_hook_require_callbacks["scripts/extension_systems/behavior/bot_behavior_extension"])
+			assert.is_function(ReviveAbility.on_refresh_destination)
+		end)
 
 		it("is idempotent when the hook_require callback fires twice on the same BtBotInteractAction", function()
 			local unit = make_unit("bot_1")

@@ -180,7 +180,39 @@ end
 
 -- Close-range suppression: after target selection runs, if the chosen target
 -- is a poxburster within detonation range, clear it so bots don't chase or
--- shoot at point-blank distance.
+-- shoot at point-blank distance. Called by the consolidated _update_target_enemy
+-- hook in BetterBots.lua — see install_bot_perception_hooks for rationale.
+function M.post_update_target_enemy(_self, self_unit, self_position, perception_component, side)
+	if _is_enabled and not _is_enabled() then
+		return
+	end
+
+	local perf_t0 = _perf and _perf.begin()
+
+	-- #54: skip target_enemy suppression when poxburster is in push range
+	-- so the bot enters melee and pushes instead of ignoring
+	local in_push_range = _is_poxburster_in_push_range(perception_component.target_enemy, self_position)
+	if not in_push_range then
+		_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
+	elseif _debug_enabled() then
+		_debug_log(
+			"poxburster_push_range:" .. tostring(self_unit),
+			_fixed_time(),
+			"poxburster in push range, keeping target for melee push",
+			2
+		)
+	end
+	_try_suppress_target(perception_component, "opportunity_target_enemy", "_opp", self_position, side, self_unit)
+	_try_suppress_target(perception_component, "urgent_target_enemy", "_urg", self_position, side, self_unit)
+	_try_suppress_target(perception_component, "priority_target_enemy", "_pri", self_position, side, self_unit)
+
+	if perf_t0 then
+		_perf.finish("poxburster.update_target_enemy", perf_t0)
+	end
+end
+
+-- Kept for unit tests; production registration lives in BetterBots.lua.
+-- DMF dedupes hook registrations by (mod, obj, method).
 function M.install_bot_perception_hooks(BotPerceptionExtension)
 	if not BotPerceptionExtension or rawget(BotPerceptionExtension, POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL) then
 		return
@@ -196,48 +228,8 @@ function M.install_bot_perception_hooks(BotPerceptionExtension)
 	_mod:hook_safe(
 		BotPerceptionExtension,
 		"_update_target_enemy",
-		function(
-			_self,
-			self_unit,
-			self_position,
-			perception_component,
-			_behavior_component,
-			_enemies_in_proximity,
-			side
-		)
-			if _is_enabled and not _is_enabled() then
-				return
-			end
-
-			local perf_t0 = _perf and _perf.begin()
-
-			-- #54: skip target_enemy suppression when poxburster is in push range
-			-- so the bot enters melee and pushes instead of ignoring
-			local in_push_range = _is_poxburster_in_push_range(perception_component.target_enemy, self_position)
-			if not in_push_range then
-				_try_suppress_target(perception_component, "target_enemy", "", self_position, side, self_unit)
-			elseif _debug_enabled() then
-				_debug_log(
-					"poxburster_push_range:" .. tostring(self_unit),
-					_fixed_time(),
-					"poxburster in push range, keeping target for melee push",
-					2
-				)
-			end
-			_try_suppress_target(
-				perception_component,
-				"opportunity_target_enemy",
-				"_opp",
-				self_position,
-				side,
-				self_unit
-			)
-			_try_suppress_target(perception_component, "urgent_target_enemy", "_urg", self_position, side, self_unit)
-			_try_suppress_target(perception_component, "priority_target_enemy", "_pri", self_position, side, self_unit)
-
-			if perf_t0 then
-				_perf.finish("poxburster.update_target_enemy", perf_t0)
-			end
+		function(self, self_unit, self_position, perception_component, _behavior_component, _enemies_in_proximity, side)
+			M.post_update_target_enemy(self, self_unit, self_position, perception_component, side)
 		end
 	)
 end

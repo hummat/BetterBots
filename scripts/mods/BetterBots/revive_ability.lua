@@ -399,35 +399,31 @@ function M.register_hooks()
 	)
 end
 
-function M.install_behavior_ext_hooks(BotBehaviorExtension)
-	_mod:hook_safe(
-		BotBehaviorExtension,
-		"_refresh_destination",
-		function(
-			self,
-			_t,
-			_self_position,
-			_previous_destination,
-			_hold_position,
-			_hold_position_max_distance_sq,
-			_bot_group_data,
-			_navigation_extension,
-			_follow_component,
-			perception_component
-		)
-			if not (_debug_enabled and _debug_enabled()) then
-				return
-			end
+-- Called from the consolidated _refresh_destination hook_safe in BetterBots.lua.
+-- See mule_pickup.on_refresh_destination for rationale.
+function M.on_refresh_destination(
+	self,
+	_t,
+	_self_position,
+	_previous_destination,
+	_hold_position,
+	_hold_position_max_distance_sq,
+	_bot_group_data,
+	_navigation_extension,
+	_follow_component,
+	perception_component
+)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
 
-			local unit = self and self._unit
-			local behavior_component = self and self._behavior_component
-			if not unit or not behavior_component or not perception_component then
-				return
-			end
+	local unit = self and self._unit
+	local behavior_component = self and self._behavior_component
+	if not unit or not behavior_component or not perception_component then
+		return
+	end
 
-			M.log_revive_candidate(unit, behavior_component, perception_component)
-		end
-	)
+	M.log_revive_candidate(unit, behavior_component, perception_component)
 end
 
 M.RESCUE_INTERACTION_TYPES = RESCUE_INTERACTION_TYPES

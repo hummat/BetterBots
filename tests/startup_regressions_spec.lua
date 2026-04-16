@@ -128,6 +128,7 @@ local function make_bootstrap_harness(module_overrides)
 	local echoes = {}
 	local warnings = {}
 	local commands = {}
+	local hook_registrations = {}
 	local settings = {
 		enable_debug_logs = 0,
 		enable_event_log = false,
@@ -507,6 +508,7 @@ local function make_bootstrap_harness(module_overrides)
 		hook = function(_, target, method_name, handler)
 			local original = assert(target[method_name], "missing hook target method: " .. tostring(method_name))
 			assert.equals("function", type(original), "hook target must be callable: " .. tostring(method_name))
+			hook_registrations[#hook_registrations + 1] = { target = target, method = method_name, hook_type = "hook" }
 			target[method_name] = function(...)
 				return handler(original, ...)
 			end
@@ -514,6 +516,8 @@ local function make_bootstrap_harness(module_overrides)
 		hook_safe = function(_, target, method_name, handler)
 			local original = assert(target[method_name], "missing hook target method: " .. tostring(method_name))
 			assert.equals("function", type(original), "hook target must be callable: " .. tostring(method_name))
+			hook_registrations[#hook_registrations + 1] =
+				{ target = target, method = method_name, hook_type = "hook_safe" }
 			target[method_name] = function(...)
 				local results = { original(...) }
 				handler(...)
@@ -538,6 +542,7 @@ local function make_bootstrap_harness(module_overrides)
 		warnings = warnings,
 		commands = commands,
 		hook_require_callbacks = hook_require_callbacks,
+		hook_registrations = hook_registrations,
 		init_calls = install_calls.init_calls,
 		wire_calls = install_calls.wire_calls,
 		register_calls = install_calls.register_calls,
@@ -796,15 +801,11 @@ describe("startup regressions", function()
 
 		assert.is_truthy(find_install_call(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Poxburster", "install_melee_hooks"))
-		assert.is_truthy(find_install_call(harness.install_calls, "Poxburster", "install_bot_perception_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "EngagementLeash", "install_melee_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "SustainedFire", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Sprint", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
-		assert.is_truthy(
-			find_install_call(harness.install_calls, "TargetTypeHysteresis", "install_bot_perception_hooks")
-		)
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
@@ -826,6 +827,26 @@ describe("startup regressions", function()
 			"scripts/settings/bot/bot_settings",
 			"scripts/settings/equipment/weapon_templates/weapon_templates",
 		}, sorted_keys(harness.hook_require_callbacks))
+	end)
+
+	it("registers a single hook on BotBehaviorExtension._refresh_destination from BetterBots.lua", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local count = 0
+		for _ in source:gmatch('"_refresh_destination"') do
+			count = count + 1
+		end
+
+		assert.equals(1, count)
+	end)
+
+	it("registers a single hook on BotPerceptionExtension._update_target_enemy from BetterBots.lua", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local count = 0
+		for _ in source:gmatch('"_update_target_enemy"') do
+			count = count + 1
+		end
+
+		assert.equals(1, count)
 	end)
 
 	it("fails bootstrap when a required module API is missing", function()
@@ -992,8 +1013,8 @@ describe("startup regressions", function()
 
 		assert.equals(1, main_count)
 		assert.equals(0, revive_count)
-		assert.is_truthy(main_source:find("ReviveAbility%.install_behavior_ext_hooks", 1))
-		assert.is_truthy(main_source:find("MulePickup%.install_behavior_ext_hooks", 1))
+		assert.is_truthy(main_source:find("ReviveAbility%.on_refresh_destination", 1))
+		assert.is_truthy(main_source:find("MulePickup%.on_refresh_destination", 1))
 	end)
 
 	it("persists /bb_reset through DMF instead of the BetterBots mod object", function()

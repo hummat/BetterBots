@@ -834,24 +834,85 @@ BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()
 
--- Consolidated bot_perception_extension hook_require: two modules hook this path.
--- Keep one owner in BetterBots.lua so DMF doesn't silently clobber one callback
--- with the other (#90).
+-- Consolidated bot_perception_extension hook_require: two modules post-process
+-- _update_target_enemy. DMF dedupes hook registrations by (mod, obj, method)
+-- and silently discards duplicates, so both handlers dispatch from a single
+-- hook here. One wrapper captures the pre-state (used by hysteresis) and then
+-- calls both post-process functions (#90).
+local _bot_perception_installed = setmetatable({}, { __mode = "k" })
 local function _install_bot_perception_extension_hooks(BotPerceptionExtension)
-	local ok, err
-	ok, err = pcall(TargetTypeHysteresis.install_bot_perception_hooks, BotPerceptionExtension)
-	if not ok then
-		mod:echo("BetterBots: target_type_hysteresis hook install failed: " .. tostring(err))
+	if not BotPerceptionExtension or _bot_perception_installed[BotPerceptionExtension] then
+		return
 	end
-	ok, err = pcall(Poxburster.install_bot_perception_hooks, BotPerceptionExtension)
-	if not ok then
-		mod:echo("BetterBots: poxburster perception hook install failed: " .. tostring(err))
+	local original = BotPerceptionExtension._update_target_enemy
+	if type(original) ~= "function" then
+		return
 	end
+	_bot_perception_installed[BotPerceptionExtension] = true
+
+	mod:hook(
+		BotPerceptionExtension,
+		"_update_target_enemy",
+		function(
+			func,
+			self,
+			self_unit,
+			self_position,
+			perception_component,
+			behavior_component,
+			enemies_in_proximity,
+			side,
+			bot_group,
+			dt,
+			t
+		)
+			local pre_state = {
+				target_enemy = perception_component.target_enemy,
+				target_enemy_type = perception_component.target_enemy_type,
+				target_enemy_reevaluation_t = perception_component.target_enemy_reevaluation_t,
+			}
+			func(
+				self,
+				self_unit,
+				self_position,
+				perception_component,
+				behavior_component,
+				enemies_in_proximity,
+				side,
+				bot_group,
+				dt,
+				t
+			)
+			local h_ok, h_err = pcall(
+				TargetTypeHysteresis.post_update_target_enemy,
+				self,
+				pre_state,
+				self_unit,
+				self_position,
+				perception_component,
+				behavior_component,
+				enemies_in_proximity,
+				side,
+				bot_group,
+				dt,
+				t
+			)
+			if not h_ok then
+				mod:echo("BetterBots: target_type_hysteresis dispatch failed: " .. tostring(h_err))
+			end
+			local p_ok, p_err =
+				pcall(Poxburster.post_update_target_enemy, self, self_unit, self_position, perception_component, side)
+			if not p_ok then
+				mod:echo("BetterBots: poxburster dispatch failed: " .. tostring(p_err))
+			end
+		end
+	)
+
 	if _debug_enabled() then
 		_debug_log(
 			"hook_require:bot_perception_extension",
 			0,
-			"installed consolidated bot_perception_extension hooks (target_type_hysteresis, poxburster)",
+			"installed consolidated _update_target_enemy hook (target_type_hysteresis + poxburster)",
 			nil,
 			"info"
 		)
@@ -1219,14 +1280,46 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	if not ok then
 		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
 	end
-	ok, err = pcall(MulePickup.install_behavior_ext_hooks, BotBehaviorExtension)
-	if not ok then
-		mod:echo("BetterBots: mule_pickup behavior hook install failed: " .. tostring(err))
-	end
-	ok, err = pcall(ReviveAbility.install_behavior_ext_hooks, BotBehaviorExtension)
-	if not ok then
-		mod:echo("BetterBots: revive_ability behavior hook install failed: " .. tostring(err))
-	end
+	-- Consolidated _refresh_destination hook. DMF dedupes hook registrations by
+	-- (mod, obj, method) and silently discards duplicates, so each feature's
+	-- handler is dispatched from a single hook_safe here.
+	mod:hook_safe(
+		BotBehaviorExtension,
+		"_refresh_destination",
+		function(
+			self,
+			t,
+			self_position,
+			previous_destination,
+			hold_position,
+			hold_position_max_distance_sq,
+			bot_group_data,
+			navigation_extension,
+			follow_component,
+			perception_component
+		)
+			local m_ok, m_err = pcall(MulePickup.on_refresh_destination, self)
+			if not m_ok then
+				mod:echo("BetterBots: mule_pickup _refresh_destination dispatch failed: " .. tostring(m_err))
+			end
+			local r_ok, r_err = pcall(
+				ReviveAbility.on_refresh_destination,
+				self,
+				t,
+				self_position,
+				previous_destination,
+				hold_position,
+				hold_position_max_distance_sq,
+				bot_group_data,
+				navigation_extension,
+				follow_component,
+				perception_component
+			)
+			if not r_ok then
+				mod:echo("BetterBots: revive_ability _refresh_destination dispatch failed: " .. tostring(r_err))
+			end
+		end
+	)
 	mod:hook(
 		BotBehaviorExtension,
 		"_init_blackboard_components",

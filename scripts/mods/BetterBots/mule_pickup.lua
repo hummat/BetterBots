@@ -550,13 +550,14 @@ function M.should_block_pickup_order(pickup_unit)
 	return false, nil
 end
 
-function M.install_behavior_ext_hooks(BotBehaviorExtension)
-	_mod:hook_safe(BotBehaviorExtension, "_refresh_destination", function(self)
-		local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit)
-		if changed then
-			_clear_behavior_targets(self._behavior_component, self._unit)
-		end
-	end)
+-- Called from the consolidated _refresh_destination hook_safe in BetterBots.lua.
+-- DMF dedupes hook registrations by (mod, obj, method); registering one hook
+-- per feature on the same method silently drops all but the first (#_refresh_destination).
+function M.on_refresh_destination(self)
+	local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit)
+	if changed then
+		_clear_behavior_targets(self._behavior_component, self._unit)
+	end
 end
 
 function M.install_bot_group_hooks(BotGroup)
