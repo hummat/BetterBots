@@ -514,7 +514,6 @@ describe("weapon_action", function()
 	end)
 
 	it("bridges warp peril into Overheat.slot_percentage when config is missing", function()
-		local saved_require = require
 		local unit = "bot_1"
 		local Overheat = {
 			slot_percentage = function()
@@ -553,8 +552,48 @@ describe("weapon_action", function()
 		})
 
 		assert.equals(0.72, Overheat.slot_percentage(unit, "slot_secondary", "venting"))
+	end)
 
-		rawset(_G, "require", saved_require)
+	it("falls back to the original Overheat.slot_percentage when config exists", function()
+		local unit = "bot_1"
+		local original_calls = 0
+		local Overheat = {
+			slot_percentage = function()
+				original_calls = original_calls + 1
+				return 0.41
+			end,
+			configuration = function()
+				return {
+					venting = true,
+				}
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/utilities/overheat"] = Overheat,
+			}),
+		})
+
+		_extensions[unit] = {
+			visual_loadout_system = {},
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		assert.equals(0.41, Overheat.slot_percentage(unit, "slot_secondary", "venting"))
+		assert.equals(1, original_calls)
 	end)
 
 	it("blocks non-vent warp actions at critical peril", function()
