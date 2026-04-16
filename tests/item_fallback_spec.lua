@@ -185,6 +185,25 @@ local function find_log(pattern)
 	return nil
 end
 
+local function make_item_ability(name)
+	return {
+		name = name,
+		inventory_item_name = "content/items/weapons/player/" .. name,
+	}
+end
+
+local function install_force_field_templates()
+	_weapon_templates.psyker_force_field = {
+		action_inputs = {
+			aim_force_field = {},
+			place_force_field = {},
+			unwield_to_previous = {},
+			instant_aim_force_field = {},
+			instant_place_force_field = {},
+		},
+	}
+end
+
 describe("item_fallback", function()
 	before_each(function()
 		reset()
@@ -318,5 +337,242 @@ describe("item_fallback", function()
 		local should_lock = ItemFallback.should_lock_weapon_switch(unit)
 
 		assert.is_false(should_lock)
+	end)
+
+	it("schedule_retry resets active stage and keeps the earliest retry time", function()
+		_fallback_state_by_unit[unit] = {
+			item_stage = "waiting_start",
+			item_ability_name = "zealot_relic",
+			next_try_t = 12,
+		}
+
+		ItemFallback.schedule_retry(unit, _mock_time, 0.6)
+		ItemFallback.schedule_retry(unit, _mock_time, 1.2)
+
+		assert.is_nil(_fallback_state_by_unit[unit].item_stage)
+		assert.equals(10.6, _fallback_state_by_unit[unit].next_try_t)
+	end)
+
+	it("does not lock sequence weapon switch while interaction is pending", function()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_interaction_component.target_unit = "medicae_station"
+		_fallback_state_by_unit[unit] = {
+			item_stage = "waiting_unwield",
+			item_ability_name = "psyker_force_field",
+		}
+
+		local should_lock = ItemFallback.should_lock_weapon_switch(unit)
+
+		assert.is_false(should_lock)
+	end)
+
+	it("retries and rotates when combat-ability wield is lost before followup", function()
+		local state = {}
+		local combat_ability = make_item_ability("psyker_force_field")
+
+		install_force_field_templates()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_weapon_action_component.template_name = "psyker_force_field"
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_wield", state.item_stage)
+
+		_mock_time = _mock_time + 0.01
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_start", state.item_stage)
+
+		_mock_time = _mock_time + 0.1
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_followup", state.item_stage)
+
+		_inventory_component.wielded_slot = "slot_primary"
+		_mock_time = _mock_time + 0.1
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.is_nil(state.item_stage)
+		assert.equals(_mock_time + 1, state.next_try_t)
+		assert.equals(2, state.item_profile_index_by_key["psyker_force_field:psyker_force_field"])
+	end)
+
+	it("retries when combat-ability wield is lost before start", function()
+		local state = {}
+		local combat_ability = make_item_ability("psyker_force_field")
+
+		install_force_field_templates()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_weapon_action_component.template_name = "psyker_force_field"
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_wield", state.item_stage)
+
+		_mock_time = _mock_time + 0.01
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_start", state.item_stage)
+
+		_inventory_component.wielded_slot = "slot_primary"
+		_mock_time = _mock_time + 0.01
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.is_nil(state.item_stage)
+		assert.equals(_mock_time + 1, state.next_try_t)
+	end)
+
+	it("rotates force-field profile after charge-confirm timeout and uses instant variant next", function()
+		local state = {}
+		local combat_ability = make_item_ability("psyker_force_field")
+
+		install_force_field_templates()
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_weapon_action_component.template_name = "psyker_force_field"
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_wield", state.item_stage)
+
+		_mock_time = _mock_time + 0.01
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("force_field_regular", state.item_profile_name)
+		assert.equals("waiting_start", state.item_stage)
+
+		_mock_time = _mock_time + 0.1
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		_mock_time = _mock_time + 0.4
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		_mock_time = _mock_time + 1.7
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.equals("waiting_charge_confirmation", state.item_stage)
+
+		_mock_time = _mock_time + 2.3
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.is_nil(state.item_stage)
+		assert.equals(2, state.item_profile_index_by_key["psyker_force_field:psyker_force_field"])
+
+		_mock_time = state.next_try_t
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_wield", state.item_stage)
+
+		_mock_time = _mock_time + 0.01
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("force_field_instant", state.item_profile_name)
 	end)
 end)
