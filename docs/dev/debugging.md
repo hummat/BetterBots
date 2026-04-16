@@ -183,6 +183,24 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 5. If still unclear, run `/bb_brain` once and inspect the dump.
 6. Correlate with log lines (`fallback held/queued`, `charge consumed`, `invalid action_input`).
 
+### Pre-release verification (required before `make release`)
+
+Static checks (`make check`) and hot-reload testing (`Ctrl+Shift+R`) do **not** surface hook-registration issues, load-order crashes, or DMF warnings. A clean test run is not sufficient to ship to Nexus.
+
+1. **Cold boot** — fully quit Darktide and relaunch. Do not rely on a hot reload.
+2. **Run a mission** — booting to the hub is not enough; at least one mission load exercises the full hook chain.
+3. **Test both mod load orders** when the change touches shared engine tables (`attack_meta_data`, `ability_meta_data`, breed data). Run once with BetterBots near the top of `mod_load_order.txt` and once with it near the bottom. Sibling mods that pre-mutate shared state (Tertium4Or5, SoloPlay) can mask or reveal crashes depending on order.
+4. **Check BetterBots events**: `./bb-log summary` — verify expected activations and no error lines.
+5. **Check DMF warnings and engine errors**: `bb-log` does not surface these today. Grep the raw console log directly:
+   ```bash
+   LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
+   NEW=$(ls -t "$LOG_DIR" | head -1)
+   grep -cE "rehook active|\[ERROR\]|lua error|CRASH" "$LOG_DIR/$NEW"  # expect 0
+   ```
+6. Only after both load-order sessions are clean, run `make release VERSION=X.Y.Z` and push to Nexus.
+
+The v0.11.0 release shipped a startup CTD (`ranged_meta_data.lua: attempt to index local 'original_fields'`) that passed all static checks and reproduced only with BetterBots loaded before the sibling mod that pre-set `attack_meta_data`. Dev-side load order masked it. Steps 3 and 5 catch this class of bug.
+
 ### Grenade regression shortcut
 
 For item-based grenade regressions, check the grenade state-machine phases before blaming aim, gravity, or heuristics:

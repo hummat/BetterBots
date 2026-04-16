@@ -193,6 +193,33 @@ This mod targets bot ability activation in three paths:
 - Do not call `dofile("scripts/mods/BetterBots/...")` from leaf modules for shared helpers. That path can also fail under DMF resource loading.
 - Share common tables/functions by dependency injection through `init({...})` and `wire({...})`. `shared_rules.lua` and `bot_targeting.lua` are the canonical examples.
 
+## Hook registration: consolidation + idempotency
+
+DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `mod:hook_safe` call from the same mod on the same method is silently discarded, and emits `WARNING (hook_save): Attempting to rehook active hook [...]`. Two consequences follow.
+
+**Rule 1: one hook per (obj, method) per mod.** When multiple features need to observe or wrap the same engine method, consolidate them under a single dispatcher hook in `BetterBots.lua`. Each feature module exposes a plain callback (for example `Poxburster.post_update_target_enemy`, `MulePickup.on_refresh_destination`) and the dispatcher pcall-invokes each one in turn. Current consolidated dispatchers:
+
+| Engine method | Features dispatched | Dispatcher location |
+|---|---|---|
+| `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
+| `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
+| `BtBotMeleeAction.attack` | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
+
+**Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
+
+```lua
+local SENTINEL = "__bb_<feature>_installed"
+mod:hook_require("scripts/extension_systems/.../some_file", function(Target)
+    if not Target or rawget(Target, SENTINEL) then return end
+    Target[SENTINEL] = true
+    -- hook / field mutation here
+end)
+```
+
+The sentinel string must live on the engine class table (`rawget(Target, SENTINEL)`), not in a module-level Lua local (`setmetatable({}, {__mode="k"})`). Module locals reset when `BetterBots.lua` re-executes on hot reload; the engine class persists. Current callers of this pattern: `poxburster.lua`, `revive_ability.lua`, `ammo_policy.lua`, `weapon_action.lua`, `smart_targeting.lua`, and the two consolidated dispatchers in `BetterBots.lua`.
+
+Regression coverage: `tests/startup_regressions_spec.lua` includes idempotency tests that simulate hot reload by loading the test harness twice with a shared extension table and assert zero new hook registrations on the second load.
+
 ## Why item fallback is needed
 
 Item-based abilities rely heavily on weapon `conditional_state_to_action_input` chains (for example wield -> channel/place).
