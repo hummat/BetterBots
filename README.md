@@ -148,11 +148,24 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Healing deferral
 - [x] Mule scripture/tome pickup (grimoires opt-in)
 
-**Long-term**
-- [ ] Talent-aware bot behavior
-- [ ] Healing item management
-- [ ] Weapon special actions (parry, bayonet)
-- [ ] Utility-based ability scoring
+**Planned for v1.0.0 (final release)**
+- [ ] Navmesh validation for charge/dash abilities
+- [ ] Per-breed weakspot aim map (Mauler, Crusher, Bulwark)
+- [ ] Talent-aware bot behavior (Zealot Martyrdom, Psyker Warp Siphon, Venting Shriek, Veteran VoC)
+- [ ] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
+- [ ] Melee activated specials (power sword, thunder hammer, force sword)
+- [ ] Pocketable pickup primitive + medicae/stim/med-kit discipline
+- [ ] Deployable crate carry and deploy (ammo + medical)
+- [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
+- [ ] Communication wheel response (ForTheEmperor compat)
+- [ ] Smart-tag item interaction bridge
+- [ ] Unified non-book resource arbitration
+
+**Post-1.0 (may never ship)**
+- Utility-based ability scoring (architectural)
+- Built-in bot profile management (Tertium4Or5 replacement)
+- Grenade/blitz tactical evaluator
+- User-authored bot profiles
 
 See [Status Snapshot](docs/dev/status.md) and [Validation Tracker](docs/dev/validation-tracker.md) for detailed evidence.
 
