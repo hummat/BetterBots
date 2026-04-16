@@ -127,37 +127,109 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 91 | Bot weakspot aim MVP | Closed 2026-04-13. `ranged_meta_data.lua` injects vanilla-style `aim_at_node = { 'j_head', 'j_spine' }` for lasguns, autoguns, bolters, and stub revolvers when the template leaves `attack_meta_data.aim_at_node` unset. Existing `aim_at_node` values still win, and vanilla `target_breed.override_bot_target_node` behavior is unchanged. Live runtime confirmation now exists via `weakspot aim selected j_head|j_spine ...`. Per-breed weakspot map (Mauler/Crusher/Bulwark) remains deferred to `#92`. |
 | 93 | Grenade ballistic arc fix | **Closed 2026-04-13.** `grenade_fallback.lua` now resolves projectile locomotion data from the equipped grenade weapon template and mirrors vanilla `Trajectory.angle_to_hit_moving_target(...)` solving for supported gravity-affected manual-physics projectile families. `console-2026-04-13-14.10.19` confirmed ballistic aim, queued wield, and charge consumption during live throws; closure used that runtime evidence plus manual gameplay confirmation that the remaining short-throw concern was gone. Covered: standard grenades, handleless grenades, Ogryn grenade throws, and zealot throwing knives. Flat fallback remains for `broker_missile`, psyker knives, whistle, smite, chain lightning, and mines. |
 
-### v1.0.0 — "Bot Identity"
+### v1.0.0 — "Bot Identity" (final release)
 
-*Theme: bots feel like teammates, not automatons. VT2 Bot Improvements parity. Mechanical polish + talent awareness.*
+*Theme: bots feel like teammates, not automatons. VT2 Bot Improvements parity. Mechanical polish + talent awareness + consumable-item coordination.*
+
+**Release framing.** `v1.0.0` is scoped as the terminal release. Post-1.0 work may never ship — the milestone therefore includes everything feasible without architectural rewrites, not just the cheapest wins. Broad-scope follow-ups under individual issues are formally documented as scope-exit (see Post-1.0 section).
+
+**Execution order.** Sprints are a logical dependency ordering, not calendar weeks. Foundation primitives (F1 talent context, F2 pocketable pickup) are load-bearing — F2 unlocks three downstream features on its own.
+
+#### Sprint 1 — Foundations + cheap independent wins
+
+| # | Item | Notes |
+|---|------|-------|
+| F1 | Talent/buff context extension | Additive fields in `build_context()` — `has_talent()`, `current_stacks()`. Prerequisite for `#38`. Pure additive. |
+| 13 | Navmesh charge/dash validation | GwNav raycast before committing charge direction. Darktide uses navigation destination vector, not `aim_position` (per March 8 audit correction on issue). Applies to `ogryn_charge`, `adamant_charge`, `zealot_targeted_dash`. Existing rescue-aim path at `ability_queue.lua:359` is a complementary layer, not a substitute. |
+| 92 | Per-breed weakspot aim map | Hook `BtBotShootAction._set_new_aim_target` + breed→node override table. Ships atop `#91` MVP allowlist in `ranged_meta_data.lua:224`. Independent of `#41`. Per-breed node names need verification from `breeds/*` source. |
+| 86 | Tier 3 revive cover — timing investigation | Answer the blocker in the issue body: does `BtBotInteractAction.enter` leave ≥1.5–2s window before revive commits? Ship or scope-exit based on result. Cheap to investigate. |
+
+#### Sprint 2 — Keystone-aware layer (shipped-roster coverage)
+
+Not a Zealot-Martyrdom one-liner. BB ships three tuned builds in `bot_profiles.lua`; each needs heuristic touchpoints.
+
+| Build | Talent marker | Touchpoint |
+|---|---|---|
+| Zealot Martyrdom | `zealot_martyrdom` | Healing suppression + `zealot_invisibility` low-HP panic disable; wound-cure exception |
+| Psyker Warp Siphon / glass cannon | `psyker_damage_based_on_warp_charge` + `psyker_warp_glass_cannon` | Raise peril vent threshold to preserve warp-charge-scaled damage |
+| Psyker Venting Shriek cadence | `psyker_shout_vent_warp_charge` | Shout as vent-trigger; cooldown shape differs from burst-damage shout |
+| Veteran VoC + Focus Target | existing stance path | Targeting weight pass — verify focus-target passive flows through |
+
+Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor) remain post-1.0.
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 13 | Navmesh validation for charges | GwNav raycast before committing charge direction. VT2 reference values available. Darktide uses navigation destination vector, not `aim_position`. Moved from v0.11.0 — research-heavy, better paired with weapon-family work. |
-| 24 | Healing item management | Medicae discipline, healing item distribution, stim usage. Three independent subsystems. |
-| 97 | Unified non-book resource arbitration after human reserve | Normalize resource arbitration so bots treat any missing amount as worth taking once eligible humans are above reserve. Scope: ammo, ammo-driven grenade refills, valid world grenade pickups, medicae stations, and med-crates. Explicitly excludes books and still-dead pocketable health paths. Filed 2026-04-15 and deferred from v0.11.x to v1.0.0 because this is a behavior-policy change, not a hotfix. |
-| 33 | Weapon special actions | Parry, heavy sweep, racking slide. Input mechanism trivial; decision logic (when to parry) is the work. |
-| 38 | Talent-aware behavior | Zealot Martyrdom PoC: suppress healing, adjust heuristic thresholds. Framework for future keystones (Scrier's Gaze peril, Carapace Armor stacks). Detection via `talent_extension:talents()`. |
-| 41 | Weapon-aware ADS vs hip-fire | Dynamic `ranged_gestalt` per weapon family. Per-weapon aim data alongside `attack_meta_data`. Moved from v0.11.0 — wide blast radius across ranged code, pairs with weapon-family taxonomy. |
-| 86 | Tier 3 revive cover (extends #7) | Extend pre-revive activation to item-based defensives: Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Requires parallel resolution branch through `item_fallback.lua`. 2026-04-11 audit confirmed combat-ability whitelist is complete; Tier 3 is the remaining gap. |
-| 92 | Per-breed weakspot aim map (follow-up to #91) | MVP #91 randomizes head/spine via `attack_meta_data` for all humanoid breeds, which is correct for ~80% but wrong for several elites: Mauler helmet glances, Crusher carapace front rending-resistant (back-of-head is the weakspot), Bulwark shield-front exposure. Hook `BtBotShootAction._set_new_aim_target` (per-target acquisition, cheap) and override `scratchpad.aim_at_node` from a `{[breed_name] = aim_node}` table. Depends on #91 (MVP injection layer) + #41 (weapon-family classifier — skip override on weapons where breed weakspot doesn't matter). Per-breed node names need verification from `breeds/*` source. Filed 2026-04-11. |
-| 98 | Harden engine-facing metadata consumers against sparse tables | Narrow hardening issue filed 2026-04-15 after three separate melee crash fixes (`299eaac`, `ebcb71c`, `15fdd65`) exposed the same root cause: partial/malformed engine metadata reaching hot paths. Scope is targeted boundary hardening + sparse-shape regressions for metadata readers, not blanket `pcall` or a broad refactor. |
-| 99 | Post-#82 perf follow-up: benchmark protocol and medium-risk hotspots | New perf follow-up filed 2026-04-16 after closing `#82`. Scope is explicitly **not** another low-risk audit. Preserve the useful conclusions from `#82`: current-branch mission-end samples still range roughly `99.1-124.5 us/bot/frame`, the latest validated run is `104.9 us/bot/frame`, and the remaining meaningful hotspots are `ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, and `ammo_policy.update_ammo`. First job is to define a real benchmark protocol / acceptance target before doing more medium-risk work. |
+| 38 | Talent-aware behavior | Full shipped-roster coverage per table above. Detection via `talent_extension:talents()` + `buff_extension:current_stacks()`. Graceful degrade when talent missing (non-BB profiles). Validation surface = load BB + Solo Play + each class slot. |
 
-### Post-1.0 — "Intelligence Architecture"
+#### Sprint 3 — Close-range ranged gap + melee identity
 
-*Theme: architectural upgrades and research-track items. Not scoped for a release — each is a mini-project.*
+| # | Issue | Notes |
+|---|-------|-------|
+| 41 (narrow) | Weapon-family close-range classifier | Purgatus/flamer/shotgun/stubber — hip-fire gestalt + skip melee transition under close-range pressure. Closes Nexus Auric Psyker-dies-most field report. Broad enemy-aware fire cadence stays post-1.0. Touches `target_type_hysteresis.lua`, `ranged_meta_data.lua`, `weapon_action.lua`, vanilla `_should_aim` — med-high blast radius even when narrowed. |
+| 33 (narrow) | Activate_special melee | Power sword, thunder hammer, force sword — pre-engagement `special_action` input when facing elite/specialist + charges available. `damage_profile_special_active` is 2–3× damage + rending + AP per Mar 15 comment on issue. Biggest unshipped lethality lift. Ranged specials + `toggle_special` chainaxe energy mgmt stay post-1.0. |
+
+#### Sprint 4 — Pocketable pickup primitive + consumable features
+
+F2 is the real infrastructure bet. One primitive unlocks three downstream features. Per `#24` Mar 8 audit + `#88` body, the shared blocker is a missing BT primitive for pocketable item pickup.
+
+| # | Item | Notes |
+|---|------|-------|
+| F2 | Pocketable pickup primitive | New module `pocketable_pickup.lua`: BT walk-to-unit + interact + pocket-slot insert. No existing path in bot BT. Load-bearing. |
+| 24 (a) | Medicae discipline | Extend `healing_deferral.lua:182` plumbing: corruption-only gate + charge reserve + 80%+ skip. Existing hooks. |
+| 24 (b) | Stim usage | Rides F2; trigger = high-threat combat entry. |
+| 24 (c) | Med-kit carry + distribute | Rides F2; give-to-ally on ping or <40% threshold. |
+| 88 | Deployable crate carry + deploy | Rides F2 for ammo + medical pocketable forms. Existing mule-pickup plumbing (`mule_pickup.lua:64`, `bot_group.lua:1064`, `bt_bot_conditions.lua:287`) carries the carry side. Deploy-location heuristic (coherency anchor + ≥2 allies + resource need + no 15m enemies) is the real design cost. |
+
+#### Sprint 5 — Team coordination + safety
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 86 | Tier 3 revive cover | Ship if Sprint 1 investigation cleared the timing window. Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Parallel resolution branch through `item_fallback.lua`. |
+| 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
+| 96 | Smart-tag item interaction bridge | Route explicit non-enemy smart-tag interactions into bot pickup/drop orders. Sits atop `#24` + `#88` pickup paths — queue after those ship. |
+| 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
+
+#### Sprint 6 — Validation, hardening, release
+
+| # | Issue | Notes |
+|---|-------|-------|
+| 98 | Sparse metadata hardening | Targeted boundary guards in engine-facing consumers — follow-up to three v0.11.x melee crash fixes (`299eaac`, `ebcb71c`, `15fdd65`). No blanket `pcall`, no broad refactor. |
+| 99 | Perf benchmark protocol | Reusable perf harness — acceptance target definition first, then medium-risk hotspot work (`ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, `ammo_policy.update_ammo`). Current-branch mission-end sample: `104.9 us/bot/frame`. |
+| 85 | Combat ability identity refactor | Tech debt, user-invisible — separate `template_name` from `ability_name` semantics. Ship if runway permits; drop first if tight. |
+| — | Full cold-boot soak | Both mod load orders, grep DMF warnings in raw console, Auric mission runs. |
+| — | Nexus package + changelog + outreach | Release mechanics. |
+
+#### Tier-cut priority if runway tight
+
+Hard cut order (first to drop):
+
+1. `#85` (refactor, user-invisible)
+2. `#56` (comm wheel — ForTheEmperor users only)
+3. `#86` (ship/skip based on Sprint 1 timing investigation)
+4. `#96` + `#97` (coordination polish)
+5. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
+6. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
+
+**Do not cut:** F2 primitive + its three downstream consumable features (`#24a/b/c`, `#88` carry), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
+
+### Post-1.0 — "Intelligence Architecture" (may never ship)
+
+*Theme: architectural upgrades and research-track items. If post-1.0 happens, each is a mini-project.*
 
 | # | Issue | Notes |
 |---|-------|-------|
 | 22 | Utility-based ability scoring | Replace boolean heuristics with spline-interpolated utility curves. Darktide has native `utility.lua` + `bot_utility_considerations.lua` — framework exists, needs wiring. Architectural upgrade. |
 | 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
-| 56 | Communication wheel response | React to com wheel commands (battle cry → aggression boost, need help → converge). `Vo.on_demand_vo_event` hook for detection. ForTheEmperor compat. |
-| 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` (companion command smart tag) and is intentionally narrower than `#22`. |
+| 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` and is intentionally narrower than `#22`. |
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
-| 85 | Refactor combat ability identity | Separate `template_name` from `ability_name` semantics. Tech debt cleanup, no user-visible value. |
-| 88 | Deployable crate carry + deploy (ammo + medical) | Bots walk past `pocketable` form crates — cannot carry, cannot deploy. Full vanilla use pipeline for *deployed* crates (see `#39`/`#72`), but no detection, carry, or deploy action for carryable form. Shared pocketable-pickup primitive with `#24` stim section. Design work: deploy-location heuristic (coherency anchor, objective markers, ally resource needs). Filed 2026-04-11 after `#32` triage exposed the gap. |
-| 96 | Bridge explicit smart-tag item interactions into bot pickup/drop orders | Shared bridge issue, not an item-family issue. VT2 precedent is explicit pickup orders via item-ping/social-wheel response; Darktide has `BotOrder` backend plus smart-tag interaction backend but no obvious equivalent Lua UI sender. Scope: route explicit non-enemy smart-tag interaction into bot pickup/drop assignment for supported families; queue after `#24` and `#88`. |
+
+**Broad-scope cuts (scope-exit, captured under parent issues):**
+
+- Broad `#24`: complex healing-item ping negotiation beyond F2 primitive + medicae + basic distribution
+- Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide), `toggle_special` chainaxe energy management
+- Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type
+- Broad `#92`: Bulwark angle-aware aim (shield direction tracking)
+- Keystone extensions beyond shipped roster: Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt
 
 ### Validation-gated — slot into any batch when testable
 
