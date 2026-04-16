@@ -1,5 +1,3 @@
-local _is_monster_signal_allowed
-
 local ADAMANT_STANCE_THRESHOLDS = {
 	aggressive = {
 		low_toughness = 0.45,
@@ -30,22 +28,7 @@ local ADAMANT_STANCE_THRESHOLDS = {
 	},
 }
 
--- #17: once a heuristic would key off target_is_monster, the decision must
--- first confirm the monster is not a dormant daemonhost. Centralized so every
--- call site gets the same gate (and respects the avoidance setting toggle).
-local function _is_monster_signal_allowed(context)
-	if not context.target_is_monster then
-		return false
-	end
-	if
-		context.target_is_dormant_daemonhost
-		and _is_daemonhost_avoidance_enabled
-		and _is_daemonhost_avoidance_enabled()
-	then
-		return false
-	end
-	return true
-end
+local _is_monster_signal_allowed
 
 local function _can_activate_adamant_stance(context, thresholds)
 	local target_distance = context.target_enemy_distance

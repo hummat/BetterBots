@@ -2,16 +2,13 @@ local _fixed_time
 local _decision_context_cache
 local _super_armor_breed_cache
 local _armor_type_super_armor
-local _is_testing_profile
 local _resolve_preset
 local _debug_log
 local _debug_enabled
-local _combat_ability_identity
 local _daemonhost_breed_names
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_state
 local _overlapping_liquids = {}
-local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
 local SHIELD_INTERACTION_TYPES = {
 	scanning = true,
 	setup_decoding = true,

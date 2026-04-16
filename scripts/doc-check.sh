@@ -15,7 +15,7 @@ ok()   { echo "  ok:  $*"; }
 
 # ── 1. Heuristic function count ──────────────────────────────────────────────
 
-actual_heuristic_count=$(grep -c '^local function _can_activate_' scripts/mods/BetterBots/heuristics.lua)
+actual_heuristic_count=$(grep -h '^local function _can_activate_' scripts/mods/BetterBots/heuristics_*.lua | wc -l | tr -d ' ')
 
 for f in AGENTS.md docs/dev/debugging.md; do
   # Match lines like "18 per-template heuristic functions" or "18 `_can_activate_*` heuristic functions"

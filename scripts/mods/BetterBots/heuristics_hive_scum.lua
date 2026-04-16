@@ -38,27 +38,6 @@ local function _can_activate_broker_rage(context)
 	return false, "broker_rage_hold"
 end
 
-local ZEALOT_RELIC_THRESHOLDS = {
-	aggressive = {
-		team_toughness = 0.55,
-		team_max_enemies = 3,
-		self_critical_toughness = 0.35,
-		self_max_enemies = 4,
-	},
-	balanced = {
-		team_toughness = 0.40,
-		team_max_enemies = 2,
-		self_critical_toughness = 0.25,
-		self_max_enemies = 3,
-	},
-	conservative = {
-		team_toughness = 0.30,
-		team_max_enemies = 1,
-		self_critical_toughness = 0.15,
-		self_max_enemies = 2,
-	},
-}
-
 local function _can_activate_stimm_field(context)
 	if context.allies_in_coherency == 0 then
 		return false, "stimm_block_no_allies"

@@ -175,33 +175,6 @@ local function _can_activate_veteran_stealth(context, thresholds)
 	return false, "veteran_stealth_hold"
 end
 
-local ZEALOT_DASH_THRESHOLDS = {
-	aggressive = {
-		low_toughness = 0.45,
-		elite_min_dist = 3,
-		elite_max_dist = 28,
-		combat_gap_nearby = 1,
-		combat_gap_min_dist = 3,
-		combat_gap_max_dist = 22,
-	},
-	balanced = {
-		low_toughness = 0.30,
-		elite_min_dist = 5,
-		elite_max_dist = 20,
-		combat_gap_nearby = 2,
-		combat_gap_min_dist = 4,
-		combat_gap_max_dist = 15,
-	},
-	conservative = {
-		low_toughness = 0.20,
-		elite_min_dist = 6,
-		elite_max_dist = 15,
-		combat_gap_nearby = 3,
-		combat_gap_min_dist = 5,
-		combat_gap_max_dist = 10,
-	},
-}
-
 return {
 	init = function(deps)
 		assert(deps.combat_ability_identity, "heuristics_veteran: combat_ability_identity dep required")
