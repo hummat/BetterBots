@@ -37,6 +37,512 @@ local function read_file(path)
 	return source
 end
 
+local function find_named_call(calls, module_name)
+	for i = 1, #calls do
+		if calls[i].module == module_name then
+			return calls[i]
+		end
+	end
+
+	return nil
+end
+
+local function find_install_call(calls, module_name, method_name)
+	for i = 1, #calls do
+		local entry = calls[i]
+		if entry.module == module_name and entry.method == method_name then
+			return entry
+		end
+	end
+
+	return nil
+end
+
+local function find_echo(echoes, pattern)
+	for i = 1, #echoes do
+		if string.find(echoes[i], pattern, 1, true) then
+			return echoes[i]
+		end
+	end
+
+	return nil
+end
+
+local function make_runtime_module(module_name, install_calls, extra)
+	local module = extra or {}
+
+	if module.init == nil then
+		module.init = function(deps)
+			install_calls.init_calls[#install_calls.init_calls + 1] = {
+				module = module_name,
+				deps = deps,
+			}
+		end
+	end
+
+	if module.wire == nil then
+		module.wire = function(refs)
+			install_calls.wire_calls[#install_calls.wire_calls + 1] = {
+				module = module_name,
+				refs = refs,
+			}
+		end
+	end
+
+	if module.register_hooks == nil then
+		module.register_hooks = function(...)
+			install_calls.register_calls[#install_calls.register_calls + 1] = {
+				module = module_name,
+				args = { ... },
+			}
+		end
+	end
+
+	return module
+end
+
+local function make_bootstrap_harness()
+	local saved_get_mod = rawget(_G, "get_mod")
+	local saved_require = require
+	local saved_script_unit = rawget(_G, "ScriptUnit")
+	local saved_blackboards = rawget(_G, "BLACKBOARDS")
+	local hook_require_callbacks = {}
+	local install_calls = {
+		init_calls = {},
+		wire_calls = {},
+		register_calls = {},
+		install_calls = {},
+	}
+	local echoes = {}
+	local warnings = {}
+	local commands = {}
+	local settings = {
+		enable_debug_logs = 0,
+		enable_event_log = false,
+		enable_perf_timing = false,
+	}
+
+	local function record_install(module_name, method_name, ...)
+		install_calls.install_calls[#install_calls.install_calls + 1] = {
+			module = module_name,
+			method = method_name,
+			args = { ... },
+		}
+	end
+
+	local modules = {}
+
+	modules.LogLevels = make_runtime_module("LogLevels", install_calls, {
+		resolve_setting = function()
+			return 0
+		end,
+		should_log = function()
+			return false
+		end,
+		level_name = function()
+			return "off"
+		end,
+	})
+
+	modules.SharedRules = {}
+	modules.BotTargeting = {}
+	modules.CombatAbilityIdentity = make_runtime_module("CombatAbilityIdentity", install_calls, {
+		resolve = function()
+			return nil
+		end,
+	})
+	modules.TeamCooldown = make_runtime_module("TeamCooldown", install_calls, {
+		record = function() end,
+		reset = function() end,
+	})
+	modules.Settings = make_runtime_module("Settings", install_calls, {
+		resolve_human_timing_config = function()
+			return {}
+		end,
+		resolve_pressure_leash_config = function()
+			return {}
+		end,
+		is_testing_profile = function()
+			return false
+		end,
+		resolve_preset = function()
+			return "default"
+		end,
+		is_feature_enabled = function()
+			return false
+		end,
+		sprint_follow_distance = function()
+			return 12
+		end,
+		player_tag_bonus = function()
+			return 1
+		end,
+		special_chase_penalty_range = function()
+			return 8
+		end,
+		melee_horde_light_bias = function()
+			return 0.5
+		end,
+		is_item_ability_enabled = function()
+			return true
+		end,
+		is_combat_template_enabled = function()
+			return true
+		end,
+		is_grenade_enabled = function()
+			return true
+		end,
+		is_bot_grimoire_pickup_enabled = function()
+			return false
+		end,
+		DEFAULTS = {},
+	})
+	modules.Heuristics = make_runtime_module("Heuristics", install_calls, {
+		build_context = function()
+			return {}
+		end,
+		resolve_decision = function()
+			return false, "noop", {}
+		end,
+		evaluate_item_heuristic = function()
+			return false, "noop"
+		end,
+		evaluate_grenade_heuristic = function()
+			return false, "noop"
+		end,
+		normalize_grenade_context = function(_unit, context)
+			return context
+		end,
+		enemy_breed = function()
+			return nil
+		end,
+	})
+	modules.ItemFallback = make_runtime_module("ItemFallback", install_calls, {
+		should_lock_weapon_switch = function()
+			return false
+		end,
+		can_use_item_fallback = function()
+			return false
+		end,
+		schedule_retry = function() end,
+		reset_item_sequence_state = function() end,
+	})
+	modules.Debug = make_runtime_module("Debug", install_calls, {
+		context_snapshot = function(context)
+			return context
+		end,
+		fallback_state_snapshot = function(state)
+			return state
+		end,
+		bot_slot_for_unit = function()
+			return 1
+		end,
+		register_commands = function() end,
+		collect_alive_bots = function()
+			return {}
+		end,
+	})
+	modules.EventLog = make_runtime_module("EventLog", install_calls, {
+		is_enabled = function()
+			return false
+		end,
+		set_enabled = function() end,
+		start_session = function() end,
+		end_session = function() end,
+		try_flush = function() end,
+		next_attempt_id = function()
+			return 1
+		end,
+		emit = function() end,
+	})
+	modules.Perf = make_runtime_module("Perf", install_calls, {
+		begin = function()
+			return 0
+		end,
+		finish = function() end,
+		sync_setting = function() end,
+		enter_run = function() end,
+		mark_bot_frame = function() end,
+		report_and_reset = function()
+			return nil
+		end,
+		format_report_lines = function()
+			return {}
+		end,
+		is_enabled = function()
+			return false
+		end,
+	})
+	modules.Sprint = make_runtime_module("Sprint", install_calls, {
+		DAEMONHOST_COMBAT_RANGE_SQ = 9,
+		is_near_daemonhost = function()
+			return false
+		end,
+		install_bot_unit_input_hooks = function(target)
+			record_install("Sprint", "install_bot_unit_input_hooks", target)
+		end,
+	})
+	modules.MeleeMetaData = make_runtime_module("MeleeMetaData", install_calls, {
+		inject = function() end,
+		sync_all = function() end,
+	})
+	modules.MeleeAttackChoice = make_runtime_module("MeleeAttackChoice", install_calls, {
+		install_melee_hooks = function(target)
+			record_install("MeleeAttackChoice", "install_melee_hooks", target)
+		end,
+	})
+	modules.RangedMetaData = make_runtime_module("RangedMetaData", install_calls, {
+		inject = function() end,
+		sync_all = function() end,
+	})
+	modules.TargetSelection = make_runtime_module("TargetSelection", install_calls)
+	modules.Poxburster = make_runtime_module("Poxburster", install_calls, {
+		install_melee_hooks = function(target)
+			record_install("Poxburster", "install_melee_hooks", target)
+		end,
+	})
+	modules.SmartTargeting = make_runtime_module("SmartTargeting", install_calls)
+	modules.AnimationGuard = make_runtime_module("AnimationGuard", install_calls)
+	modules.AirlockGuard = make_runtime_module("AirlockGuard", install_calls)
+	modules.VfxSuppression = make_runtime_module("VfxSuppression", install_calls, {
+		install_ability_ext_hooks = function(target)
+			record_install("VfxSuppression", "install_ability_ext_hooks", target)
+		end,
+	})
+	modules.WeaponAction = make_runtime_module("WeaponAction", install_calls)
+	modules.SustainedFire = make_runtime_module("SustainedFire", install_calls, {
+		install_bot_unit_input_hooks = function(target)
+			record_install("SustainedFire", "install_bot_unit_input_hooks", target)
+		end,
+		observe_queued_weapon_action = function() end,
+	})
+	modules.ConditionPatch = make_runtime_module("ConditionPatch", install_calls)
+	modules.AbilityQueue = make_runtime_module("AbilityQueue", install_calls, {
+		try_queue = function() end,
+	})
+	modules.GrenadeFallback = make_runtime_module("GrenadeFallback", install_calls, {
+		prime_weapon_templates = function(target)
+			record_install("GrenadeFallback", "prime_weapon_templates", target)
+		end,
+		should_lock_weapon_switch = function()
+			return false
+		end,
+		should_block_wield_input = function()
+			return false
+		end,
+		should_block_weapon_action_input = function()
+			return false
+		end,
+		record_charge_event = function() end,
+		try_queue = function() end,
+	})
+	modules.PingSystem = make_runtime_module("PingSystem", install_calls, {
+		update = function() end,
+	})
+	modules.CompanionTag = make_runtime_module("CompanionTag", install_calls, {
+		update = function() end,
+		is_recent_command_target = function()
+			return false
+		end,
+	})
+	modules.HealingDeferral = make_runtime_module("HealingDeferral", install_calls, {
+		install_bot_group_hooks = function(target)
+			record_install("HealingDeferral", "install_bot_group_hooks", target)
+		end,
+		install_behavior_ext_hooks = function(target)
+			record_install("HealingDeferral", "install_behavior_ext_hooks", target)
+		end,
+	})
+	modules.AmmoPolicy = make_runtime_module("AmmoPolicy", install_calls, {
+		install_behavior_ext_hooks = function(target)
+			record_install("AmmoPolicy", "install_behavior_ext_hooks", target)
+		end,
+	})
+	modules.MulePickup = make_runtime_module("MulePickup", install_calls, {
+		install_bot_group_hooks = function(target)
+			record_install("MulePickup", "install_bot_group_hooks", target)
+		end,
+		install_behavior_ext_hooks = function(target)
+			record_install("MulePickup", "install_behavior_ext_hooks", target)
+		end,
+		patch_pickups = function() end,
+		sync_live_bot_groups = function() end,
+	})
+	modules.BotProfiles = make_runtime_module("BotProfiles", install_calls, {
+		reset = function() end,
+		register_hooks = function()
+			install_calls.register_calls[#install_calls.register_calls + 1] = {
+				module = "BotProfiles",
+				args = {},
+			}
+		end,
+	})
+	modules.HumanLikeness = make_runtime_module("HumanLikeness", install_calls, {
+		patch_bot_settings = function(target)
+			record_install("HumanLikeness", "patch_bot_settings", target)
+		end,
+	})
+	modules.TargetTypeHysteresis = make_runtime_module("TargetTypeHysteresis", install_calls)
+	modules.EngagementLeash = make_runtime_module("EngagementLeash", install_calls, {
+		install_melee_hooks = function(target)
+			record_install("EngagementLeash", "install_melee_hooks", target)
+		end,
+		is_movement_ability = function()
+			return false
+		end,
+		record_charge = function() end,
+	})
+	modules.ReviveAbility = make_runtime_module("ReviveAbility", install_calls, {
+		install_behavior_ext_hooks = function(target)
+			record_install("ReviveAbility", "install_behavior_ext_hooks", target)
+		end,
+	})
+
+	local module_path_map = {
+		["BetterBots/scripts/mods/BetterBots/log_levels"] = modules.LogLevels,
+		["BetterBots/scripts/mods/BetterBots/shared_rules"] = modules.SharedRules,
+		["BetterBots/scripts/mods/BetterBots/combat_ability_identity"] = modules.CombatAbilityIdentity,
+		["BetterBots/scripts/mods/BetterBots/bot_targeting"] = modules.BotTargeting,
+		["BetterBots/scripts/mods/BetterBots/team_cooldown"] = modules.TeamCooldown,
+		["BetterBots/scripts/mods/BetterBots/meta_data"] = modules.MetaData
+			or make_runtime_module("MetaData", install_calls, {
+				inject = function() end,
+			}),
+		["BetterBots/scripts/mods/BetterBots/settings"] = modules.Settings,
+		["BetterBots/scripts/mods/BetterBots/heuristics"] = modules.Heuristics,
+		["BetterBots/scripts/mods/BetterBots/item_fallback"] = modules.ItemFallback,
+		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
+		["BetterBots/scripts/mods/BetterBots/event_log"] = modules.EventLog,
+		["BetterBots/scripts/mods/BetterBots/perf"] = modules.Perf,
+		["BetterBots/scripts/mods/BetterBots/sprint"] = modules.Sprint,
+		["BetterBots/scripts/mods/BetterBots/melee_meta_data"] = modules.MeleeMetaData,
+		["BetterBots/scripts/mods/BetterBots/melee_attack_choice"] = modules.MeleeAttackChoice,
+		["BetterBots/scripts/mods/BetterBots/ranged_meta_data"] = modules.RangedMetaData,
+		["BetterBots/scripts/mods/BetterBots/target_selection"] = modules.TargetSelection,
+		["BetterBots/scripts/mods/BetterBots/poxburster"] = modules.Poxburster,
+		["BetterBots/scripts/mods/BetterBots/smart_targeting"] = modules.SmartTargeting,
+		["BetterBots/scripts/mods/BetterBots/animation_guard"] = modules.AnimationGuard,
+		["BetterBots/scripts/mods/BetterBots/airlock_guard"] = modules.AirlockGuard,
+		["BetterBots/scripts/mods/BetterBots/vfx_suppression"] = modules.VfxSuppression,
+		["BetterBots/scripts/mods/BetterBots/weapon_action"] = modules.WeaponAction,
+		["BetterBots/scripts/mods/BetterBots/sustained_fire"] = modules.SustainedFire,
+		["BetterBots/scripts/mods/BetterBots/condition_patch"] = modules.ConditionPatch,
+		["BetterBots/scripts/mods/BetterBots/ability_queue"] = modules.AbilityQueue,
+		["BetterBots/scripts/mods/BetterBots/grenade_fallback"] = modules.GrenadeFallback,
+		["BetterBots/scripts/mods/BetterBots/ping_system"] = modules.PingSystem,
+		["BetterBots/scripts/mods/BetterBots/companion_tag"] = modules.CompanionTag,
+		["BetterBots/scripts/mods/BetterBots/healing_deferral"] = modules.HealingDeferral,
+		["BetterBots/scripts/mods/BetterBots/ammo_policy"] = modules.AmmoPolicy,
+		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
+		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
+		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
+		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
+		["BetterBots/scripts/mods/BetterBots/engagement_leash"] = modules.EngagementLeash,
+		["BetterBots/scripts/mods/BetterBots/revive_ability"] = modules.ReviveAbility,
+	}
+
+	local fake_mod = {
+		get = function(_, setting_id)
+			return settings[setting_id]
+		end,
+		set = function(_, setting_id, value)
+			settings[setting_id] = value
+		end,
+		io_dofile = function(_, path)
+			return assert(module_path_map[path], "missing fake io_dofile module: " .. path)
+		end,
+		hook_require = function(_, path, callback)
+			hook_require_callbacks[path] = callback
+		end,
+		hook = function(_, target, method_name, handler)
+			local original = target[method_name] or function() end
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end,
+		hook_safe = function(_, target, method_name, handler)
+			local original = target[method_name] or function() end
+			target[method_name] = function(...)
+				local results = { original(...) }
+				handler(...)
+				return unpack(results)
+			end
+		end,
+		command = function(_, name, _description, callback)
+			commands[name] = callback
+		end,
+		echo = function(_, message)
+			echoes[#echoes + 1] = message
+		end,
+		warning = function(_, message)
+			warnings[#warnings + 1] = message
+		end,
+	}
+
+	local harness = {
+		mod = fake_mod,
+		modules = modules,
+		echoes = echoes,
+		warnings = warnings,
+		commands = commands,
+		init_calls = install_calls.init_calls,
+		wire_calls = install_calls.wire_calls,
+		register_calls = install_calls.register_calls,
+		install_calls = install_calls.install_calls,
+		load = function(self)
+			rawset(_G, "get_mod", function(mod_name)
+				assert.equals("BetterBots", mod_name)
+				return fake_mod
+			end)
+			rawset(_G, "ScriptUnit", {
+				has_extension = function()
+					return nil
+				end,
+				extension = function()
+					return nil
+				end,
+			})
+			rawset(_G, "BLACKBOARDS", {})
+			rawset(_G, "require", function(path)
+				if path == "scripts/utilities/fixed_frame" then
+					return {
+						get_latest_fixed_time = function()
+							return 0
+						end,
+					}
+				end
+				if path == "scripts/settings/damage/armor_settings" then
+					return {
+						types = {
+							super_armor = 4,
+							armored = 2,
+						},
+					}
+				end
+				if path == "scripts/settings/bot/bot_settings" then
+					return {}
+				end
+				return saved_require(path)
+			end)
+
+			local ok, loaded = pcall(dofile, "scripts/mods/BetterBots/BetterBots.lua")
+			rawset(_G, "require", saved_require)
+			rawset(_G, "get_mod", saved_get_mod)
+			rawset(_G, "ScriptUnit", saved_script_unit)
+			rawset(_G, "BLACKBOARDS", saved_blackboards)
+
+			assert.is_true(ok, tostring(loaded))
+			return fake_mod
+		end,
+		invoke_hook_require = function(_, path, target)
+			local callback = assert(hook_require_callbacks[path], "missing hook_require callback for " .. path)
+			callback(target)
+		end,
+	}
+
+	return harness
+end
+
 describe("startup regressions", function()
 	it("escapes percent signs in localized setting labels", function()
 		for key, entry in pairs(Localization) do
@@ -156,6 +662,43 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.init%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.update%(", 1))
+	end)
+
+	it("boots BetterBots.lua against fake mod and asserts runtime wiring", function()
+		local harness = make_bootstrap_harness()
+		local mod = harness:load()
+
+		assert.is_truthy(mod)
+		assert.is_truthy(find_named_call(harness.init_calls, "Settings"))
+		assert.is_truthy(find_named_call(harness.init_calls, "AbilityQueue"))
+		assert.is_truthy(find_named_call(harness.wire_calls, "ItemFallback"))
+		assert.is_truthy(find_named_call(harness.register_calls, "WeaponAction"))
+
+		local item_wire = find_named_call(harness.wire_calls, "ItemFallback")
+		assert.equals(harness.modules.Heuristics.build_context, item_wire.refs.build_context)
+		assert.equals(harness.modules.Settings.is_item_ability_enabled, item_wire.refs.is_item_ability_enabled)
+
+		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
+		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
+		assert.is_function(weapon_register.args[1].should_block_wield_input)
+		assert.is_function(weapon_register.args[1].should_block_weapon_action_input)
+
+		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
+			attack = function() end,
+		})
+		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
+		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
+		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
+
+		assert.is_truthy(find_install_call(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "Poxburster", "install_melee_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "EngagementLeash", "install_melee_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "SustainedFire", "install_bot_unit_input_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "Sprint", "install_bot_unit_input_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
+		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
 
 	it("wires Perf into AbilityQueue initialization", function()
