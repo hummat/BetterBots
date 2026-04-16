@@ -489,7 +489,7 @@ local function make_bootstrap_harness()
 		wire_calls = install_calls.wire_calls,
 		register_calls = install_calls.register_calls,
 		install_calls = install_calls.install_calls,
-		load = function(self)
+		load = function()
 			rawset(_G, "get_mod", function(mod_name)
 				assert.equals("BetterBots", mod_name)
 				return fake_mod

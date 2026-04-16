@@ -433,7 +433,9 @@ tests/
   event_log_spec.lua                        # event buffering/flush/lifecycle
   sprint_spec.lua                           # sprint conditions + daemonhost safety
   condition_patch_spec.lua                  # DH combat suppression wrappers
+  shared_rules_spec.lua                     # parser queueability + daemonhost aggro-state helpers
   target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
+  bot_targeting_spec.lua                    # shared perception target resolution + elite/special detection
   melee_meta_data_spec.lua                  # melee meta_data classification + injection
   melee_attack_choice_spec.lua              # melee attack-choice bias for unarmored hordes
   weapon_action_spec.lua                    # weapon-action logging, dead-zone ranged fire confirmation
