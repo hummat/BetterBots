@@ -236,6 +236,14 @@ local function make_bootstrap_harness(module_overrides)
 			return nil
 		end,
 	})
+	modules.HeuristicsContext = make_runtime_module("HeuristicsContext", install_calls)
+	modules.HeuristicsVeteran = make_runtime_module("HeuristicsVeteran", install_calls)
+	modules.HeuristicsZealot = make_runtime_module("HeuristicsZealot", install_calls)
+	modules.HeuristicsPsyker = make_runtime_module("HeuristicsPsyker", install_calls)
+	modules.HeuristicsOgryn = make_runtime_module("HeuristicsOgryn", install_calls)
+	modules.HeuristicsArbites = make_runtime_module("HeuristicsArbites", install_calls)
+	modules.HeuristicsHiveScum = make_runtime_module("HeuristicsHiveScum", install_calls)
+	modules.HeuristicsGrenade = make_runtime_module("HeuristicsGrenade", install_calls)
 	modules.ItemFallback = make_runtime_module("ItemFallback", install_calls, {
 		should_lock_weapon_switch = function()
 			return false
@@ -436,6 +444,14 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/team_cooldown"] = modules.TeamCooldown,
 		["BetterBots/scripts/mods/BetterBots/meta_data"] = modules.MetaData,
 		["BetterBots/scripts/mods/BetterBots/settings"] = modules.Settings,
+		["BetterBots/scripts/mods/BetterBots/heuristics_context"] = modules.HeuristicsContext,
+		["BetterBots/scripts/mods/BetterBots/heuristics_veteran"] = modules.HeuristicsVeteran,
+		["BetterBots/scripts/mods/BetterBots/heuristics_zealot"] = modules.HeuristicsZealot,
+		["BetterBots/scripts/mods/BetterBots/heuristics_psyker"] = modules.HeuristicsPsyker,
+		["BetterBots/scripts/mods/BetterBots/heuristics_ogryn"] = modules.HeuristicsOgryn,
+		["BetterBots/scripts/mods/BetterBots/heuristics_arbites"] = modules.HeuristicsArbites,
+		["BetterBots/scripts/mods/BetterBots/heuristics_hive_scum"] = modules.HeuristicsHiveScum,
+		["BetterBots/scripts/mods/BetterBots/heuristics_grenade"] = modules.HeuristicsGrenade,
 		["BetterBots/scripts/mods/BetterBots/heuristics"] = modules.Heuristics,
 		["BetterBots/scripts/mods/BetterBots/item_fallback"] = modules.ItemFallback,
 		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
@@ -602,6 +618,19 @@ describe("startup regressions", function()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/shared_rules"%)', 1))
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/bot_targeting"%)', 1))
+	end)
+
+	it("loads split heuristics modules through mod io", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_context"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_veteran"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_zealot"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_psyker"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_ogryn"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_arbites"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_hive_scum"%)', 1))
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_grenade"%)', 1))
 	end)
 
 	it("loads smart_targeting through mod io", function()
@@ -1048,8 +1077,8 @@ describe("startup regressions", function()
 		assert.is_nil(revive:find("local function _combat_ability_name", 1, true))
 	end)
 
-	it("heuristics.lua uses breed.ranged for ranged_count (not tags.ranged)", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/heuristics.lua", "r"))
+	it("heuristics_context.lua uses breed.ranged for ranged_count (not tags.ranged)", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/heuristics_context.lua", "r"))
 		local source = assert(handle:read("*a"))
 		handle:close()
 
@@ -1251,5 +1280,20 @@ describe("startup regressions", function()
 		assert.is_not_nil(result.compute_effective_leash)
 		assert.is_not_nil(result.record_charge)
 		assert.is_not_nil(result.is_movement_ability)
+	end)
+	it("passes split heuristics modules into Heuristics.init", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local heuristics_init = find_named_call(harness.init_calls, "Heuristics")
+
+		assert.equals(harness.modules.HeuristicsContext, heuristics_init.deps.context_module)
+		assert.equals(harness.modules.HeuristicsVeteran, heuristics_init.deps.veteran_module)
+		assert.equals(harness.modules.HeuristicsZealot, heuristics_init.deps.zealot_module)
+		assert.equals(harness.modules.HeuristicsPsyker, heuristics_init.deps.psyker_module)
+		assert.equals(harness.modules.HeuristicsOgryn, heuristics_init.deps.ogryn_module)
+		assert.equals(harness.modules.HeuristicsArbites, heuristics_init.deps.arbites_module)
+		assert.equals(harness.modules.HeuristicsHiveScum, heuristics_init.deps.hive_scum_module)
+		assert.equals(harness.modules.HeuristicsGrenade, heuristics_init.deps.grenade_module)
 	end)
 end)

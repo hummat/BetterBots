@@ -3,12 +3,10 @@ local helper = require("test_helper")
 -- resolve_decision calls build_context which needs ScriptUnit
 helper.setup_engine_stubs()
 
-local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 
--- Init with minimal deps so build_context and caching work
 local fixed_t = 100
-Heuristics.init({
+local Heuristics = helper.load_split_heuristics({
 	fixed_time = function()
 		return fixed_t
 	end,
@@ -24,7 +22,7 @@ describe("resolve_decision", function()
 	before_each(function()
 		-- Bump fixed_t to bust the per-tick cache
 		fixed_t = fixed_t + 1
-		Heuristics.init({
+		helper.init_split_heuristics(Heuristics, {
 			fixed_time = function()
 				return fixed_t
 			end,
@@ -216,7 +214,7 @@ describe("resolve_decision", function()
 
 			-- Re-init with shared_rules so build_context consults
 			-- DAEMONHOST_BREED_NAMES when inspecting target_breed.
-			Heuristics.init({
+			helper.init_split_heuristics(Heuristics, {
 				fixed_time = function()
 					return fixed_t
 				end,

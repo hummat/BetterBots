@@ -1,7 +1,9 @@
 local Settings = dofile("scripts/mods/BetterBots/settings.lua")
-local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local helper = require("tests.test_helper")
+local Heuristics = helper.load_split_heuristics({
+	combat_ability_identity = CombatAbilityIdentity,
+})
 local _saved_managers = rawget(_G, "Managers")
 
 local function mock_mod(overrides)
@@ -917,7 +919,7 @@ describe("settings", function()
 				"veteran_combat_ability must NOT appear in any CATEGORY_ table (uses semantic identity)"
 			)
 
-			Heuristics.init({
+			helper.init_split_heuristics(Heuristics, {
 				fixed_time = function()
 					return 0
 				end,

@@ -106,6 +106,55 @@ local function _copy_table(source)
 	return result
 end
 
+function M.make_split_heuristics_deps(overrides)
+	local deps = {
+		fixed_time = function()
+			return 0
+		end,
+		decision_context_cache = {},
+		super_armor_breed_cache = {},
+		ARMOR_TYPE_SUPER_ARMOR = 6,
+		is_testing_profile = function()
+			return false
+		end,
+		resolve_preset = function()
+			return "balanced"
+		end,
+		debug_log = function() end,
+		debug_enabled = function()
+			return false
+		end,
+		combat_ability_identity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua"),
+		context_module = dofile("scripts/mods/BetterBots/heuristics_context.lua"),
+		veteran_module = dofile("scripts/mods/BetterBots/heuristics_veteran.lua"),
+		zealot_module = dofile("scripts/mods/BetterBots/heuristics_zealot.lua"),
+		psyker_module = dofile("scripts/mods/BetterBots/heuristics_psyker.lua"),
+		ogryn_module = dofile("scripts/mods/BetterBots/heuristics_ogryn.lua"),
+		arbites_module = dofile("scripts/mods/BetterBots/heuristics_arbites.lua"),
+		hive_scum_module = dofile("scripts/mods/BetterBots/heuristics_hive_scum.lua"),
+		grenade_module = dofile("scripts/mods/BetterBots/heuristics_grenade.lua"),
+		is_daemonhost_avoidance_enabled = function()
+			return true
+		end,
+	}
+
+	for key, value in pairs(overrides or {}) do
+		deps[key] = value
+	end
+
+	return deps
+end
+
+function M.init_split_heuristics(heuristics, overrides)
+	heuristics.init(M.make_split_heuristics_deps(overrides))
+	return heuristics
+end
+
+function M.load_split_heuristics(overrides)
+	local heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
+	return M.init_split_heuristics(heuristics, overrides)
+end
+
 local function _apply_audited_overrides(builder_name, ext, overrides, allowed_keys)
 	if not overrides then
 		return

@@ -494,9 +494,8 @@ describe("grenade_fallback", function()
 		it("normalizes priority-only targets before evaluating and selecting Assail profile", function()
 			local seen_context
 			local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
-			local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 			local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
-			Heuristics.init({
+			local Heuristics = test_helper.load_split_heuristics({
 				combat_ability_identity = CombatAbilityIdentity,
 				decision_context_cache = {},
 				super_armor_breed_cache = {},

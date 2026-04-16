@@ -1,7 +1,8 @@
 local helper = require("test_helper")
-local Heuristics = dofile("scripts/mods/BetterBots/heuristics.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
-Heuristics.init({ combat_ability_identity = CombatAbilityIdentity })
+local Heuristics = helper.load_split_heuristics({
+	combat_ability_identity = CombatAbilityIdentity,
+})
 
 local ctx = helper.make_context
 local evaluate = Heuristics.evaluate_heuristic
@@ -2291,7 +2292,7 @@ describe("heuristics", function()
 					return extensions and extensions[extension_name] or nil
 				end,
 			}
-			Heuristics.init({
+			helper.init_split_heuristics(Heuristics, {
 				fixed_time = function()
 					return current_fixed_t
 				end,
@@ -2370,7 +2371,7 @@ describe("heuristics", function()
 				},
 			}
 
-			Heuristics.init({
+			helper.init_split_heuristics(Heuristics, {
 				fixed_time = function()
 					return current_fixed_t
 				end,
@@ -2912,13 +2913,13 @@ describe("heuristics", function()
 		describe("daemonhost_avoidance setting toggle", function()
 			after_each(function()
 				-- Restore default (avoidance enabled) for the rest of the suite.
-				Heuristics.init({
+				helper.init_split_heuristics(Heuristics, {
 					combat_ability_identity = CombatAbilityIdentity,
 				})
 			end)
 
 			it("does not block dormant DH when avoidance is disabled", function()
-				Heuristics.init({
+				helper.init_split_heuristics(Heuristics, {
 					combat_ability_identity = CombatAbilityIdentity,
 					is_daemonhost_avoidance_enabled = function()
 						return false

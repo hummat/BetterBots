@@ -1,0 +1,162 @@
+local PSYKER_SHOUT_THRESHOLDS = {
+	aggressive = {
+		high_peril = 0.60,
+		surrounded = 2,
+		low_toughness = 0.30,
+		priority_dist = 30,
+		block_low_value_toughness = 0.35,
+	},
+	balanced = {
+		high_peril = 0.75,
+		surrounded = 3,
+		low_toughness = 0.20,
+		priority_dist = 20,
+		block_low_value_toughness = 0.50,
+	},
+	conservative = {
+		high_peril = 0.85,
+		surrounded = 4,
+		low_toughness = 0.12,
+		priority_dist = 15,
+		block_low_value_toughness = 0.65,
+	},
+}
+
+local function _can_activate_psyker_shout(context, thresholds)
+	if context.num_nearby == 0 then
+		return false, "psyker_shout_block_no_enemies"
+	end
+	if context.peril_pct and context.peril_pct >= thresholds.high_peril then
+		return true, "psyker_shout_high_peril"
+	end
+	if context.num_nearby >= thresholds.surrounded then
+		return true, "psyker_shout_surrounded"
+	end
+	if context.toughness_pct < thresholds.low_toughness and context.num_nearby >= 1 then
+		return true, "psyker_shout_low_toughness"
+	end
+	if
+		context.priority_target_enemy
+		and context.target_enemy_distance
+		and context.target_enemy_distance <= thresholds.priority_dist
+	then
+		return true, "psyker_shout_priority_target"
+	end
+	if
+		context.peril_pct
+		and context.peril_pct < 0.30
+		and context.num_nearby < thresholds.surrounded
+		and context.toughness_pct > thresholds.block_low_value_toughness
+	then
+		return false, "psyker_shout_block_low_value"
+	end
+
+	return false, "psyker_shout_hold"
+end
+
+local PSYKER_STANCE_THRESHOLDS = {
+	aggressive = { threat_cr = 3.0, combat_density = 2 },
+	balanced = { threat_cr = 4.0, combat_density = 3 },
+	conservative = { threat_cr = 5.0, combat_density = 4 },
+}
+
+local function _can_activate_psyker_stance(context, thresholds)
+	if context.peril_pct == nil then
+		return nil, "psyker_stance_missing_peril"
+	end
+	if context.num_nearby == 0 then
+		return false, "psyker_stance_block_no_enemies"
+	end
+	if context.health_pct < 0.25 then
+		return false, "psyker_stance_block_low_health"
+	end
+
+	-- Some bot loadouts still report 0 peril in live combat, so keep a
+	-- threat-only fallback instead of hard-blocking on the human peril window.
+	local bot_no_peril = context.peril_pct == 0
+
+	if not bot_no_peril and (context.peril_pct < 0.20 or context.peril_pct > 0.90) then
+		return false, "psyker_stance_block_peril_window"
+	end
+	if
+		(context.opportunity_target_enemy or context.urgent_target_enemy)
+		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+	then
+		return true, "psyker_stance_target_window"
+	end
+	if
+		context.challenge_rating_sum >= thresholds.threat_cr
+		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+	then
+		return true, "psyker_stance_threat_window"
+	end
+	if bot_no_peril and context.num_nearby >= thresholds.combat_density then
+		return true, "psyker_stance_combat_density"
+	end
+
+	return false, "psyker_stance_hold"
+end
+
+local FORCE_FIELD_THRESHOLDS = {
+	aggressive = {
+		block_safe_toughness = 0.65,
+		pressure_nearby = 2,
+		pressure_toughness = 0.55,
+		ranged_toughness = 0.75,
+	},
+	balanced = {
+		block_safe_toughness = 0.80,
+		pressure_nearby = 3,
+		pressure_toughness = 0.40,
+		ranged_toughness = 0.60,
+	},
+	conservative = {
+		block_safe_toughness = 0.90,
+		pressure_nearby = 4,
+		pressure_toughness = 0.25,
+		ranged_toughness = 0.45,
+	},
+}
+
+local function _can_activate_force_field(context, thresholds)
+	if context.num_nearby == 0 and not context.target_enemy then
+		return false, "force_field_block_no_threats"
+	end
+	if context.ally_interacting and (context.ranged_count >= 1 or context.num_nearby >= 2) then
+		return true, "force_field_protect_interactor"
+	end
+	if context.target_ally_needs_aid then
+		return true, "force_field_ally_aid"
+	end
+	if context.toughness_pct > thresholds.block_safe_toughness then
+		return false, "force_field_block_safe"
+	end
+	if context.num_nearby >= thresholds.pressure_nearby and context.toughness_pct < thresholds.pressure_toughness then
+		return true, "force_field_pressure"
+	end
+	if context.target_enemy_type == "ranged" and context.toughness_pct < thresholds.ranged_toughness then
+		return true, "force_field_ranged_pressure"
+	end
+	return false, "force_field_hold"
+end
+
+return {
+	template_heuristics = {
+		psyker_shout = _can_activate_psyker_shout,
+		psyker_overcharge_stance = _can_activate_psyker_stance,
+	},
+	heuristic_thresholds = {
+		psyker_shout = PSYKER_SHOUT_THRESHOLDS,
+		psyker_overcharge_stance = PSYKER_STANCE_THRESHOLDS,
+	},
+	item_heuristics = {
+		psyker_force_field = _can_activate_force_field,
+		psyker_force_field_improved = _can_activate_force_field,
+		psyker_force_field_dome = _can_activate_force_field,
+	},
+	item_thresholds = {
+		psyker_force_field = FORCE_FIELD_THRESHOLDS,
+		psyker_force_field_improved = FORCE_FIELD_THRESHOLDS,
+		psyker_force_field_dome = FORCE_FIELD_THRESHOLDS,
+	},
+}

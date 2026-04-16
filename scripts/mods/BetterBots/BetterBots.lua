@@ -212,6 +212,30 @@ assert(MetaData, "BetterBots: failed to load meta_data module")
 Settings = mod:io_dofile("BetterBots/scripts/mods/BetterBots/settings")
 assert(Settings, "BetterBots: failed to load settings module")
 
+local HeuristicsContext = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_context")
+assert(HeuristicsContext, "BetterBots: failed to load heuristics_context module")
+
+local HeuristicsVeteran = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_veteran")
+assert(HeuristicsVeteran, "BetterBots: failed to load heuristics_veteran module")
+
+local HeuristicsZealot = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_zealot")
+assert(HeuristicsZealot, "BetterBots: failed to load heuristics_zealot module")
+
+local HeuristicsPsyker = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_psyker")
+assert(HeuristicsPsyker, "BetterBots: failed to load heuristics_psyker module")
+
+local HeuristicsOgryn = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_ogryn")
+assert(HeuristicsOgryn, "BetterBots: failed to load heuristics_ogryn module")
+
+local HeuristicsArbites = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_arbites")
+assert(HeuristicsArbites, "BetterBots: failed to load heuristics_arbites module")
+
+local HeuristicsHiveScum = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_hive_scum")
+assert(HeuristicsHiveScum, "BetterBots: failed to load heuristics_hive_scum module")
+
+local HeuristicsGrenade = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics_grenade")
+assert(HeuristicsGrenade, "BetterBots: failed to load heuristics_grenade module")
+
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
 assert(Heuristics, "BetterBots: failed to load heuristics module")
 
@@ -375,6 +399,14 @@ Heuristics.init({
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")
 	end,
+	context_module = HeuristicsContext,
+	veteran_module = HeuristicsVeteran,
+	zealot_module = HeuristicsZealot,
+	psyker_module = HeuristicsPsyker,
+	ogryn_module = HeuristicsOgryn,
+	arbites_module = HeuristicsArbites,
+	hive_scum_module = HeuristicsHiveScum,
+	grenade_module = HeuristicsGrenade,
 })
 
 ItemFallback.init({
