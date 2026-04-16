@@ -124,6 +124,7 @@ function M.make_split_heuristics_deps(overrides)
 		debug_enabled = function()
 			return false
 		end,
+		shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
 		combat_ability_identity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua"),
 		context_module = dofile("scripts/mods/BetterBots/heuristics_context.lua"),
 		veteran_module = dofile("scripts/mods/BetterBots/heuristics_veteran.lua"),

@@ -54,9 +54,8 @@ local function _can_activate_stimm_field(context)
 	return false, "stimm_hold"
 end
 
--- Template heuristic dispatch: fn(context, thresholds) -> can_activate, rule
--- veteran_combat_ability is dispatched separately in _evaluate_template_heuristic
--- because it needs the full condition_patch args.
+-- Hive Scum exports direct template/item heuristics only.
+-- No per-preset threshold tables yet.
 
 return {
 	template_heuristics = {

@@ -42,6 +42,7 @@ This mod targets bot ability activation in three paths:
 10. Per-template heuristics (via thin `heuristics.lua` dispatcher + split heuristic modules):
     - `evaluate_heuristic(template_name, context, opts)` for template-path abilities
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
+    - `evaluate_grenade_heuristic(grenade_template_name, context, opts)` for grenade/blitz abilities
     - `heuristics_context.lua` owns `build_context()` and shared target/breed/resource helper functions
     - `heuristics_veteran.lua`, `heuristics_zealot.lua`, `heuristics_psyker.lua`, `heuristics_ogryn.lua`, `heuristics_arbites.lua`, `heuristics_hive_scum.lua`, and `heuristics_grenade.lua` own the per-career and grenade/blitz trigger rules
     - `combat_ability_identity.lua` separates engine template identity (`ability_component.template_name`) from semantic ability identity (`ability_name` / `semantic_key`) so shared templates such as Veteran shout vs stance can route to different heuristics/settings without changing template-based engine lookups

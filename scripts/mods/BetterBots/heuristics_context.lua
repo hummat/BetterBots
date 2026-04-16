@@ -541,6 +541,15 @@ end
 
 return {
 	init = function(deps)
+		assert(deps.fixed_time, "heuristics_context: fixed_time dep required")
+		assert(deps.decision_context_cache, "heuristics_context: decision_context_cache dep required")
+		assert(deps.super_armor_breed_cache, "heuristics_context: super_armor_breed_cache dep required")
+		assert(deps.ARMOR_TYPE_SUPER_ARMOR, "heuristics_context: ARMOR_TYPE_SUPER_ARMOR dep required")
+		assert(deps.resolve_preset, "heuristics_context: resolve_preset dep required")
+		assert(deps.debug_log, "heuristics_context: debug_log dep required")
+		assert(deps.debug_enabled, "heuristics_context: debug_enabled dep required")
+		assert(deps.shared_rules, "heuristics_context: shared_rules dep required")
+
 		_fixed_time = deps.fixed_time
 		_decision_context_cache = deps.decision_context_cache
 		_super_armor_breed_cache = deps.super_armor_breed_cache

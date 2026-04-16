@@ -295,24 +295,18 @@ return {
 			is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
 		})
 
-		if _veteran_module.init then
-			_veteran_module.init({
-				combat_ability_identity = deps.combat_ability_identity,
-			})
-		end
+		_veteran_module.init({
+			combat_ability_identity = deps.combat_ability_identity,
+		})
 
-		if deps.arbites_module.init then
-			deps.arbites_module.init({
-				is_monster_signal_allowed = _context_module.is_monster_signal_allowed,
-			})
-		end
+		deps.arbites_module.init({
+			is_monster_signal_allowed = _context_module.is_monster_signal_allowed,
+		})
 
-		if deps.grenade_module.init then
-			deps.grenade_module.init({
-				is_monster_signal_allowed = _context_module.is_monster_signal_allowed,
-				is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
-			})
-		end
+		deps.grenade_module.init({
+			is_monster_signal_allowed = _context_module.is_monster_signal_allowed,
+			is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
+		})
 
 		_template_heuristics = {}
 		_heuristic_thresholds = {}
