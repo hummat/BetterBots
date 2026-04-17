@@ -136,8 +136,8 @@ Order: detect the surface is outward-facing → invoke `human-writing` → invok
 
 **Register calibration.** Outward-facing is not one register. The two skills strip AI patterns and apply Matthias-blog voice, but that voice is not always the right tone. Pick the register before drafting:
 
-- **Blog / showcase register** — Nexus description, Reddit/forum post, Steam Guide, README highlights, changelog. Explanatory, opinionated, first-person, problem → fix → honest limits. Default when writing *about* the mod for a broad audience.
-- **Peer / insider register** — Modders Discord `#creation-showcase`, mod-author discussions once contact is established, technical PR comments. Skip the problem setup — they know vanilla bots are broken. Lead with what you built mechanically. Concise.
+- **Blog / showcase register** — Nexus description, Reddit/forum post, Steam Guide, README highlights, changelog, Modders Discord `#creation-showcase` (compressed to link + 1 player-facing sentence; no dev-speak). Explanatory, opinionated, first-person, problem → fix → honest limits. Default when writing *about* the mod for a broad audience. Even the Modders Discord channel reaches mod-using gamers, not just mod authors — frame around what the mod does for players, not internals.
+- **Peer / insider register** — mod-author DMs once contact is established, technical PR comments, GitHub issue threads with other mod authors. Skip the problem setup — they know vanilla bots are broken. Lead with what you built mechanically. Concise.
 - **Favor-ask / cold-PM register** — first DM to a stranger (other mod authors, creators, Fatshark staff). Warm, deferential, low-pressure. Name the recipient. Lead with the ask, not the feature list. Keep the feature paragraph short. Close with genuine thanks.
 
 All three still invoke `human-writing` + `style:blog` for pattern-stripping, but the **framing and cadence** differ. A cold-email pitch written in blog-showcase register reads transactional and templated. See `memory/promotion_plan.md` "Positioning principles" and `memory/promotion_drafts.md` for worked examples.
