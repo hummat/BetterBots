@@ -44,6 +44,20 @@ Run this after every feature batch that touches hooks, fallback state, event log
    - Revive/rescue still works.
    - Navigation/combat loop still looks normal.
 
+## Patch-Day Preflight
+
+Run this when Darktide ships a new patch and `../Darktide-Source-Code` has been updated:
+
+1. Refresh the decompiled source and BetterBots' engine contract checks.
+   - `make patch-check-refresh`
+
+2. Re-run the normal local gate.
+   - `make check-ci`
+
+3. Then run the release-candidate smoke loop above.
+   - Structural drift catches missing files, renamed functions, and broken hook anchors.
+   - The smoke loop still catches semantic drift that kept the same names.
+
 ## Test matrix
 
 1. Baseline startup

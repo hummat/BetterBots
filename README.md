@@ -229,12 +229,14 @@ Commands:
 | `make format` | Format with StyLua |
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
+| `make patch-check` | Verify decompiled Darktide engine anchors against the current local checkout |
+| `make patch-check-refresh` | `git pull --ff-only` the decompiled Darktide checkout, then verify engine anchors |
 | `make check` | Auto-format, then run lint + lsp + tests + doc checks |
 | `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
 | `make test` | Run busted tests |
 | `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
-| `make release VERSION=X.Y.Z` | Check + package + tag + push + upload ZIP |
+| `make release VERSION=X.Y.Z` | Patch-check-refresh + check + package + tag + push + upload ZIP |
 
 After cloning, run `make deps` to install the commit-msg hook.
 
@@ -243,6 +245,7 @@ order: `busted`, `lua-busted`, then Arch's `/usr/lib/luarocks/.../busted`
 runner.
 
 CI runs `make check-ci` on every push to `main` and on pull requests.
+Patch-day validation is separate on purpose: run `make patch-check-refresh` after updating `../Darktide-Source-Code`.
 
 ## Contributing
 

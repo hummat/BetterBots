@@ -13,7 +13,7 @@ Example:
 
 Notes:
   - Requires: git, zip, gh
-  - Runs: make check, make package, creates/pushes annotated tag.
+  - Runs: make patch-check-refresh, make check, make package, creates/pushes annotated tag.
   - CI handles GitHub release creation; script uploads ZIP artifact.
 EOF
   exit 0
@@ -47,6 +47,9 @@ require_clean_git
 TAG="v$VERSION_ARG"
 
 echo "Release: $TAG"
+echo "Running patch drift gate..."
+make patch-check-refresh
+
 echo "Running checks..."
 make check
 
