@@ -34,6 +34,11 @@ local _interacting_types = {}
 local _interacting_cache_t = nil
 local _interacting_cache_side = nil
 
+local EMPTY_TALENTS = {}
+local function _zero_stacks()
+	return 0
+end
+
 local function _scan_interacting_allies(side, fixed_t)
 	if _interacting_cache_t == fixed_t and _interacting_cache_side == side then
 		return _interacting_units, _interacting_profiles, _interacting_types
@@ -322,6 +327,8 @@ local function build_context(unit, blackboard)
 		ally_interacting_unit = nil,
 		ally_interacting_distance = nil,
 		ally_interaction_profile = nil,
+		talents = EMPTY_TALENTS,
+		current_stacks = _zero_stacks,
 	}
 
 	context.preset = _resolve_preset and _resolve_preset() or "balanced"
@@ -373,6 +380,23 @@ local function build_context(unit, blackboard)
 		local warp_charge_component = unit_data_extension:read_component("warp_charge")
 		if warp_charge_component and warp_charge_component.current_percentage ~= nil then
 			context.peril_pct = warp_charge_component.current_percentage
+		end
+	end
+
+	-- F1: expose talent + buff state for heuristics. Vanilla bot stubs lack
+	-- both extensions, so fall back to an empty talents table and a
+	-- zero-returning current_stacks closure. Callers check context.talents[name]
+	-- for presence (value is the talent tier) and context.current_stacks(name)
+	-- for stacking buff counts.
+	local talent_extension = ScriptUnit.has_extension(unit, "talent_system")
+	if talent_extension and talent_extension.talents then
+		context.talents = talent_extension:talents() or EMPTY_TALENTS
+	end
+
+	local buff_extension = ScriptUnit.has_extension(unit, "buff_system")
+	if buff_extension and buff_extension.current_stacks then
+		context.current_stacks = function(buff_name)
+			return buff_extension:current_stacks(buff_name) or 0
 		end
 	end
 

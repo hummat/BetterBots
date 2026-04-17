@@ -437,6 +437,7 @@ end
 function M.make_player_talent_extension(opts)
 	opts = opts or {}
 	local special_rules = opts.special_rules or {}
+	local talents = opts.talents
 	local ext = {
 		has_special_rule = opts.has_special_rule or function(_, rule_name)
 			if special_rules[rule_name] ~= nil then
@@ -444,10 +445,30 @@ function M.make_player_talent_extension(opts)
 			end
 			return false
 		end,
+		talents = function()
+			return talents
+		end,
 	}
 
 	_apply_audited_overrides("make_player_talent_extension", ext, opts.overrides, {
 		has_special_rule = true,
+		talents = true,
+	})
+
+	return ext
+end
+
+function M.make_player_buff_extension(opts)
+	opts = opts or {}
+	local stacks = opts.stacks or {}
+	local ext = {
+		current_stacks = function(_, buff_name)
+			return stacks[buff_name] or 0
+		end,
+	}
+
+	_apply_audited_overrides("make_player_buff_extension", ext, opts.overrides, {
+		current_stacks = true,
 	})
 
 	return ext
