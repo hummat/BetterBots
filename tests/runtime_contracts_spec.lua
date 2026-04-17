@@ -5,6 +5,7 @@ local ItemFallback = dofile("scripts/mods/BetterBots/item_fallback.lua")
 
 describe("runtime contracts", function()
 	local saved_script_unit
+	local saved_schedule_retry
 	local fallback_state_by_unit
 	local last_charge_event_by_unit
 	local emitted
@@ -12,6 +13,7 @@ describe("runtime contracts", function()
 
 	before_each(function()
 		saved_script_unit = rawget(_G, "ScriptUnit")
+		saved_schedule_retry = ItemFallback.schedule_retry
 		fallback_state_by_unit = {
 			unit_stub = {
 				item_rule = "zealot_relic_hazard",
@@ -114,6 +116,7 @@ describe("runtime contracts", function()
 
 	after_each(function()
 		rawset(_G, "ScriptUnit", saved_script_unit)
+		ItemFallback.schedule_retry = saved_schedule_retry
 	end)
 
 	it("carries fallback rule and attempt id into consumed event", function()

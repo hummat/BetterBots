@@ -15,6 +15,8 @@ local _ITEM_DEFAULT_START_DELAY_S
 local _event_log
 local _bot_slot_for_unit
 
+local ABILITY_STATE_FAIL_RETRY_S = 0.35
+
 -- Late-bound cross-module refs, set via wire()
 local _build_context
 local _context_snapshot
@@ -327,7 +329,7 @@ local function on_state_change_finish(func, self, reason, data, t, time_in_actio
 
 	local fixed_t = _fixed_time()
 	local ability_name = _equipped_combat_ability_name(unit)
-	M.schedule_retry(unit, fixed_t, 0.35)
+	M.schedule_retry(unit, fixed_t, ABILITY_STATE_FAIL_RETRY_S)
 	if _debug_enabled() then
 		_debug_log(
 			"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
