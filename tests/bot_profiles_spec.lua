@@ -323,6 +323,140 @@ describe("bot_profiles", function()
 			assert.is_nil(resolved._bb_resolved)
 		end)
 
+		it("preserves cosmetic/UI contract fields when mutating a vanilla profile in place", function()
+			local saved_require = require
+
+			local ok, err = pcall(function()
+				local fake_master_items = {
+					get_cached = function()
+						return {
+							zealot_primary = { id = "zealot_primary" },
+							zealot_secondary = { id = "zealot_secondary" },
+						}
+					end,
+					get_item_or_fallback = function(item_id)
+						return {
+							name = item_id,
+						}
+					end,
+					get_item_instance = function(gear)
+						return {
+							name = gear.masterDataInstance.id,
+							gear_id = gear.masterDataInstance.id,
+						}
+					end,
+				}
+
+				local fake_archetypes = {
+					zealot = { name = "zealot", breed = "human" },
+				}
+
+				local fake_weapon_templates = {
+					powersword_2h_p1_m2 = {
+						base_stats = {
+							damage_stat = {},
+							finesse_stat = {},
+						},
+					},
+					flamer_p1_m1 = {
+						base_stats = {
+							damage_stat = {},
+							charge_stat = {},
+							ammo_stat = {},
+						},
+					},
+				}
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function(_profile, _id)
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return fake_weapon_templates
+					end
+
+					return saved_require(modname)
+				end)
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+
+				local profile = {
+					archetype = "veteran",
+					name_list_id = "veteran_names",
+					current_level = 1,
+					gender = "male",
+					selected_voice = "veteran_male_a",
+					visual_loadout = {
+						slot_body_face = { id = "vanilla_face_visual" },
+						slot_body_hair = { id = "vanilla_hair_visual" },
+						slot_gear_head = { id = "vanilla_head_visual" },
+					},
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+						slot_body_face = { id = "vanilla_face_loadout" },
+						slot_body_hair = { id = "vanilla_hair_loadout" },
+						slot_gear_head = { id = "vanilla_head_loadout" },
+					},
+					loadout_item_ids = {
+						slot_body_face = "vanilla_face_id",
+						slot_body_hair = "vanilla_hair_id",
+						slot_gear_head = "vanilla_head_id",
+					},
+					loadout_item_data = {
+						slot_body_face = { id = "vanilla_face_id" },
+						slot_body_hair = { id = "vanilla_hair_id" },
+						slot_gear_head = { id = "vanilla_head_id" },
+					},
+					bot_gestalts = {
+						melee = "linesman",
+						ranged = "killshot",
+					},
+					talents = {},
+				}
+
+				local resolved, swapped = BotProfiles.resolve_profile(profile)
+
+				assert.is_true(swapped)
+				assert.is_true(resolved == profile, "resolve_profile must mutate the incoming profile table")
+				assert.equals("veteran_names", resolved.name_list_id)
+				assert.is_true(resolved.loadout == profile.loadout, "loadout table must be preserved")
+				assert.is_true(
+					resolved.visual_loadout == profile.visual_loadout,
+					"visual_loadout table must be preserved"
+				)
+				assert.is_true(
+					resolved.loadout_item_ids == profile.loadout_item_ids,
+					"loadout_item_ids table must be preserved"
+				)
+				assert.is_true(
+					resolved.loadout_item_data == profile.loadout_item_data,
+					"loadout_item_data table must be preserved"
+				)
+				assert.is_not_nil(resolved.loadout.slot_body_face, "face slot must still exist for the UI contract")
+				assert.is_not_nil(resolved.loadout.slot_body_hair, "hair slot must still exist for the UI contract")
+				assert.is_not_nil(resolved.loadout.slot_gear_head, "head slot must still exist for the UI contract")
+				assert.is_not_nil(resolved.visual_loadout.slot_body_face, "face visual slot must still exist")
+				assert.is_not_nil(resolved.visual_loadout.slot_body_hair, "hair visual slot must still exist")
+				assert.is_not_nil(resolved.visual_loadout.slot_gear_head, "head visual slot must still exist")
+				assert.is_not_nil(resolved.loadout_item_ids.slot_body_face, "face loadout_item_ids must still exist")
+				assert.is_not_nil(resolved.loadout_item_data.slot_body_face, "face loadout_item_data must still exist")
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
 		describe("set_profile hook", function()
 			it("register_hooks registers BotPlayer.set_profile hook", function()
 				local hooked_targets = {}

@@ -1230,6 +1230,47 @@ describe("startup regressions", function()
 		assert.is_truthy(main_source:find("MulePickup%.on_refresh_destination", 1))
 	end)
 
+	it("recovers EventLog on bootstrap after hot reload without waiting for on_game_state_changed", function()
+		local saved_mods = rawget(_G, "Mods")
+		local event_log = dofile("scripts/mods/BetterBots/event_log.lua")
+
+		_G.Mods = {
+			lua = {
+				io = {
+					open = function()
+						return nil
+					end,
+				},
+				os = {
+					execute = function() end,
+					time = function()
+						return 123
+					end,
+				},
+			},
+		}
+
+		event_log._reset()
+
+		local harness = make_bootstrap_harness({
+			Debug = {
+				collect_alive_bots = function()
+					return { { unit = "bot_unit_1" } }
+				end,
+			},
+			EventLog = event_log,
+		})
+
+		harness.mod:set("enable_event_log", true)
+		harness:load()
+
+		assert.is_true(event_log.is_enabled())
+		event_log.emit({ event = "probe" })
+		assert.are.equal(1, #event_log._get_buffer())
+
+		_G.Mods = saved_mods
+	end)
+
 	it("persists /bb_reset through DMF instead of the BetterBots mod object", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
