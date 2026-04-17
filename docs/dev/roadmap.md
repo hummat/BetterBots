@@ -92,7 +92,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | # | Issue | Notes |
 |---|-------|-------|
 | 67 | **P0: hook_require clobbering** | **Done.** April 7 logs show the consolidated `bt_bot_melee_action` hook install and repeated `melee choice ...` lines, confirming the clobbering regression is fixed. |
-| 68 | **P1: Veteran class swap with other mods** | `resolve_profile` yield guard checks `archetype != "veteran"` — fails when Tertium assigns a real veteran. DMF hook order flips with extra mods. Fix: check `profile.character_id` instead. |
+| 68 | **P1: Veteran class swap with other mods** | **Done.** Yield guard now checks `profile.character_id and profile.name` (real backend characters always carry `name`; vanilla bot stubs use `name_list_id` instead), committed in `8520485`. Validated from run `console-2026-04-07-15.36.11`: BetterBots preserved external profiles for bot slots 1–4 with real `character_id` values and logged `allowed profile update (no _bb_resolved sentinel)`. Regression coverage in `tests/bot_profiles_spec.lua`. Closed. |
 | 73 | **P1: exception-safe shared state mutation** | **Done.** Wrapped the temporary shared-state mutations in restore-on-error guards. Kept as defensive hardening; reopen only on actual repro. |
 | 69 | P2: Mastiff-pinned target fixation | **Done.** Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring. |
 | 70 | P2: Arbites whistle ignores dog position | **Done.** Validated in run `0`: invalid whistles were held and valid whistles still consumed charges. |

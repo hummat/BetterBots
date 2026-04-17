@@ -21,7 +21,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, bot_targeting, charge_tracker, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, gestalt_injector, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, runtime_contracts, settings, shared_rules, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, update_dispatcher, vfx_suppression, weapon_action)
+- `make test` — unit tests via busted (see `tests/*_spec.lua` for the full list; inventory enforced by `make doc-check`)
 - `make patch-check` — verify BetterBots' engine anchor contracts against the current `../Darktide-Source-Code` checkout
 - `make patch-check-refresh` — `git pull --ff-only` the decompiled source, then rerun the engine anchor checks
 - `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
@@ -345,30 +345,14 @@ Every factual claim about Darktide mechanics — talent effects, ability interac
 
 ### Full doc listing
 
-**Per-class ability references** (template names, input patterns, cooldowns, tiers):
-`docs/classes/veteran.md`, `docs/classes/zealot.md`, `docs/classes/psyker.md`, `docs/classes/ogryn.md`, `docs/classes/arbites.md`, `docs/classes/hive-scum.md`
+Per-class ability references and tactical heuristics live under `docs/classes/` (one `<class>.md` + `<class>-tactics.md` per class). Bot system internals live under `docs/bot/`. Project management lives under `docs/dev/`. Below are the non-obvious entries that filename alone doesn't explain.
 
-**Per-class tactical heuristics** (community-sourced USE WHEN / DON'T USE / proposed bot rules):
-`docs/classes/veteran-tactics.md`, `docs/classes/zealot-tactics.md`, `docs/classes/psyker-tactics.md`, `docs/classes/ogryn-tactics.md`, `docs/classes/arbites-tactics.md`, `docs/classes/hive-scum-tactics.md`
-
-**Bot system internals** (from decompiled source):
-- `docs/bot/vanilla-capabilities.md` — exhaustive inventory of what vanilla bots can/cannot do, with source references
-- `docs/bot/behavior-tree.md` — full BT node hierarchy, all conditions, blackboard schema
-- `docs/bot/combat-actions.md` — melee/shoot/ability action node lifecycles, utility scoring
-- `docs/bot/perception-targeting.md` — target selection scoring formula, gestalt weights, proximity
-- `docs/bot/navigation.md` — pathfinding, follow behavior, teleport triggers, formation
-- `docs/bot/input-system.md` — two-pathway input architecture, ActionInputParser, bot_actions.lua
-- `docs/bot/profiles-spawning.md` — all vanilla bots are veterans, zero talents, weapon templates
-
-**API references** (from decompiled source):
+**API references:**
 - `docs/classes/grenade-inventory.md` — all 19 grenade/blitz templates, input patterns, implementation approach
 - `docs/classes/character-state-api.md` — character state detection components, fields, access patterns
 - `docs/classes/meta-builds-research.md` — endgame meta builds per class, weapon/ability rankings, community build database
 - `docs/backend-progression.md` — backend API architecture, progression systems, local backend feasibility
 - `docs/local-multiplayer.md` — local co-op feasibility, engine networking, VT2 comparison
-
-**Project management:**
-`docs/dev/debugging.md`, `docs/dev/logging.md`, `docs/dev/architecture.md`, `docs/dev/validation-tracker.md`, `docs/dev/known-issues.md`, `docs/related-mods.md`, `docs/dev/roadmap.md`, `docs/dev/status.md`, `docs/dev/test-plan.md`
 
 **Game knowledge base** (`docs/knowledge/`):
 - `class-talents.md` — all 6 classes: abilities, keystones, key passives, coherency (from decompiled source)
@@ -382,111 +366,12 @@ Every factual claim about Darktide mechanics — talent effects, ability interac
 - `research.md` — ability patterns, bot system docs, API gotchas, healing architecture
 - `patch-history.md` — balance changes Mar 2025–Mar 2026
 
-**Release:**
-- `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing)
+**Release:** `docs/nexus-description.bbcode` — Nexus mod page description (BBCode format, copy to Nexus when releasing).
 
 ## Mod file structure
 
-```
-BetterBots.mod                              # DMF entry point
-bb-log                                      # Log analysis CLI (bash)
-scripts/mods/BetterBots/
-  BetterBots.lua                            # Main: module wiring, lifecycle hooks, BT hooks
-  bot_targeting.lua                         # Shared bot target resolver for grenade aim and smart-target seeding
-  condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
-  ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
-  charge_tracker.lua                        # use_ability_charge dispatch: consumed events, semantic routing, team cooldown, fallback completion
-  combat_ability_identity.lua               # Semantic ability identity: shout vs stance routing for shared templates
-  heuristics.lua                            # Thin public API + dispatcher for split heuristic modules
-  heuristics_context.lua                    # Shared build_context() + target/breed helper functions
-  heuristics_veteran.lua                    # Veteran ability heuristics
-  heuristics_zealot.lua                     # Zealot ability heuristics
-  heuristics_psyker.lua                     # Psyker ability heuristics
-  heuristics_ogryn.lua                      # Ogryn ability heuristics
-  heuristics_arbites.lua                    # Arbites ability heuristics
-  heuristics_hive_scum.lua                  # Hive Scum ability heuristics
-  heuristics_grenade.lua                    # Grenade/blitz tactical evaluators
-  meta_data.lua                             # ability_meta_data injection (Tier 2 templates + Veteran overrides)
-  gestalt_injector.lua                      # Default bot_gestalts injection for ADS-capable profiles
-  item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
-  grenade_fallback.lua                      # Grenade throw state machine (wield/aim/throw/unwield)
-  update_dispatcher.lua                     # BotBehaviorExtension.update dispatcher ordering and gating
-  event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
-  sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
-  melee_meta_data.lua                       # Melee attack_meta_data injection (arc/penetrating classification)
-  melee_attack_choice.lua                   # Melee attack-choice hook: bias lights into unarmored hordes while preserving armored heavy preference (#52)
-  ranged_meta_data.lua                      # Ranged attack_meta_data injection (fire/aim input derivation)
-  weapon_action.lua                         # Weapon action hooks: overheat bridge, vent translation, peril guard, _may_fire fix, ADS log
-  sustained_fire.lua                        # Held-input bridge for sustained-fire ranged weapon paths (#87)
-  team_cooldown.lua                         # Team-level ability cooldown staggering (#14)
-  target_selection.lua                      # Melee target selection distance penalty for specials
-  target_type_hysteresis.lua                # Perception-layer melee/ranged target type stabilization (#90)
-  ping_system.lua                           # Bot elite/special pinging system
-  companion_tag.lua                         # Arbites Cyber-Mastiff companion-command smart tag (#49)
-  poxburster.lua                            # Poxburster targeting fix: remove not_bot_target + close-range suppression (#34)
-  animation_guard.lua                       # Animation crash guard: skip invalid animation variable ids on bot-only item paths (#50)
-  airlock_guard.lua                          # Airlock teleport crash guard: narrow nil-node guard for vanilla has_node bug
-  smart_targeting.lua                       # Smart-target seeding: feed bot perception targets through vanilla sticky/range validation for precision blitzes (#61/#62)
-  vfx_suppression.lua                       # VFX/SFX bleed fix: set is_local_unit=false for bot ability/loadout/state-machine contexts (#42)
-  healing_deferral.lua                      # Bot healing deferral: defer health stations/med-crates to human players (#39)
-  ammo_policy.lua                           # Bot ammo + grenade pickup policy: defer scarce resources to humans, configurable thresholds (#72/#89)
-  mule_pickup.lua                           # Book mule pickup activation + grimoire opt-in policy (#32)
-  bot_profiles.lua                          # Bot-optimized class profiles: archetype/weapon/talent/cosmetic per slot (#45/#63), builds sourced from hadrons-blessing
-  human_likeness.lua                        # Tier A teammate-feel tuning: profile-driven reaction times, bucketed ability jitter, pressure leash scaling (#44)
-  engagement_leash.lua                      # Coherency-anchored melee engagement range (#47)
-  revive_ability.lua                        # Pre-revive defensive ability activation (#7)
-  settings.lua                              # Category gates, feature gates, preset resolver, dual-category veteran gate
-  log_levels.lua                            # Tiered debug log level constants and resolution (#40)
-  perf.lua                                  # Per-hook runtime recorder + /bb_perf command
-  shared_rules.lua                          # Shared rule tables (daemonhost breeds, rescue charge rules)
-  debug.lua                                 # Debug commands + context/state snapshots
-  BetterBots_data.lua                       # Mod options / widget definitions
-  BetterBots_localization.lua               # Display strings
-tests/
-  test_helper.lua                           # make_context(), mock factories, engine stubs
-  heuristics_spec.lua                       # all 18 heuristic functions + grenade heuristic
-  meta_data_spec.lua                        # injection/overrides/idempotency
-  resolve_decision_spec.lua                 # nil→fallback paths
-  event_log_spec.lua                        # event buffering/flush/lifecycle
-  sprint_spec.lua                           # sprint conditions + daemonhost safety
-  condition_patch_spec.lua                  # DH combat suppression wrappers
-  charge_tracker_spec.lua                   # use_ability_charge dispatch, team cooldown, fallback completion
-  shared_rules_spec.lua                     # parser queueability + daemonhost aggro-state helpers
-  target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
-  bot_targeting_spec.lua                    # shared perception target resolution + elite/special detection
-  melee_meta_data_spec.lua                  # melee meta_data classification + injection
-  melee_attack_choice_spec.lua              # melee attack-choice bias for unarmored hordes
-  weapon_action_spec.lua                    # weapon-action logging, dead-zone ranged fire confirmation
-  ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
-  grenade_fallback_spec.lua                 # grenade throw state machine
-  gestalt_injector_spec.lua                 # bot_gestalt defaulting + per-unit dedup
-  ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff
-  companion_tag_spec.lua                    # Arbites companion-command tag: guard checks, target priority, dedup
-  boss_engagement_spec.lua                  # boss/miniboss targeting self-defense exception
-  healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
-  item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
-  runtime_contracts_spec.lua                # cross-module charge/event/retry contract coverage
-  poxburster_spec.lua                       # poxburster suppression (all perception slots)
-  animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
-  airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior
-  smart_targeting_spec.lua                  # smart-target seeding preserves vanilla fixed_update behavior for bots
-  bot_profiles_spec.lua                     # bot profile construction, slot resolution, Tertium compat
-  human_likeness_spec.lua                   # profile-driven reaction times, jitter buckets/bypass, pressure leash scaling
-  engagement_leash_spec.lua                 # engagement leash conditions, coherency scaling, grace periods
-  target_type_hysteresis_spec.lua           # momentum + margin stabilization for melee/ranged target type flips
-  revive_ability_spec.lua                   # revive-with-ability hook + guards
-  team_cooldown_spec.lua                    # team cooldown suppression, windows, emergency overrides
-  settings_spec.lua                         # tier gates, behavior profile, grenade toggle
-  mule_pickup_spec.lua                      # book template patching, grimoire toggle, mule-order suppression
-  log_levels_spec.lua                       # log level resolution
-  perf_spec.lua                             # perf timing recorder
-  debug_spec.lua                            # debug command registration
-  startup_regressions_spec.lua              # structural regression guards
-  sustained_fire_spec.lua                   # sustained-fire path detection, hold injection, stale clears
-  update_dispatcher_spec.lua                # per-frame dispatcher order, gating, session-start, snapshot cadence
-  ability_queue_spec.lua                    # combat ability fallback queueing
-  ammo_policy_spec.lua                      # ammo policy thresholds + defer logic
-  combat_ability_identity_spec.lua          # semantic ability identity routing
-  test_helper_spec.lua                      # audited mock-builder override hardening
-  vfx_suppression_spec.lua                  # bot VFX/SFX bleed suppression
-```
+For per-module descriptions see the repo layout block in `README.md`; for architecture and hook wiring see `docs/dev/architecture.md`. The inventories below are what `make doc-check` cross-checks against the filesystem — keep them in lockstep with `scripts/mods/BetterBots/` and `tests/`.
+
+**Modules** (`scripts/mods/BetterBots/`): `BetterBots.lua`, `BetterBots_data.lua`, `BetterBots_localization.lua`, `ability_queue.lua`, `airlock_guard.lua`, `ammo_policy.lua`, `animation_guard.lua`, `bot_profiles.lua`, `bot_targeting.lua`, `charge_tracker.lua`, `combat_ability_identity.lua`, `companion_tag.lua`, `condition_patch.lua`, `debug.lua`, `engagement_leash.lua`, `event_log.lua`, `gestalt_injector.lua`, `grenade_fallback.lua`, `healing_deferral.lua`, `heuristics.lua`, `heuristics_arbites.lua`, `heuristics_context.lua`, `heuristics_grenade.lua`, `heuristics_hive_scum.lua`, `heuristics_ogryn.lua`, `heuristics_psyker.lua`, `heuristics_veteran.lua`, `heuristics_zealot.lua`, `human_likeness.lua`, `item_fallback.lua`, `log_levels.lua`, `melee_attack_choice.lua`, `melee_meta_data.lua`, `meta_data.lua`, `mule_pickup.lua`, `perf.lua`, `ping_system.lua`, `poxburster.lua`, `ranged_meta_data.lua`, `revive_ability.lua`, `settings.lua`, `shared_rules.lua`, `smart_targeting.lua`, `sprint.lua`, `sustained_fire.lua`, `target_selection.lua`, `target_type_hysteresis.lua`, `team_cooldown.lua`, `update_dispatcher.lua`, `vfx_suppression.lua`, `weapon_action.lua`.
+
+**Test specs** (`tests/`): `ability_queue_spec.lua`, `airlock_guard_spec.lua`, `ammo_policy_spec.lua`, `animation_guard_spec.lua`, `boss_engagement_spec.lua`, `bot_profiles_spec.lua`, `bot_targeting_spec.lua`, `charge_tracker_spec.lua`, `combat_ability_identity_spec.lua`, `companion_tag_spec.lua`, `condition_patch_spec.lua`, `debug_spec.lua`, `engagement_leash_spec.lua`, `event_log_spec.lua`, `gestalt_injector_spec.lua`, `grenade_fallback_spec.lua`, `healing_deferral_spec.lua`, `heuristics_spec.lua`, `human_likeness_spec.lua`, `item_fallback_spec.lua`, `log_levels_spec.lua`, `melee_attack_choice_spec.lua`, `melee_meta_data_spec.lua`, `meta_data_spec.lua`, `mule_pickup_spec.lua`, `perf_spec.lua`, `ping_system_spec.lua`, `poxburster_spec.lua`, `ranged_meta_data_spec.lua`, `resolve_decision_spec.lua`, `revive_ability_spec.lua`, `runtime_contracts_spec.lua`, `settings_spec.lua`, `shared_rules_spec.lua`, `smart_targeting_spec.lua`, `sprint_spec.lua`, `startup_regressions_spec.lua`, `sustained_fire_spec.lua`, `target_selection_spec.lua`, `target_type_hysteresis_spec.lua`, `team_cooldown_spec.lua`, `test_helper_spec.lua`, `update_dispatcher_spec.lua`, `vfx_suppression_spec.lua`, `weapon_action_spec.lua`.

@@ -79,7 +79,6 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 
 1. **Hive Scum DLC (broker_ archetype)**: Focus, Rage, and Stimm Field abilities are DLC-blocked for validation. Arbites (adamant_ archetype) is available and testable.
 2. **#17 daemonhost avoidance**: v0.6.0 suppression first had a heuristic-path gap (grenade_fallback bypassed BT condition wrappers), then a state-model gap (`aggro_state` only was too late once the daemonhost started waking), then a scope gap (offensive abilities were still allowed near a sleeping daemonhost unless the DH had already become `target_enemy`). The current branch now uses daemonhost `stage` when available, preserves the long-range target-based carve-out, and restores a tight proximity gate for offensive abilities plus close-range melee/ranged checks. Re-validation with the new build is the next gate — watch for `*_block_dormant_daemonhost`, `ability suppressed (daemonhost_nearby)`, `melee/ranged suppressed (daemonhost nearby)`, and `dormant_daemonhost` skip lines on a DH spawn.
-3. **#4 whistle hot-reload**: whistle works on fresh launch but fails after hot-reload (component template_name likely reset). Not a shipping blocker — hot-reload is dev-only.
 
 ## v0.7.0 (2026-03-12)
 
@@ -163,7 +162,6 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 - **v0.11.0 released 2026-04-15** — the tag is out, and post-release issue hygiene is mostly caught up. `#82` is now closed on direct live evidence from `console-2026-04-16-15.35.10...`: same-log `resolve_decision cache hit ...` markers plus a fresh mission-end `bb-perf:auto: 104.9 us/bot/frame total` block. That closes the low-risk perf audit as implemented and validated, but not the original `<80 us/bot/frame` target. Follow-up perf work now lives in `#99` instead of pretending `#82` is still a validation gate.
 - **v0.10.0 released 2026-04-11** — all 6 issues validated, tagged, pushed, GitHub release + Nexus package ready.
-- **#49 — no DLC blocker** — Arbites `adamant_` archetype owned and validated in-game (companion_tag confirmed firing 2026-04-11). The earlier "DLC-blocked" note was stale.
 
 ### Later batches
 
