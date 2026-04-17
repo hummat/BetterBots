@@ -2625,6 +2625,86 @@ describe("heuristics", function()
 			assert.equals("shield", context.ally_interaction_profile)
 			assert.is_true(math.abs(context.ally_interacting_distance - 5) < 0.001)
 		end)
+
+		it("exposes empty talents + zero current_stacks for vanilla bots lacking extensions", function()
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
+			assert.equals(0, context.current_stacks("zealot_martyrdom_base"))
+			assert.equals(0, context.current_stacks("any_other_buff"))
+		end)
+
+		it("surfaces talent tiers and buff stacks when player extensions are present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = {
+							zealot_martyrdom = 1,
+							zealot_blazing_piety = 3,
+						},
+					}),
+					buff_system = helper.make_player_buff_extension({
+						stacks = {
+							zealot_martyrdom_base = 2,
+							psyker_warp_charge = 4,
+						},
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.talents["zealot_martyrdom"])
+			assert.equals(3, context.talents["zealot_blazing_piety"])
+			assert.is_nil(context.talents["zealot_not_taken"])
+			assert.equals(2, context.current_stacks("zealot_martyrdom_base"))
+			assert.equals(4, context.current_stacks("psyker_warp_charge"))
+			assert.equals(0, context.current_stacks("absent_buff"))
+		end)
+
+		it("keeps current_stacks at zero when only the talent extension is present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = { zealot_martyrdom = 1 },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.talents["zealot_martyrdom"])
+			assert.equals(0, context.current_stacks("zealot_martyrdom_base"))
+		end)
+
+		it("keeps talents empty when only the buff extension is present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					buff_system = helper.make_player_buff_extension({
+						stacks = { psyker_warp_charge = 5 },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
+			assert.equals(5, context.current_stacks("psyker_warp_charge"))
+		end)
+
+		it("falls back to empty talents when the talent extension returns nil", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = nil,
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
+		end)
 	end)
 
 	describe("behavior_profile", function()
