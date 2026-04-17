@@ -232,6 +232,8 @@ local function _should_sprint(self, unit, _input)
 	return false, "enemies_nearby"
 end
 
+local _default_should_sprint = _should_sprint
+
 local function on_update_movement(func, self, unit, input, dt, t)
 	local perf_t0 = _perf and _perf.begin()
 	func(self, unit, input, dt, t)
@@ -316,6 +318,11 @@ Sprint.register_hook = function()
 end
 
 Sprint.should_sprint = _should_sprint
+Sprint._on_update_movement = on_update_movement
+Sprint._set_should_sprint_for_test = function(fn)
+	_should_sprint = fn or _default_should_sprint
+	Sprint.should_sprint = _should_sprint
+end
 Sprint.is_near_daemonhost = _is_near_daemonhost
 Sprint.DAEMONHOST_COMBAT_RANGE_SQ = DAEMONHOST_COMBAT_RANGE_SQ
 

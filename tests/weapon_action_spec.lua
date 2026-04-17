@@ -5,21 +5,36 @@ local _blackboards = {}
 local _debug_logs = {}
 local _echoes = {}
 local _warnings = {}
-
-_G.ScriptUnit = {
-	has_extension = function(unit, system_name)
-		local exts = _extensions[unit]
-		return exts and exts[system_name] or nil
-	end,
-}
-
-_G.BLACKBOARDS = setmetatable({}, {
-	__index = function(_, unit)
-		return _blackboards[unit]
-	end,
-})
+local _saved_globals = {}
 
 local WeaponAction = dofile("scripts/mods/BetterBots/weapon_action.lua")
+
+setup(function()
+	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
+	_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
+
+	rawset(_G, "ScriptUnit", {
+		has_extension = function(unit, system_name)
+			local exts = _extensions[unit]
+			return exts and exts[system_name] or nil
+		end,
+	})
+
+	rawset(
+		_G,
+		"BLACKBOARDS",
+		setmetatable({}, {
+			__index = function(_, unit)
+				return _blackboards[unit]
+			end,
+		})
+	)
+end)
+
+teardown(function()
+	rawset(_G, "BLACKBOARDS", _saved_globals.BLACKBOARDS)
+	rawset(_G, "ScriptUnit", _saved_globals.ScriptUnit)
+end)
 
 local function reset(opts)
 	opts = opts or {}

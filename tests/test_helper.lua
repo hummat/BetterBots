@@ -310,6 +310,38 @@ function M.make_player_action_input_extension(opts)
 	return ext
 end
 
+function M.make_bot_unit_input(overrides)
+	local ext = {
+		set_aiming = function() end,
+		set_aim_rotation = function() end,
+		set_aim_position = function() end,
+	}
+
+	_apply_audited_overrides("make_bot_unit_input", ext, overrides, {
+		set_aiming = true,
+		set_aim_rotation = true,
+		set_aim_position = true,
+	})
+
+	return ext
+end
+
+function M.make_player_input_extension(opts)
+	opts = opts or {}
+	local bot_unit_input = opts.bot_unit_input or M.make_bot_unit_input()
+	local ext = {
+		bot_unit_input = function()
+			return bot_unit_input
+		end,
+	}
+
+	_apply_audited_overrides("make_player_input_extension", ext, opts.overrides, {
+		bot_unit_input = true,
+	})
+
+	return ext
+end
+
 function M.make_bot_perception_extension(opts)
 	opts = opts or {}
 	local enemies = opts.enemies or {}
@@ -322,6 +354,19 @@ function M.make_bot_perception_extension(opts)
 
 	_apply_audited_overrides("make_bot_perception_extension", ext, opts.overrides, {
 		enemies_in_proximity = true,
+	})
+
+	return ext
+end
+
+function M.make_bot_behavior_extension(opts)
+	opts = opts or {}
+	local ext = {
+		_brain = opts.brain or opts._brain,
+	}
+
+	_apply_audited_overrides("make_bot_behavior_extension", ext, opts.overrides, {
+		_brain = true,
 	})
 
 	return ext
@@ -428,6 +473,46 @@ function M.make_companion_spawner_extension(opts)
 	_apply_audited_overrides("make_companion_spawner_extension", ext, opts.overrides, {
 		should_have_companion = true,
 		companion_units = true,
+	})
+
+	return ext
+end
+
+function M.make_side_system_double(opts)
+	opts = opts or {}
+	local ext = {
+		side_by_unit = opts.side_by_unit or {},
+		get_side_from_name = opts.get_side_from_name or function()
+			return nil
+		end,
+		relation_side_names = opts.relation_side_names or function()
+			return {}
+		end,
+	}
+
+	_apply_audited_overrides("make_side_system_double", ext, opts.overrides, {
+		side_by_unit = true,
+		get_side_from_name = true,
+		relation_side_names = true,
+	})
+
+	return ext
+end
+
+function M.make_liquid_area_system_double(opts)
+	opts = opts or {}
+	local ext = {
+		find_liquid_areas_in_position = opts.find_liquid_areas_in_position or function()
+			return nil
+		end,
+		is_position_in_liquid = opts.is_position_in_liquid or function()
+			return false
+		end,
+	}
+
+	_apply_audited_overrides("make_liquid_area_system_double", ext, opts.overrides, {
+		find_liquid_areas_in_position = true,
+		is_position_in_liquid = true,
 	})
 
 	return ext

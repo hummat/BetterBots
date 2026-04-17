@@ -38,7 +38,7 @@ if command -v gh >/dev/null 2>&1 && gh auth status -h github.com >/dev/null 2>&1
   if [[ -n "$closed_issues" ]]; then
     # Only check lines in active-work sections (tables with issue numbers as task items)
     # Pattern: "| <number> |" at start of table row — these are the P1/P2/P3 task tables
-    for doc in docs/ROADMAP.md docs/STATUS.md; do
+    for doc in docs/dev/roadmap.md docs/dev/status.md; do
       [ -f "$doc" ] || continue
       while IFS= read -r num; do
         # Match table rows where the issue number is the task ID column
@@ -56,7 +56,7 @@ if command -v gh >/dev/null 2>&1 && gh auth status -h github.com >/dev/null 2>&1
     done
 
     # Also check "Next Steps" / "Known Blockers" sections for closed issue references
-    doc="docs/STATUS.md"
+    doc="docs/dev/status.md"
     if [ -f "$doc" ]; then
       in_next_steps=false
       while IFS= read -r line; do
@@ -134,7 +134,7 @@ ok "test spec inventory: $actual_spec_count files (parity verified in AGENTS)"
 # ad-hoc table literals. This catches regressions where impossible engine APIs
 # get reintroduced into the suite.
 
-audited_extension_regex='unit_data_system|ability_system|action_input_system|perception_system|smart_tag_system|companion_spawner_system|coherency_system|talent_system'
+audited_extension_regex='unit_data_system|ability_system|action_input_system|perception_system|smart_tag_system|companion_spawner_system|coherency_system|talent_system|input_system|behavior_system'
 
 direct_assignment_matches=$(rg -nP "\b(${audited_extension_regex})\s*=\s*\{" tests/*_spec.lua 2>/dev/null || true)
 if [[ -n "$direct_assignment_matches" ]]; then
@@ -155,6 +155,31 @@ $extension_return_matches"
 fi
 
 ok "audited ScriptUnit extension mocks route through shared builders"
+
+# ── 5b. Manager-system doubles ───────────────────────────────────────────────
+
+audited_manager_regex='side_system|liquid_area_system'
+
+manager_ad_hoc_matches=$(rg -nUP ":system\\(\"(${audited_manager_regex})\"\\)[^\\n]*\\n\\s*return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+manager_variable_matches=$(rg -nP "\\b[[:alnum:]_]*(${audited_manager_regex})[[:alnum:]_]*\\s*=\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+
+manager_matches=""
+if [[ -n "$manager_ad_hoc_matches" ]]; then
+  manager_matches="$manager_ad_hoc_matches"
+fi
+if [[ -n "$manager_variable_matches" ]]; then
+  if [[ -n "$manager_matches" ]]; then
+    manager_matches+=$'\n'
+  fi
+  manager_matches+="$manager_variable_matches"
+fi
+
+if [[ -n "$manager_matches" ]]; then
+  err "audited Managers.state.extension:system(...) doubles must use tests/test_helper.lua builders:
+$manager_matches"
+fi
+
+ok "audited manager-system doubles route through shared builders"
 
 # ── 6. Summary ───────────────────────────────────────────────────────────────
 

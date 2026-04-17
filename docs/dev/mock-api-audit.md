@@ -52,4 +52,4 @@ Current status:
 - If production code reads a private engine field, the audit must record the exact file and line where that field exists.
 - If decompiled source does not prove a method/field exists, do not mock it. Get an in-game dump first.
 - Audited shared builders in `tests/test_helper.lua` must reject unknown override keys at construction time. If a test needs a newly verified method, update this audit file and the builder allowlist in the same change.
-- `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above. Extend that check when a new audited family is added.
+- `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above and for audited `Managers.state.extension:system(...)` doubles. Extend that check when a new audited family is added.

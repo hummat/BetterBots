@@ -50,6 +50,12 @@ echo "Release: $TAG"
 echo "Running checks..."
 make check
 
+if ! git diff --quiet || ! git diff --cached --quiet; then
+	echo "make check produced formatter changes. Commit them, then re-run release." >&2
+	git --no-pager diff --stat >&2
+	exit 2
+fi
+
 echo "Building package..."
 make package
 

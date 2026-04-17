@@ -124,6 +124,9 @@ local function reset()
 		debug_enabled = function()
 			return _debug_enabled_result
 		end,
+		fixed_time = function()
+			return 42
+		end,
 		equipped_combat_ability_name = function()
 			return "zealot_relic"
 		end,
@@ -574,5 +577,133 @@ describe("item_fallback", function()
 			{}
 		)
 		assert.equals("force_field_instant", state.item_profile_name)
+	end)
+
+	describe("on_state_change_finish", function()
+		local original_schedule_retry
+		local scheduled
+
+		before_each(function()
+			original_schedule_retry = ItemFallback.schedule_retry
+			scheduled = nil
+			ItemFallback.schedule_retry = function(unit_arg, fixed_t_arg, window_arg)
+				scheduled = {
+					unit = unit_arg,
+					fixed_t = fixed_t_arg,
+					window = window_arg,
+				}
+			end
+		end)
+
+		after_each(function()
+			ItemFallback.schedule_retry = original_schedule_retry
+		end)
+
+		it("chains original func then schedules retry when a bot combat ability state transition fails", function()
+			local called_order = {}
+			local orig_func = function()
+				called_order[#called_order + 1] = "orig"
+			end
+
+			ItemFallback.schedule_retry = function(unit_arg, fixed_t_arg, window_arg)
+				scheduled = {
+					unit = unit_arg,
+					fixed_t = fixed_t_arg,
+					window = window_arg,
+				}
+				called_order[#called_order + 1] = "retry"
+			end
+
+			local self = {
+				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				_player_unit = "unit_stub",
+				_wanted_state_name = "stunned",
+				_character_sate_component = { state_name = "walking" },
+			}
+
+			ItemFallback.on_state_change_finish(orig_func, self, "interrupted", nil, 100, 0.1)
+
+			assert.same({ "orig", "retry" }, called_order)
+			assert.equals("unit_stub", scheduled.unit)
+			assert.equals(42, scheduled.fixed_t)
+			assert.equals(0.35, scheduled.window)
+		end)
+
+		it("does not schedule retry when human-controlled", function()
+			local self = {
+				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_player = {
+					is_human_controlled = function()
+						return true
+					end,
+				},
+				_player_unit = "unit_stub",
+				_wanted_state_name = "stunned",
+				_character_sate_component = { state_name = "walking" },
+			}
+
+			ItemFallback.on_state_change_finish(function() end, self, "interrupted", nil, 100, 0.1)
+
+			assert.is_nil(scheduled)
+		end)
+
+		it("does not schedule retry when state transition succeeded", function()
+			local self = {
+				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				_player_unit = "unit_stub",
+				_wanted_state_name = "walking",
+				_character_sate_component = { state_name = "walking" },
+			}
+
+			ItemFallback.on_state_change_finish(function() end, self, "finished", nil, 100, 0.1)
+
+			assert.is_nil(scheduled)
+		end)
+
+		it("does not schedule retry for non-combat ability type", function()
+			local self = {
+				_action_settings = { ability_type = "grenade_ability", use_ability_charge = true },
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				_player_unit = "unit_stub",
+				_wanted_state_name = "stunned",
+				_character_sate_component = { state_name = "walking" },
+			}
+
+			ItemFallback.on_state_change_finish(function() end, self, "interrupted", nil, 100, 0.1)
+
+			assert.is_nil(scheduled)
+		end)
+
+		it("does not schedule retry when use_ability_charge is false", function()
+			local self = {
+				_action_settings = { ability_type = "combat_ability", use_ability_charge = false },
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				_player_unit = "unit_stub",
+				_wanted_state_name = "stunned",
+				_character_sate_component = { state_name = "walking" },
+			}
+
+			ItemFallback.on_state_change_finish(function() end, self, "interrupted", nil, 100, 0.1)
+
+			assert.is_nil(scheduled)
+		end)
 	end)
 end)

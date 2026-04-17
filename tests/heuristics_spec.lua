@@ -2204,6 +2204,7 @@ describe("heuristics", function()
 		local saved_script_unit
 		local saved_alive
 		local liquid_results_return_mode
+		local liquid_area_system
 		local side_system
 		local current_fixed_t
 		local captured_liquid_results
@@ -2213,6 +2214,7 @@ describe("heuristics", function()
 
 		before_each(function()
 			liquid_results_return_mode = "table"
+			liquid_area_system = nil
 			side_system = nil
 			current_fixed_t = 42
 			captured_liquid_results = {}
@@ -2229,28 +2231,7 @@ describe("heuristics", function()
 					extension = {
 						system = function(_, system_name)
 							if system_name == "liquid_area_system" then
-								return {
-									find_liquid_areas_in_position = function(_, position, results)
-										captured_liquid_results[#captured_liquid_results + 1] = results
-
-										if position == "hazard_pos" then
-											results[1] = {
-												source_side_name = function()
-													return "enemy"
-												end,
-												area_template_name = function()
-													return "cultist_grenadier_gas"
-												end,
-											}
-
-											if liquid_results_return_mode == "number" then
-												return 1
-											end
-										end
-
-										return results
-									end,
-								}
+								return liquid_area_system
 							end
 							if system_name == "side_system" then
 								return side_system
@@ -2292,6 +2273,28 @@ describe("heuristics", function()
 					return extensions and extensions[extension_name] or nil
 				end,
 			}
+			liquid_area_system = helper.make_liquid_area_system_double({
+				find_liquid_areas_in_position = function(_, position, results)
+					captured_liquid_results[#captured_liquid_results + 1] = results
+
+					if position == "hazard_pos" then
+						results[1] = {
+							source_side_name = function()
+								return "enemy"
+							end,
+							area_template_name = function()
+								return "cultist_grenadier_gas"
+							end,
+						}
+
+						if liquid_results_return_mode == "number" then
+							return 1
+						end
+					end
+
+					return results
+				end,
+			})
 			helper.init_split_heuristics(Heuristics, {
 				fixed_time = function()
 					return current_fixed_t
@@ -2421,13 +2424,13 @@ describe("heuristics", function()
 		end)
 
 		it("defaults when no allies are interacting", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot" },
 					},
 				},
-			}
+			})
 
 			local context = Heuristics.build_context("hazard_bot", nil)
 
@@ -2439,13 +2442,13 @@ describe("heuristics", function()
 		end)
 
 		it("detects shield interactions via interacting character state", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot", "ally_unit" },
 					},
 				},
-			}
+			})
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
@@ -2465,13 +2468,13 @@ describe("heuristics", function()
 		end)
 
 		it("detects shield interactions via minigame character state", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot", "ally_unit" },
 					},
 				},
-			}
+			})
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
@@ -2490,13 +2493,13 @@ describe("heuristics", function()
 		end)
 
 		it("detects escort interactions via luggable slot", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot", "ally_unit" },
 					},
 				},
-			}
+			})
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
@@ -2516,13 +2519,13 @@ describe("heuristics", function()
 		end)
 
 		it("skips self when scanning ally interactions", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot" },
 					},
 				},
-			}
+			})
 			script_unit_extensions = {
 				hazard_bot = {
 					unit_data_system = helper.make_player_unit_data_extension({
@@ -2540,13 +2543,13 @@ describe("heuristics", function()
 		end)
 
 		it("ignores non-shield interaction types", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot", "ally_unit" },
 					},
 				},
-			}
+			})
 			_G.ALIVE.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
@@ -2566,13 +2569,13 @@ describe("heuristics", function()
 		end)
 
 		it("ignores dead allies", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					hazard_bot = {
 						valid_player_units = { "hazard_bot", "ally_unit" },
 					},
 				},
-			}
+			})
 			script_unit_extensions = {
 				ally_unit = {
 					unit_data_system = helper.make_player_unit_data_extension({
@@ -2590,13 +2593,13 @@ describe("heuristics", function()
 		end)
 
 		it("picks the closest interacting ally", function()
-			side_system = {
+			side_system = helper.make_side_system_double({
 				side_by_unit = {
 					bot_unit = {
 						valid_player_units = { "bot_unit", "far_ally", "close_ally" },
 					},
 				},
-			}
+			})
 			_G.ALIVE.far_ally = true
 			_G.ALIVE.close_ally = true
 			_G.POSITION_LOOKUP.bot_unit = { x = 0, y = 0, z = 0 }

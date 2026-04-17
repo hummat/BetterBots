@@ -12,3 +12,4 @@ BetterBots.zip
 .remember/
 
 .claude/settings.local.json
+build/

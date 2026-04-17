@@ -17,6 +17,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Lua tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4 liblua5.4-dev luarocks
+          sudo luarocks --lua-version=5.4 install luacheck
+          sudo luarocks --lua-version=5.4 install busted
+          STYLUA_VERSION="2.0.2"
+          curl -fsSL "https://github.com/JohnnyMorganz/StyLua/releases/download/v${STYLUA_VERSION}/stylua-linux-x86_64.zip" -o /tmp/stylua.zip
+          unzip -o /tmp/stylua.zip -d /usr/local/bin
+          chmod +x /usr/local/bin/stylua
+          LLS_VERSION="3.13.6"
+          curl -fsSL "https://github.com/LuaLS/lua-language-server/releases/download/${LLS_VERSION}/lua-language-server-${LLS_VERSION}-linux-x64.tar.gz" -o /tmp/lls.tar.gz
+          mkdir -p /opt/lua-language-server
+          tar -xzf /tmp/lls.tar.gz -C /opt/lua-language-server
+          ln -sf /opt/lua-language-server/bin/lua-language-server /usr/local/bin/lua-language-server
+
+      - name: Run checks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make check-ci
+
       - name: Build mod package
         run: make package
 

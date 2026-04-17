@@ -11,7 +11,6 @@ local DEBUG_SETTING_ID = "enable_debug_logs"
 local DEBUG_LOG_INTERVAL_S = 2
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20
 local EVENT_LOG_SETTING_ID = "enable_event_log"
-local ABILITY_STATE_FAIL_RETRY_S = 0.35
 local META_PATCH_VERSION = "2026-03-04-tier2-v3"
 local CONDITIONS_PATCH_VERSION = "2026-03-05-conditions-v4"
 local _last_debug_log_t_by_key = {}
@@ -29,7 +28,7 @@ local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_hits_logged_by_unit = setmetatable({}, { __mode = "k" })
 local _suppression_cache_by_unit = setmetatable({}, { __mode = "k" })
-local _session_start_emitted = false
+local _session_start_state = { emitted = false }
 local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
@@ -244,6 +243,15 @@ assert(Heuristics, "BetterBots: failed to load heuristics module")
 local ItemFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/item_fallback")
 assert(ItemFallback, "BetterBots: failed to load item_fallback module")
 
+local ChargeTracker = mod:io_dofile("BetterBots/scripts/mods/BetterBots/charge_tracker")
+assert(ChargeTracker, "BetterBots: failed to load charge_tracker module")
+
+local GestaltInjector = mod:io_dofile("BetterBots/scripts/mods/BetterBots/gestalt_injector")
+assert(GestaltInjector, "BetterBots: failed to load gestalt_injector module")
+
+local UpdateDispatcher = mod:io_dofile("BetterBots/scripts/mods/BetterBots/update_dispatcher")
+assert(UpdateDispatcher, "BetterBots: failed to load update_dispatcher module")
+
 local Debug = mod:io_dofile("BetterBots/scripts/mods/BetterBots/debug")
 assert(Debug, "BetterBots: failed to load debug module")
 
@@ -417,6 +425,7 @@ ItemFallback.init({
 	mod = mod,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	equipped_combat_ability_name = _equipped_combat_ability_name,
 	fallback_state_by_unit = _fallback_state_by_unit,
 	last_charge_event_by_unit = _last_charge_event_by_unit,
@@ -442,6 +451,45 @@ Debug.init({
 EventLog.init({
 	mod = mod,
 	context_snapshot = Debug.context_snapshot,
+})
+
+ChargeTracker.init({
+	fixed_time = _fixed_time,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	last_charge_event_by_unit = _last_charge_event_by_unit,
+	fallback_state_by_unit = _fallback_state_by_unit,
+	grenade_fallback = GrenadeFallback,
+	settings = Settings,
+	team_cooldown = TeamCooldown,
+	combat_ability_identity = CombatAbilityIdentity,
+	event_log = EventLog,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+})
+
+GestaltInjector.init({
+	default_ranged_gestalt = DEFAULT_RANGED_GESTALT,
+	default_melee_gestalt = DEFAULT_MELEE_GESTALT,
+	injected_units = _gestalt_injected_units,
+})
+
+UpdateDispatcher.init({
+	perf = Perf,
+	event_log = EventLog,
+	debug = Debug,
+	ability_queue = AbilityQueue,
+	grenade_fallback = GrenadeFallback,
+	ping_system = PingSystem,
+	companion_tag = CompanionTag,
+	settings = Settings,
+	build_context = Heuristics.build_context,
+	equipped_combat_ability_name = _equipped_combat_ability_name,
+	fallback_state_by_unit = _fallback_state_by_unit,
+	last_snapshot_t_by_unit = _last_snapshot_t_by_unit,
+	session_start_state = _session_start_state,
+	snapshot_interval_s = _SNAPSHOT_INTERVAL_S,
+	meta_patch_version = META_PATCH_VERSION,
+	fixed_time = _fixed_time,
 })
 
 Perf.init({
@@ -1124,96 +1172,7 @@ mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extensio
 		mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
 	end
 	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
-		if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
-			return
-		end
-
-		local player = self._player
-		if not player or player:is_human_controlled() then
-			return
-		end
-
-		if ability_type == "grenade_ability" then
-			local grenade_name = "unknown"
-			local equipped_abilities = self._equipped_abilities
-			local grenade_ability = equipped_abilities and equipped_abilities.grenade_ability
-			if grenade_ability and grenade_ability.name then
-				grenade_name = grenade_ability.name
-			end
-
-			local unit = self._unit
-			if unit then
-				GrenadeFallback.record_charge_event(unit, grenade_name, _fixed_time())
-			end
-
-			if _debug_enabled() then
-				_debug_log(
-					"grenade_charge:" .. grenade_name .. ":" .. tostring(unit),
-					_fixed_time(),
-					"grenade charge consumed for "
-						.. grenade_name
-						.. " (charges="
-						.. tostring(optional_num_charges or 1)
-						.. ")"
-				)
-			end
-			return
-		end
-
-		local ability_name = "unknown"
-		local equipped_abilities = self._equipped_abilities
-		local combat_ability = equipped_abilities and equipped_abilities.combat_ability
-		if combat_ability and combat_ability.name then
-			ability_name = combat_ability.name
-		end
-
-		local fixed_t = _fixed_time()
-		local unit = self._unit
-		if unit then
-			_last_charge_event_by_unit[unit] = {
-				ability_name = ability_name,
-				fixed_t = fixed_t,
-			}
-			if ability_name ~= "unknown" then
-				-- Resolve to the base/semantic template name so variant talent
-				-- names (e.g. psyker_discharge_shout_improved) collapse to the
-				-- key team_cooldown.CATEGORY_MAP uses (psyker_shout). Without
-				-- this, record() is a silent no-op for variant abilities and
-				-- staggering never fires for their category.
-				if Settings.is_feature_enabled("team_cooldown") then
-					local unit_data_ext = ScriptUnit.has_extension(unit, "unit_data_system")
-					local ability_component = unit_data_ext and unit_data_ext:read_component("combat_ability_action")
-					local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
-					local identity = CombatAbilityIdentity.resolve(unit, ability_extension, ability_component)
-					local team_key = (identity and identity.semantic_key) or ability_name
-					TeamCooldown.record(unit, team_key, fixed_t)
-				end
-			end
-
-			if EventLog.is_enabled() then
-				local bot_slot = Debug.bot_slot_for_unit(unit)
-				local fb_state = _fallback_state_by_unit[unit]
-				EventLog.emit({
-					t = fixed_t,
-					event = "consumed",
-					bot = bot_slot,
-					ability = ability_name,
-					charges = optional_num_charges or 1,
-					rule = fb_state and fb_state.item_rule or nil,
-					attempt_id = fb_state and fb_state.attempt_id or nil,
-				})
-			end
-		end
-
-		if not _debug_enabled() then
-			return
-		end
-
-		_debug_log(
-			"charge:" .. ability_name,
-			fixed_t,
-			"charge consumed for " .. ability_name .. " (charges=" .. tostring(optional_num_charges or 1) .. ")"
-		)
+		ChargeTracker.handle(self, ability_type, optional_num_charges)
 	end)
 end)
 
@@ -1222,47 +1181,7 @@ mod:hook_require(
 	"scripts/extension_systems/ability/actions/action_character_state_change",
 	function(ActionCharacterStateChange)
 		mod:hook(ActionCharacterStateChange, "finish", function(func, self, reason, data, t, time_in_action)
-			local action_settings = self._action_settings
-			local ability_type = action_settings and action_settings.ability_type
-			local use_ability_charge = action_settings and action_settings.use_ability_charge
-			local player = self._player
-			local unit = self._player_unit
-			local wanted_state_name = self._wanted_state_name
-			local character_state_component = self._character_sate_component
-			local current_state_name = character_state_component and character_state_component.state_name or nil
-			local failed_state_transition = wanted_state_name ~= nil and current_state_name ~= wanted_state_name
-			local is_bot = player and not player:is_human_controlled()
-
-			func(self, reason, data, t, time_in_action)
-
-			if
-				not is_bot
-				or not unit
-				or ability_type ~= "combat_ability"
-				or not use_ability_charge
-				or not failed_state_transition
-			then
-				return
-			end
-
-			local fixed_t = _fixed_time()
-			local ability_name = _equipped_combat_ability_name(unit)
-			ItemFallback.schedule_retry(unit, fixed_t, ABILITY_STATE_FAIL_RETRY_S)
-			if _debug_enabled() then
-				_debug_log(
-					"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
-					fixed_t,
-					"combat ability state transition failed for "
-						.. tostring(ability_name)
-						.. " (wanted="
-						.. tostring(wanted_state_name)
-						.. ", current="
-						.. tostring(current_state_name)
-						.. ", reason="
-						.. tostring(reason)
-						.. "); scheduled fast retry"
-				)
-			end
+			return ItemFallback.on_state_change_finish(func, self, reason, data, t, time_in_action)
 		end)
 	end
 )
@@ -1330,21 +1249,18 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		"_init_blackboard_components",
 		function(func, self, blackboard, physics_world, gestalts_or_nil)
 			local unit = self._unit
-			if not gestalts_or_nil or not gestalts_or_nil.ranged then
-				gestalts_or_nil = gestalts_or_nil or {}
-				gestalts_or_nil.ranged = gestalts_or_nil.ranged or DEFAULT_RANGED_GESTALT
-				gestalts_or_nil.melee = gestalts_or_nil.melee or DEFAULT_MELEE_GESTALT
-				if unit and not _gestalt_injected_units[unit] then
-					_gestalt_injected_units[unit] = true
-					_debug_log(
-						"gestalt_inject:" .. tostring(unit),
-						0,
-						"injected default bot_gestalts (ranged=killshot, melee=linesman)",
-						nil,
-						"info"
-					)
-				end
-			else
+			local had_ranged = gestalts_or_nil and gestalts_or_nil.ranged ~= nil
+			local injected
+			gestalts_or_nil, injected = GestaltInjector.inject(gestalts_or_nil, unit)
+			if injected then
+				_debug_log(
+					"gestalt_inject:" .. tostring(unit),
+					0,
+					"injected default bot_gestalts (ranged=killshot, melee=linesman)",
+					nil,
+					"info"
+				)
+			elseif had_ranged then
 				_debug_log(
 					"gestalt_skip:" .. tostring(unit),
 					0,
@@ -1356,82 +1272,7 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	)
 
 	mod:hook_safe(BotBehaviorExtension, "update", function(self, unit)
-		local player = self._player
-		if not player or player:is_human_controlled() then
-			return
-		end
-
-		Perf.sync_setting()
-		Perf.mark_bot_frame()
-
-		local brain = self._brain
-		local blackboard = brain and brain._blackboard or nil
-
-		if EventLog.is_enabled() and not _session_start_emitted then
-			local perf_t0 = Perf.begin()
-			local bots = Debug.collect_alive_bots()
-			if bots and #bots > 0 then
-				_session_start_emitted = true
-				local bot_info = {}
-				for i, bot_entry in ipairs(bots) do
-					local p = bot_entry.player
-					bot_info[i] = {
-						slot = type(p.slot) == "function" and p:slot() or nil,
-						archetype = type(p.archetype_name) == "function" and p:archetype_name() or nil,
-						ability = _equipped_combat_ability_name(bot_entry.unit),
-					}
-				end
-				EventLog.emit({
-					t = _fixed_time(),
-					event = "session_start",
-					version = META_PATCH_VERSION,
-					bots = bot_info,
-				})
-			end
-			Perf.finish("event_log_session_start", perf_t0)
-		end
-
-		local perf_t0 = Perf.begin()
-		AbilityQueue.try_queue(unit, blackboard)
-		Perf.finish("ability_queue", perf_t0)
-		perf_t0 = Perf.begin()
-		GrenadeFallback.try_queue(unit, blackboard)
-		Perf.finish("grenade_fallback", perf_t0)
-		if Settings.is_feature_enabled("pinging") then
-			perf_t0 = Perf.begin()
-			PingSystem.update(unit, blackboard)
-			Perf.finish("ping_system", perf_t0)
-			perf_t0 = Perf.begin()
-			CompanionTag.update(unit, blackboard)
-			Perf.finish("companion_tag", perf_t0)
-		end
-		perf_t0 = Perf.begin()
-		EventLog.try_flush(_fixed_time())
-		Perf.finish("event_log_flush", perf_t0)
-
-		if EventLog.is_enabled() then
-			local fixed_t = _fixed_time()
-			local last_snap = _last_snapshot_t_by_unit[unit]
-			if not last_snap or fixed_t - last_snap >= _SNAPSHOT_INTERVAL_S then
-				local snapshot_t0 = Perf.begin()
-				_last_snapshot_t_by_unit[unit] = fixed_t
-				local ability_extension = ScriptUnit.has_extension(unit, "ability_system")
-				local bot_slot = Debug.bot_slot_for_unit(unit)
-				local fb_state = _fallback_state_by_unit[unit]
-				EventLog.emit({
-					t = fixed_t,
-					event = "snapshot",
-					bot = bot_slot,
-					ability = _equipped_combat_ability_name(unit),
-					cooldown_ready = ability_extension and ability_extension:can_use_ability("combat_ability") or false,
-					charges = ability_extension and ability_extension:remaining_ability_charges("combat_ability")
-						or nil,
-					ctx = Debug.context_snapshot(Heuristics.build_context(unit, blackboard)),
-					item_stage = fb_state and fb_state.item_stage or nil,
-				})
-				Perf.finish("event_log_snapshot", snapshot_t0)
-			end
-		end
+		UpdateDispatcher.dispatch(self, unit)
 	end)
 end)
 
@@ -1524,7 +1365,7 @@ function mod.on_game_state_changed(status, state)
 		_debug_log("state:GameplayStateRun", _fixed_time(), "entered GameplayStateRun")
 		EventLog.set_enabled(mod:get(EVENT_LOG_SETTING_ID) == true)
 		EventLog.start_session(_fixed_time())
-		_session_start_emitted = false
+		_session_start_state.emitted = false
 		for unit in pairs(_last_snapshot_t_by_unit) do
 			_last_snapshot_t_by_unit[unit] = nil
 		end
@@ -1572,7 +1413,7 @@ if mod:get(EVENT_LOG_SETTING_ID) == true then
 	if bots and #bots > 0 then
 		EventLog.set_enabled(true)
 		EventLog.start_session(_fixed_time())
-		_session_start_emitted = false
+		_session_start_state.emitted = false
 	end
 end
 

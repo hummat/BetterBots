@@ -12,138 +12,12 @@ local _fixed_time_value = 0
 local _game_object_ids = {}
 local _game_object_fields = {}
 local _is_near_daemonhost_result = false
+local _saved_globals = {}
+local SharedRules
+local CombatAbilityIdentity
+local ConditionPatch
 
-_G.ScriptUnit = {
-	has_extension = function(unit, system_name)
-		local unit_exts = _extensions[unit]
-		return unit_exts and unit_exts[system_name] or nil
-	end,
-	extension = function(unit, system_name)
-		local ext = _extensions[unit] and _extensions[unit][system_name]
-		if not ext then
-			error("No extension " .. system_name .. " for " .. tostring(unit))
-		end
-		return ext
-	end,
-}
-
-_G.BLACKBOARDS = setmetatable({}, {
-	__index = function(_, unit)
-		return _blackboards[unit]
-	end,
-})
-
-_G.POSITION_LOOKUP = {}
-_G.Vector3 = {
-	distance_squared = function(a, b)
-		local dx = a.x - b.x
-		local dy = a.y - b.y
-		local dz = a.z - b.z
-		return dx * dx + dy * dy + dz * dz
-	end,
-}
 local _alive = {}
-_G.ALIVE = setmetatable({}, {
-	__index = function(_, unit)
-		return _alive[unit]
-	end,
-})
-_G.Managers = {
-	state = {
-		extension = {
-			system = function()
-				return nil
-			end,
-		},
-		unit_spawner = {
-			game_object_id = function(_, unit)
-				return _game_object_ids[unit]
-			end,
-		},
-		game_session = {
-			game_session = function()
-				return "test_game_session"
-			end,
-		},
-	},
-}
-_G.GameSession = {
-	game_object_field = function(game_session, game_object_id, field_name)
-		assert.equals("test_game_session", game_session)
-		local fields = _game_object_fields[game_object_id]
-		return fields and fields[field_name] or nil
-	end,
-}
-
--- Stub require so condition_patch.lua doesn't crash on game modules
-local _orig_require = require
-local function _mock_require(path)
-	if path:match("^scripts/") then
-		return {}
-	end
-	return _orig_require(path)
-end
-rawset(_G, "require", _mock_require)
-
-local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
-local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
-local ConditionPatch = dofile("scripts/mods/BetterBots/condition_patch.lua")
-
--- Restore require
-rawset(_G, "require", _orig_require)
-
--- Initialize with minimal deps
-ConditionPatch.init({
-	shared_rules = SharedRules,
-	mod = { echo = function() end, hook_require = function() end },
-	debug_log = function(key, fixed_t, message)
-		_debug_logs[#_debug_logs + 1] = {
-			key = key,
-			fixed_t = fixed_t,
-			message = message,
-		}
-	end,
-	debug_enabled = function()
-		return _debug_enabled_result
-	end,
-	fixed_time = function()
-		return _fixed_time_value
-	end,
-	is_near_daemonhost = function()
-		return _is_near_daemonhost_result
-	end,
-	is_suppressed = function()
-		return false
-	end,
-	equipped_combat_ability_name = function()
-		return "none"
-	end,
-	patched_bt_bot_conditions = {},
-	patched_bt_conditions = {},
-	rescue_intent = {},
-	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
-	CONDITIONS_PATCH_VERSION = "test",
-})
-
-ConditionPatch.wire({
-	Heuristics = {
-		resolve_decision = function()
-			return false
-		end,
-	},
-	MetaData = { inject = function() end },
-	Debug = {
-		log_ability_decision = function() end,
-		bot_slot_for_unit = function()
-			return 1
-		end,
-	},
-	EventLog = {
-		is_enabled = function()
-			return false
-		end,
-	},
-})
 
 -- Helper: set up unit_data extension for a breed (marks unit alive)
 local function setup_breed(unit, breed_name)
@@ -225,6 +99,149 @@ local function find_debug_log_by_key(key)
 end
 
 describe("condition_patch", function()
+	setup(function()
+		_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
+		_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
+		_saved_globals.POSITION_LOOKUP = rawget(_G, "POSITION_LOOKUP")
+		_saved_globals.Vector3 = rawget(_G, "Vector3")
+		_saved_globals.ALIVE = rawget(_G, "ALIVE")
+		_saved_globals.Managers = rawget(_G, "Managers")
+		_saved_globals.GameSession = rawget(_G, "GameSession")
+		_saved_globals.require = rawget(_G, "require")
+
+		_G.ScriptUnit = {
+			has_extension = function(unit, system_name)
+				local unit_exts = _extensions[unit]
+				return unit_exts and unit_exts[system_name] or nil
+			end,
+			extension = function(unit, system_name)
+				local ext = _extensions[unit] and _extensions[unit][system_name]
+				if not ext then
+					error("No extension " .. system_name .. " for " .. tostring(unit))
+				end
+				return ext
+			end,
+		}
+
+		_G.BLACKBOARDS = setmetatable({}, {
+			__index = function(_, unit)
+				return _blackboards[unit]
+			end,
+		})
+
+		_G.POSITION_LOOKUP = {}
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = a.x - b.x
+				local dy = a.y - b.y
+				local dz = a.z - b.z
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.ALIVE = setmetatable({}, {
+			__index = function(_, unit)
+				return _alive[unit]
+			end,
+		})
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function()
+						return nil
+					end,
+				},
+				unit_spawner = {
+					game_object_id = function(_, unit)
+						return _game_object_ids[unit]
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "test_game_session"
+					end,
+				},
+			},
+		}
+		_G.GameSession = {
+			game_object_field = function(game_session, game_object_id, field_name)
+				assert.equals("test_game_session", game_session)
+				local fields = _game_object_fields[game_object_id]
+				return fields and fields[field_name] or nil
+			end,
+		}
+
+		rawset(_G, "require", function(path)
+			if path:match("^scripts/") then
+				return {}
+			end
+			return _saved_globals.require(path)
+		end)
+
+		SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
+		CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+		ConditionPatch = dofile("scripts/mods/BetterBots/condition_patch.lua")
+
+		rawset(_G, "require", _saved_globals.require)
+
+		ConditionPatch.init({
+			shared_rules = SharedRules,
+			mod = { echo = function() end, hook_require = function() end },
+			debug_log = function(key, fixed_t, message)
+				_debug_logs[#_debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return _debug_enabled_result
+			end,
+			fixed_time = function()
+				return _fixed_time_value
+			end,
+			is_near_daemonhost = function()
+				return _is_near_daemonhost_result
+			end,
+			is_suppressed = function()
+				return false
+			end,
+			equipped_combat_ability_name = function()
+				return "none"
+			end,
+			patched_bt_bot_conditions = {},
+			patched_bt_conditions = {},
+			rescue_intent = {},
+			DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+			CONDITIONS_PATCH_VERSION = "test",
+		})
+
+		ConditionPatch.wire({
+			Heuristics = {
+				resolve_decision = function()
+					return false
+				end,
+			},
+			MetaData = { inject = function() end },
+			Debug = {
+				log_ability_decision = function() end,
+				bot_slot_for_unit = function()
+					return 1
+				end,
+			},
+			EventLog = {
+				is_enabled = function()
+					return false
+				end,
+			},
+		})
+	end)
+
+	teardown(function()
+		for k, v in pairs(_saved_globals) do
+			rawset(_G, k, v)
+		end
+	end)
+
 	before_each(function()
 		reset()
 		ConditionPatch.init({
@@ -1296,6 +1313,80 @@ describe("condition_patch", function()
 			assert.is_false(second_result)
 			assert.equals(1, require_calls)
 			assert.equals(1, inject_calls)
+		end)
+	end)
+
+	describe("should_vent_overheat", function()
+		local overheat_percentage
+		local original_overheat_module
+
+		before_each(function()
+			overheat_percentage = 0
+			original_overheat_module = package.loaded["scripts/utilities/overheat"]
+			package.loaded["scripts/utilities/overheat"] = {
+				slot_percentage = function(_unit, _slot, _limit_type)
+					return overheat_percentage
+				end,
+			}
+		end)
+
+		after_each(function()
+			package.loaded["scripts/utilities/overheat"] = original_overheat_module
+		end)
+
+		local function install_conditions()
+			local conditions = {
+				should_vent_overheat = function()
+					return false
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test")
+			return conditions
+		end
+
+		local function call(conditions, is_running, target_type, args)
+			local blackboard = { perception = { target_enemy_type = target_type or "ranged" } }
+
+			return conditions.should_vent_overheat("unit_stub", blackboard, {}, args or {
+				overheat_limit_type = "standard",
+				start_min_percentage = 0.5,
+				start_max_percentage = 0.9,
+				stop_percentage = 0.2,
+			}, {}, is_running)
+		end
+
+		it("returns false for melee target regardless of overheat", function()
+			local conditions = install_conditions()
+
+			overheat_percentage = 0.95
+			assert.is_false(call(conditions, false, "melee"))
+			assert.is_false(call(conditions, true, "melee"))
+		end)
+
+		it("when is_running uses stop_percentage lower bound", function()
+			local conditions = install_conditions()
+
+			overheat_percentage = 0.19
+			assert.is_false(call(conditions, true))
+			overheat_percentage = 0.2
+			assert.is_true(call(conditions, true))
+		end)
+
+		it("when not is_running requires start range window", function()
+			local conditions = install_conditions()
+
+			overheat_percentage = 0.49
+			assert.is_false(call(conditions, false))
+			overheat_percentage = 0.5
+			assert.is_true(call(conditions, false))
+			overheat_percentage = 0.9
+			assert.is_true(call(conditions, false))
+			overheat_percentage = 0.91
+			assert.is_false(call(conditions, false))
 		end)
 	end)
 end)

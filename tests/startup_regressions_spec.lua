@@ -255,6 +255,17 @@ local function make_bootstrap_harness(module_overrides)
 		schedule_retry = function() end,
 		reset_item_sequence_state = function() end,
 	})
+	modules.ChargeTracker = make_runtime_module("ChargeTracker", install_calls, {
+		handle = function() end,
+	})
+	modules.GestaltInjector = make_runtime_module("GestaltInjector", install_calls, {
+		inject = function(gestalts_or_nil)
+			return gestalts_or_nil, false
+		end,
+	})
+	modules.UpdateDispatcher = make_runtime_module("UpdateDispatcher", install_calls, {
+		dispatch = function() end,
+	})
 	modules.Debug = make_runtime_module("Debug", install_calls, {
 		context_snapshot = function(context)
 			return context
@@ -462,6 +473,9 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/heuristics_grenade"] = modules.HeuristicsGrenade,
 		["BetterBots/scripts/mods/BetterBots/heuristics"] = modules.Heuristics,
 		["BetterBots/scripts/mods/BetterBots/item_fallback"] = modules.ItemFallback,
+		["BetterBots/scripts/mods/BetterBots/charge_tracker"] = modules.ChargeTracker,
+		["BetterBots/scripts/mods/BetterBots/gestalt_injector"] = modules.GestaltInjector,
+		["BetterBots/scripts/mods/BetterBots/update_dispatcher"] = modules.UpdateDispatcher,
 		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
 		["BetterBots/scripts/mods/BetterBots/event_log"] = modules.EventLog,
 		["BetterBots/scripts/mods/BetterBots/perf"] = modules.Perf,
@@ -731,8 +745,13 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
+		assert.is_truthy(source:find("ChargeTracker%.init%(", 1))
+		assert.is_truthy(source:find("ChargeTracker%.handle%(", 1))
+		assert.is_truthy(source:find("GestaltInjector%.init%(", 1))
+		assert.is_truthy(source:find("GestaltInjector%.inject%(", 1))
+		assert.is_truthy(source:find("UpdateDispatcher%.init%(", 1))
+		assert.is_truthy(source:find("UpdateDispatcher%.dispatch%(", 1))
 		assert.is_truthy(source:find("CompanionTag%.init%(", 1))
-		assert.is_truthy(source:find("CompanionTag%.update%(", 1))
 	end)
 
 	it("boots BetterBots.lua against fake mod and asserts runtime wiring", function()
@@ -783,6 +802,31 @@ describe("startup regressions", function()
 		)
 		assert.equals(harness.modules.Settings.is_grenade_enabled, grenade_wire.refs.is_grenade_enabled)
 		assert.equals(harness.modules.BotTargeting, grenade_wire.refs.bot_targeting)
+
+		local charge_init = find_named_call(harness.init_calls, "ChargeTracker")
+		assert.equals(harness.modules.GrenadeFallback, charge_init.deps.grenade_fallback)
+		assert.equals(harness.modules.Settings, charge_init.deps.settings)
+		assert.equals(harness.modules.TeamCooldown, charge_init.deps.team_cooldown)
+		assert.equals(harness.modules.CombatAbilityIdentity, charge_init.deps.combat_ability_identity)
+		assert.equals(harness.modules.EventLog, charge_init.deps.event_log)
+
+		local gestalt_init = find_named_call(harness.init_calls, "GestaltInjector")
+		assert.equals("killshot", gestalt_init.deps.default_ranged_gestalt)
+		assert.equals("linesman", gestalt_init.deps.default_melee_gestalt)
+		assert.equals("table", type(gestalt_init.deps.injected_units))
+
+		local dispatcher_init = find_named_call(harness.init_calls, "UpdateDispatcher")
+		assert.equals(harness.modules.Perf, dispatcher_init.deps.perf)
+		assert.equals(harness.modules.EventLog, dispatcher_init.deps.event_log)
+		assert.equals(harness.modules.Debug, dispatcher_init.deps.debug)
+		assert.equals(harness.modules.AbilityQueue, dispatcher_init.deps.ability_queue)
+		assert.equals(harness.modules.GrenadeFallback, dispatcher_init.deps.grenade_fallback)
+		assert.equals(harness.modules.PingSystem, dispatcher_init.deps.ping_system)
+		assert.equals(harness.modules.CompanionTag, dispatcher_init.deps.companion_tag)
+		assert.equals(harness.modules.Settings, dispatcher_init.deps.settings)
+		assert.equals(harness.modules.Heuristics.build_context, dispatcher_init.deps.build_context)
+		assert.equals("table", type(dispatcher_init.deps.session_start_state))
+		assert.equals("number", type(dispatcher_init.deps.snapshot_interval_s))
 
 		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)

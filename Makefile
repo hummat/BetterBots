@@ -19,7 +19,8 @@ format-check:
 	stylua --check $(LUA_FILES)
 
 lsp-check:
-	lua-language-server --configpath=.luarc.json --check=. --check_format=pretty --logpath=/tmp/luals-betterbots
+	@mkdir -p build/luals-log
+	lua-language-server --configpath=.luarc.json --check=. --check_format=pretty --logpath=build/luals-log
 
 doc-check:
 	@scripts/doc-check.sh

@@ -10,30 +10,7 @@ local _suppressed_reason = nil
 local _combat_template_enabled = true
 local _hook_require_callbacks = {}
 local _hook_safe_calls = {}
-
-_G.ScriptUnit = {
-	has_extension = function(unit, system_name)
-		local unit_exts = _extensions[unit]
-		return unit_exts and unit_exts[system_name] or nil
-	end,
-	extension = function(unit, system_name)
-		local ext = _extensions[unit] and _extensions[unit][system_name]
-		if not ext then
-			error("No extension " .. system_name .. " for " .. tostring(unit))
-		end
-		return ext
-	end,
-}
-_G.ALIVE = setmetatable({}, {
-	__index = function()
-		return true
-	end,
-})
-_G.Managers = { state = { extension = {
-	system = function()
-		return nil
-	end,
-} } }
+local _saved_globals = {}
 
 local _orig_require = require
 local _ability_templates = {}
@@ -46,11 +23,57 @@ local function _mock_require(path)
 	end
 	return _orig_require(path)
 end
-rawset(_G, "require", _mock_require)
 
 local SharedRules = dofile("scripts/mods/BetterBots/shared_rules.lua")
 local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
 local ReviveAbility = dofile("scripts/mods/BetterBots/revive_ability.lua")
+
+setup(function()
+	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
+	_saved_globals.ALIVE = rawget(_G, "ALIVE")
+	_saved_globals.Managers = rawget(_G, "Managers")
+	_saved_globals.require = rawget(_G, "require")
+
+	rawset(_G, "ScriptUnit", {
+		has_extension = function(unit, system_name)
+			local unit_exts = _extensions[unit]
+			return unit_exts and unit_exts[system_name] or nil
+		end,
+		extension = function(unit, system_name)
+			local ext = _extensions[unit] and _extensions[unit][system_name]
+			if not ext then
+				error("No extension " .. system_name .. " for " .. tostring(unit))
+			end
+			return ext
+		end,
+	})
+	rawset(
+		_G,
+		"ALIVE",
+		setmetatable({}, {
+			__index = function()
+				return true
+			end,
+		})
+	)
+	rawset(_G, "Managers", {
+		state = {
+			extension = {
+				system = function()
+					return nil
+				end,
+			},
+		},
+	})
+	rawset(_G, "require", _mock_require)
+end)
+
+teardown(function()
+	rawset(_G, "require", _saved_globals.require)
+	rawset(_G, "Managers", _saved_globals.Managers)
+	rawset(_G, "ALIVE", _saved_globals.ALIVE)
+	rawset(_G, "ScriptUnit", _saved_globals.ScriptUnit)
+end)
 
 -- Mock factories
 local function make_unit(id)
@@ -197,10 +220,6 @@ describe("revive_ability", function()
 	before_each(function()
 		_extensions = {}
 		init_module()
-	end)
-
-	teardown(function()
-		rawset(_G, "require", _orig_require)
 	end)
 
 	it("loads without error", function()

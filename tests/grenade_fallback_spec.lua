@@ -19,6 +19,7 @@ local _grenade_state_by_unit = {}
 local _last_grenade_charge_event_by_unit = {}
 local _perf_calls = {}
 local unit
+local _saved_globals = {}
 
 -- Mock ability_extension
 local _can_use_grenade = true
@@ -44,7 +45,7 @@ local mock_action_input_extension = test_helper.make_player_action_input_extensi
 	end,
 })
 
-local mock_bot_unit_input = {
+local mock_bot_unit_input = test_helper.make_bot_unit_input({
 	set_aiming = function(_self, aiming, soft, use_rotation)
 		_aim_calls[#_aim_calls + 1] = {
 			method = "set_aiming",
@@ -65,26 +66,17 @@ local mock_bot_unit_input = {
 			position = position,
 		}
 	end,
-}
+})
 
-local mock_input_extension = {
-	bot_unit_input = function()
-		return mock_bot_unit_input
-	end,
-}
+local mock_input_extension = test_helper.make_player_input_extension({
+	bot_unit_input = mock_bot_unit_input,
+})
 
 -- Mock unit_data component state
 local _wielded_slot = "slot_secondary"
 local _component_state_by_name = {}
 
 -- Mock ScriptUnit
-_G.ScriptUnit = {
-	has_extension = function(u, system_name)
-		local exts = _extensions[u]
-		return exts and exts[system_name] or nil
-	end,
-}
-
 -- Mock heuristic result
 local _heuristic_result = true
 local _heuristic_rule = "grenade_generic"
@@ -100,6 +92,21 @@ local _grenades_enabled_result = true
 
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
+
+setup(function()
+	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
+
+	rawset(_G, "ScriptUnit", {
+		has_extension = function(u, system_name)
+			local exts = _extensions[u]
+			return exts and exts[system_name] or nil
+		end,
+	})
+end)
+
+teardown(function()
+	rawset(_G, "ScriptUnit", _saved_globals.ScriptUnit)
+end)
 
 unit = "bot_unit_1"
 local blackboard = {}
@@ -502,15 +509,11 @@ describe("grenade_fallback", function()
 				ARMOR_TYPE_SUPER_ARMOR = "super_armor",
 			})
 			_extensions.enemy_1 = {
-				unit_data_system = test_helper.make_player_unit_data_extension(nil, {
-					breed = function()
-						return {
-							name = "chaos_traitor_gunner",
-							tags = { special = true },
-							ranged = true,
-							game_object_type = "minion_ranged",
-						}
-					end,
+				unit_data_system = test_helper.make_minion_unit_data_extension({
+					name = "chaos_traitor_gunner",
+					tags = { special = true },
+					ranged = true,
+					game_object_type = "minion_ranged",
 				}),
 			}
 

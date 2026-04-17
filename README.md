@@ -291,6 +291,7 @@ scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
+  charge_tracker.lua              #   use_ability_charge dispatch: consumed events, team cooldown, fallback completion
   combat_ability_identity.lua     #   Semantic ability identity (shout vs stance, etc.)
   heuristics.lua                  #   Thin public API + dispatcher for split heuristic modules
   heuristics_context.lua          #   Shared context builder + target/breed helper functions
@@ -302,8 +303,10 @@ scripts/mods/BetterBots/          # Mod source
   heuristics_hive_scum.lua        #   Hive Scum ability heuristics
   heuristics_grenade.lua          #   Grenade/blitz tactical evaluators
   meta_data.lua                   #   ability_meta_data injection at load time
+  gestalt_injector.lua            #   Default bot_gestalts injection for ADS-capable bot profiles
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua            #   Grenade throw state machine (wield/aim/throw/unwield)
+  update_dispatcher.lua           #   BotBehaviorExtension.update dispatcher ordering and gating
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profiles.lua                #   Bot-optimized class profiles per slot
   bot_targeting.lua               #   Shared perception target resolver + helpers

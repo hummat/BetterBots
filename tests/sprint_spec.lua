@@ -4,74 +4,17 @@ local test_helper = require("tests.test_helper")
 local _extensions = {}
 local _positions = {}
 local _alive = {}
-
-_G.ScriptUnit = {
-	has_extension = function(unit, system_name)
-		local unit_exts = _extensions[unit]
-		return unit_exts and unit_exts[system_name] or nil
-	end,
-}
-
-_G.POSITION_LOOKUP = setmetatable({}, {
-	__index = function(_, unit)
-		return _positions[unit]
-	end,
-})
-
-_G.ALIVE = setmetatable({}, {
-	__index = function(_, unit)
-		return _alive[unit]
-	end,
-})
-
-_G.Vector3 = {
-	distance_squared = function(a, b)
-		local dx = a.x - b.x
-		local dy = a.y - b.y
-		local dz = a.z - b.z
-		return dx * dx + dy * dy + dz * dz
-	end,
-}
+local _saved_globals = {}
+local Sprint
 
 -- Mock BLACKBOARDS for daemonhost aggro state detection (#17)
 local _blackboards = {}
-_G.BLACKBOARDS = setmetatable({}, {
-	__index = function(_, unit)
-		return _blackboards[unit]
-	end,
-})
 
 -- Mock Managers.state.extension:system("side_system") for daemonhost detection
 local _mock_side_system = nil
 
-_G.Managers = {
-	state = {
-		extension = {
-			system = function(_self, name)
-				if name == "side_system" and _mock_side_system then
-					return _mock_side_system
-				end
-				return nil
-			end,
-		},
-	},
-}
-
-local Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
-
 -- Mock time for per-frame caching — increment between tests to bust cache
 local _mock_time = 0
-
-Sprint.init({
-	mod = { echo = function() end },
-	debug_log = function() end,
-	debug_enabled = function()
-		return false
-	end,
-	fixed_time = function()
-		return _mock_time
-	end,
-})
 
 -- Helper: build a mock BotUnitInput self with _move and _group_extension
 local function make_self(opts)
@@ -103,13 +46,13 @@ local function setup_behavior(unit, perception_data)
 	if not _extensions[unit] then
 		_extensions[unit] = {}
 	end
-	_extensions[unit].behavior_system = {
-		_brain = {
+	_extensions[unit].behavior_system = test_helper.make_bot_behavior_extension({
+		brain = {
 			_blackboard = {
 				perception = perception_data or {},
 			},
 		},
-	}
+	})
 end
 
 -- Helper: set up unit_data extension for a breed
@@ -134,7 +77,7 @@ local function setup_side_system(bot_unit, enemy_units)
 	local enemy_side = {
 		ai_target_units = enemy_units or {},
 	}
-	_mock_side_system = {
+	_mock_side_system = test_helper.make_side_system_double({
 		side_by_unit = {
 			[bot_unit] = {
 				relation_side_names = function()
@@ -145,7 +88,7 @@ local function setup_side_system(bot_unit, enemy_units)
 		get_side_from_name = function(_self, _name)
 			return enemy_side
 		end,
-	}
+	})
 end
 
 -- Reset all mocks between tests
@@ -167,6 +110,80 @@ local function reset()
 end
 
 describe("sprint", function()
+	setup(function()
+		_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
+		_saved_globals.POSITION_LOOKUP = rawget(_G, "POSITION_LOOKUP")
+		_saved_globals.ALIVE = rawget(_G, "ALIVE")
+		_saved_globals.Vector3 = rawget(_G, "Vector3")
+		_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
+		_saved_globals.Managers = rawget(_G, "Managers")
+
+		_G.ScriptUnit = {
+			has_extension = function(unit, system_name)
+				local unit_exts = _extensions[unit]
+				return unit_exts and unit_exts[system_name] or nil
+			end,
+		}
+
+		_G.POSITION_LOOKUP = setmetatable({}, {
+			__index = function(_, unit)
+				return _positions[unit]
+			end,
+		})
+
+		_G.ALIVE = setmetatable({}, {
+			__index = function(_, unit)
+				return _alive[unit]
+			end,
+		})
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = a.x - b.x
+				local dy = a.y - b.y
+				local dz = a.z - b.z
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+
+		_G.BLACKBOARDS = setmetatable({}, {
+			__index = function(_, unit)
+				return _blackboards[unit]
+			end,
+		})
+
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function(_self, name)
+						if name == "side_system" and _mock_side_system then
+							return _mock_side_system
+						end
+						return nil
+					end,
+				},
+			},
+		}
+
+		Sprint = dofile("scripts/mods/BetterBots/sprint.lua")
+		Sprint.init({
+			mod = { echo = function() end },
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return _mock_time
+			end,
+		})
+	end)
+
+	teardown(function()
+		for k, v in pairs(_saved_globals) do
+			rawset(_G, k, v)
+		end
+	end)
+
 	before_each(function()
 		reset()
 	end)
@@ -234,7 +251,7 @@ describe("sprint", function()
 			-- same team share the same enemy_side_names reference. Mirror that
 			-- here so the cache-by-reference check still collapses to one scan.
 			local shared_enemy_sides = { "enemy" }
-			_mock_side_system = {
+			_mock_side_system = test_helper.make_side_system_double({
 				side_by_unit = {
 					[bot1] = {
 						relation_side_names = function()
@@ -250,7 +267,7 @@ describe("sprint", function()
 				get_side_from_name = function()
 					return { ai_target_units = { daemonhost } }
 				end,
-			}
+			})
 
 			assert.is_false(Sprint.is_near_daemonhost(bot1))
 			assert.is_false(Sprint.is_near_daemonhost(bot2))
@@ -283,7 +300,7 @@ describe("sprint", function()
 			-- different enemy unit lists depending on the side name queried.
 			local enemy_sides_a = { "side_a" }
 			local enemy_sides_b = { "side_b" }
-			_mock_side_system = {
+			_mock_side_system = test_helper.make_side_system_double({
 				side_by_unit = {
 					[bot1] = {
 						relation_side_names = function()
@@ -304,7 +321,7 @@ describe("sprint", function()
 					end
 					return nil
 				end,
-			}
+			})
 
 			-- bot1 scans side_a, finds dh_a at 5m → near.
 			assert.is_true(Sprint.is_near_daemonhost(bot1))
@@ -701,6 +718,112 @@ describe("sprint", function()
 			_mock_time = _mock_time + 1
 			-- Tighter 10m combat range: false (15m > 10m)
 			assert.is_false(Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ))
+		end)
+	end)
+
+	describe("on_update_movement hook", function()
+		local input
+		local next_should
+		local next_reason
+
+		before_each(function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 5
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+			Sprint._set_should_sprint_for_test(function()
+				return next_should, next_reason
+			end)
+			input = {}
+			next_should = false
+			next_reason = "enemies_nearby"
+		end)
+
+		local function call(func, input_arg)
+			Sprint._on_update_movement(func or function() end, make_self(), "unit_stub", input_arg or input, 0.016, 1.0)
+		end
+
+		it("always sets hold_to_sprint = true when enabled", function()
+			call()
+			assert.is_true(input.hold_to_sprint)
+		end)
+
+		it("sets input.sprinting to _should_sprint result", function()
+			next_should = true
+			call()
+			assert.is_true(input.sprinting)
+
+			next_should = false
+			call()
+			assert.is_false(input.sprinting)
+		end)
+
+		it("short-circuits and does not mutate input when follow_distance = 0", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 0
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+
+			call()
+			assert.is_nil(input.hold_to_sprint)
+			assert.is_nil(input.sprinting)
+		end)
+
+		it("chains original func on both normal and short-circuit paths", function()
+			local func_calls = 0
+			local wrapped = function()
+				func_calls = func_calls + 1
+			end
+
+			call(wrapped)
+			assert.equals(1, func_calls)
+
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 0
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+
+			call(wrapped, {})
+			assert.equals(2, func_calls)
 		end)
 	end)
 end)

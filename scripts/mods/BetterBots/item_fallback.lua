@@ -1,6 +1,9 @@
+local M = {}
+
 local _mod
 local _debug_log
 local _debug_enabled
+local _fixed_time
 local _equipped_combat_ability_name
 local _fallback_state_by_unit
 local _last_charge_event_by_unit
@@ -295,6 +298,50 @@ local function schedule_retry(unit, fixed_t, retry_delay_s)
 	local next_try_t = state.next_try_t
 	if not next_try_t or retry_t < next_try_t then
 		state.next_try_t = retry_t
+	end
+end
+
+local function on_state_change_finish(func, self, reason, data, t, time_in_action)
+	local action_settings = self._action_settings
+	local ability_type = action_settings and action_settings.ability_type
+	local use_ability_charge = action_settings and action_settings.use_ability_charge
+	local player = self._player
+	local unit = self._player_unit
+	local wanted_state_name = self._wanted_state_name
+	local character_state_component = self._character_sate_component
+	local current_state_name = character_state_component and character_state_component.state_name or nil
+	local failed_state_transition = wanted_state_name ~= nil and current_state_name ~= wanted_state_name
+	local is_bot = player and not player:is_human_controlled()
+
+	func(self, reason, data, t, time_in_action)
+
+	if
+		not is_bot
+		or not unit
+		or ability_type ~= "combat_ability"
+		or not use_ability_charge
+		or not failed_state_transition
+	then
+		return
+	end
+
+	local fixed_t = _fixed_time()
+	local ability_name = _equipped_combat_ability_name(unit)
+	M.schedule_retry(unit, fixed_t, 0.35)
+	if _debug_enabled() then
+		_debug_log(
+			"state_fail_retry:" .. tostring(ability_name) .. ":" .. tostring(reason),
+			fixed_t,
+			"combat ability state transition failed for "
+				.. tostring(ability_name)
+				.. " (wanted="
+				.. tostring(wanted_state_name)
+				.. ", current="
+				.. tostring(current_state_name)
+				.. ", reason="
+				.. tostring(reason)
+				.. "); scheduled fast retry"
+		)
 	end
 end
 
@@ -879,32 +926,36 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	end
 end
 
-return {
-	init = function(deps)
-		_mod = deps.mod
-		_debug_log = deps.debug_log
-		_debug_enabled = deps.debug_enabled
-		_equipped_combat_ability_name = deps.equipped_combat_ability_name
-		_fallback_state_by_unit = deps.fallback_state_by_unit
-		_last_charge_event_by_unit = deps.last_charge_event_by_unit
-		_fallback_queue_dumped_by_key = deps.fallback_queue_dumped_by_key
-		_ITEM_WIELD_TIMEOUT_S = deps.ITEM_WIELD_TIMEOUT_S
-		_ITEM_SEQUENCE_RETRY_S = deps.ITEM_SEQUENCE_RETRY_S
-		_ITEM_CHARGE_CONFIRM_TIMEOUT_S = deps.ITEM_CHARGE_CONFIRM_TIMEOUT_S
-		_ITEM_DEFAULT_START_DELAY_S = deps.ITEM_DEFAULT_START_DELAY_S
-		_event_log = deps.event_log
-		_bot_slot_for_unit = deps.bot_slot_for_unit
-	end,
-	wire = function(refs)
-		_build_context = refs.build_context
-		_context_snapshot = refs.context_snapshot
-		_fallback_state_snapshot = refs.fallback_state_snapshot
-		_evaluate_item_heuristic = refs.evaluate_item_heuristic
-		_is_item_ability_enabled = refs.is_item_ability_enabled
-	end,
-	try_queue_item = try_queue_item,
-	can_use_item_fallback = can_use_item_fallback,
-	should_lock_weapon_switch = should_lock_weapon_switch,
-	reset_item_sequence_state = _reset_item_sequence_state,
-	schedule_retry = schedule_retry,
-}
+M.init = function(deps)
+	_mod = deps.mod
+	_debug_log = deps.debug_log
+	_debug_enabled = deps.debug_enabled
+	_fixed_time = deps.fixed_time
+	_equipped_combat_ability_name = deps.equipped_combat_ability_name
+	_fallback_state_by_unit = deps.fallback_state_by_unit
+	_last_charge_event_by_unit = deps.last_charge_event_by_unit
+	_fallback_queue_dumped_by_key = deps.fallback_queue_dumped_by_key
+	_ITEM_WIELD_TIMEOUT_S = deps.ITEM_WIELD_TIMEOUT_S
+	_ITEM_SEQUENCE_RETRY_S = deps.ITEM_SEQUENCE_RETRY_S
+	_ITEM_CHARGE_CONFIRM_TIMEOUT_S = deps.ITEM_CHARGE_CONFIRM_TIMEOUT_S
+	_ITEM_DEFAULT_START_DELAY_S = deps.ITEM_DEFAULT_START_DELAY_S
+	_event_log = deps.event_log
+	_bot_slot_for_unit = deps.bot_slot_for_unit
+end
+
+M.wire = function(refs)
+	_build_context = refs.build_context
+	_context_snapshot = refs.context_snapshot
+	_fallback_state_snapshot = refs.fallback_state_snapshot
+	_evaluate_item_heuristic = refs.evaluate_item_heuristic
+	_is_item_ability_enabled = refs.is_item_ability_enabled
+end
+
+M.try_queue_item = try_queue_item
+M.can_use_item_fallback = can_use_item_fallback
+M.should_lock_weapon_switch = should_lock_weapon_switch
+M.reset_item_sequence_state = _reset_item_sequence_state
+M.schedule_retry = schedule_retry
+M.on_state_change_finish = on_state_change_finish
+
+return M

@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Darktide Mod Framework (DMF) mod that makes bots use their combat abilities in Solo Play. The game has a complete bot ability activation system (behavior tree node + condition guard + action input queue), but Fatshark hardcoded a whitelist in `bt_bot_conditions.can_activate_ability` that only allows two abilities. This mod removes that gate and injects missing metadata so the existing infrastructure handles the rest.
 
+**Scope — critical:** BetterBots is client-side and only affects bots in locally-hosted sessions (`game_mode_settings.host_singleplay = true`). Darktide uses Fatshark dedicated servers for all public and matched play, so this mod has zero effect on bots there. In practice, the Solo Play mod is the only context where BetterBots runs. When answering "does the mod work in [Havoc / public / matched / Penances / X]" questions, the answer is **no** unless X is locally hosted — verify against `host_singleplay` before investigating engine capabilities. Do not pattern-match from Vermintide 2's P2P/listen-server model; Darktide's architecture is different.
+
 ## Deployment
 
 The mod lives in `$GIT_ROOT/BetterBots/` and is symlinked into the Darktide mods directory:
@@ -19,7 +21,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, bot_targeting, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, shared_rules, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, vfx_suppression, weapon_action)
+- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, bot_targeting, charge_tracker, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, gestalt_injector, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, shared_rules, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, update_dispatcher, vfx_suppression, weapon_action)
 - `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
 - `make check-ci` — CI quality gate: format-check + lint + lsp + test + doc-check
 
@@ -389,6 +391,7 @@ scripts/mods/BetterBots/
   bot_targeting.lua                         # Shared bot target resolver for grenade aim and smart-target seeding
   condition_patch.lua                       # BT can_activate_ability replacement + DH suppression wrappers
   ability_queue.lua                         # Fallback combat ability activation (Tier 1/2); delegates Tier 3 to ItemFallback
+  charge_tracker.lua                        # use_ability_charge dispatch: consumed events, semantic routing, team cooldown, fallback completion
   combat_ability_identity.lua               # Semantic ability identity: shout vs stance routing for shared templates
   heuristics.lua                            # Thin public API + dispatcher for split heuristic modules
   heuristics_context.lua                    # Shared build_context() + target/breed helper functions
@@ -400,8 +403,10 @@ scripts/mods/BetterBots/
   heuristics_hive_scum.lua                  # Hive Scum ability heuristics
   heuristics_grenade.lua                    # Grenade/blitz tactical evaluators
   meta_data.lua                             # ability_meta_data injection (Tier 2 templates + Veteran overrides)
+  gestalt_injector.lua                      # Default bot_gestalts injection for ADS-capable profiles
   item_fallback.lua                         # Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua                      # Grenade throw state machine (wield/aim/throw/unwield)
+  update_dispatcher.lua                     # BotBehaviorExtension.update dispatcher ordering and gating
   event_log.lua                             # Structured JSONL event logging (decision/queued/consumed)
   sprint.lua                                # Bot sprint injection (catch-up, rescue, traversal, daemonhost safety)
   melee_meta_data.lua                       # Melee attack_meta_data injection (arc/penetrating classification)
@@ -441,6 +446,7 @@ tests/
   event_log_spec.lua                        # event buffering/flush/lifecycle
   sprint_spec.lua                           # sprint conditions + daemonhost safety
   condition_patch_spec.lua                  # DH combat suppression wrappers
+  charge_tracker_spec.lua                   # use_ability_charge dispatch, team cooldown, fallback completion
   shared_rules_spec.lua                     # parser queueability + daemonhost aggro-state helpers
   target_selection_spec.lua                 # melee target distance penalty + player-tag boost + boss engagement
   bot_targeting_spec.lua                    # shared perception target resolution + elite/special detection
@@ -449,6 +455,7 @@ tests/
   weapon_action_spec.lua                    # weapon-action logging, dead-zone ranged fire confirmation
   ranged_meta_data_spec.lua                 # ranged fallback, input derivation, injection + charge override
   grenade_fallback_spec.lua                 # grenade throw state machine
+  gestalt_injector_spec.lua                 # bot_gestalt defaulting + per-unit dedup
   ping_system_spec.lua                      # bot pinging logic + tag refresh + failure backoff
   companion_tag_spec.lua                    # Arbites companion-command tag: guard checks, target priority, dedup
   boss_engagement_spec.lua                  # boss/miniboss targeting self-defense exception
@@ -471,6 +478,7 @@ tests/
   debug_spec.lua                            # debug command registration
   startup_regressions_spec.lua              # structural regression guards
   sustained_fire_spec.lua                   # sustained-fire path detection, hold injection, stale clears
+  update_dispatcher_spec.lua                # per-frame dispatcher order, gating, session-start, snapshot cadence
   ability_queue_spec.lua                    # combat ability fallback queueing
   ammo_policy_spec.lua                      # ammo policy thresholds + defer logic
   combat_ability_identity_spec.lua          # semantic ability identity routing

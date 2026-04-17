@@ -22,11 +22,13 @@ This mod targets bot ability activation in three paths:
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
 3. Replaces `can_activate_ability` on both `bt_bot_conditions` and `bt_conditions` so templates with valid metadata can pass (via `condition_patch.lua`).
-4. Adds a fallback in `BotBehaviorExtension:update` (via `ability_queue.lua` for Tier 1/2; `item_fallback.lua` for Tier 3):
+4. Adds a fallback in `BotBehaviorExtension:update` (via `update_dispatcher.lua` coordinating `ability_queue.lua` for Tier 1/2 and `grenade_fallback.lua` for grenade/blitz paths):
+   - per-frame order is stable: perf sync → session-start event → ability queue → grenade fallback → ping/companion updates → event-log flush → snapshot emit
    - template fallback: queue ability action input directly on `combat_ability_action`
    - item fallback: queue explicit `weapon_action` sequence (`combat_ability` wield + cast follow-ups + unwind)
    - item sequence selection is profile-driven (shared profile catalog + per-ability priority order)
-5. Adds state-transition recovery:
+5. Tracks charge consumption + state-transition recovery:
+   - `charge_tracker.lua` wraps `PlayerUnitAbilityExtension.use_ability_charge` for bot-only consumed events, semantic-key routing, team-cooldown recording, and grenade/item fallback completion
    - hook `ActionCharacterStateChange.finish`
    - if bot combat ability did not reach wanted character state, schedule a fast fallback retry
 6. Adds queue-level weapon-switch protection for item abilities (via `weapon_action.lua`):
@@ -105,7 +107,7 @@ This mod targets bot ability activation in three paths:
     - hook `BotGroup.init`, `BotGroup._update_mule_pickups`, and setting-change sync: backfills missing mule slot caches on construction, then prunes cached reservations and explicit `slot_pocketable` pickup orders immediately when a pickup type is disabled, so bots can fall through to the other type without waiting for the vanilla cache to expire
     - post-processes vanilla `_update_mule_pickups()` assignment to ignore the stock "suppress mule pickup while any human is within ~20m of the book" rule; BetterBots now claims the nearest eligible unassigned book for a bot with a free mule slot and an in-leash follow position, then marks destination refresh so ordinary book pickup can happen in the common nearby-player case
     - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled; leaves orders for enabled types intact
-22. ADS fix for T5/T6 bots (#35):
+22. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
 23. Bot sprinting (#36, via `sprint.lua`):
