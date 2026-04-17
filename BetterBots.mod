@@ -1,6 +1,8 @@
 return {
 	run = function()
-		fassert(googlemain ~= nil, "BetterBots must be lower than Darktide Mod Framework in your mod load order.")
+		if not rawget(_G, "new_mod") then
+			error("BetterBots must be lower than Darktide Mod Framework in your mod load order.")
+		end
 
 		new_mod("BetterBots", {
 			mod_script       = "BetterBots/scripts/mods/BetterBots/BetterBots",
