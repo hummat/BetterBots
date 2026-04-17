@@ -142,7 +142,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | F1 | Talent/buff context extension | Additive fields in `build_context()` — `has_talent()`, `current_stacks()`. Prerequisite for `#38`. Pure additive. |
 | 13 | Navmesh charge/dash validation | GwNav raycast before committing charge direction. Darktide uses navigation destination vector, not `aim_position` (per March 8 audit correction on issue). Applies to `ogryn_charge`, `adamant_charge`, `zealot_targeted_dash`. Existing rescue-aim path at `ability_queue.lua:359` is a complementary layer, not a substitute. |
 | 92 | Per-breed weakspot aim map | Hook `BtBotShootAction._set_new_aim_target` + breed→node override table. Ships atop `#91` MVP allowlist in `ranged_meta_data.lua:224`. Independent of `#41`. Per-breed node names need verification from `breeds/*` source. |
-| 86 | Tier 3 revive cover — timing investigation | Answer the blocker in the issue body: does `BtBotInteractAction.enter` leave ≥1.5–2s window before revive commits? Ship or scope-exit based on result. Cheap to investigate. |
+| 86 | Tier 3 revive cover — timing investigation | **Done 2026-04-17.** Scope-exit at the `enter` hook confirmed by two independent investigations. `PlayerCharacterStateInteracting.on_enter` interrupts any in-flight ability/weapon action and force-wields `slot_unarmed`, killing Tier 3 sequences on revive entry. Viable-but-substantial architecture (approach-phase hook via `on_refresh_destination` + gated `can_revive`) documented on the issue and moved to Post-1.0. |
 
 #### Sprint 2 — Keystone-aware layer (shipped-roster coverage)
 
@@ -184,7 +184,6 @@ F2 is the real infrastructure bet. One primitive unlocks three downstream featur
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 86 | Tier 3 revive cover | Ship if Sprint 1 investigation cleared the timing window. Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Parallel resolution branch through `item_fallback.lua`. |
 | 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
 | 96 | Smart-tag item interaction bridge | Route explicit non-enemy smart-tag interactions into bot pickup/drop orders. Sits atop `#24` + `#88` pickup paths — queue after those ship. |
 | 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
@@ -207,10 +206,9 @@ Hard cut order (first to drop):
 
 1. `#85` (refactor, user-invisible)
 2. `#56` (comm wheel — ForTheEmperor users only)
-3. `#86` (ship/skip based on Sprint 1 timing investigation)
-4. `#96` + `#97` (coordination polish)
-5. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
-6. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
+3. `#96` + `#97` (coordination polish)
+4. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
+5. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
 
 **Do not cut:** F2 primitive + its three downstream consumable features (`#24a/b/c`, `#88` carry), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
 
@@ -224,6 +222,7 @@ Hard cut order (first to drop):
 | 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
 | 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` and is intentionally narrower than `#22`. |
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
+| 86 | Tier 3 revive cover | Moved 2026-04-17 after Sprint 1 timing investigation confirmed `BtBotInteractAction.enter` is unusable (engine interrupt on interacting state entry). Viable architecture: approach-phase hook in `revive_ability.on_refresh_destination` + gate `bt_bot_conditions.can_revive` while item sequence mid-flight. Ships instant-variant shield + drone; relic stays excluded (5.6s unwield + slot lock). Full plan on the issue. |
 
 **Broad-scope cuts (scope-exit, captured under parent issues):**
 
