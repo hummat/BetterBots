@@ -21,7 +21,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 ## Testing
 
 **Automated** (outside the game):
-- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, bot_targeting, charge_tracker, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, gestalt_injector, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, settings, shared_rules, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, update_dispatcher, vfx_suppression, weapon_action)
+- `make test` — unit tests via busted (ability_queue, airlock_guard, ammo_policy, animation_guard, boss_engagement, bot_profiles, bot_targeting, charge_tracker, combat_ability_identity, companion_tag, condition_patch, debug, engagement_leash, event_log, gestalt_injector, grenade_fallback, healing_deferral, heuristics, human_likeness, item_fallback, log_levels, melee_attack_choice, melee_meta_data, meta_data, mule_pickup, perf, ping_system, poxburster, ranged_meta_data, resolve_decision, revive_ability, runtime_contracts, settings, shared_rules, smart_targeting, sprint, startup_regressions, sustained_fire, target_selection, target_type_hysteresis, team_cooldown, update_dispatcher, vfx_suppression, weapon_action)
 - `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
 - `make check-ci` — CI quality gate: format-check + lint + lsp + test + doc-check
 
@@ -461,6 +461,7 @@ tests/
   boss_engagement_spec.lua                  # boss/miniboss targeting self-defense exception
   healing_deferral_spec.lua                 # healing deferral settings, health resolution, defer logic
   item_fallback_spec.lua                    # Tier 3 item state machine + profile selection
+  runtime_contracts_spec.lua                # cross-module charge/event/retry contract coverage
   poxburster_spec.lua                       # poxburster suppression (all perception slots)
   animation_guard_spec.lua                  # animation variable id guard helper + load-time regression
   airlock_guard_spec.lua                    # airlock teleport nil-node guard + warn-once behavior

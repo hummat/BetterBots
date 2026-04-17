@@ -20,6 +20,30 @@ Use `docs/dev/validation-tracker.md` as the canonical run log and matrix.
 3. At least one item-path cast occurs when using item ability bots (`fallback item queued ...` then `charge consumed for ...`).
 4. No obvious regressions to revive/rescue/navigation/basic combat.
 
+## Release-Candidate Smoke Loop
+
+Run this after every feature batch that touches hooks, fallback state, event logging, or bot input dispatch:
+
+1. Fresh launch smoke
+   - Start Darktide from a cold process.
+   - Launch one Solo Play mission.
+   - Confirm `BetterBots loaded` appears exactly once.
+   - Confirm no startup traceback appears in the first minute.
+
+2. Ability-path smoke
+   - Observe at least one template-path activation.
+   - Observe at least one item-path activation.
+   - Observe at least one grenade/blitz activation if the batch touched grenade logic.
+
+3. Session-lifecycle smoke
+   - Finish the mission or return to Mourningstar.
+   - Launch a second Solo Play mission without restarting the game.
+   - Confirm no duplicate startup spam, no stale fallback loops, and no immediate traceback on mission start.
+
+4. Core regression smoke
+   - Revive/rescue still works.
+   - Navigation/combat loop still looks normal.
+
 ## Test matrix
 
 1. Baseline startup

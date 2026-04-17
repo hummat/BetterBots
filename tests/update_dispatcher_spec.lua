@@ -11,6 +11,17 @@ describe("update_dispatcher", function()
 	local snapshot_state
 	local session_start_state
 	local fixed_t
+	local collect_alive_bots_calls
+
+	local function count_events(event_name)
+		local count = 0
+		for i = 1, #emitted_events do
+			if emitted_events[i].event == event_name then
+				count = count + 1
+			end
+		end
+		return count
+	end
 
 	local function make_self(is_human)
 		return {
@@ -62,6 +73,7 @@ describe("update_dispatcher", function()
 			},
 			debug = {
 				collect_alive_bots = function()
+					collect_alive_bots_calls = collect_alive_bots_calls + 1
 					return opts.bots
 						or {
 							{
@@ -133,6 +145,7 @@ describe("update_dispatcher", function()
 		snapshot_state = {}
 		session_start_state = { emitted = false }
 		fixed_t = 100
+		collect_alive_bots_calls = 0
 		extension_map = {
 			unit_stub = {
 				ability_system = test_helper.make_player_ability_extension({
@@ -186,14 +199,27 @@ describe("update_dispatcher", function()
 		UpdateDispatcher.dispatch(self, "unit_stub")
 		UpdateDispatcher.dispatch(self, "unit_stub")
 
-		local session_start_count = 0
-		for i = 1, #emitted_events do
-			if emitted_events[i].event == "session_start" then
-				session_start_count = session_start_count + 1
-			end
-		end
+		assert.equals(1, count_events("session_start"))
+	end)
 
-		assert.equals(1, session_start_count)
+	it("does not emit session_start when no alive bots are reported", function()
+		UpdateDispatcher.init(make_deps({ bots = {} }))
+
+		UpdateDispatcher.dispatch(make_self(false), "unit_stub")
+
+		assert.equals(0, count_events("session_start"))
+		assert.is_false(session_start_state.emitted)
+	end)
+
+	it("re-emits session_start after the emitted flag is reset", function()
+		local self = make_self(false)
+
+		UpdateDispatcher.dispatch(self, "unit_stub")
+		session_start_state.emitted = false
+		UpdateDispatcher.dispatch(self, "unit_stub")
+
+		assert.equals(2, count_events("session_start"))
+		assert.is_true(session_start_state.emitted)
 	end)
 
 	it("emits snapshot on first call and again after the cadence elapses", function()
@@ -203,14 +229,7 @@ describe("update_dispatcher", function()
 		fixed_t = fixed_t + 31
 		UpdateDispatcher.dispatch(self, "unit_stub")
 
-		local snapshot_count = 0
-		for i = 1, #emitted_events do
-			if emitted_events[i].event == "snapshot" then
-				snapshot_count = snapshot_count + 1
-			end
-		end
-
-		assert.equals(2, snapshot_count)
+		assert.equals(2, count_events("snapshot"))
 	end)
 
 	it("does not emit snapshot within the cadence window", function()
@@ -220,14 +239,17 @@ describe("update_dispatcher", function()
 		fixed_t = fixed_t + 5
 		UpdateDispatcher.dispatch(self, "unit_stub")
 
-		local snapshot_count = 0
-		for i = 1, #emitted_events do
-			if emitted_events[i].event == "snapshot" then
-				snapshot_count = snapshot_count + 1
-			end
-		end
+		assert.equals(1, count_events("snapshot"))
+	end)
 
-		assert.equals(1, snapshot_count)
+	it("sets snapshot cooldown_ready to false when the ability extension is missing", function()
+		extension_map.unit_stub = {}
+
+		UpdateDispatcher.dispatch(make_self(false), "unit_stub")
+
+		assert.equals(1, count_events("snapshot"))
+		assert.is_false(emitted_events[#emitted_events].cooldown_ready)
+		assert.is_nil(emitted_events[#emitted_events].charges)
 	end)
 
 	-- Explicit order check required by the plan.
@@ -252,13 +274,14 @@ describe("update_dispatcher", function()
 
 		UpdateDispatcher.dispatch(make_self(false), "unit_stub")
 
-		local snapshot_count = 0
-		for i = 1, #emitted_events do
-			if emitted_events[i].event == "snapshot" then
-				snapshot_count = snapshot_count + 1
-			end
-		end
+		assert.equals(0, count_events("snapshot"))
+	end)
 
-		assert.equals(0, snapshot_count)
+	it("does not collect alive bots when the event log is disabled", function()
+		UpdateDispatcher.init(make_deps({ event_log_enabled = false }))
+
+		UpdateDispatcher.dispatch(make_self(false), "unit_stub")
+
+		assert.equals(0, collect_alive_bots_calls)
 	end)
 end)

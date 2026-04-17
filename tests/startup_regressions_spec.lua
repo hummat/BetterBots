@@ -1,4 +1,8 @@
 local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
+local unpack_results = unpack
+if table and table.unpack then -- luacheck: ignore 143
+	unpack_results = table.unpack -- luacheck: ignore 143
+end
 
 local function has_bare_percent(str)
 	local i = 1
@@ -78,6 +82,18 @@ local function sorted_keys(map)
 	table.sort(keys)
 
 	return keys
+end
+
+local function count_hooks(hook_registrations, target, method_name, hook_type)
+	local count = 0
+
+	for _, reg in ipairs(hook_registrations) do
+		if reg.target == target and reg.method == method_name and reg.hook_type == hook_type then
+			count = count + 1
+		end
+	end
+
+	return count
 end
 
 local function make_runtime_module(module_name, install_calls, extra)
@@ -535,7 +551,7 @@ local function make_bootstrap_harness(module_overrides)
 			target[method_name] = function(...)
 				local results = { original(...) }
 				handler(...)
-				return unpack(results)
+				return unpack_results(results)
 			end
 		end,
 		command = function(_, name, _description, callback)
@@ -873,6 +889,115 @@ describe("startup regressions", function()
 		}, sorted_keys(harness.hook_require_callbacks))
 	end)
 
+	it("dispatches use_ability_charge through ChargeTracker.handle", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local handled = {}
+		harness.modules.ChargeTracker.handle = function(self, ability_type, optional_num_charges)
+			handled[#handled + 1] = {
+				self = self,
+				ability_type = ability_type,
+				charges = optional_num_charges,
+			}
+		end
+
+		local ability_ext = {
+			use_ability_charge = function(_self, ability_type, optional_num_charges)
+				return "orig", ability_type, optional_num_charges
+			end,
+		}
+
+		harness:invoke_hook_require("scripts/extension_systems/ability/player_unit_ability_extension", ability_ext)
+		local tag, ability_type, charges = ability_ext:use_ability_charge("combat_ability", 2)
+
+		assert.equals("orig", tag)
+		assert.equals("combat_ability", ability_type)
+		assert.equals(2, charges)
+		assert.equals(1, #handled)
+		assert.same(ability_ext, handled[1].self)
+		assert.equals("combat_ability", handled[1].ability_type)
+		assert.equals(2, handled[1].charges)
+	end)
+
+	it("dispatches ActionCharacterStateChange.finish through ItemFallback", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local forwarded = {}
+		harness.modules.ItemFallback.on_state_change_finish = function(func, self, reason, data, t, time_in_action)
+			forwarded[#forwarded + 1] = {
+				self = self,
+				reason = reason,
+				t = t,
+				time_in_action = time_in_action,
+			}
+			return func(self, reason, data, t, time_in_action)
+		end
+
+		local action = {
+			finish = function(_self, reason, _data, t, time_in_action)
+				return "orig-finish", reason, t, time_in_action
+			end,
+		}
+
+		harness:invoke_hook_require("scripts/extension_systems/ability/actions/action_character_state_change", action)
+		local tag, reason, t, time_in_action = action:finish("interrupted", {}, 12, 0.1)
+
+		assert.equals("orig-finish", tag)
+		assert.equals("interrupted", reason)
+		assert.equals(12, t)
+		assert.equals(0.1, time_in_action)
+		assert.equals(1, #forwarded)
+		assert.same(action, forwarded[1].self)
+		assert.equals("interrupted", forwarded[1].reason)
+		assert.equals(12, forwarded[1].t)
+		assert.equals(0.1, forwarded[1].time_in_action)
+	end)
+
+	it("installs behavior hooks once and dispatches update/init through extracted modules", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local dispatched = { update = 0, inject = 0 }
+		harness.modules.UpdateDispatcher.dispatch = function(self, unit)
+			dispatched.update = dispatched.update + 1
+			dispatched.last_self = self
+			dispatched.last_unit = unit
+		end
+		harness.modules.GestaltInjector.inject = function(gestalts_or_nil, unit)
+			dispatched.inject = dispatched.inject + 1
+			dispatched.inject_unit = unit
+			return gestalts_or_nil or { ranged = "killshot" }, true
+		end
+
+		local behavior_ext = {
+			update = function() end,
+			_init_blackboard_components = function(_self, _blackboard, _physics_world, gestalts_or_nil)
+				return gestalts_or_nil
+			end,
+			_refresh_destination = function() end,
+		}
+
+		harness:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
+		harness:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
+
+		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
+		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "update", "hook_safe"))
+
+		behavior_ext._unit = "bot_unit_1"
+		behavior_ext:update("bot_unit_1")
+		local gestalts = behavior_ext:_init_blackboard_components({}, nil, nil)
+
+		assert.equals(1, dispatched.update)
+		assert.same(behavior_ext, dispatched.last_self)
+		assert.equals("bot_unit_1", dispatched.last_unit)
+		assert.equals(1, dispatched.inject)
+		assert.equals("bot_unit_1", dispatched.inject_unit)
+		assert.equals("killshot", gestalts.ranged)
+	end)
+
 	it("registers a single hook on BotBehaviorExtension._refresh_destination from BetterBots.lua", function()
 		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 		local count = 0
@@ -932,14 +1057,9 @@ describe("startup regressions", function()
 		harness2:load()
 		harness2:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
 
-		local count = 0
-		for _, reg in ipairs(harness2.hook_registrations) do
-			if reg.target == behavior_ext and reg.method == "_refresh_destination" then
-				count = count + 1
-			end
-		end
-
-		assert.equals(0, count)
+		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
+		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
 	end)
 
 	it("fails bootstrap when a required module API is missing", function()

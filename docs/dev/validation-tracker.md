@@ -38,6 +38,10 @@ Tier 3 evidence:
   - key lines / timestamps:
 
 Regression checks:
+- fresh launch / startup load: PASS/FAIL/UNKNOWN
+- second mission without restart: PASS/FAIL/UNKNOWN
+- duplicate startup spam: yes/no
+- template/item/grenade smoke all observed: yes/no
 - revive/rescue: PASS/FAIL/UNKNOWN
 - navigation/pathing: PASS/FAIL/UNKNOWN
 - basic combat loop: PASS/FAIL/UNKNOWN
