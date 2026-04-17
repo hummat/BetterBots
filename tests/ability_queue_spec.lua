@@ -264,11 +264,12 @@ describe("ability_queue", function()
 			assert.equals(0, queued_inputs)
 		end)
 
-		it("suppresses fallback queueing when team cooldown blocks the semantic ability family", function()
+		it("does not queue fallback input after a pre-queue suppression gate fires", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require
 
 			local queued_inputs = 0
+			local emitted_events = {}
 			local recorded_team_key
 			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function()
@@ -388,7 +389,14 @@ describe("ability_queue", function()
 				},
 				EventLog = {
 					is_enabled = function()
-						return false
+						return true
+					end,
+					emit_decision = function() end,
+					next_attempt_id = function()
+						error("queued events must not allocate attempt ids after suppression")
+					end,
+					emit = function(event)
+						emitted_events[#emitted_events + 1] = event
 					end,
 				},
 				EngagementLeash = {
@@ -421,6 +429,7 @@ describe("ability_queue", function()
 
 			assert.equals("veteran_combat_ability_shout", recorded_team_key)
 			assert.equals(0, queued_inputs)
+			assert.same({}, emitted_events)
 		end)
 
 		it("records breakdown buckets for the template fallback path", function()

@@ -323,7 +323,7 @@ describe("bot_profiles", function()
 			assert.is_nil(resolved._bb_resolved)
 		end)
 
-		it("preserves cosmetic/UI contract fields when mutating a vanilla profile in place", function()
+		it("preserves the curated UI/profile contract subtree during in-place bot profile resolution", function()
 			local saved_require = require
 
 			local ok, err = pcall(function()

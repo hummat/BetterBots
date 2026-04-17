@@ -1230,7 +1230,7 @@ describe("startup regressions", function()
 		assert.is_truthy(main_source:find("MulePickup%.on_refresh_destination", 1))
 	end)
 
-	it("recovers EventLog on bootstrap after hot reload without waiting for on_game_state_changed", function()
+	it("restores session-scoped EventLog behavior on bootstrap after hot reload", function()
 		local saved_mods = rawget(_G, "Mods")
 		local event_log = dofile("scripts/mods/BetterBots/event_log.lua")
 
@@ -1265,6 +1265,7 @@ describe("startup regressions", function()
 		harness:load()
 
 		assert.is_true(event_log.is_enabled())
+		assert.are.equal(0, #event_log._get_buffer())
 		event_log.emit({ event = "probe" })
 		assert.are.equal(1, #event_log._get_buffer())
 
