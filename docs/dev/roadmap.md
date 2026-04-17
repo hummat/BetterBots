@@ -188,12 +188,14 @@ F2 is the real infrastructure bet. One primitive unlocks three downstream featur
 | 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
 | 96 | Smart-tag item interaction bridge | Route explicit non-enemy smart-tag interactions into bot pickup/drop orders. Sits atop `#24` + `#88` pickup paths — queue after those ship. |
 | 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
+| 101 | Weapon-slot wield timeout on BB-locked swap | Grenade/item fallbacks wait out full 2 s timeout + 2 s retry when `weapon_action.bot_queue_action_input` rejects the wield. Expose lock state; short-circuit with `reason = 'slot_locked'`. Fits coordination-polish neighborhood; not load-bearing. |
 
 #### Sprint 6 — Validation, hardening, release
 
 | # | Issue | Notes |
 |---|-------|-------|
 | 98 | Sparse metadata hardening | Targeted boundary guards in engine-facing consumers — follow-up to three v0.11.x melee crash fixes (`299eaac`, `ebcb71c`, `15fdd65`). No blanket `pcall`, no broad refactor. |
+| 102 | ActionInputParser zoom/unzoom noise | Same family as `#98`: `ranged_meta_data.lua:15` falls back to `"zoom"` when the weapon uses `action_brace` (plasmagun) or has no aim action (flamer, melee). 0–195 engine INFO lines/run. Log hygiene only, not user-visible. |
 | 99 | Perf benchmark protocol | Reusable perf harness — acceptance target definition first, then medium-risk hotspot work (`ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, `ammo_policy.update_ammo`). Current-branch mission-end sample: `104.9 us/bot/frame`. |
 | 85 | Combat ability identity refactor | Tech debt, user-invisible — separate `template_name` from `ability_name` semantics. Ship if runway permits; drop first if tight. |
 | — | Full cold-boot soak | Both mod load orders, grep DMF warnings in raw console, Auric mission runs. |
