@@ -161,6 +161,13 @@ return {
 		en = "Bots aim for the torso on Scab Maulers so shots do not glance off the helmet. "
 			.. "Other armored elites keep vanilla aim until their weakspot nodes are verified.",
 	},
+	enable_charge_nav_validation = {
+		en = "Validate charge and dash launch paths",
+	},
+	enable_charge_nav_validation_description = {
+		en = "Bots check the navmesh path before Zealot dash and Ogryn/Arbites charges "
+			.. "so they do not launch into blocked geometry.",
+	},
 	human_timing_profile = {
 		en = "Timing profile",
 	},

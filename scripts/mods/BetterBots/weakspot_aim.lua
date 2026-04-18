@@ -1,12 +1,9 @@
--- weakspot_aim.lua — per-breed override for ranged aim node (#92).
+-- weakspot_aim.lua — per-breed override for ranged aim nodes on armored elites.
 --
--- Builds on the #91 MVP injection (`ranged_meta_data.lua` sets
--- attack_meta_data.aim_at_node = {"j_head", "j_spine"} for finesse weapons).
--- The shoot action randomly picks one per target acquisition. For breeds
--- where the head is the most armored hitbox (Scab Mauler) or carapace
--- redirects the weakspot elsewhere, this module post-processes
--- `BtBotShootAction._set_new_aim_target` to pin scratchpad.aim_at_node
--- to the correct node.
+-- Vanilla ranged weapon metadata can expose multiple aim nodes, and the shoot
+-- action picks one per target acquisition. For breeds where one of those nodes
+-- is a trap (for example Mauler helmet shots glancing off armor), this module
+-- post-processes the chosen node and pins the scratchpad to the safer weakspot.
 --
 -- Per-target cost: one breed lookup on acquisition for static breeds, plus a
 -- live re-check for the two stateful breeds (Bulwark/Crusher) while the target
@@ -26,6 +23,8 @@ local BLOCK_ANGLE_DISTANCE_SQUARED_EPSILON = 0.01
 local CRUSHER_BREED_NAME = "chaos_ogryn_executor"
 local CRUSHER_PROVISIONAL_WEAKSPOT_NODE = "j_head"
 local CRUSHER_REAR_ARC_MIN_ANGLE = math.pi / 2
+local _missing_override_node_logged_by_breed = {}
+local _missing_shield_api_logged_by_unit = setmetatable({}, { __mode = "k" })
 
 function M.init(deps)
 	_mod = deps.mod
@@ -115,10 +114,53 @@ local function target_forward_angle_to_bot(target_unit, scratchpad)
 	)
 
 	if not to_bot_flat_normalized then
-		return 0
+		return nil
 	end
 
 	return Vector3.angle(target_forward_flat_normalized, to_bot_flat_normalized)
+end
+
+M._target_forward_angle_to_bot = target_forward_angle_to_bot
+
+local function log_missing_shield_api_once(target_unit)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+	if _missing_shield_api_logged_by_unit[target_unit] then
+		return
+	end
+
+	_missing_shield_api_logged_by_unit[target_unit] = true
+	_debug_log(
+		"weakspot_aim:shield_api_missing:" .. tostring(target_unit),
+		0,
+		"weakspot shield API missing; leaving Bulwark on vanilla aim"
+	)
+end
+
+local function log_missing_override_node_once(breed_name, override)
+	if not breed_name or not override then
+		return
+	end
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local key = tostring(breed_name) .. ":" .. tostring(override)
+	if _missing_override_node_logged_by_breed[key] then
+		return
+	end
+
+	_missing_override_node_logged_by_breed[key] = true
+	_debug_log(
+		"weakspot_aim:missing_node:" .. key,
+		0,
+		"weakspot override node missing; leaving vanilla aim (breed="
+			.. tostring(breed_name)
+			.. ", node="
+			.. tostring(override)
+			.. ")"
+	)
 end
 
 local function resolve_bulwark_override(target_unit, scratchpad)
@@ -131,8 +173,16 @@ local function resolve_bulwark_override(target_unit, scratchpad)
 		return nil
 	end
 
+	if not ScriptUnit or not ScriptUnit.has_extension then
+		return nil
+	end
+
 	local shield_extension = ScriptUnit.has_extension(target_unit, "shield_system")
-	if not shield_extension or not shield_extension.is_blocking then
+	if not shield_extension then
+		return nil
+	end
+	if not shield_extension.is_blocking then
+		log_missing_shield_api_once(target_unit)
 		return nil
 	end
 	if not shield_extension:is_blocking() then
@@ -191,7 +241,7 @@ local function capture_baseline_once(scratchpad)
 end
 
 local function resolve_breed_name(target_unit)
-	if not target_unit then
+	if not target_unit or not ScriptUnit or not ScriptUnit.has_extension then
 		return nil
 	end
 	local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")
@@ -225,7 +275,7 @@ local function restore_baseline(scratchpad)
 	end
 end
 
-function M.apply_override(target_unit, scratchpad)
+function M.apply_override(target_unit, scratchpad, self_unit)
 	if not scratchpad then
 		return nil
 	end
@@ -237,6 +287,7 @@ function M.apply_override(target_unit, scratchpad)
 	local breed_name = current_breed_name(target_unit, scratchpad)
 	local override = resolve_override(target_unit, scratchpad, breed_name)
 	if override and Unit and Unit.has_node and not Unit.has_node(target_unit, override) then
+		log_missing_override_node_once(breed_name, override)
 		override = nil
 	end
 
@@ -248,8 +299,9 @@ function M.apply_override(target_unit, scratchpad)
 	scratchpad.aim_at_node = override
 	scratchpad.aim_at_node_charged = override
 	if _debug_enabled and _debug_enabled() and _debug_log then
+		local shooter_unit = self_unit or scratchpad.__bb_weakspot_self_unit
 		_debug_log(
-			"weakspot_aim:" .. tostring(target_unit),
+			"weakspot_aim:" .. tostring(target_unit) .. ":" .. tostring(shooter_unit),
 			0,
 			"weakspot override applied (breed=" .. breed_name .. ", node=" .. override .. ")"
 		)
@@ -257,7 +309,7 @@ function M.apply_override(target_unit, scratchpad)
 	return override
 end
 
-function M.refresh_live_override(target_unit, scratchpad)
+function M.refresh_live_override(target_unit, scratchpad, self_unit)
 	if not scratchpad then
 		return nil
 	end
@@ -267,15 +319,14 @@ function M.refresh_live_override(target_unit, scratchpad)
 		return nil
 	end
 
-	return M.apply_override(target_unit, scratchpad)
+	return M.apply_override(target_unit, scratchpad, self_unit)
 end
 
 local SENTINEL = "__bb_weakspot_aim_installed"
 
--- Called from `weapon_action.lua`'s existing `bt_bot_shoot_action` hook_require
--- callback. `BetterBots.lua` wraps `mod:hook_require` with a duplicate-path
--- guard, so this module deliberately does not own its own hook_require
--- registration — weapon_action hands us the class.
+-- This module only patches the class it is handed. It deliberately does not
+-- own any `hook_require` registration because the mod bootstrap consolidates
+-- shared hook targets and rejects duplicate path ownership.
 function M.install_on_shoot_action(BtBotShootAction)
 	if not _mod or not BtBotShootAction then
 		return
@@ -285,14 +336,21 @@ function M.install_on_shoot_action(BtBotShootAction)
 	end
 	BtBotShootAction[SENTINEL] = true
 
+	_mod:hook(BtBotShootAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
+		if scratchpad then
+			scratchpad.__bb_weakspot_self_unit = unit
+		end
+
+		return func(self, unit, breed, blackboard, scratchpad, action_data, t)
+	end)
 	_mod:hook_safe(BtBotShootAction, "_set_new_aim_target", function(_self, _t, target_unit, scratchpad, _action_data)
-		M.apply_override(target_unit, scratchpad)
+		M.apply_override(target_unit, scratchpad, scratchpad and scratchpad.__bb_weakspot_self_unit or nil)
 	end)
 	_mod:hook(
 		BtBotShootAction,
 		"_aim_position",
 		function(func, self, self_unit, scratchpad, action_data, dt, current_position, current_rotation, target_unit)
-			M.refresh_live_override(target_unit, scratchpad)
+			M.refresh_live_override(target_unit, scratchpad, self_unit)
 
 			return func(self, self_unit, scratchpad, action_data, dt, current_position, current_rotation, target_unit)
 		end

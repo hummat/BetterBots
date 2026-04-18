@@ -359,27 +359,14 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
 	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
-	local validation_target_position
+	local rescue_ally_position
 	if rule and RESCUE_CHARGE_RULES[rule] then
 		local perception = blackboard and blackboard.perception
 		local ally_unit = perception and perception.target_ally
 		if ally_unit then
 			local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 			if ally_pos then
-				validation_target_position = ally_pos
-				local input_ext = ScriptUnit.has_extension(unit, "input_system")
-				local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
-				if bot_input then
-					bot_input:set_aiming(true)
-					bot_input:set_aim_position(ally_pos)
-					if _debug_enabled() then
-						_debug_log(
-							"rescue_aim:" .. tostring(unit),
-							fixed_t,
-							"rescue aim (fallback): directed charge toward disabled ally"
-						)
-					end
-				end
+				rescue_ally_position = ally_pos
 			end
 		end
 	end
@@ -387,7 +374,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	if _ChargeNavValidation and _ChargeNavValidation.should_validate(ability_template_name) then
 		local nav_ok, nav_reason = _ChargeNavValidation.validate(unit, ability_template_name, "fallback", {
 			blackboard = blackboard,
-			target_position = validation_target_position,
+			target_position = rescue_ally_position,
 		})
 		if not nav_ok then
 			if _EventLog.is_enabled() then
@@ -404,6 +391,22 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			end
 			_finish_child_perf("ability_queue.queue", queue_t0)
 			return
+		end
+	end
+
+	if rescue_ally_position then
+		local input_ext = ScriptUnit.has_extension(unit, "input_system")
+		local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+		if bot_input then
+			bot_input:set_aiming(true)
+			bot_input:set_aim_position(rescue_ally_position)
+			if _debug_enabled() then
+				_debug_log(
+					"rescue_aim:" .. tostring(unit),
+					fixed_t,
+					"rescue aim (fallback): directed charge toward disabled ally"
+				)
+			end
 		end
 	end
 

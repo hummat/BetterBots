@@ -71,6 +71,7 @@ local FEATURE_GATES = {
 	ammo_policy = "enable_ammo_policy",
 	bot_tome_pickup = "enable_bot_tome_pickup",
 	weakspot_aim = "enable_weakspot_aim",
+	charge_nav_validation = "enable_charge_nav_validation",
 }
 
 -- Preset system
@@ -108,6 +109,7 @@ M.DEFAULTS = {
 	enable_ammo_policy = true,
 	enable_bot_tome_pickup = true,
 	enable_weakspot_aim = true,
+	enable_charge_nav_validation = true,
 	human_timing_profile = "auto",
 	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,

@@ -603,7 +603,7 @@ describe("ability_queue", function()
 			}, validated)
 		end)
 
-		it("applies rescue aim before validating fallback launch geometry", function()
+		it("validates fallback rescue geometry before mutating aim", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require
 
@@ -799,11 +799,199 @@ describe("ability_queue", function()
 				target_position = ally_pos,
 			}, validated)
 			assert.same({
+				"validate",
 				"set_aiming",
 				"set_aim_position",
-				"validate",
 				"bot_queue_action_input",
 			}, call_order)
+		end)
+
+		it("does not mutate rescue aim when fallback launch validation fails", function()
+			saved_script_unit = _G.ScriptUnit
+			saved_require = require
+
+			local queued_inputs = 0
+			local call_order = {}
+			local ally_pos = { x = 18, y = -4, z = 0 }
+			local bot_unit_input = test_helper.make_bot_unit_input({
+				set_aiming = function()
+					call_order[#call_order + 1] = "set_aiming"
+				end,
+				set_aim_position = function()
+					call_order[#call_order + 1] = "set_aim_position"
+				end,
+			})
+			local input_extension = test_helper.make_player_input_extension({
+				bot_unit_input = bot_unit_input,
+			})
+			local ability_extension = test_helper.make_player_ability_extension({
+				can_use_ability = function()
+					return true
+				end,
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			})
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				bot_queue_action_input = function()
+					call_order[#call_order + 1] = "bot_queue_action_input"
+					queued_inputs = queued_inputs + 1
+				end,
+				action_input_parsers = {
+					combat_ability_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							ogryn_charge = {
+								charge_pressed = {},
+							},
+						},
+					},
+				},
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "ogryn_charge" },
+			})
+
+			_G.POSITION_LOOKUP = {
+				ally_unit = ally_pos,
+			}
+			_G.ScriptUnit = {
+				has_extension = function(_, system_name)
+					if system_name == "unit_data_system" then
+						return unit_data_extension
+					end
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					if system_name == "input_system" then
+						return input_extension
+					end
+					return nil
+				end,
+				extension = function(_, system_name)
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+			}
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return {
+						ogryn_charge = {
+							ability_meta_data = {
+								activation = { action_input = "charge_pressed" },
+							},
+						},
+					}
+				end
+				if path == "scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions" then
+					return {}
+				end
+				return saved_require(path)
+			end)
+
+			AbilityQueue.init({
+				mod = { echo = function() end, dump = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				equipped_combat_ability = function()
+					return ability_extension, { name = "ogryn_charge" }
+				end,
+				equipped_combat_ability_name = function()
+					return "ogryn_charge"
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				fallback_state_by_unit = {},
+				fallback_queue_dumped_by_key = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20,
+				shared_rules = SharedRules,
+			})
+			AbilityQueue.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true, "ogryn_charge_ally_aid", { num_nearby = 1 }
+					end,
+				},
+				MetaData = { inject = function() end },
+				ItemFallback = {
+					try_queue_item = function() end,
+					reset_item_sequence_state = function() end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+					context_snapshot = function(context)
+						return context
+					end,
+					fallback_state_snapshot = function(state)
+						return state
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				EngagementLeash = {
+					is_movement_ability = function()
+						return false
+					end,
+				},
+				ChargeNavValidation = {
+					should_validate = function(template_name)
+						return template_name == "ogryn_charge"
+					end,
+					validate = function(unit, template_name, source, opts)
+						call_order[#call_order + 1] = "validate"
+						assert.equals("bot_unit", unit)
+						assert.equals("ogryn_charge", template_name)
+						assert.equals("fallback", source)
+						assert.same(ally_pos, opts and opts.target_position or nil)
+						return false, "ray_blocked"
+					end,
+				},
+				TeamCooldown = {
+					is_suppressed = function()
+						return false
+					end,
+				},
+				CombatAbilityIdentity = {
+					resolve = function()
+						return nil
+					end,
+				},
+				HumanLikeness = {
+					should_bypass_ability_jitter = function()
+						return true
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+
+			AbilityQueue.try_queue("bot_unit", {
+				perception = {
+					target_ally = "ally_unit",
+				},
+			})
+
+			assert.equals(0, queued_inputs)
+			assert.same({ "validate" }, call_order)
 		end)
 
 		it("records breakdown buckets for the template fallback path", function()

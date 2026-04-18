@@ -1027,6 +1027,80 @@ describe("startup regressions", function()
 		}, validated)
 	end)
 
+	it("does not mutate rescue aim before bt_enter charge validation blocks the action", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local ally_pos = { x = 12, y = -3, z = 0 }
+		local call_order = {}
+		local validated = {}
+		local condition_init = find_named_call(harness.init_calls, "ConditionPatch")
+		local rescue_intent = condition_init and condition_init.deps and condition_init.deps.rescue_intent
+
+		assert.is_not_nil(rescue_intent, "ConditionPatch rescue_intent dep was not wired")
+
+		harness.modules.ChargeNavValidation.should_validate = function(template_name)
+			return template_name == "ogryn_charge"
+		end
+		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source, opts)
+			call_order[#call_order + 1] = "validate"
+			validated[#validated + 1] = {
+				unit = unit,
+				template_name = template_name,
+				source = source,
+				target_position = opts and opts.target_position or nil,
+			}
+			return false, "ray_blocked"
+		end
+
+		local action = {
+			enter = function()
+				call_order[#call_order + 1] = "enter"
+			end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "ogryn_charge" },
+		})
+		local bot_unit_input = test_helper.make_bot_unit_input({
+			set_aiming = function()
+				call_order[#call_order + 1] = "set_aiming"
+			end,
+			set_aim_position = function()
+				call_order[#call_order + 1] = "set_aim_position"
+			end,
+		})
+		local input_extension = test_helper.make_player_input_extension({
+			bot_unit_input = bot_unit_input,
+		})
+
+		_G.POSITION_LOOKUP = {
+			ally_unit = ally_pos,
+		}
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+				input_system = input_extension,
+			},
+		})
+		rescue_intent["bot_unit"] = "ally_unit"
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, { perception = {} }, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		assert.same({ "validate" }, call_order)
+		assert.same({
+			{
+				unit = "bot_unit",
+				template_name = "ogryn_charge",
+				source = "bt_enter",
+				target_position = ally_pos,
+			},
+		}, validated)
+	end)
+
 	it("installs behavior hooks once and dispatches update/init through extracted modules", function()
 		local harness = make_bootstrap_harness()
 		harness:load()

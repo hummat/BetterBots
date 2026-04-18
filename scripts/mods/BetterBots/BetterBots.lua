@@ -394,6 +394,9 @@ ChargeNavValidation.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_targeting = BotTargeting,
+	is_enabled = function()
+		return Settings.is_feature_enabled("charge_nav_validation")
+	end,
 })
 
 EngagementLeash.init({
@@ -1072,23 +1075,12 @@ mod:hook_require(
 				-- the original enter() reads first_person_component.rotation for
 				-- the lunge direction.
 				local ally_unit = _rescue_intent[unit]
-				local validation_target_position
+				local rescue_ally_position
 				if ally_unit then
 					_rescue_intent[unit] = nil
 					local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 					if ally_pos then
-						validation_target_position = ally_pos
-						local input_ext = ScriptUnit.has_extension(unit, "input_system")
-						local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
-						if bot_input then
-							bot_input:set_aiming(true)
-							bot_input:set_aim_position(ally_pos)
-							_debug_log(
-								"rescue_aim:" .. tostring(unit),
-								_fixed_time(),
-								"rescue aim: directed charge toward disabled ally"
-							)
-						end
+						rescue_ally_position = ally_pos
 					end
 				end
 
@@ -1127,13 +1119,38 @@ mod:hook_require(
 						end
 					end
 					if gate_template and ChargeNavValidation.should_validate(gate_template) then
-						local nav_ok = ChargeNavValidation.validate(unit, gate_template, "bt_enter", {
+						local nav_ok, nav_reason = ChargeNavValidation.validate(unit, gate_template, "bt_enter", {
 							blackboard = blackboard,
-							target_position = validation_target_position,
+							target_position = rescue_ally_position,
 						})
 						if not nav_ok then
+							if EventLog.is_enabled() then
+								EventLog.emit({
+									t = _fixed_time(),
+									event = "blocked",
+									bot = Debug.bot_slot_for_unit(unit),
+									ability = _equipped_combat_ability_name(unit),
+									template = gate_template,
+									source = "bt_enter",
+									reason = nav_reason,
+								})
+							end
 							return
 						end
+					end
+				end
+
+				if rescue_ally_position then
+					local input_ext = ScriptUnit.has_extension(unit, "input_system")
+					local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+					if bot_input then
+						bot_input:set_aiming(true)
+						bot_input:set_aim_position(rescue_ally_position)
+						_debug_log(
+							"rescue_aim:" .. tostring(unit),
+							_fixed_time(),
+							"rescue aim: directed charge toward disabled ally"
+						)
 					end
 				end
 

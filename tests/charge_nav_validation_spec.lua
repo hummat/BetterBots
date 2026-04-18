@@ -59,6 +59,33 @@ describe("charge_nav_validation", function()
 		assert.is_false(ChargeNavValidation.should_validate("psyker_shout"))
 	end)
 
+	it("fails open before runtime deps are wired", function()
+		local uninitialized = dofile("scripts/mods/BetterBots/charge_nav_validation.lua")
+		local ok_call, ok = pcall(uninitialized.validate, "bot_unit", "zealot_dash", "fallback")
+
+		assert.is_true(ok_call)
+		assert.is_true(ok)
+	end)
+
+	it("respects the feature gate", function()
+		ChargeNavValidation.init({
+			fixed_time = function()
+				return fixed_t
+			end,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			is_enabled = function()
+				return false
+			end,
+			nav_queries = nav_queries,
+		})
+
+		assert.is_false(ChargeNavValidation.should_validate("zealot_dash"))
+		assert.is_true(ChargeNavValidation.validate("bot_unit", "zealot_dash", "fallback"))
+	end)
+
 	it("blocks when the bot has no navigation extension", function()
 		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
 
@@ -95,6 +122,37 @@ describe("charge_nav_validation", function()
 		assert.is_false(second_ok)
 		assert.equals("cached_ray_blocked", second_reason)
 		assert.equals(1, calls)
+	end)
+
+	it("keeps negative-cache state isolated per bot unit", function()
+		local calls = 0
+
+		_G.POSITION_LOOKUP.bot_a = vec(0, 0, 0)
+		_G.POSITION_LOOKUP.bot_b = vec(0, 0, 0)
+		nav_extension = {
+			destination = function()
+				return vec(12, 0, 0)
+			end,
+			destination_reached = function()
+				return false
+			end,
+			_nav_world = "nav_world",
+			_traverse_logic = "traverse_logic",
+		}
+		nav_queries.ray_can_go = function()
+			calls = calls + 1
+			return false, vec(0, 0, 0), vec(12, 0, 0)
+		end
+
+		local first_ok, first_reason = ChargeNavValidation.validate("bot_a", "zealot_dash", "fallback")
+		fixed_t = 10.2
+		local second_ok, second_reason = ChargeNavValidation.validate("bot_b", "zealot_dash", "fallback")
+
+		assert.is_false(first_ok)
+		assert.equals("ray_blocked", first_reason)
+		assert.is_false(second_ok)
+		assert.equals("ray_blocked", second_reason)
+		assert.equals(2, calls)
 	end)
 
 	it("revalidates immediately when the navigation destination changes", function()

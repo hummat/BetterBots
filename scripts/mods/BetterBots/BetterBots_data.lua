@@ -119,6 +119,11 @@ return {
 						default_value = DEFAULTS.enable_weakspot_aim,
 					},
 					{
+						setting_id = "enable_charge_nav_validation",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_charge_nav_validation,
+					},
+					{
 						setting_id = "human_timing_profile",
 						type = "dropdown",
 						default_value = DEFAULTS.human_timing_profile,

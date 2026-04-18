@@ -3,11 +3,15 @@ local M = {}
 local _fixed_time
 local _debug_log
 local _debug_enabled
+local _is_enabled
 local _NavQueries
 local _resolve_bot_target_unit_fn
 
 local NAV_CHECK_ABOVE = 0.75
 local NAV_CHECK_BELOW = 0.5
+-- Negative results are cheap to repeat but still cost a GwNav ray query. A
+-- short cooldown collapses repeated same-endpoint failures inside one burst
+-- without leaving the bot blind for a meaningful amount of time.
 local NEGATIVE_CACHE_COOLDOWN_S = 0.5
 local MIN_DESTINATION_DIST_SQ = 0.0625
 
@@ -28,6 +32,9 @@ local TARGETED_DASH_TEMPLATES = {
 	zealot_targeted_dash_improved_double = true,
 }
 
+-- Cache shape: unit -> { template_name, destination_key, reason, until_t }.
+-- The destination key stays in the cache key so a bot immediately re-checks
+-- when the launch endpoint changes, even inside the cooldown window.
 local _blocked_state_by_unit = setmetatable({}, { __mode = "k" })
 
 local function _distance_squared(a, b)
@@ -86,7 +93,7 @@ local function _resolve_target_position(template_name, options, navigation_exten
 end
 
 local function _log_block(unit, source, template_name, fixed_t, reason)
-	if not _debug_enabled() then
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
 		return
 	end
 
@@ -104,6 +111,18 @@ local function _log_block(unit, source, template_name, fixed_t, reason)
 	)
 end
 
+local function _log_validated(unit, source, template_name, fixed_t)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	_debug_log(
+		"charge_nav:validated:" .. tostring(template_name) .. ":" .. tostring(unit),
+		fixed_t,
+		tostring(source) .. " validated " .. tostring(template_name) .. " (charge_nav=clear)"
+	)
+end
+
 local function _remember_block(unit, template_name, source, fixed_t, reason, destination_key)
 	_blocked_state_by_unit[unit] = {
 		template_name = template_name,
@@ -116,11 +135,18 @@ local function _remember_block(unit, template_name, source, fixed_t, reason, des
 end
 
 function M.should_validate(template_name)
+	if _is_enabled and not _is_enabled() then
+		return false
+	end
+
 	return CHARGE_DASH_TEMPLATES[template_name] == true
 end
 
 function M.validate(unit, template_name, source, options)
 	if not M.should_validate(template_name) then
+		return true
+	end
+	if not _fixed_time or not _NavQueries or not ScriptUnit or not ScriptUnit.has_extension then
 		return true
 	end
 
@@ -180,6 +206,9 @@ function M.validate(unit, template_name, source, options)
 	end
 
 	local traverse_logic = navigation_extension._traverse_logic
+	if not traverse_logic then
+		return _remember_block(unit, template_name, source, fixed_t, "missing_traverse_logic", target_key)
+	end
 	local ray_can_go, projected_start_position, projected_end_position =
 		_NavQueries.ray_can_go(nav_world, position, target_position, traverse_logic, NAV_CHECK_ABOVE, NAV_CHECK_BELOW)
 
@@ -192,6 +221,7 @@ function M.validate(unit, template_name, source, options)
 	end
 
 	_blocked_state_by_unit[unit] = nil
+	_log_validated(unit, source, template_name, fixed_t)
 	return true
 end
 
@@ -199,6 +229,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
+	_is_enabled = deps.is_enabled
 	_NavQueries = deps.nav_queries or require("scripts/utilities/nav_queries")
 	local bot_targeting = deps.bot_targeting
 	_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil

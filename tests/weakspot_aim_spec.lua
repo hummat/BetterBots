@@ -196,9 +196,11 @@ describe("weakspot_aim", function()
 			})
 
 			local scratchpad = { aim_at_node = "j_head", aim_at_node_charged = "j_head" }
-			WeakspotAim.apply_override("target_unit_a", scratchpad)
+			WeakspotAim.apply_override("target_unit_a", scratchpad, "bot_unit_a")
 
 			assert.equals(1, #log_entries)
+			assert.matches("target_unit_a", log_entries[1].key)
+			assert.matches("bot_unit_a", log_entries[1].key)
 			assert.matches("j_spine", log_entries[1].msg)
 			assert.matches("renegade_executor", log_entries[1].msg)
 
@@ -212,6 +214,46 @@ describe("weakspot_aim", function()
 					return true
 				end,
 			})
+		end)
+
+		it("logs once when a configured weakspot node is missing at runtime", function()
+			_G.ScriptUnit = {
+				has_extension = function()
+					return {
+						breed = function()
+							return { name = "renegade_executor" }
+						end,
+					}
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return false
+				end,
+			}
+
+			local log_entries = {}
+			WeakspotAim.init({
+				mod = { echo = function() end },
+				debug_log = function(key, _t, msg)
+					log_entries[#log_entries + 1] = { key = key, msg = msg }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				is_enabled = function()
+					return true
+				end,
+			})
+
+			local scratchpad = { aim_at_node = "j_head", aim_at_node_charged = "j_head" }
+			assert.is_nil(WeakspotAim.apply_override("target_unit", scratchpad, "bot_unit"))
+			assert.is_nil(WeakspotAim.apply_override("target_unit", scratchpad, "bot_unit"))
+
+			assert.equals(1, #log_entries)
+			assert.matches("missing_node", log_entries[1].key)
+			assert.matches("renegade_executor", log_entries[1].key)
+			assert.matches("j_spine", log_entries[1].msg)
 		end)
 
 		it("restores the vanilla baseline when the action starts on a Mauler (in-game enter order)", function()
@@ -247,6 +289,42 @@ describe("weakspot_aim", function()
 			assert.is_nil(node)
 			assert.equals("j_head", scratchpad.aim_at_node, "must restore vanilla baseline, not overridden j_spine")
 			assert.equals("j_head", scratchpad.aim_at_node_charged)
+		end)
+
+		it("keeps override state isolated across bots with different targets", function()
+			local breeds_by_unit = {
+				mauler_unit = { name = "renegade_executor" },
+				gunner_unit = { name = "chaos_ogryn_gunner" },
+			}
+
+			_G.ScriptUnit = {
+				has_extension = function(unit)
+					return {
+						breed = function()
+							return breeds_by_unit[unit]
+						end,
+					}
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+			}
+
+			local scratchpad_a = { aim_at_node = "j_head", aim_at_node_charged = "j_head" }
+			local scratchpad_b = { aim_at_node = "j_head", aim_at_node_charged = "j_head" }
+
+			WeakspotAim.apply_override("mauler_unit", scratchpad_a)
+			WeakspotAim.apply_override("gunner_unit", scratchpad_b)
+
+			assert.equals("j_spine", scratchpad_a.aim_at_node)
+			assert.equals("j_head", scratchpad_b.aim_at_node)
+
+			WeakspotAim.apply_override("gunner_unit", scratchpad_a)
+
+			assert.equals("j_head", scratchpad_a.aim_at_node)
+			assert.equals("j_head", scratchpad_b.aim_at_node)
 		end)
 
 		it("skips override when the target rig is missing the node", function()
@@ -494,6 +572,63 @@ describe("weakspot_aim", function()
 			assert.equals("j_head", scratchpad.aim_at_node_charged)
 		end)
 
+		it("logs once when the Bulwark shield API is missing", function()
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local log_entries = {}
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return {}
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+			WeakspotAim.init({
+				mod = { echo = function() end },
+				debug_log = function(key, _t, msg)
+					log_entries[#log_entries + 1] = { key = key, msg = msg }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				is_enabled = function()
+					return true
+				end,
+			})
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, 10, 0) },
+			}
+
+			assert.is_nil(WeakspotAim.apply_override("target_unit", scratchpad, "bot_unit"))
+			assert.is_nil(WeakspotAim.apply_override("target_unit", scratchpad, "bot_unit"))
+			assert.equals(1, #log_entries)
+			assert.matches("shield_api_missing", log_entries[1].key)
+			assert.matches("target_unit", log_entries[1].key)
+		end)
+
 		it("restores the vanilla baseline when a Bulwark turns to block the bot from the front again", function()
 			install_bulwark_math_globals()
 
@@ -709,7 +844,7 @@ describe("weakspot_aim", function()
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 
-			assert.equals(2, #hooks) -- one _set_new_aim_target hook and one _aim_position hook
+			assert.equals(3, #hooks) -- enter + _set_new_aim_target + _aim_position
 		end)
 
 		it("does not own a mod:hook_require registration (weapon_action consolidates)", function()
@@ -743,6 +878,25 @@ describe("weakspot_aim", function()
 	end)
 
 	describe("bulwark angle handling", function()
+		it("returns nil when the bot only differs in vertical position", function()
+			install_bulwark_math_globals()
+
+			_G.Unit = {
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local angle = WeakspotAim._target_forward_angle_to_bot("target_unit", {
+				first_person_component = { position = vec(0, 0, 5) },
+			})
+
+			assert.is_nil(angle)
+		end)
+
 		it("does not treat elevated frontal positions as exposed", function()
 			install_bulwark_math_globals()
 
