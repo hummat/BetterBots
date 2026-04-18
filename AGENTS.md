@@ -35,6 +35,12 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
+**Pre-release cold-boot test (mandatory before `make release` → Nexus push).** Static checks pass for code that still crashes on real bootstrap (v0.11.0 shipped clean tests but CTD'd on cold launch). Hot-reload skips the Lua state reset that exposes `hook_require` sentinel bugs. Before pushing a release:
+1. Fully quit Darktide, relaunch, load into a mission — no hot-reload, state must reset.
+2. Run `bb-log summary` AND `bb-log warnings` — expect zero rehook / install-failure lines.
+3. Grep the raw console log: `grep -cE "rehook active|\[ERROR\]|lua error|CRASH" <newest-console-log>` — expect 0.
+4. Repeat the launch with BetterBots loaded **first** and **last** in the mod order. Some crashes only reproduce under one ordering (v0.11.0 regression was BetterBots-first-only).
+
 **Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95. Current audited surface + source-line evidence: `docs/dev/mock-api-audit.md`.
 
 **Bug-catch audit (mandatory for every bug fix).** Every time a bug surfaces — Codex/Claude review finding, runtime crash, Nexus report, in-game regression, DMF warning — the fix is not complete until you have asked *"should the harness have caught this?"* and acted on the answer.
@@ -111,7 +117,11 @@ Use project-local tooling configs before handing off changes:
 - `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → patch-check-refresh + check + package + tag + push + upload ZIP (CI also attaches ZIP)
-  - **Post-release:** prepare a Nexus changelog entry (version + summary of user-facing changes) and add it via the Nexus "Add new changelog" form
+  - **Post-release (all 4 Nexus fields required):**
+    1. Update `docs/nexus-description.bbcode` — remove fixed bugs from "Known issues", update "New in vX.Y.Z", move shipped features to ✓ in roadmap. Commit + push.
+    2. Brief overview (≤350 chars, plain text) for the Nexus "Summary" field.
+    3. File description (≤255 chars, plain text) for the upload's "File description" field.
+    4. Changelog row (version + summary of user-facing changes) via the Nexus "Add new changelog" form.
 
 Notes:
 
@@ -302,7 +312,7 @@ Do not jump to web search first for Darktide mechanics or patch-impact questions
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
 | Fixed a user-reported bug or known issue | `docs/nexus-description.bbcode` ("Known issues") + relevant GitHub issue |
 | Added/changed user-visible behavior | README.md highlights + `docs/nexus-description.bbcode` (roadmap, "What works", version notes) |
-| Released a new version (`make release`) | Add changelog entry on Nexus (version + summary of user-facing changes) |
+| Released a new version (`make release`) | Update `docs/nexus-description.bbcode` + post all 4 Nexus fields (brief overview, file description, changelog row, mod page description) |
 
 ### Doc index by activity
 
