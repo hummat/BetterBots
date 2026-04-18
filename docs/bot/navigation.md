@@ -547,11 +547,13 @@ For Tier 2 charge abilities (Zealot Dash, Ogryn Charge, Arbites Charge), the abi
 - When the charge ends and the bot lands, navmesh position is recalculated
 
 **BetterBots #13 fix:** BetterBots now validates the current launch vector before the
-charge starts. The shared `charge_nav_validation.lua` module reads
-`navigation_extension:destination()` and runs `NavQueries.ray_can_go(...)` once after
-the heuristic already wants to fire, from both the BT enter path and the fallback queue
-path. Same-destination failures cache for 0.5s, so bots do not spam GwNav queries while
-waiting for the follow destination to refresh.
+charge starts. The shared `charge_nav_validation.lua` module runs
+`NavQueries.ray_can_go(...)` against the endpoint the lunge will actually use: explicit
+ally aim for rescue charges, bot-perception target position for zealot's targeted dash,
+and `navigation_extension:destination()` only as the fallback for directional charges.
+This check runs from both the BT enter path and the fallback queue path. Same-endpoint
+failures cache for 0.5s, so bots do not spam GwNav queries while waiting for the launch
+geometry to change.
 
 ### Teleport Interaction
 

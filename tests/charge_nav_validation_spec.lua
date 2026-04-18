@@ -131,4 +131,69 @@ describe("charge_nav_validation", function()
 		assert.is_nil(second_reason)
 		assert.equals(2, calls)
 	end)
+
+	it("uses the targeted dash enemy position instead of a reached nav destination", function()
+		local ray_end_position
+		local blackboard = {
+			perception = {
+				target_enemy = "enemy_unit",
+			},
+		}
+
+		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
+		_G.POSITION_LOOKUP.enemy_unit = vec(15, 0, 0)
+		nav_extension = {
+			destination = function()
+				return vec(0, 0, 0)
+			end,
+			destination_reached = function()
+				return true
+			end,
+			_nav_world = "nav_world",
+			_traverse_logic = "traverse_logic",
+		}
+		nav_queries.ray_can_go = function(_, _, destination)
+			ray_end_position = destination
+			return true, vec(0, 0, 0), destination
+		end
+
+		local ok, reason = ChargeNavValidation.validate("bot_unit", "zealot_dash", "fallback", {
+			blackboard = blackboard,
+		})
+
+		assert.is_true(ok)
+		assert.is_nil(reason)
+		assert.same(vec(15, 0, 0), ray_end_position)
+	end)
+
+	it("prefers an explicit launch target position over the nav destination", function()
+		local ray_end_position
+
+		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
+		nav_extension = {
+			destination = function()
+				return vec(4, 0, 0)
+			end,
+			destination_reached = function()
+				return false
+			end,
+			_nav_world = "nav_world",
+			_traverse_logic = "traverse_logic",
+		}
+		nav_queries.ray_can_go = function(_, _, destination)
+			ray_end_position = destination
+			if destination.x == 20 then
+				return false, vec(0, 0, 0), destination
+			end
+			return true, vec(0, 0, 0), destination
+		end
+
+		local ok, reason = ChargeNavValidation.validate("bot_unit", "ogryn_charge", "fallback", {
+			target_position = vec(20, 0, 0),
+		})
+
+		assert.is_false(ok)
+		assert.equals("ray_blocked", reason)
+		assert.same(vec(20, 0, 0), ray_end_position)
+	end)
 end)

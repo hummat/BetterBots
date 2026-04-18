@@ -4,6 +4,7 @@ local _fixed_time
 local _debug_log
 local _debug_enabled
 local _NavQueries
+local _resolve_bot_target_unit_fn
 
 local NAV_CHECK_ABOVE = 0.75
 local NAV_CHECK_BELOW = 0.5
@@ -18,6 +19,13 @@ local CHARGE_DASH_TEMPLATES = {
 	ogryn_charge = true,
 	ogryn_charge_increased_distance = true,
 	adamant_charge = true,
+}
+
+local TARGETED_DASH_TEMPLATES = {
+	zealot_dash = true,
+	zealot_targeted_dash = true,
+	zealot_targeted_dash_improved = true,
+	zealot_targeted_dash_improved_double = true,
 }
 
 local _blocked_state_by_unit = setmetatable({}, { __mode = "k" })
@@ -35,6 +43,46 @@ local function _destination_key(position)
 	end
 
 	return string.format("%.3f:%.3f:%.3f", position.x or 0, position.y or 0, position.z or 0)
+end
+
+local function _resolve_bot_target_unit(perception_component)
+	if _resolve_bot_target_unit_fn then
+		return _resolve_bot_target_unit_fn(perception_component)
+	end
+
+	if not perception_component then
+		return nil
+	end
+
+	return perception_component.target_enemy
+		or perception_component.priority_target_enemy
+		or perception_component.opportunity_target_enemy
+		or perception_component.urgent_target_enemy
+end
+
+local function _resolve_target_position(template_name, options, navigation_extension)
+	options = options or {}
+
+	if options.target_position then
+		return options.target_position, _destination_key(options.target_position), false
+	end
+
+	if TARGETED_DASH_TEMPLATES[template_name] then
+		local blackboard = options.blackboard
+		local perception = blackboard and blackboard.perception
+		local target_unit = _resolve_bot_target_unit(perception)
+		local target_position = target_unit and POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
+		if target_position then
+			return target_position, _destination_key(target_position), false
+		end
+	end
+
+	local destination = navigation_extension.destination and navigation_extension:destination() or nil
+	if destination then
+		return destination, _destination_key(destination), true
+	end
+
+	return nil, "missing_destination", true
 end
 
 local function _log_block(unit, source, template_name, fixed_t, reason)
@@ -71,7 +119,7 @@ function M.should_validate(template_name)
 	return CHARGE_DASH_TEMPLATES[template_name] == true
 end
 
-function M.validate(unit, template_name, source)
+function M.validate(unit, template_name, source, options)
 	if not M.should_validate(template_name) then
 		return true
 	end
@@ -91,20 +139,21 @@ function M.validate(unit, template_name, source)
 		)
 	end
 
-	local destination = navigation_extension.destination and navigation_extension:destination() or nil
 	if not position then
 		return _remember_block(unit, template_name, source, fixed_t, "missing_position", "missing_position")
 	end
-	if not destination then
-		return _remember_block(unit, template_name, source, fixed_t, "missing_destination", "missing_destination")
+
+	local target_position, target_key, is_navigation_destination =
+		_resolve_target_position(template_name, options, navigation_extension)
+	if not target_position then
+		return _remember_block(unit, template_name, source, fixed_t, "missing_destination", target_key)
 	end
 
-	local destination_key = _destination_key(destination)
 	local blocked_state = _blocked_state_by_unit[unit]
 	if
 		blocked_state
 		and blocked_state.template_name == template_name
-		and blocked_state.destination_key == destination_key
+		and blocked_state.destination_key == target_key
 		and fixed_t < blocked_state.until_t
 	then
 		local cached_reason = "cached_" .. tostring(blocked_state.reason)
@@ -112,29 +161,34 @@ function M.validate(unit, template_name, source)
 		return false, cached_reason
 	end
 
-	if navigation_extension.destination_reached and navigation_extension:destination_reached() then
-		return _remember_block(unit, template_name, source, fixed_t, "destination_reached", destination_key)
+	if
+		is_navigation_destination
+		and navigation_extension.destination_reached
+		and navigation_extension:destination_reached()
+	then
+		return _remember_block(unit, template_name, source, fixed_t, "destination_reached", target_key)
 	end
 
-	if _distance_squared(position, destination) <= MIN_DESTINATION_DIST_SQ then
-		return _remember_block(unit, template_name, source, fixed_t, "destination_too_close", destination_key)
+	if _distance_squared(position, target_position) <= MIN_DESTINATION_DIST_SQ then
+		local too_close_reason = is_navigation_destination and "destination_too_close" or "target_too_close"
+		return _remember_block(unit, template_name, source, fixed_t, too_close_reason, target_key)
 	end
 
 	local nav_world = navigation_extension._nav_world
 	if not nav_world then
-		return _remember_block(unit, template_name, source, fixed_t, "missing_nav_world", destination_key)
+		return _remember_block(unit, template_name, source, fixed_t, "missing_nav_world", target_key)
 	end
 
 	local traverse_logic = navigation_extension._traverse_logic
 	local ray_can_go, projected_start_position, projected_end_position =
-		_NavQueries.ray_can_go(nav_world, position, destination, traverse_logic, NAV_CHECK_ABOVE, NAV_CHECK_BELOW)
+		_NavQueries.ray_can_go(nav_world, position, target_position, traverse_logic, NAV_CHECK_ABOVE, NAV_CHECK_BELOW)
 
 	if not projected_start_position or not projected_end_position then
-		return _remember_block(unit, template_name, source, fixed_t, "projection_failed", destination_key)
+		return _remember_block(unit, template_name, source, fixed_t, "projection_failed", target_key)
 	end
 
 	if not ray_can_go then
-		return _remember_block(unit, template_name, source, fixed_t, "ray_blocked", destination_key)
+		return _remember_block(unit, template_name, source, fixed_t, "ray_blocked", target_key)
 	end
 
 	_blocked_state_by_unit[unit] = nil
@@ -146,6 +200,8 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_NavQueries = deps.nav_queries or require("scripts/utilities/nav_queries")
+	local bot_targeting = deps.bot_targeting
+	_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
 end
 
 return M

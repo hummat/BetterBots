@@ -393,6 +393,7 @@ ChargeNavValidation.init({
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
+	bot_targeting = BotTargeting,
 })
 
 EngagementLeash.init({
@@ -1071,10 +1072,12 @@ mod:hook_require(
 				-- the original enter() reads first_person_component.rotation for
 				-- the lunge direction.
 				local ally_unit = _rescue_intent[unit]
+				local validation_target_position
 				if ally_unit then
 					_rescue_intent[unit] = nil
 					local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 					if ally_pos then
+						validation_target_position = ally_pos
 						local input_ext = ScriptUnit.has_extension(unit, "input_system")
 						local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
 						if bot_input then
@@ -1124,7 +1127,10 @@ mod:hook_require(
 						end
 					end
 					if gate_template and ChargeNavValidation.should_validate(gate_template) then
-						local nav_ok = ChargeNavValidation.validate(unit, gate_template, "bt_enter")
+						local nav_ok = ChargeNavValidation.validate(unit, gate_template, "bt_enter", {
+							blackboard = blackboard,
+							target_position = validation_target_position,
+						})
 						if not nav_ok then
 							return
 						end

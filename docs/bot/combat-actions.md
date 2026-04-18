@@ -713,7 +713,7 @@ The lock is intentionally disabled once the unit has a live interaction target. 
 
 2. **Grenade ability support**: The BT has an `activate_grenade_ability` node (priority 9) pointing to `grenade_ability_action`. Currently blocked by the same condition gate. Grenade abilities are item-based (Tier 3) and would need an item sequence similar to the combat ability fallback.
 
-3. **Aim position during ability activation**: `BtBotActivateAbilityAction` does not set aim direction. For charge abilities (zealot dash, ogryn charge), the bot charges toward its current navigation destination. A hook could set aim toward the highest-threat enemy cluster to improve charge targeting.
+3. **Aim position during ability activation**: `BtBotActivateAbilityAction` does not set aim direction on its own. BetterBots now patches this for rescue charges by setting explicit ally aim before validation/launch, while zealot dash remains target-driven through `targeted_dash_aim` and smart targeting. Directional charges without an explicit aim point still fall back to the current navigation destination.
 
 4. **Cooldown awareness**: The condition check validates `action_input_is_currently_valid` but does not consider cooldown progress or charge count. Adding cooldown-based throttling could prevent wasted activations.
 
