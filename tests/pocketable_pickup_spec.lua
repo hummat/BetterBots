@@ -284,4 +284,74 @@ describe("pocketable_pickup", function()
 
 		assert.is_truthy(debug_logs[#debug_logs].message:find("pocketable use completed", 1, true))
 	end)
+
+	-- Static-source check. Every cooldown-form _reset_state(state, <expr>) call MUST be
+	-- followed by `return` so the retry-delay actually defers the next attempt. Falling
+	-- through leaves a stale state.next_try_t that silently suppresses wield-timeout
+	-- monitoring on the following tick. See GitHub comment on pocketable_pickup.lua:510
+	-- and the bug-catch-audit rule in CLAUDE.md.
+	it("pairs every _reset_state cooldown call with a return", function()
+		local path = "scripts/mods/BetterBots/pocketable_pickup.lua"
+		local handle = assert(io.open(path, "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		local lines = {}
+		for line in (source .. "\n"):gmatch("([^\n]*)\n") do
+			lines[#lines + 1] = line
+		end
+
+		local function is_trivial(line)
+			local trimmed = line:match("^%s*(.-)%s*$") or ""
+			if trimmed == "" then
+				return true
+			end
+			if trimmed:sub(1, 2) == "--" then
+				return true
+			end
+			-- Block terminator; control falls through to the statement below.
+			if trimmed == "end" then
+				return true
+			end
+			return false
+		end
+
+		local function first_word(line)
+			local trimmed = line:match("^%s*(.-)%s*$") or ""
+			return trimmed:match("^(%w+)")
+		end
+
+		local violations = {}
+		for i, line in ipairs(lines) do
+			-- Two-arg form sets state.next_try_t. One-arg form (no comma) is the cancel
+			-- path at line ~504 and handled by the surrounding block's explicit return.
+			local is_declaration = line:find("function%s+_reset_state") ~= nil
+			if not is_declaration and line:find("_reset_state%(state,") then
+				local follower_idx
+				for j = i + 1, #lines do
+					if not is_trivial(lines[j]) then
+						follower_idx = j
+						break
+					end
+				end
+
+				if not follower_idx or first_word(lines[follower_idx]) ~= "return" then
+					violations[#violations + 1] = string.format(
+						"line %d: `%s` is not followed by `return` (next statement at line %s: `%s`)",
+						i,
+						line:match("^%s*(.-)%s*$") or line,
+						tostring(follower_idx),
+						follower_idx and (lines[follower_idx]:match("^%s*(.-)%s*$") or lines[follower_idx]) or "<EOF>"
+					)
+				end
+			end
+		end
+
+		assert.equals(
+			0,
+			#violations,
+			"pocketable_pickup.lua has cooldown resets without a terminating return:\n  "
+				.. table.concat(violations, "\n  ")
+		)
+	end)
 end)

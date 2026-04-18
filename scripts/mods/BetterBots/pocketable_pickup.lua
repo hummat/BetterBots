@@ -508,6 +508,7 @@ function M.try_queue(unit, blackboard)
 
 		if state.pickup_name and state.pickup_name ~= desired.pickup_name then
 			_reset_state(state, fixed_t + RETRY_DELAY_S)
+			return
 		end
 	end
 
