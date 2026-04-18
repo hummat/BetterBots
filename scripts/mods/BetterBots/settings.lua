@@ -2,6 +2,7 @@ local M = {}
 
 local _mod
 local _combat_ability_identity
+local _behavior_profile_override
 
 -- Category → setting ID mapping
 -- These tables are the authoritative list of templates covered by each gate.
@@ -183,6 +184,11 @@ function M.init(deps)
 	assert(deps.combat_ability_identity, "settings: combat_ability_identity dep required")
 	_mod = deps.mod
 	_combat_ability_identity = deps.combat_ability_identity
+	_behavior_profile_override = nil
+end
+
+function M.wire(refs)
+	_behavior_profile_override = refs and refs.behavior_profile_override or nil
 end
 
 function M.resolve_preset()
@@ -198,6 +204,11 @@ function M.resolve_preset()
 	end
 
 	if VALID_PRESETS[value] then
+		local override = _behavior_profile_override and _behavior_profile_override(value) or nil
+		if VALID_PRESETS[override] then
+			return override
+		end
+
 		return value
 	end
 

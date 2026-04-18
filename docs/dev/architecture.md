@@ -118,6 +118,10 @@ This mod targets bot ability activation in three paths:
     - `smart_tag_orders.lua` hooks `SmartTagSystem.trigger_tag_interaction` after vanilla processing and routes explicit item-tag interactions back into the existing `BotOrder.pickup(...)` path instead of inventing a second order system
     - smart-tag routing is intentionally narrow for the MVP: ammo, tomes/grimoires, and supported pocketables only; grenade refills, health stations, and location-style interactions are ignored
     - the routing layer reuses `MulePickup.should_block_pickup_order(...)` so existing BetterBots policy gates still apply (unsupported pocketables, disabled books, human-slot-open pocketables), selects the nearest eligible live bot on the interactor's side, and is guarded by the `enable_smart_tag_orders` setting plus a class-table hot-reload sentinel on `SmartTagSystem`
+22b. Communication-wheel response (#56, via `com_wheel_response.lua` + `settings.lua` + resource policy hooks):
+    - hooks `Vo.on_demand_vo_event` through a class-table hot-reload sentinel on `scripts/utilities/vo`, so vanilla and ForTheEmperor wheel events share one cheap Solo Play-safe detection point
+    - MVP scope is intentionally narrow: `com_cheer` temporarily overrides the resolved behavior preset to `aggressive`, while `com_need_ammo` and `com_need_health` set short-lived human request flags that `ammo_policy.lua` and `healing_deferral.lua` treat as stronger-than-reserve deferral signals
+    - no fake location/pathing orders ship here; `Need Help`, `location_this_way`, and similar world-marker flows remain out of scope until BetterBots has a real movement-directive layer
 23. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights

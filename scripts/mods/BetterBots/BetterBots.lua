@@ -319,6 +319,9 @@ assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
 assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 
+local ComWheelResponse = mod:io_dofile("BetterBots/scripts/mods/BetterBots/com_wheel_response")
+assert(ComWheelResponse, "BetterBots: failed to load com_wheel_response module")
+
 local MulePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/mule_pickup")
 assert(MulePickup, "BetterBots: failed to load mule_pickup module")
 
@@ -755,6 +758,7 @@ HealingDeferral.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	com_wheel = ComWheelResponse,
 })
 
 AmmoPolicy.init({
@@ -765,8 +769,19 @@ AmmoPolicy.init({
 	perf = Perf,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	settings = Settings,
+	com_wheel = ComWheelResponse,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ammo_policy")
+	end,
+})
+
+ComWheelResponse.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	is_enabled = function()
+		return Settings.is_feature_enabled("com_wheel_responses")
 	end,
 })
 
@@ -810,6 +825,10 @@ MulePickup.init({
 
 SmartTagOrders.wire({
 	should_block_pickup_order = MulePickup.should_block_pickup_order,
+})
+
+Settings.wire({
+	behavior_profile_override = ComWheelResponse.override_behavior_profile,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -959,6 +978,7 @@ WeaponAction.register_hooks({
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 AmmoPolicy.register_hooks()
+ComWheelResponse.register_hooks()
 MulePickup.register_hooks()
 SmartTagOrders.register_hooks()
 BotProfiles.register_hooks()

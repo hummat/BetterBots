@@ -417,6 +417,11 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("AmmoPolicy", "install_behavior_ext_hooks", target)
 		end,
 	})
+	modules.ComWheelResponse = make_runtime_module("ComWheelResponse", install_calls, {
+		override_behavior_profile = function()
+			return nil
+		end,
+	})
 	modules.MulePickup = make_runtime_module("MulePickup", install_calls, {
 		install_bot_group_hooks = function(target)
 			record_install("MulePickup", "install_bot_group_hooks", target)
@@ -531,6 +536,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/companion_tag"] = modules.CompanionTag,
 		["BetterBots/scripts/mods/BetterBots/healing_deferral"] = modules.HealingDeferral,
 		["BetterBots/scripts/mods/BetterBots/ammo_policy"] = modules.AmmoPolicy,
+		["BetterBots/scripts/mods/BetterBots/com_wheel_response"] = modules.ComWheelResponse,
 		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
 		["BetterBots/scripts/mods/BetterBots/pocketable_pickup"] = modules.PocketablePickup,
 		["BetterBots/scripts/mods/BetterBots/smart_tag_orders"] = modules.SmartTagOrders,
@@ -760,6 +766,14 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/pocketable_pickup"%)', 1))
 	end)
 
+	it("loads com_wheel_response through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/com_wheel_response"%)', 1))
+	end)
+
 	it("loads companion_tag through mod io", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
@@ -798,6 +812,8 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
+		assert.is_truthy(source:find("ComWheelResponse%.init%(", 1))
+		assert.is_truthy(source:find("ComWheelResponse%.register_hooks%(", 1))
 		assert.is_truthy(source:find("SmartTagOrders%.init%(", 1))
 		assert.is_truthy(source:find("SmartTagOrders%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.init%(", 1))
@@ -846,6 +862,17 @@ describe("startup regressions", function()
 		local smart_tag_init = find_named_call(harness.init_calls, "SmartTagOrders")
 		assert.is_truthy(smart_tag_init)
 		assert.equals(harness.modules.Debug.bot_slot_for_unit, smart_tag_init.deps.bot_slot_for_unit)
+
+		local com_wheel_init = find_named_call(harness.init_calls, "ComWheelResponse")
+		assert.is_truthy(com_wheel_init)
+		assert.is_function(com_wheel_init.deps.is_enabled)
+
+		local settings_wire = find_named_call(harness.wire_calls, "Settings")
+		assert.is_truthy(settings_wire)
+		assert.equals(
+			harness.modules.ComWheelResponse.override_behavior_profile,
+			settings_wire.refs.behavior_profile_override
+		)
 
 		local smart_tag_wire = find_named_call(harness.wire_calls, "SmartTagOrders")
 		assert.is_truthy(smart_tag_wire)

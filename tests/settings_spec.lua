@@ -83,6 +83,17 @@ describe("settings", function()
 			Settings.init(mock_mod({ behavior_profile = "broken" }))
 			assert.equals("balanced", Settings.resolve_preset())
 		end)
+
+		it("applies a wired behavior-profile override when present", function()
+			Settings.init(mock_mod({ behavior_profile = "balanced" }))
+			Settings.wire({
+				behavior_profile_override = function()
+					return "aggressive"
+				end,
+			})
+
+			assert.equals("aggressive", Settings.resolve_preset())
+		end)
 	end)
 
 	describe("is_testing_profile", function()

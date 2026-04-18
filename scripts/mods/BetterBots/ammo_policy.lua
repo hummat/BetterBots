@@ -7,6 +7,7 @@ local _fixed_time
 local _perf
 local _Ammo
 local _Settings
+local _com_wheel
 local _ability_extension
 local _bot_slot_for_unit
 local _nearby_grenade_pickups
@@ -449,6 +450,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_Ammo = deps.ammo_module or require("scripts/utilities/ammo")
 	_Settings = deps.settings
+	_com_wheel = deps.com_wheel
 	_ability_extension = deps.ability_extension or (ScriptUnit and ScriptUnit.has_extension)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_nearby_grenade_pickups = deps.nearby_grenade_pickups
@@ -553,11 +555,16 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
+		local human_units = self._side and self._side.valid_human_units
+		local human_request_active = _com_wheel
+				and _com_wheel.has_recent_ammo_request
+				and _com_wheel.has_recent_ammo_request(human_units)
+			or false
 		local bot_ammo_percentage = _current_ammo_percentage(unit)
 		local bot_needs_grenade_refill = _needs_ammo_pickup_for_grenade_refill(unit)
 		local bot_needs_ammo = (bot_ammo_percentage ~= nil and bot_ammo_percentage < 1) or bot_needs_grenade_refill
-		local humans_ok =
-			_all_eligible_humans_above_threshold(self._side and self._side.valid_human_units, _human_threshold())
+		local humans_ok = not human_request_active
+			and _all_eligible_humans_above_threshold(human_units, _human_threshold())
 
 		if not bot_needs_ammo then
 			pickup_component.needs_ammo = false
@@ -572,19 +579,30 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			local bot_desperate = bot_ammo_percentage ~= nil and bot_ammo_percentage <= bot_threshold
 			pickup_component.needs_ammo = bot_desperate
 			if bot_desperate and _ammo_pickup_log_state_changed(unit, "desperate") then
-				_log(
-					"ammo_pickup_desperate:" .. tostring(unit),
-					"ammo pickup permitted: bot desperate ("
-						.. string.format("%.0f%% <= %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
-						.. ") despite human reserve low"
-				)
+				if human_request_active then
+					_log(
+						"ammo_pickup_desperate:" .. tostring(unit),
+						"ammo pickup permitted: bot desperate despite human request"
+					)
+				else
+					_log(
+						"ammo_pickup_desperate:" .. tostring(unit),
+						"ammo pickup permitted: bot desperate ("
+							.. string.format("%.0f%% <= %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
+							.. ") despite human reserve low"
+					)
+				end
 			elseif not bot_desperate and _ammo_pickup_log_state_changed(unit, "defer") then
-				_log(
-					"ammo_pickup_defer:" .. tostring(unit),
-					"ammo pickup deferred to human ("
-						.. string.format("bot %.0f%% > %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
-						.. ")"
-				)
+				if human_request_active then
+					_log("ammo_pickup_defer:" .. tostring(unit), "ammo pickup deferred to human request")
+				else
+					_log(
+						"ammo_pickup_defer:" .. tostring(unit),
+						"ammo pickup deferred to human ("
+							.. string.format("bot %.0f%% > %.0f%%", bot_ammo_percentage * 100, bot_threshold * 100)
+							.. ")"
+					)
+				end
 			end
 		end
 
@@ -605,9 +623,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			end
 
 			if grenade_pickup then
-				local human_units = self._side and self._side.valid_human_units
-				local humans_ok_for_grenade =
-					_all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
+				local humans_ok_for_grenade = not human_request_active
+					and _all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
 				if humans_ok_for_grenade then
 					_reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance)
 					pickup_component.needs_ammo = true
@@ -629,7 +646,11 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 					end
 					local pickup_state = "deferred:" .. tostring(grenade_pickup)
 					if _grenade_pickup_log_state_changed(unit, pickup_state) then
-						_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
+						if human_request_active then
+							_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human request")
+						else
+							_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
+						end
 					end
 				end
 			end

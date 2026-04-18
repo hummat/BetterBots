@@ -184,7 +184,7 @@ Sprint 4 stopped being "invent a missing primitive" once the decompiled source w
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
+| 56 | Communication wheel response | **Code-complete 2026-04-18; in-game validation pending.** Narrow Solo Play MVP in `com_wheel_response.lua`: hook `Vo.on_demand_vo_event` so vanilla + ForTheEmperor wheel events share one detection path, temporarily force `aggressive` after `com_cheer`, and treat `com_need_ammo` / `com_need_health` as short-lived human-priority overrides in `ammo_policy.lua` / `healing_deferral.lua`. `Need Help` convergence and location-directed movement stay out of scope because BetterBots still has no movement-order layer. |
 | 96 | Smart-tag item interaction bridge | **Code-complete 2026-04-18; in-game validation pending.** `smart_tag_orders.lua` hooks `SmartTagSystem.trigger_tag_interaction` after vanilla processing and routes explicit item-tag interactions for ammo, books, and supported pocketables back into `BotOrder.pickup(...)`, reusing existing `MulePickup`/`PocketablePickup` policy gates and choosing the nearest eligible bot. Grenade refills, health stations, and location-style interactions stay out of scope for the MVP. |
 | 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
 | 101 | Weapon-slot wield timeout on BB-locked swap | **Code-complete 2026-04-18; in-game validation pending.** Grenade + item fallbacks now query shared BetterBots slot-lock state and fast-retry with `reason = "slot_locked"` instead of waiting out the full wield timeout when another BB sequence is holding a different slot. Fits coordination-polish neighborhood; not load-bearing. |
@@ -205,8 +205,8 @@ Sprint 4 stopped being "invent a missing primitive" once the decompiled source w
 Hard cut order (first to drop):
 
 1. `#85` (refactor, user-invisible)
-2. `#56` (comm wheel — ForTheEmperor users only)
-3. `#96` + `#97` (coordination polish)
+2. `#97` (resource-policy unification)
+3. `#56` + `#96` (coordination polish)
 4. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
 5. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
 

@@ -8,6 +8,7 @@ local _debug_enabled
 local _fixed_time
 local _health
 local _perf
+local _com_wheel
 local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
@@ -86,9 +87,13 @@ local function _resolve_settings()
 	return _cached_settings
 end
 
-local function _any_human_needs_healing(human_units, threshold, health_pct_fn)
+local function _any_human_needs_healing(human_units, threshold, health_pct_fn, request_fn)
 	local limit = threshold or DEFERRAL_THRESHOLD
 	local read_health_pct = health_pct_fn or (_health and _health.current_health_percent)
+
+	if request_fn and request_fn(human_units) then
+		return true
+	end
 
 	if not (human_units and read_health_pct) then
 		return false
@@ -212,6 +217,7 @@ function M.init(deps)
 		_health = ok and health_module or nil
 	end
 	_perf = deps.perf
+	_com_wheel = deps.com_wheel
 end
 
 local function _warn_missing_health_once()
@@ -300,8 +306,16 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
-		local side = self._side
-		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
+		local human_request_active = _com_wheel
+				and _com_wheel.has_recent_health_request
+				and _com_wheel.has_recent_health_request(human_units)
+			or false
+		local human_needs_healing = _any_human_needs_healing(
+			human_units,
+			settings.human_threshold,
+			nil,
+			_com_wheel and _com_wheel.has_recent_health_request
+		)
 		local preserve_wounded_state = _bot_preserves_wounded_state(unit)
 
 		if
@@ -322,6 +336,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		_apply_health_station_deferral(health_station_component)
 		if preserve_wounded_state then
 			_log("healing_station:" .. tostring(unit), "deferred health station to preserve Martyrdom wounded state")
+		elseif human_request_active then
+			_log("healing_station:" .. tostring(unit), "deferred health station to human request")
 		else
 			_log("healing_station:" .. tostring(unit), "deferred health station to human player")
 		end
@@ -357,7 +373,17 @@ function M.install_bot_group_hooks(BotGroup)
 		end
 
 		local side = self._side
-		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
+		local human_units = side and side.valid_human_units
+		local human_request_active = _com_wheel
+				and _com_wheel.has_recent_health_request
+				and _com_wheel.has_recent_health_request(human_units)
+			or false
+		local human_needs_healing = _any_human_needs_healing(
+			human_units,
+			settings.human_threshold,
+			nil,
+			_com_wheel and _com_wheel.has_recent_health_request
+		)
 
 		for unit, data in pairs(bot_data) do
 			local pickup_component = data and data.pickup_component
@@ -379,6 +405,8 @@ function M.install_bot_group_hooks(BotGroup)
 							"healing_deployable:" .. tostring(unit),
 							"deferred medical crate to preserve Martyrdom wounded state"
 						)
+					elseif human_request_active then
+						_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human request")
 					else
 						_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
 					end

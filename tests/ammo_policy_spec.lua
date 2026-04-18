@@ -52,6 +52,7 @@ describe("ammo_policy", function()
 			nearby_grenade_pickups = overrides and overrides.nearby_grenade_pickups,
 			bot_slot_for_unit = overrides and overrides.bot_slot_for_unit,
 			settings = overrides and overrides.settings,
+			com_wheel = overrides and overrides.com_wheel,
 			is_enabled = overrides and overrides.is_enabled,
 		})
 	end
@@ -193,6 +194,47 @@ describe("ammo_policy", function()
 				end,
 				human_ammo_reserve_threshold = function()
 					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = true },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_false(self._pickup_component.needs_ammo)
+	end)
+
+	it("defers ammo to a recent human request even when humans are above reserve", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.50 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+			com_wheel = {
+				has_recent_ammo_request = function(human_units)
+					return human_units and human_units[1] == "human1"
 				end,
 			},
 		})

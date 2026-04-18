@@ -20,6 +20,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Ammo awareness: bots defer ammo pickups when humans are low
 - Engagement leash: bots stay in combat longer using coherency-based ranges
 - Healing deferral: bots let humans heal first at health stations and med-crates
+- Communication-wheel response: battle cry briefly pushes aggression; ammo/health requests defer bot pickups
 - Talent-aware Sprint 2 MVP: Martyrdom bots stay wounded, Psykers preserve peril for Venting Shriek, Focus Target veterans can claim their own threat tags
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
@@ -97,6 +98,7 @@ Bots use 18 per-ability heuristic functions split across class-specific modules 
 - Bot ranged ammo threshold and human ammo reserve threshold
 - Human-likeness timing and pressure-leash profiles (auto / manual / custom)
 - Healing deferral mode + thresholds
+- Communication wheel response toggle
 - Bot grimoire pickup toggle
 - Bot profiles: class per slot, weapon quality
 - Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
@@ -158,7 +160,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Pocketable pickup primitive + medicae/stim/med-kit discipline
 - [x] Deployable crate carry and deploy (ammo + medical)
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
-- [ ] Communication wheel response (ForTheEmperor compat)
+- [x] Communication wheel response (ForTheEmperor compat)
 - [x] Smart-tag item interaction bridge
 - [ ] Unified non-book resource arbitration
 
@@ -332,6 +334,7 @@ scripts/mods/BetterBots/          # Mod source
   engagement_leash.lua            #   Coherency-anchored melee engagement range
   healing_deferral.lua            #   Defer health stations/med-crates to humans
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
+  com_wheel_response.lua          #   Communication-wheel aggression/resource overrides
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
   smart_tag_orders.lua            #   Explicit smart-tag pickup-order bridge

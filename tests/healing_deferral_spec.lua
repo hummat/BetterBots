@@ -180,6 +180,16 @@ describe("healing_deferral", function()
 			assert.is_false(HealingDeferral.any_human_needs_healing(humans, 0.9, health_pct))
 		end)
 
+		it("treats a recent health request as human need even when everyone is healthy", function()
+			local humans = {
+				{ health_pct = 0.95 },
+			}
+
+			assert.is_true(HealingDeferral.any_human_needs_healing(humans, 0.9, health_pct, function()
+				return true
+			end))
+		end)
+
 		it("returns false with no humans", function()
 			assert.is_false(HealingDeferral.any_human_needs_healing({}, 0.9, health_pct))
 		end)
