@@ -18,6 +18,7 @@ local _last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local INTERACTION_PATCH_SENTINEL = "__bb_ammo_policy_stop_installed"
+local BEHAVIOR_EXT_PATCH_SENTINEL = "__bb_ammo_policy_behavior_installed"
 
 local PICKUP_BROADPHASE_CATEGORY = {
 	"pickups",
@@ -511,6 +512,12 @@ function M.register_hooks()
 end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
+	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_EXT_PATCH_SENTINEL) then
+		return
+	end
+
+	BotBehaviorExtension[BEHAVIOR_EXT_PATCH_SENTINEL] = true
+
 	_mod:hook_safe(BotBehaviorExtension, "_update_ammo", function(self, unit)
 		local pickup_component = self._pickup_component
 		local bot_group = self._bot_group
@@ -682,5 +689,6 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 end
 
 M.all_eligible_humans_above_threshold = _all_eligible_humans_above_threshold
+M.needs_ammo_pickup_for_grenade_refill = _needs_ammo_pickup_for_grenade_refill
 
 return M

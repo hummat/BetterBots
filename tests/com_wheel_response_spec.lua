@@ -87,6 +87,18 @@ describe("com_wheel_response", function()
 		assert.is_false(ComWheelResponse.has_recent_health_request({ human_unit }))
 	end)
 
+	it("clears battle-cry and resource requests on reset", function()
+		ComWheelResponse.record_trigger(human_unit, "com_cheer")
+		ComWheelResponse.record_trigger(human_unit, "com_need_ammo")
+		ComWheelResponse.record_trigger(human_unit, "com_need_health")
+
+		ComWheelResponse.reset()
+
+		assert.is_nil(ComWheelResponse.override_behavior_profile("balanced"))
+		assert.is_false(ComWheelResponse.has_recent_ammo_request({ human_unit }))
+		assert.is_false(ComWheelResponse.has_recent_health_request({ human_unit }))
+	end)
+
 	it("ignores non-human trigger sources", function()
 		ComWheelResponse.record_trigger(bot_unit, "com_cheer")
 		ComWheelResponse.record_trigger(bot_unit, "com_need_ammo")

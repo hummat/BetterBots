@@ -87,7 +87,13 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `grenade pickup skipped: no ability extension` | Grenade refill logic could not resolve the bot's `ability_system`; grenade reserve policy did not run |
 | `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
+| `grenade blocked during <stage> by <ability> <reason>` | Grenade fallback hit the shared BetterBots slot-lock fast retry instead of idling into a wield timeout |
+| `fallback item blocked <ability> (slot locked by <ability> <reason>)` | Item fallback hit the same shared slot-lock fast retry path |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
+| `battle cry request noted` / `need ammo request noted` / `need health request noted` | Communication-wheel bridge cached a short-lived aggressive override or human-priority resource request |
+| `smart-tag pickup routed` / `smart-tag pickup ignored` | Explicit item tag was accepted or rejected after BetterBots reused its normal pickup policy gates |
+| `queued pocketable wield` / `queued pocketable input` | Carried pocketable state machine advanced into wield/use |
+| `pocketable use completed` / `pocketable ended without confirmation` / `pocketable timed out waiting for consume|wield` | Pocketable follow-through either finished, ended ambiguously, or stalled |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
 | `skipped ping for <target> (reason: recent_companion_tag)` | Generic pinging backed off because an Arbites bot had just issued a mastiff smart-tag on the same target; use this when checking remaining tag-spam reports |
 | `melee suppressed (daemonhost nearby)` / `ranged suppressed (daemonhost nearby)` | Close-range daemonhost safety gate fired; bot was inside the tight daemonhost combat radius and refused the attack (`#17`) |

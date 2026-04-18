@@ -128,10 +128,11 @@ describe("pocketable_pickup", function()
 		extension_map = {
 			[unit] = {
 				action_input_system = test_helper.make_player_action_input_extension({
-					bot_queue_action_input = function(_self, component, input_name)
+					bot_queue_action_input = function(_self, component, input_name, raw_input)
 						queued_inputs[#queued_inputs + 1] = {
 							component = component,
 							input = input_name,
+							raw_input = raw_input,
 						}
 					end,
 				}),
@@ -190,7 +191,8 @@ describe("pocketable_pickup", function()
 		PocketablePickup.try_queue(unit, { perception = {} })
 		assert.same({
 			component = "weapon_action",
-			input = "wield_4",
+			input = "wield",
+			raw_input = "wield_4",
 		}, queued_inputs[1])
 
 		inventory_component.wielded_slot = "slot_pocketable_small"
@@ -225,7 +227,8 @@ describe("pocketable_pickup", function()
 		PocketablePickup.try_queue(unit, { perception = {} })
 		assert.same({
 			component = "weapon_action",
-			input = "wield_3",
+			input = "wield",
+			raw_input = "wield_3",
 		}, queued_inputs[1])
 
 		inventory_component.wielded_slot = "slot_pocketable"
@@ -235,6 +238,50 @@ describe("pocketable_pickup", function()
 		assert.same({
 			component = "weapon_action",
 			input = "place",
+			raw_input = nil,
 		}, queued_inputs[2])
+	end)
+
+	it("does not report success when the carried slot empties without a confirmed use transition", function()
+		init_module()
+
+		build_context_result = test_helper.make_context({
+			num_nearby = 4,
+			challenge_rating_sum = 8,
+			target_is_elite_special = true,
+		})
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+		inventory_component.wielded_slot = "slot_pocketable_small"
+		fixed_t = fixed_t + 0.1
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		inventory_component.slot_pocketable_small = "not_equipped"
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		for i = 1, #debug_logs do
+			assert.is_nil(string.find(debug_logs[i].message, "pocketable use completed", 1, true))
+		end
+	end)
+
+	it("reports success after the carried slot empties and the bot unwields the pocketable", function()
+		init_module()
+
+		build_context_result = test_helper.make_context({
+			num_nearby = 4,
+			challenge_rating_sum = 8,
+			target_is_elite_special = true,
+		})
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+		inventory_component.wielded_slot = "slot_pocketable_small"
+		fixed_t = fixed_t + 0.1
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_primary"
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.is_truthy(debug_logs[#debug_logs].message:find("pocketable use completed", 1, true))
 	end)
 end)

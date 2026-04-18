@@ -13,6 +13,7 @@ local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
 local _last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
+local BOT_GROUP_PATCH_SENTINEL = "__bb_healing_deferral_bot_group_installed"
 
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
@@ -239,7 +240,7 @@ local function _warn_missing_health_once()
 	_log("healing_deferral_missing_health", "healing deferral disabled: health utility unavailable")
 end
 
--- Called from the consolidated bot_behavior_extension hook_require in BetterBots.lua (#67).
+-- Called from the consolidated bot_behavior_extension hook_require in BetterBots.lua.
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	_mod:hook_safe(BotBehaviorExtension, "_update_health_stations", function(self, unit)
 		local perf_t0 = _perf and _perf.begin()
@@ -355,13 +356,15 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	end)
 end
 
-function M.register_hooks()
-	-- Pocketable wound-cure / ally-handoff behavior stays outside healing_deferral.
-	-- Sprint 4 ships medicae discipline here, while supported carried stims/crates
-	-- are handled in pocketable_pickup.lua.
-end
+function M.register_hooks() end
 
 function M.install_bot_group_hooks(BotGroup)
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) then
+		return
+	end
+
+	BotGroup[BOT_GROUP_PATCH_SENTINEL] = true
+
 	_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
 		local perf_t0 = _perf and _perf.begin()
 		if not (_health and _health.current_health_percent) then

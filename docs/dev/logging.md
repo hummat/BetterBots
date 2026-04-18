@@ -94,6 +94,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `ability blitz activated <grenade> on <component> (rule=<rule>) ...` (ability-based blitz path fired directly on the action component instead of through grenade-slot wield)
 - `ability blitz complete (charge confirmed|timeout) ...` (ability-based blitz path reached its terminal confirmation or timeout)
 - `grenade deferred while unarmed (slot=<slot>, template=<template>)` (grenade fallback refused to start because the bot was currently unarmed)
+- `grenade blocked during <stage> by <ability> <reason> (held_slot=<slot>)` (grenade fallback hit the shared BetterBots slot-lock fast retry instead of waiting out a full wield timeout)
 - `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
 - `post-charge grace started (4s)` (engagement leash recorded a movement-ability charge and started the temporary 20m grace window for that bot)
 - `restored engagement leash overrides after vanilla error` (the `_allow_engage` hook restored shared singleton state before rethrowing; direct failure-path validation signal for `#73`)
@@ -172,6 +173,11 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots: blackboard utility unavailable; mule pickup destination refresh skipped` (one-shot warning that the blackboard write helper could not be loaded, so mule destination refresh fell back to a no-op for that session)
 - `ammo policy skipped: no pickup_component` (debug-only diagnostic that `_update_ammo` ran on a bot without a pickup component, so reserve logic was skipped for that tick)
 - `deferred health station to human player` / `deferred medical crate to human player` (healing deferral yielded a medicae station or med-crate because a human player was below the configured reserve)
+- `battle cry request noted: aggressive preset override for <N>s` / `need ammo request noted for <N>s` / `need health request noted for <N>s` (`com_wheel_response.lua` observed the relevant communication-wheel trigger and cached its short-lived override state)
+- `smart-tag pickup routed <pickup> to bot <slot> (family=<family>)` / `smart-tag pickup ignored for <pickup> (reason=<reason>)` (`smart_tag_orders.lua` accepted or rejected an explicit item tag after reusing the normal BetterBots pickup policy gates)
+- `queued pocketable wield <input> for <pickup>` / `queued pocketable input <input> for <pickup>` (`pocketable_pickup.lua` advanced the carried-item state machine into wield/use)
+- `pocketable use completed for <pickup>` / `pocketable ended without confirmation for <pickup>` / `pocketable timed out waiting for consume` / `pocketable timed out waiting for wield` (carried pocketable follow-through succeeded, ended ambiguously, or stalled)
+- `fallback item blocked <ability> (slot locked by <ability> <reason>)` (item fallback hit the shared BetterBots slot-lock fast retry instead of waiting out the normal wield timeout)
 
 ## Intentionally suppressed (noise reduction)
 

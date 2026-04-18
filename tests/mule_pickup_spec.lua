@@ -379,6 +379,47 @@ describe("mule_pickup", function()
 		assert.is_table(instance._available_mule_pickups.slot_pocketable)
 	end)
 
+	it("installs BotGroup hooks only once per shared class table", function()
+		local hook_safe_calls = {}
+		local BotGroup = {
+			init = function() end,
+			_update_mule_pickups = function() end,
+		}
+
+		MulePickup.init({
+			mod = {
+				hook_safe = function(_, target, method_name)
+					hook_safe_calls[#hook_safe_calls + 1] = {
+						target = target,
+						method = method_name,
+					}
+				end,
+			},
+			debug_enabled = function()
+				return false
+			end,
+			debug_log = function() end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		MulePickup.install_bot_group_hooks(BotGroup)
+
+		assert.equals(2, #hook_safe_calls)
+	end)
+
 	it("assigns an available tome mule pickup even when vanilla leaves it unclaimed", function()
 		local tome_unit = { pickup_type = "tome" }
 		local bot_unit = "bot_1"
@@ -609,6 +650,45 @@ describe("mule_pickup", function()
 		)
 
 		assert.is_truthy(find_debug_log("mule pickup success: tome (bot=3)"))
+	end)
+
+	it("installs PocketableInteraction hooks only once per shared class table", function()
+		local hook_calls = 0
+		local PocketableInteraction = {
+			stop = function() end,
+		}
+
+		MulePickup.init({
+			mod = {
+				hook = function(_, target, method_name)
+					if target == PocketableInteraction and method_name == "stop" then
+						hook_calls = hook_calls + 1
+					end
+				end,
+			},
+			debug_enabled = function()
+				return false
+			end,
+			debug_log = function() end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+
+		assert.equals(1, hook_calls)
 	end)
 
 	it("warns when the group system cannot be resolved", function()

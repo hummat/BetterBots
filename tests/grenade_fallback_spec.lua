@@ -2257,6 +2257,30 @@ describe("grenade_fallback", function()
 			assert.equals("wield", blocked[1].stage)
 		end)
 
+		it(
+			"emits slot_locked before the initial grenade_ability queue when another ability already holds a different slot",
+			function()
+				_debug_enabled_result = true
+				_heuristic_result = true
+				_query_weapon_switch_lock = function()
+					return true, "zealot_relic", "active", "slot_combat_ability"
+				end
+
+				GrenadeFallback.try_queue(unit, blackboard)
+
+				local blocked = find_events("blocked")
+				assert.equals(1, #blocked)
+				assert.equals("slot_locked", blocked[1].reason)
+				assert.equals("wield", blocked[1].stage)
+				assert.equals("zealot_relic", blocked[1].blocked_by)
+				assert.equals("slot_combat_ability", blocked[1].held_slot)
+				assert.equals(10.35, _grenade_state_by_unit[unit].next_try_t)
+				assert.is_nil(_grenade_state_by_unit[unit].stage)
+				assert.equals(0, #_recorded_inputs)
+				assert.is_not_nil(find_debug_log("grenade blocked during wield by zealot_relic active"))
+			end
+		)
+
 		it("emits slot_locked instead of wield_timeout when another ability holds a different slot", function()
 			_debug_enabled_result = true
 			_heuristic_result = true

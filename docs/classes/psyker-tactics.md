@@ -26,7 +26,10 @@ Psyker is unique: all warp abilities share a Peril resource. **Without Peril tra
 **Cooldown:** 30s | **Role:** AoE stagger + Peril vent
 
 ### USE WHEN
-- High Peril (>= 80%) AND `num_nearby >= 1` — primary Peril management tool
+- High Peril AND `num_nearby >= 1` — primary Peril management tool
+  - base shout builds: roughly `>= 75-85%` depending on preset
+  - `psyker_damage_based_on_warp_charge` / `psyker_warp_glass_cannon`: hold a bit longer and prefer `>= 85-95%`
+  - `psyker_shout_vent_warp_charge`: hold later again so Shriek behaves like the vent valve
 - Surrounded (`num_nearby >= 3`) — AoE knockdown
 - Toughness critical (<20%) AND `num_nearby >= 1` — defensive panic
 - Ally being disabled (`priority_target_enemy`) within 15m — stagger goes through walls
@@ -37,14 +40,17 @@ Psyker is unique: all warp abilities share a Peril resource. **Without Peril tra
 
 ### PROPOSED BOT RULES
 ```
-IF peril_pct >= 0.80 AND num_nearby >= 1 THEN activate
+IF peril_pct >= dynamic_shout_threshold AND num_nearby >= 1 THEN activate
 IF num_nearby >= 3 THEN activate
 IF toughness_pct < 0.20 AND num_nearby >= 1 THEN activate
 IF priority_target_enemy AND dist < 15 THEN activate
 BLOCK IF num_nearby == 0
+BLOCK IF preserve_peril_talent AND peril_pct >= base_high_peril THEN hold
 BLOCK IF peril_pct < 0.30 AND num_nearby < 3 AND toughness_pct > 0.50
 ```
 **Confidence:** HIGH
+
+**Current BetterBots note:** the shipped Warp Siphon / warp-charge damage path is talent-aware. BetterBots raises the high-peril trigger by `+0.10` when warp-charge damage talents are present, adds another `+0.05` with `psyker_shout_vent_warp_charge`, and caps the result at `95%` so Shriek vents later instead of spending peril early.
 
 ---
 

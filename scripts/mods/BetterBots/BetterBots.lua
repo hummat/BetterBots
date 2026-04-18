@@ -554,6 +554,7 @@ MeleeMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 	is_enabled = function()
 		return Settings.is_feature_enabled("melee_improvements")
@@ -577,6 +578,7 @@ RangedMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
@@ -825,6 +827,16 @@ MulePickup.init({
 
 SmartTagOrders.wire({
 	should_block_pickup_order = MulePickup.should_block_pickup_order,
+	needs_ammo_pickup = function(unit)
+		local Ammo = require("scripts/utilities/ammo")
+		local missing_reserve_ammo = Ammo and not Ammo.reserve_ammo_is_full(unit) or false
+
+		return missing_reserve_ammo
+			or (
+				AmmoPolicy.needs_ammo_pickup_for_grenade_refill
+				and AmmoPolicy.needs_ammo_pickup_for_grenade_refill(unit)
+			)
+	end,
 })
 
 Settings.wire({
@@ -1134,7 +1146,13 @@ end)
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
 -- same mod on the same path silently clobber each other. Install all BotGroup
 -- hooks through one callback so healing deferral and mule pickup both survive.
+local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
 mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
+		return
+	end
+
+	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = true
 	HealingDeferral.install_bot_group_hooks(BotGroup)
 	MulePickup.install_bot_group_hooks(BotGroup)
 end)
@@ -1471,6 +1489,7 @@ function mod.on_game_state_changed(status, state)
 		_refresh_debug_log_level()
 		Perf.enter_run()
 		BotProfiles.reset()
+		ComWheelResponse.reset()
 		TeamCooldown.reset()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil

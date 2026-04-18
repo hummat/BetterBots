@@ -3,6 +3,7 @@ local _patched_set
 local _debug_log
 local _debug_enabled
 local _is_enabled
+local _fixed_time
 local ABSENT = {}
 local is_valid_input
 local find_aim_fire_input
@@ -306,7 +307,6 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 	forcestaff_p2_m1 = {
 		family = "forcestaff_p2_m1",
 		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
-		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
 	},
 }
 
@@ -451,7 +451,7 @@ local function inject(WeaponTemplates)
 			change.mode = "replace_invalid"
 			return change
 		end
-		if mode == "fields" and change.mode ~= "replace" then
+		if mode == "fields" and change.mode ~= "replace" and change.mode ~= "replace_invalid" then
 			change.mode = "fields"
 			change.original_fields = change.original_fields or {}
 		end
@@ -573,7 +573,7 @@ local function inject(WeaponTemplates)
 	if _debug_enabled() then
 		_debug_log(
 			"ranged_meta_injection:" .. tostring(WeaponTemplates),
-			0,
+			_fixed_time and _fixed_time() or 0,
 			"ranged attack_meta_data patch installed (injected="
 				.. injected
 				.. ", patched="
@@ -596,6 +596,7 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_is_enabled = deps.is_enabled
+		_fixed_time = deps.fixed_time
 	end,
 	inject = inject,
 	sync_all = function()

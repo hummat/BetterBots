@@ -441,4 +441,36 @@ describe("healing_deferral", function()
 			assert.are.equal(-math.huge, pickup_component.health_deployable_valid_until)
 		end)
 	end)
+
+	describe("install_bot_group_hooks", function()
+		it("installs BotGroup deployable hooks only once per shared class table", function()
+			local hook_safe_calls = 0
+			local BotGroup = {
+				_update_pickups_and_deployables_near_player = function() end,
+			}
+
+			HealingDeferral.init({
+				mod = {
+					hook_safe = function(_, target, method_name)
+						if target == BotGroup and method_name == "_update_pickups_and_deployables_near_player" then
+							hook_safe_calls = hook_safe_calls + 1
+						end
+					end,
+				},
+				health_module = {
+					current_health_percent = function()
+						return 1
+					end,
+				},
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			HealingDeferral.install_bot_group_hooks(BotGroup)
+			HealingDeferral.install_bot_group_hooks(BotGroup)
+
+			assert.equals(1, hook_safe_calls)
+		end)
+	end)
 end)

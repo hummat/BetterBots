@@ -124,6 +124,11 @@ return {
 						default_value = DEFAULTS.enable_smart_tag_orders,
 					},
 					{
+						setting_id = "enable_com_wheel_responses",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_com_wheel_responses,
+					},
+					{
 						setting_id = "enable_weakspot_aim",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_weakspot_aim,

@@ -971,6 +971,49 @@ describe("ranged_meta_data", function()
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
 		end)
 
+		it("restores invalid original attack_meta_data after the charge-override pass", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					charge_flame = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					trigger_charge_flame = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+					action_charge_flame = {
+						start_input = "charge_flame",
+						stop_input = "charge_flame_release",
+						allowed_chain_actions = {
+							trigger_charge_flame = { action_name = "action_shoot_charged_flame" },
+						},
+					},
+					action_charge_flame_release = { start_input = "charge_flame_release" },
+					action_shoot_charged_flame = {
+						stop_input = "cancel_flame",
+					},
+				},
+			})
+			local templates = { forcestaff_p2 = template }
+
+			template.attack_meta_data = "invalid_meta"
+			RangedMetaData.inject(templates)
+
+			assert.is_table(template.attack_meta_data)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("invalid_meta", template.attack_meta_data)
+		end)
+
 		it("overrides aim metadata for braced stream weapons (#87 flamer)", function()
 			local template = make_ranged_template({
 				action_inputs = {

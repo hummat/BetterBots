@@ -1,3 +1,4 @@
+local test_helper = require("tests.test_helper")
 local SmartTagOrders = dofile("scripts/mods/BetterBots/smart_tag_orders.lua")
 
 describe("smart_tag_orders", function()
@@ -11,6 +12,7 @@ describe("smart_tag_orders", function()
 	local pickup_orders
 	local pickup_defs
 	local ammo_full_by_unit
+	local grenade_refill_by_unit
 	local players_by_unit
 	local inventories_by_unit
 	local side_units
@@ -26,6 +28,7 @@ describe("smart_tag_orders", function()
 		pickup_orders = {}
 		pickup_defs = {}
 		ammo_full_by_unit = {}
+		grenade_refill_by_unit = {}
 		players_by_unit = {}
 		inventories_by_unit = {}
 		side_units = {}
@@ -65,15 +68,9 @@ describe("smart_tag_orders", function()
 					return nil
 				end
 
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return inventory
-						end
-
-						return nil
-					end,
-				}
+				return test_helper.make_player_unit_data_extension({
+					inventory = inventory,
+				})
 			end,
 		}
 
@@ -168,6 +165,9 @@ describe("smart_tag_orders", function()
 		SmartTagOrders.wire({
 			should_block_pickup_order = function()
 				return false
+			end,
+			needs_ammo_pickup = function(unit)
+				return ammo_full_by_unit[unit] ~= true or grenade_refill_by_unit[unit] == true
 			end,
 		})
 	end
@@ -264,6 +264,43 @@ describe("smart_tag_orders", function()
 		assert.equals(bot_two, pickup_orders[1].bot_unit)
 	end)
 
+	it("keeps ammo smart-tags eligible for grenade refill bots with full reserve ammo", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		players_by_unit[bot_two] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		ammo_full_by_unit[bot_one] = true
+		grenade_refill_by_unit[bot_one] = true
+		ammo_full_by_unit[bot_two] = true
+		side_units = { human_unit, bot_one, bot_two }
+		_G.ALIVE[bot_one] = true
+		_G.ALIVE[bot_two] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_two] = { x = 12, y = 0, z = 0 }
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
 	it("ignores unsupported grenade pickup families safely", function()
 		target_unit.pickup_type = "small_grenade"
 		players_by_unit[human_unit] = {
@@ -322,6 +359,116 @@ describe("smart_tag_orders", function()
 		assert.equals(0, #pickup_orders)
 	end)
 
+	it("routes pickup tags through the set_tag hook and ignores trigger_tag_interaction", function()
+		target_unit.pickup_type = "tome"
+		pickup_defs.tome = {
+			slot_name = "slot_pocketable",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {}
+		smart_tag_class.set_tag = function(_self, template_name, tagger_unit, tagged_unit, target_location)
+			return {
+				template_name = template_name,
+				tagger_unit = tagger_unit,
+				tagged_unit = tagged_unit,
+				target_location = target_location,
+			}
+		end
+		smart_tag_class.trigger_tag_interaction = function()
+			error("trigger_tag_interaction should not be hooked")
+		end
+
+		callback(smart_tag_class)
+
+		assert.equals(1, #hook_registrations)
+		assert.equals("set_tag", hook_registrations[1].method)
+
+		local result = hook_registrations[1].handler(
+			smart_tag_class.set_tag,
+			smart_tag_class,
+			"pickup_tag",
+			human_unit,
+			target_unit,
+			nil
+		)
+
+		assert.same({
+			template_name = "pickup_tag",
+			tagger_unit = human_unit,
+			tagged_unit = target_unit,
+			target_location = nil,
+		}, result)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("pcall-wraps pickup routing errors inside the set_tag hook", function()
+		target_unit.pickup_type = "tome"
+		pickup_defs.tome = {
+			slot_name = "slot_pocketable",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		package.loaded["scripts/utilities/bot_order"] = {
+			pickup = function()
+				error("pickup failed")
+			end,
+		}
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {}
+		smart_tag_class.set_tag = function()
+			return "original_result"
+		end
+
+		callback(smart_tag_class)
+
+		local ok, result = pcall(
+			hook_registrations[1].handler,
+			smart_tag_class.set_tag,
+			smart_tag_class,
+			"pickup_tag",
+			human_unit,
+			target_unit,
+			nil
+		)
+
+		assert.is_true(ok)
+		assert.equals("original_result", result)
+	end)
+
 	it("registers the smart-tag hook once per shared SmartTagSystem table", function()
 		SmartTagOrders.register_hooks()
 
@@ -329,7 +476,7 @@ describe("smart_tag_orders", function()
 		assert.is_function(callback)
 
 		local target = {
-			trigger_tag_interaction = function() end,
+			set_tag = function() end,
 		}
 
 		callback(target)
@@ -337,6 +484,6 @@ describe("smart_tag_orders", function()
 
 		assert.equals(1, #hook_registrations)
 		assert.equals(target, hook_registrations[1].target)
-		assert.equals("trigger_tag_interaction", hook_registrations[1].method)
+		assert.equals("set_tag", hook_registrations[1].method)
 	end)
 end)

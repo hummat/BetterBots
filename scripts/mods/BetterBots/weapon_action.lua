@@ -1,6 +1,5 @@
--- Weapon action hooks: overheat bridge (#30), vent translation (#30),
--- peril guard, _may_fire() validation fix (#43), ADS logging (#35),
--- and diagnostic weapon logging (#43).
+-- Weapon action hooks: overheat bridge, vent translation, peril guard,
+-- _may_fire() validation, ADS logging, and diagnostic weapon logging.
 local PERIL_CRITICAL_THRESHOLD = 0.97
 
 local _mod
@@ -477,7 +476,7 @@ function M.register_hooks(deps)
 		end
 	end)
 
-	-- ADS verification log (#35) + _may_fire() validation fix (#43)
+	-- ADS verification log plus the _may_fire() validation fix.
 	local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
@@ -638,8 +637,8 @@ function M.register_hooks(deps)
 		end
 	)
 
-	-- bot_queue_action_input: wield lock, vent translation (#30), peril guard,
-	-- and diagnostic weapon logging (#43).
+	-- bot_queue_action_input: wield lock, vent translation, peril guard,
+	-- and diagnostic weapon logging.
 	_mod:hook_require(
 		"scripts/extension_systems/action_input/player_unit_action_input_extension",
 		function(PlayerUnitActionInputExtension)
@@ -736,8 +735,8 @@ function M.register_hooks(deps)
 						end
 					end
 
-					-- #30: BtBotReloadAction queues "reload" but warp weapons have
-					-- "vent" not "reload". Translate BEFORE the peril guard so
+					-- BtBotReloadAction queues "reload" but warp weapons have
+					-- "vent" not "reload". Translate before the peril guard so
 					-- venting is not blocked at critical peril.
 					if unit and id == "weapon_action" and action_input == "reload" then
 						local ude = ScriptUnit.has_extension(unit, "unit_data_system")
@@ -783,9 +782,9 @@ function M.register_hooks(deps)
 						end
 					end
 
-					-- #43: log bot weapon actions (except wield) with bot/template
-					-- tags so charged inputs can be attributed to the correct bot
-					-- and staff family. One-shot per unique combo.
+					-- Log bot weapon actions (except wield) with bot/template tags
+					-- so charged inputs can be attributed to the correct bot and
+					-- staff family. One-shot per unique combo.
 					if id == "weapon_action" and action_input ~= "wield" and _debug_enabled() then
 						local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
 							_weapon_log_context(unit)

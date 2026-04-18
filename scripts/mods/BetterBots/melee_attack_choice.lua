@@ -10,6 +10,7 @@ local _armored_type
 local _armor
 local _logged_choice_keys = {}
 local _melee_horde_light_bias
+local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
 local DEFAULT_ATTACK_META_DATA = {
@@ -296,6 +297,12 @@ end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
 function M.install_melee_hooks(BtBotMeleeAction)
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) then
+		return
+	end
+
+	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = true
+
 	_mod:hook(BtBotMeleeAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
 		func(self, unit, breed, blackboard, scratchpad, action_data, t)
 

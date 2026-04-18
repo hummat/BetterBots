@@ -10,6 +10,15 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 2. Tier 2 ability validation (`#1`)
 3. Tier 3 item-ability fallback validation (`#3`)
 4. Regression sanity checks (revive/rescue/navigation/basic combat)
+5. v1.0.0 release-validation queue (Sprint 1-6 code is landed on `dev/v1.0.0`; live runs still needed before release)
+
+## Current v1.0.0 Validation Queue (2026-04-18)
+
+- Sprint 2: confirm Martyrdom healing suppression, Shroudfield low-health carve-out, talent-aware Venting Shriek peril preservation, and Focus Target tag ownership in a real mission.
+- Sprint 3: confirm close-range ranged families keep ranged target type without breaking Purgatus charge-fire, and powered melee specials still arm correctly in live combat.
+- Sprint 4: confirm supported pocketables are carried, wielded, consumed/deployed, and logged cleanly under both success and uncertain-end cases.
+- Sprint 5: confirm com-wheel requests reset cleanly between missions, smart-tag orders only fire on real tag set/override events, and explicit ammo tags still cover grenade-refill bots.
+- Sprint 6: cold-boot both load orders, grep raw logs for DMF warnings / parser noise, and re-check that the metadata guards restore original values on disable.
 
 ## Run Entry Template
 

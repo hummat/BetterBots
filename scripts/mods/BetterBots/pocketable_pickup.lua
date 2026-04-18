@@ -150,6 +150,7 @@ local function _reset_state(state, next_try_t)
 	state.use_input = nil
 	state.deadline_t = nil
 	state.wait_t = nil
+	state.use_snapshot = nil
 	state.next_try_t = next_try_t or nil
 end
 
@@ -158,7 +159,32 @@ local function _queue_weapon_action_input(action_input_extension, input_name)
 		return
 	end
 
+	if string.find(input_name, "wield_", 1, true) == 1 then
+		action_input_extension:bot_queue_action_input("weapon_action", "wield", input_name)
+		return
+	end
+
 	action_input_extension:bot_queue_action_input("weapon_action", input_name, nil)
+end
+
+local function _capture_use_snapshot(slot_name, inventory_component)
+	return {
+		slot_name = slot_name,
+		slot_item = inventory_component and inventory_component[slot_name] or nil,
+		wielded_slot = inventory_component and inventory_component.wielded_slot or nil,
+	}
+end
+
+local function _use_success_confirmed(snapshot, inventory_component)
+	if not (snapshot and inventory_component) then
+		return false
+	end
+
+	if inventory_component[snapshot.slot_name] == snapshot.slot_item then
+		return false
+	end
+
+	return inventory_component.wielded_slot ~= snapshot.slot_name
 end
 
 local function _carried_template_for_slot(unit, slot_name)
@@ -413,39 +439,28 @@ function M.try_queue(unit, blackboard)
 		return
 	end
 
-	local desired = _desired_action(unit, blackboard)
-	if not desired then
-		if state.stage then
-			_reset_state(state)
-		end
-		return
-	end
-
-	if state.pickup_name and state.pickup_name ~= desired.pickup_name then
-		_reset_state(state, fixed_t + RETRY_DELAY_S)
-	end
-
 	local action_input_extension = _script_unit_has_extension
 		and _script_unit_has_extension(unit, "action_input_system")
 	local inventory_component = _inventory_component(unit)
-	local carried_template = _carried_template_for_slot(unit, desired.slot_name)
 	local wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
 
-	if not (action_input_extension and inventory_component and carried_template) then
-		return
-	end
-
-	if _slot_is_empty(inventory_component, desired.slot_name) then
-		_reset_state(state, fixed_t + RETRY_DELAY_S)
+	if not (action_input_extension and inventory_component) then
 		return
 	end
 
 	if state.stage == "waiting_consume" then
-		if _slot_is_empty(inventory_component, desired.slot_name) then
-			_log(
-				"pocketable_pickup_success:" .. tostring(unit),
-				"pocketable use completed for " .. tostring(state.pickup_name)
-			)
+		if _slot_is_empty(inventory_component, state.slot_name) then
+			if _use_success_confirmed(state.use_snapshot, inventory_component) then
+				_log(
+					"pocketable_pickup_success:" .. tostring(unit),
+					"pocketable use completed for " .. tostring(state.pickup_name)
+				)
+			else
+				_log(
+					"pocketable_pickup_uncertain:" .. tostring(unit),
+					"pocketable ended without confirmation for " .. tostring(state.pickup_name)
+				)
+			end
 			_reset_state(state, fixed_t + RETRY_DELAY_S)
 			return
 		end
@@ -461,8 +476,9 @@ function M.try_queue(unit, blackboard)
 		return
 	end
 
+	local desired
 	if state.stage == "waiting_wield" then
-		if wielded_slot ~= desired.slot_name then
+		if wielded_slot ~= state.slot_name then
 			if fixed_t >= (state.deadline_t or 0) then
 				_log(
 					"pocketable_pickup_wield_timeout:" .. tostring(unit),
@@ -475,6 +491,34 @@ function M.try_queue(unit, blackboard)
 		end
 
 		state.stage = nil
+		desired = {
+			pickup_name = state.pickup_name,
+			slot_name = state.slot_name,
+			wield_input = state.wield_input,
+			use_input = state.use_input,
+		}
+	else
+		desired = _desired_action(unit, blackboard)
+		if not desired then
+			if state.stage then
+				_reset_state(state)
+			end
+			return
+		end
+
+		if state.pickup_name and state.pickup_name ~= desired.pickup_name then
+			_reset_state(state, fixed_t + RETRY_DELAY_S)
+		end
+	end
+
+	local carried_template = _carried_template_for_slot(unit, desired.slot_name)
+	if not carried_template then
+		return
+	end
+
+	if _slot_is_empty(inventory_component, desired.slot_name) then
+		_reset_state(state, fixed_t + RETRY_DELAY_S)
+		return
 	end
 
 	state.pickup_name = desired.pickup_name
@@ -501,6 +545,7 @@ function M.try_queue(unit, blackboard)
 	_queue_weapon_action_input(action_input_extension, desired.use_input)
 	state.stage = "waiting_consume"
 	state.deadline_t = fixed_t + USE_TIMEOUT_S
+	state.use_snapshot = _capture_use_snapshot(desired.slot_name, inventory_component)
 	_log(
 		"pocketable_pickup_use:" .. tostring(unit),
 		"queued pocketable input " .. tostring(desired.use_input) .. " for " .. tostring(desired.pickup_name)

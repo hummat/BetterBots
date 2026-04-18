@@ -413,6 +413,50 @@ describe("item_fallback", function()
 			lock_reason = "sequence",
 			held_slot = "slot_grenade_ability",
 		}, _events[1])
+		assert.matches("fallback_item_slot_locked:zealot_relic:bot_unit_1", _debug_logs[1].key, 1, true)
+	end)
+
+	it("fast-retries when another locked slot blocks waiting_wield confirmation", function()
+		local state = {
+			item_stage = "waiting_wield",
+			item_wield_deadline_t = 12,
+			item_rule = "psyker_force_field_hazard",
+		}
+		local combat_ability = make_item_ability("psyker_force_field")
+
+		_query_weapon_switch_lock = function()
+			return true, "veteran_frag_grenade", "sequence", "slot_grenade_ability"
+		end
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.is_nil(state.item_stage)
+		assert.equals(10.35, state.next_try_t)
+		assert.same({
+			t = 10,
+			event = "blocked",
+			bot = 5,
+			ability = "psyker_force_field",
+			rule = "psyker_force_field_hazard",
+			stage = "waiting_wield",
+			profile = nil,
+			attempt_id = nil,
+			reason = "slot_locked",
+			blocked_by = "veteran_frag_grenade",
+			lock_reason = "sequence",
+			held_slot = "slot_grenade_ability",
+		}, _events[1])
+		assert.is_not_nil(
+			find_log("fallback item blocked psyker_force_field (slot locked by veteran_frag_grenade sequence)")
+		)
 	end)
 
 	it("retries and rotates when combat-ability wield is lost before followup", function()

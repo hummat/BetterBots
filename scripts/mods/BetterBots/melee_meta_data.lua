@@ -4,6 +4,7 @@ local _debug_log
 local _debug_enabled
 local _armored_type
 local _is_enabled
+local _fixed_time
 
 local ABSENT = {}
 local DEFAULT_MELEE_RANGE = 2.5
@@ -176,7 +177,7 @@ local function inject(WeaponTemplates)
 			change.mode = "replace_invalid"
 			return change
 		end
-		if mode == "fields" and change.mode ~= "replace" then
+		if mode == "fields" and change.mode ~= "replace" and change.mode ~= "replace_invalid" then
 			change.mode = "fields"
 			change.original_fields = change.original_fields or {}
 		end
@@ -256,7 +257,7 @@ local function inject(WeaponTemplates)
 	if _debug_enabled() then
 		_debug_log(
 			"melee_meta_injection:" .. tostring(WeaponTemplates),
-			0,
+			_fixed_time and _fixed_time() or 0,
 			"melee attack_meta_data patch installed (injected="
 				.. injected
 				.. ", patched="
@@ -278,6 +279,7 @@ return {
 		_debug_enabled = deps.debug_enabled
 		_armored_type = deps.ARMOR_TYPE_ARMORED
 		_is_enabled = deps.is_enabled
+		_fixed_time = deps.fixed_time
 	end,
 	inject = inject,
 	sync_all = function()

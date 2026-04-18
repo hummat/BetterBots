@@ -7,6 +7,7 @@ local _fixed_time
 local _bot_slot_for_unit
 local _is_enabled
 local _should_block_pickup_order
+local _needs_ammo_pickup
 
 local SUPPORTED_SLOT_NAMES = {
 	slot_pocketable = true,
@@ -159,9 +160,15 @@ local function _eligible_bot_for_family(bot_unit, descriptor)
 	end
 
 	if descriptor.family == "ammo" then
-		local Ammo = _ammo_module()
-		if Ammo.reserve_ammo_is_full(bot_unit) then
-			return false, "ammo_full"
+		if _needs_ammo_pickup then
+			if not _needs_ammo_pickup(bot_unit) then
+				return false, "ammo_full"
+			end
+		else
+			local Ammo = _ammo_module()
+			if Ammo.reserve_ammo_is_full(bot_unit) then
+				return false, "ammo_full"
+			end
 		end
 
 		return true, nil
@@ -285,6 +292,7 @@ end
 
 function M.wire(refs)
 	_should_block_pickup_order = refs.should_block_pickup_order
+	_needs_ammo_pickup = refs.needs_ammo_pickup
 end
 
 function M.register_hooks()
@@ -297,11 +305,13 @@ function M.register_hooks()
 
 		_mod:hook(
 			SmartTagSystem,
-			"trigger_tag_interaction",
-			function(func, self, tag_id, interactor_unit, target_unit, optional_alternate)
-				local result = func(self, tag_id, interactor_unit, target_unit, optional_alternate)
-
-				M.try_dispatch(interactor_unit, target_unit, optional_alternate)
+			"set_tag",
+			function(func, self, template_name, tagger_unit, target_unit, target_location)
+				local result = func(self, template_name, tagger_unit, target_unit, target_location)
+				local ok, err = pcall(M.try_dispatch, tagger_unit, target_unit, nil)
+				if not ok and _mod and _mod.warning then
+					_mod:warning("BetterBots: smart-tag pickup routing failed: " .. tostring(err))
+				end
 
 				return result
 			end

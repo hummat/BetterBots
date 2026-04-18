@@ -963,6 +963,86 @@ describe("weapon_action", function()
 		assert.is_true(should_aim)
 	end)
 
+	it("preserves ADS for Purgatus inside the close-range hipfire window", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_should_aim = function()
+				return true
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			perception_component = {
+				target_ally = nil,
+				target_ally_needs_aid = false,
+				target_ally_distance = 0,
+				target_enemy_distance = 5,
+			},
+			ranged_gestalt = "killshot",
+		}
+		local action_data = {
+			gestalt_behaviors = {
+				killshot = { wants_aim = true },
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "forcestaff_p2_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+			}),
+			visual_loadout_system = {},
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return {
+							name = "forcestaff_p2_m1",
+							keywords = { "ranged", "staff" },
+							actions = {},
+						}
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction.enter({}, bot_unit, nil, nil, scratchpad)
+		local should_aim = BtBotShootAction._should_aim({}, 0, scratchpad, action_data)
+
+		rawset(_G, "require", saved_require)
+
+		assert.is_true(should_aim)
+	end)
+
 	it("logs ADS confirmation on _start_aiming once per scratchpad", function()
 		local saved_require = require
 		local BtBotShootAction = {

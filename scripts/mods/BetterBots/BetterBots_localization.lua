@@ -312,6 +312,12 @@ return {
 		en = "Routes explicit smart-tag interactions on ammo, books, and supported pocketables "
 			.. "into the existing bot pickup-order path.",
 	},
+	enable_com_wheel_responses = {
+		en = "Respond to com-wheel requests",
+	},
+	enable_com_wheel_responses_description = {
+		en = "Battle-cry and need-ammo/health calls temporarily bias bot behavior toward the player's request.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},

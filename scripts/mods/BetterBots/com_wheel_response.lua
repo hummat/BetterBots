@@ -86,6 +86,11 @@ function M.init(deps)
 	_request_state_by_unit = setmetatable({}, { __mode = "k" })
 end
 
+function M.reset()
+	_battle_cry_until_t = nil
+	_request_state_by_unit = setmetatable({}, { __mode = "k" })
+end
+
 function M.record_trigger(unit, trigger_id)
 	if not (_feature_enabled() and _human_player_by_unit(unit)) then
 		return false, "not_human"

@@ -57,6 +57,8 @@ BLOCK IF toughness_pct > 0.80 AND num_nearby <= 2
 ```
 **Confidence:** HIGH — community consensus: "spam it, 30s CD."
 
+**Current BetterBots note:** the shipped Voice of Command + Focus Target path also cares about tag ownership, not just whether an enemy is already tagged. BetterBots now allows one narrow override on an already-tagged elite/special so the Veteran can still claim `enemy_over_here_veteran` and apply the Focus Target debuff instead of silently yielding the tag forever.
+
 ---
 
 ## Infiltrate (`veteran_invisibility`)

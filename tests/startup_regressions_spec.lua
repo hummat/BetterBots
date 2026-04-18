@@ -1262,6 +1262,34 @@ describe("startup regressions", function()
 		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
 	end)
 
+	it("is idempotent on BotGroup hook installation across hot-reload (file re-execution)", function()
+		local bot_group = {
+			init = function() end,
+			_update_mule_pickups = function() end,
+			_update_pickups_and_deployables_near_player = function() end,
+		}
+
+		local harness1 = make_bootstrap_harness()
+		harness1:load()
+		harness1:invoke_hook_require("scripts/extension_systems/group/bot_group", bot_group)
+
+		local harness2 = make_bootstrap_harness()
+		harness2:load()
+		harness2:invoke_hook_require("scripts/extension_systems/group/bot_group", bot_group)
+
+		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "init", "hook_safe"))
+		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "_update_mule_pickups", "hook_safe"))
+		assert.equals(
+			0,
+			count_hooks(
+				harness2.hook_registrations,
+				bot_group,
+				"_update_pickups_and_deployables_near_player",
+				"hook_safe"
+			)
+		)
+	end)
+
 	it("fails bootstrap when a required module API is missing", function()
 		local harness = make_bootstrap_harness({
 			WeaponAction = {

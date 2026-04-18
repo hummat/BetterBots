@@ -391,7 +391,7 @@ end
 local function _block_item_for_slot_lock(unit, state, ability_name, fixed_t, blocking_ability, lock_reason, held_slot)
 	if _debug_enabled() then
 		_debug_log(
-			"fallback_item_slot_locked:" .. ability_name,
+			"fallback_item_slot_locked:" .. ability_name .. ":" .. tostring(unit),
 			fixed_t,
 			"fallback item blocked "
 				.. ability_name

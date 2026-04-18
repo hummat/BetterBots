@@ -18,6 +18,8 @@ local _last_grimoire_patch_enabled
 local _blackboard_module
 local _warned_group_system_lookup_failure
 local _warned_blackboard_module_lookup_failure
+local BOT_GROUP_PATCH_SENTINEL = "__bb_mule_pickup_bot_group_installed"
+local INTERACTION_PATCH_SENTINEL = "__bb_mule_pickup_interaction_installed"
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
@@ -605,6 +607,12 @@ function M.on_refresh_destination(self)
 end
 
 function M.install_bot_group_hooks(BotGroup)
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) then
+		return
+	end
+
+	BotGroup[BOT_GROUP_PATCH_SENTINEL] = true
+
 	_mod:hook_safe(BotGroup, "init", function(self)
 		M.patch_pickups()
 		_ensure_mule_pickup_slots(self)
@@ -643,6 +651,12 @@ function M.register_hooks()
 end
 
 function M.install_interaction_hooks(PocketableInteraction)
+	if not PocketableInteraction or rawget(PocketableInteraction, INTERACTION_PATCH_SENTINEL) then
+		return
+	end
+
+	PocketableInteraction[INTERACTION_PATCH_SENTINEL] = true
+
 	_mod:hook(
 		PocketableInteraction,
 		"stop",

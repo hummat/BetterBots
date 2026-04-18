@@ -168,6 +168,37 @@ describe("melee_attack_choice", function()
 		_G.Armor = nil
 	end)
 
+	it("installs melee hooks only once per shared BtBotMeleeAction table", function()
+		local MeleeAttackChoice = load_module()
+		local hook_calls = {}
+		local stub_mod = {
+			hook = function(_, target, method_name)
+				hook_calls[#hook_calls + 1] = {
+					target = target,
+					method = method_name,
+				}
+			end,
+		}
+		local BtBotMeleeAction = {}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+		})
+
+		MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
+		MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
+
+		assert.equals(2, #hook_calls)
+	end)
+
 	it("logs the chosen attack context for unarmored horde targets", function()
 		local MeleeAttackChoice = load_module()
 		local hook_handler
