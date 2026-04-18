@@ -270,24 +270,147 @@ describe("healing_deferral", function()
 	end)
 
 	describe("should_skip_health_station_use", function()
-		it("skips medicae when corruption is the only damage", function()
-			assert.is_true(HealingDeferral.should_skip_health_station_use(0.7, 0.3, 0.3, 4, true))
+		it("does not skip medicae for corruption-only damage", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.7, 0.3, 0.3, 4, true))
 		end)
 
-		it("skips medicae when health is above the 80 percent cap", function()
-			assert.is_true(HealingDeferral.should_skip_health_station_use(0.85, 0.15, 0, 4, true))
+		it("does not skip medicae for slight missing health", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.85, 0.15, 0, 4, true))
 		end)
 
-		it("skips medicae when only one charge remains for humans", function()
-			assert.is_true(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, true))
+		it("does not reserve the last charge once human reserve is satisfied", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, true))
 		end)
 
-		it("allows medicae when meaningful health is missing and spare charges remain", function()
+		it("allows medicae when health is missing and spare charges remain", function()
 			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 2, true))
 		end)
 
-		it("does not reserve the last charge when no humans are present", function()
-			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, false))
+		it("skips medicae only when the bot is already full", function()
+			assert.is_true(HealingDeferral.should_skip_health_station_use(1.0, 0, 0, 4, true))
+		end)
+	end)
+
+	describe("install_behavior_ext_hooks", function()
+		local update_health_stations_hook
+		local saved_script_unit
+
+		local function install_hook_fixture(opts)
+			local station_unit = {}
+
+			saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == station_unit and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return opts.charge_amount
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_human_threshold" then
+							return opts.human_threshold or 90
+						end
+						if setting_id == "healing_deferral_emergency_threshold" then
+							return 25
+						end
+					end,
+					hook_safe = function(_, _, method_name, fn)
+						if method_name == "_update_health_stations" then
+							update_health_stations_hook = fn
+						end
+					end,
+				},
+				health_module = {
+					current_health_percent = function(unit)
+						if unit == "bot1" then
+							return opts.bot_health_pct
+						end
+
+						return opts.human_health_pct
+					end,
+					permanent_damage_taken_percent = function(unit)
+						if unit == "bot1" then
+							return opts.bot_permanent_damage_pct or 0
+						end
+
+						return 0
+					end,
+				},
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			HealingDeferral.install_behavior_ext_hooks({})
+
+			return station_unit
+		end
+
+		after_each(function()
+			_G.ScriptUnit = saved_script_unit
+		end)
+
+		it("promotes slight bot damage into health-station demand when humans are above reserve", function()
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.95,
+				human_health_pct = 0.95,
+				charge_amount = 1,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("promotes corruption-only damage into health-station demand when humans are above reserve", function()
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.70,
+				bot_permanent_damage_pct = 0.30,
+				human_health_pct = 0.95,
+				charge_amount = 4,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
 		end)
 	end)
 

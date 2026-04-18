@@ -162,7 +162,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
 - [x] Communication wheel response (ForTheEmperor compat)
 - [x] Smart-tag item interaction bridge
-- [ ] Unified non-book resource arbitration
+- [x] Unified non-book resource arbitration
 
 **Post-1.0 (may never ship)**
 - Utility-based ability scoring (architectural)

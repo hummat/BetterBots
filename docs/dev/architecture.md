@@ -93,13 +93,14 @@ This mod targets bot ability activation in three paths:
     - uses `set_aim_rotation` for standard grenades, handleless grenades, Ogryn grenade throws, and zealot throwing knives; preserves flat fallback for near-flat, true-flight, and non-ballistic families
 21. Healing deferral (#39, via `healing_deferral.lua`):
     - hook `BotBehaviorExtension._update_health_stations` (post-process): clears `needs_health` when any human player is below the configured threshold (default 90%) and the bot is not in the configured emergency override state (default <25%)
-    - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
+    - when every eligible human is above reserve, the same hook now promotes health-station demand for any damaged non-Martyrdom bot and forces queue number `1`, overriding vanilla's heavier-damage threshold so slightly-damaged or corruption-only bots stop leaving spare medicae charges stranded
+    - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled; when humans are above reserve, vanilla's existing `needs_non_permanent_health` flag already gives crates an "any healable damage" onset
     - Martyrdom zealots are an explicit exception to the generic emergency override: when healing deferral is enabled, live station and med-crate seams stay blocked so the bot preserves its low-health keystone value
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
     - still does not claim generic wound-cure / give-to-ally pocketable behavior; Sprint 4 only ships medicae discipline here, with carried stims/crates handled separately in `pocketable_pickup.lua`
 22. Ammo, grenade, and mule pickup policy (#72 / #89 / #32 / #24 / #88, via `ammo_policy.lua` + `mule_pickup.lua` + `pocketable_pickup.lua`):
-    - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
-    - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
+    - hook `BotBehaviorExtension._update_ammo` (post-process): once every eligible human ammo user is above reserve, any missing ammo amount (`ammo_percentage < 1`) is enough to keep `needs_ammo` true; the configured opportunistic ranged threshold only survives as the desperation fallback while humans still need the resource
+    - opportunistic ranged fire threshold (`condition_patch.lua`) and the desperation branch in ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
     - `small_grenade` pickup support piggybacks the same vanilla `pickup_component.ammo_pickup` slot because vanilla never routes `group = "ability"` grenade refills into bot pickup awareness
     - grenade refills bind for charge-based grenade users whenever every eligible human is above the configured reserve threshold; cooldown-only blitz users are ignored

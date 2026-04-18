@@ -12,6 +12,7 @@ local _com_wheel
 local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
+local _last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
 
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
@@ -48,6 +49,16 @@ local function _log(key, message)
 	end
 
 	_debug_log(key, _fixed_time and _fixed_time() or 0, message)
+end
+
+local function _health_station_log_state_changed(unit, state)
+	if _last_health_station_log_state_by_unit[unit] == state then
+		return false
+	end
+
+	_last_health_station_log_state_by_unit[unit] = state
+
+	return true
 end
 
 local function _read_mode_setting()
@@ -173,19 +184,12 @@ local function _should_skip_health_station_use(
 	has_humans
 )
 	local total_damage = total_damage_pct or (1 - (bot_health_pct or 1))
-	local permanent_damage = permanent_damage_pct or 0
-	local non_permanent_damage = math.max(total_damage - permanent_damage, 0)
+	local _ = permanent_damage_pct
+	_ = charge_amount
+	_ = has_humans
 
-	if total_damage > 0 and non_permanent_damage <= 0.001 then
-		return true, "corruption_only"
-	end
-
-	if (bot_health_pct or 1) > 0.80 then
-		return true, "high_health"
-	end
-
-	if has_humans and (charge_amount or 0) <= 1 then
-		return true, "reserve_last_charge"
+	if total_damage <= 0.001 then
+		return true, "full_health"
 	end
 
 	return false, nil
@@ -210,6 +214,7 @@ function M.init(deps)
 	_cached_settings = nil
 	_cached_settings_fixed_t = nil
 	_missing_health_warned = false
+	_last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
 	if deps.health_module then
 		_health = deps.health_module
 	else
@@ -255,7 +260,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		end
 
 		local health_station_component = self._health_station_component
-		if not (health_station_component and health_station_component.needs_health) then
+		if not health_station_component then
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
 			end
@@ -266,39 +271,31 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local target_level_unit = perception_component and perception_component.target_level_unit or nil
 		local health_station_extension = target_level_unit
 			and ScriptUnit.has_extension(target_level_unit, "health_station_system")
+		if not health_station_extension then
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
 		local human_units = self._side and self._side.valid_human_units or nil
-		local human_count = human_units and #human_units or 0
 		local bot_health_pct = _health.current_health_percent(unit)
 		local total_damage_pct = math.max(1 - bot_health_pct, 0)
 		local permanent_damage_pct = _health.permanent_damage_taken_percent
 				and _health.permanent_damage_taken_percent(unit)
 			or 0
-		local charge_amount = health_station_extension
-				and health_station_extension.charge_amount
-				and health_station_extension:charge_amount()
-			or 0
+		local charge_amount = health_station_extension.charge_amount and health_station_extension:charge_amount() or 0
 		local skip_station_use, skip_reason = _should_skip_health_station_use(
 			bot_health_pct,
 			total_damage_pct,
 			permanent_damage_pct,
 			charge_amount,
-			human_count > 0
+			human_units and #human_units > 0
 		)
 
 		if skip_station_use then
 			_apply_health_station_deferral(health_station_component)
-			if skip_reason == "corruption_only" then
-				_log(
-					"healing_station:" .. tostring(unit),
-					"deferred health station because corruption is the only damage"
-				)
-			elseif skip_reason == "high_health" then
-				_log("healing_station:" .. tostring(unit), "deferred health station because bot health is above 80%")
-			elseif skip_reason == "reserve_last_charge" then
-				_log(
-					"healing_station:" .. tostring(unit),
-					"deferred health station to leave the last charge for humans"
-				)
+			if skip_reason == "full_health" and _health_station_log_state_changed(unit, "full_health") then
+				_log("healing_station:" .. tostring(unit), "deferred health station because bot is already full")
 			end
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
@@ -319,7 +316,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local preserve_wounded_state = _bot_preserves_wounded_state(unit)
 
 		if
-			not _should_defer_resource(
+			_should_defer_resource(
 				"health_station",
 				bot_health_pct,
 				human_needs_healing,
@@ -327,19 +324,30 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 				preserve_wounded_state
 			)
 		then
+			_apply_health_station_deferral(health_station_component)
+			if preserve_wounded_state then
+				_log(
+					"healing_station:" .. tostring(unit),
+					"deferred health station to preserve Martyrdom wounded state"
+				)
+			elseif human_request_active then
+				_log("healing_station:" .. tostring(unit), "deferred health station to human request")
+			else
+				_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+			end
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
 			end
 			return
 		end
 
-		_apply_health_station_deferral(health_station_component)
-		if preserve_wounded_state then
-			_log("healing_station:" .. tostring(unit), "deferred health station to preserve Martyrdom wounded state")
-		elseif human_request_active then
-			_log("healing_station:" .. tostring(unit), "deferred health station to human request")
-		else
-			_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+		health_station_component.needs_health = true
+		health_station_component.needs_health_queue_number = 1
+		if _health_station_log_state_changed(unit, "allow") then
+			_log(
+				"healing_station_allow:" .. tostring(unit),
+				"health station permitted: humans above reserve and bot not full"
+			)
 		end
 		if perf_t0 then
 			_perf.finish("healing_deferral.health_stations", perf_t0)

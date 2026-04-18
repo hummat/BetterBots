@@ -178,6 +178,42 @@ describe("ammo_policy", function()
 		assert.is_true(self._pickup_component.needs_ammo)
 	end)
 
+	it("sets needs_ammo when bot is slightly below full and all eligible humans are above reserve", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.99 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = { needs_ammo = false },
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
 	it("defers ammo to human when bot is above threshold and human is below reserve", function()
 		install_module({
 			ammo_module = {
