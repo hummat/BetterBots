@@ -298,6 +298,13 @@ return {
 	enable_ammo_policy_description = {
 		en = "Bots defer ammo and grenades while humans are below their reserve thresholds. Off restores vanilla pickup.",
 	},
+	enable_pocketable_support = {
+		en = "Bot pocketable support",
+	},
+	enable_pocketable_support_description = {
+		en = "Lets bots carry supported stims and crates, then self-use or deploy them conservatively. "
+			.. "Bots still leave matching empty pocket slots to humans.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},

@@ -427,6 +427,9 @@ local function make_bootstrap_harness(module_overrides)
 		patch_pickups = function() end,
 		sync_live_bot_groups = function() end,
 	})
+	modules.PocketablePickup = make_runtime_module("PocketablePickup", install_calls, {
+		patch_pickups = function() end,
+	})
 	modules.BotProfiles = make_runtime_module("BotProfiles", install_calls, {
 		reset = function() end,
 		register_hooks = function()
@@ -525,6 +528,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/healing_deferral"] = modules.HealingDeferral,
 		["BetterBots/scripts/mods/BetterBots/ammo_policy"] = modules.AmmoPolicy,
 		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
+		["BetterBots/scripts/mods/BetterBots/pocketable_pickup"] = modules.PocketablePickup,
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
@@ -741,6 +745,14 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/mule_pickup"%)', 1))
+	end)
+
+	it("loads pocketable_pickup through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/pocketable_pickup"%)', 1))
 	end)
 
 	it("loads companion_tag through mod io", function()

@@ -23,6 +23,7 @@ local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
+local _pocketable_state_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_by_unit = setmetatable({}, { __mode = "k" })
@@ -321,6 +322,9 @@ assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 local MulePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/mule_pickup")
 assert(MulePickup, "BetterBots: failed to load mule_pickup module")
 
+local PocketablePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/pocketable_pickup")
+assert(PocketablePickup, "BetterBots: failed to load pocketable_pickup module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
@@ -505,6 +509,7 @@ UpdateDispatcher.init({
 	debug = Debug,
 	ability_queue = AbilityQueue,
 	grenade_fallback = GrenadeFallback,
+	pocketable_pickup = PocketablePickup,
 	ping_system = PingSystem,
 	companion_tag = CompanionTag,
 	settings = Settings,
@@ -762,6 +767,18 @@ AmmoPolicy.init({
 	end,
 })
 
+PocketablePickup.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	state_by_unit = _pocketable_state_by_unit,
+	build_context = Heuristics.build_context,
+	is_enabled = function()
+		return Settings.is_feature_enabled("pocketable_support")
+	end,
+})
+
 MulePickup.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -773,6 +790,8 @@ MulePickup.init({
 	is_tome_pickup_enabled = function()
 		return Settings.is_feature_enabled("bot_tome_pickup")
 	end,
+	should_allow_mule_pickup = PocketablePickup.should_allow_mule_pickup,
+	should_block_pickup_order = PocketablePickup.should_block_pickup_order,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -1442,6 +1461,11 @@ function mod.on_setting_changed(setting_id)
 
 	if setting_id == "enable_bot_grimoire_pickup" then
 		MulePickup.patch_pickups()
+		MulePickup.sync_live_bot_groups()
+	end
+
+	if setting_id == "enable_pocketable_support" then
+		PocketablePickup.patch_pickups()
 		MulePickup.sync_live_bot_groups()
 	end
 

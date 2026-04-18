@@ -133,7 +133,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 **Release framing.** `v1.0.0` is scoped as the terminal release. Post-1.0 work may never ship — the milestone therefore includes everything feasible without architectural rewrites, not just the cheapest wins. Broad-scope follow-ups under individual issues are formally documented as scope-exit (see Post-1.0 section).
 
-**Execution order.** Sprints are a logical dependency ordering, not calendar weeks. Foundation primitives (F1 talent context, F2 pocketable pickup) are load-bearing — F2 unlocks three downstream features on its own.
+**Execution order.** Sprints are a logical dependency ordering, not calendar weeks. Foundation primitives (F1 talent context, F2 pocketable carry bootstrap) are load-bearing — F2 unlocks the carried-consumable MVP on its own.
 
 #### Sprint 1 — Foundations + cheap independent wins
 
@@ -170,15 +170,15 @@ Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broke
 
 #### Sprint 4 — Pocketable pickup primitive + consumable features
 
-F2 is the real infrastructure bet. One primitive unlocks three downstream features. Per `#24` Mar 8 audit + `#88` body, the shared blocker is a missing BT primitive for pocketable item pickup.
+Sprint 4 stopped being "invent a missing primitive" once the decompiled source was checked closely on 2026-04-18. Vanilla already has the carry side (`pickup_component.mule_pickup`, `BotBehaviorExtension._refresh_destination`, `PocketableInteraction.stop`); BetterBots needed to patch supported pocketables into that path, then layer conservative bot policy and use/deploy sequencing on top.
 
 | # | Item | Notes |
 |---|------|-------|
-| F2 | Pocketable pickup primitive | New module `pocketable_pickup.lua`: BT walk-to-unit + interact + pocket-slot insert. No existing path in bot BT. Load-bearing. |
-| 24 (a) | Medicae discipline | Extend `healing_deferral.lua:182` plumbing: corruption-only gate + charge reserve + 80%+ skip. Existing hooks. |
-| 24 (b) | Stim usage | Rides F2; trigger = high-threat combat entry. |
-| 24 (c) | Med-kit carry + distribute | Rides F2; give-to-ally on ping or <40% threshold. |
-| 88 | Deployable crate carry + deploy | Rides F2 for ammo + medical pocketable forms. Existing mule-pickup plumbing (`mule_pickup.lua:64`, `bot_group.lua:1064`, `bt_bot_conditions.lua:287`) carries the carry side. Deploy-location heuristic (coherency anchor + ≥2 allies + resource need + no 15m enemies) is the real design cost. |
+| F2 | Pocketable carry bootstrap | **Code-complete 2026-04-18; in-game validation pending.** New module `pocketable_pickup.lua` patches supported pocketables (`ammo_cache_pocketable`, `medical_crate_pocketable`, combat stims) into the existing vanilla mule path, blocks proactive grabs while a human still has the matching slot open, and hooks `update_dispatcher.lua` for conservative wield/use/place follow-through. |
+| 24 (a) | Medicae discipline | **Code-complete 2026-04-18; in-game validation pending.** `healing_deferral.lua` now skips stations for corruption-only damage, skips >80% health, and reserves the last charge for humans. |
+| 24 (b) | Stim usage | **Code-complete 2026-04-18; in-game validation pending.** Supported combat stims self-use on high-threat combat entry after the carried stim is wielded into `slot_pocketable_small`. |
+| 24 (c) | Pocketable wound-cure / ally distribution | **Deferred post-1.0 on 2026-04-18.** The carry primitive exists, but reliable give-to-ally / wound-cure behavior is not load-bearing for v1.0.0 and the vanilla handoff path is too narrow/flaky for an MVP claim. |
+| 88 | Deployable crate carry + deploy | **Code-complete 2026-04-18; in-game validation pending.** Ammo + medical crates now ride the vanilla mule carry path and auto-deploy from `slot_pocketable` only when the bot is safe, at least two allies are in coherency, and the team actually needs the resource. |
 
 #### Sprint 5 — Team coordination + safety
 
@@ -210,7 +210,7 @@ Hard cut order (first to drop):
 4. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
 5. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
 
-**Do not cut:** F2 primitive + its three downstream consumable features (`#24a/b/c`, `#88` carry), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
+**Do not cut:** Sprint 4's shipped MVP (`F2` bootstrap + `#24a/b` + `#88` carry/deploy), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
 
 ### Post-1.0 — "Intelligence Architecture" (may never ship)
 

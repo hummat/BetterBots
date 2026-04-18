@@ -5,6 +5,7 @@ local _event_log
 local _debug
 local _ability_queue
 local _grenade_fallback
+local _pocketable_pickup
 local _ping_system
 local _companion_tag
 local _settings
@@ -23,6 +24,7 @@ function M.init(deps)
 	_debug = deps.debug
 	_ability_queue = deps.ability_queue
 	_grenade_fallback = deps.grenade_fallback
+	_pocketable_pickup = deps.pocketable_pickup
 	_ping_system = deps.ping_system
 	_companion_tag = deps.companion_tag
 	_settings = deps.settings
@@ -78,6 +80,11 @@ function M.dispatch(self, unit)
 	perf_t0 = _perf.begin()
 	_grenade_fallback.try_queue(unit, blackboard)
 	_perf.finish("grenade_fallback", perf_t0)
+	perf_t0 = _perf.begin()
+	if _pocketable_pickup and _pocketable_pickup.try_queue then
+		_pocketable_pickup.try_queue(unit, blackboard)
+	end
+	_perf.finish("pocketable_pickup", perf_t0)
 	if _settings.is_feature_enabled("pinging") then
 		perf_t0 = _perf.begin()
 		_ping_system.update(unit, blackboard)

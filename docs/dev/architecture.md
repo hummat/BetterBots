@@ -96,8 +96,8 @@ This mod targets bot ability activation in three paths:
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
     - Martyrdom zealots are an explicit exception to the generic emergency override: when healing deferral is enabled, live station and med-crate seams stay blocked so the bot preserves its low-health keystone value
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
-    - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
-22. Ammo, grenade, and mule pickup policy (#72 / #89 / #32, via `ammo_policy.lua` + `mule_pickup.lua`):
+    - still does not claim generic wound-cure / give-to-ally pocketable behavior; Sprint 4 only ships medicae discipline here, with carried stims/crates handled separately in `pocketable_pickup.lua`
+22. Ammo, grenade, and mule pickup policy (#72 / #89 / #32 / #24 / #88, via `ammo_policy.lua` + `mule_pickup.lua` + `pocketable_pickup.lua`):
     - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
     - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
@@ -111,7 +111,10 @@ This mod targets bot ability activation in three paths:
     - hook `BotBehaviorExtension._refresh_destination` (post-process): sanitizes live mule state (stale drops for any type; blocked references for whichever type is currently disabled)
     - hook `BotGroup.init`, `BotGroup._update_mule_pickups`, and setting-change sync: backfills missing mule slot caches on construction, then prunes cached reservations and explicit `slot_pocketable` pickup orders immediately when a pickup type is disabled, so bots can fall through to the other type without waiting for the vanilla cache to expire
     - post-processes vanilla `_update_mule_pickups()` assignment to ignore the stock "suppress mule pickup while any human is within ~20m of the book" rule; BetterBots now claims the nearest eligible unassigned book for a bot with a free mule slot and an in-leash follow position, then marks destination refresh so ordinary book pickup can happen in the common nearby-player case
-    - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled; leaves orders for enabled types intact
+    - `pocketable_pickup.lua` extends the same carry path to supported pocketables (`ammo_cache_pocketable`, `medical_crate_pocketable`, combat stims) by patching `bots_mule_pickup`, mirroring `inventory_slot_name -> slot_name`, and letting vanilla `PocketableInteraction.stop` perform the actual slot insert
+    - proactive pocketable assignment is human-first: BetterBots refuses to claim a supported pocketable while any human still has the matching slot open, unless the pickup came from an explicit bot order
+    - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled, rejects unsupported pocketables entirely, and leaves supported pocketable orders intact when the feature is enabled
+    - `update_dispatcher.lua` runs the carried pocketable state machine once the bot already owns the item: combat stims self-use on high-threat entry, and ammo/medical crates auto-deploy only when at least two allies are in coherency, no enemy is currently engaged, and the team actually needs the resource
 23. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights

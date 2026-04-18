@@ -333,6 +333,7 @@ scripts/mods/BetterBots/          # Mod source
   healing_deferral.lua            #   Defer health stations/med-crates to humans
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
+  pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression

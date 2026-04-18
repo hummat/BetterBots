@@ -160,6 +160,32 @@ local function _should_defer_resource(
 	return _should_defer_healing(bot_health_pct, human_needs_healing, settings.emergency_threshold)
 end
 
+local function _should_skip_health_station_use(
+	bot_health_pct,
+	total_damage_pct,
+	permanent_damage_pct,
+	charge_amount,
+	has_humans
+)
+	local total_damage = total_damage_pct or (1 - (bot_health_pct or 1))
+	local permanent_damage = permanent_damage_pct or 0
+	local non_permanent_damage = math.max(total_damage - permanent_damage, 0)
+
+	if total_damage > 0 and non_permanent_damage <= 0.001 then
+		return true, "corruption_only"
+	end
+
+	if (bot_health_pct or 1) > 0.80 then
+		return true, "high_health"
+	end
+
+	if has_humans and (charge_amount or 0) <= 1 then
+		return true, "reserve_last_charge"
+	end
+
+	return false, nil
+end
+
 local function _apply_health_station_deferral(health_station_component)
 	health_station_component.needs_health = false
 	health_station_component.needs_health_queue_number = 0
@@ -230,9 +256,52 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
+		local perception_component = self._perception_component
+		local target_level_unit = perception_component and perception_component.target_level_unit or nil
+		local health_station_extension = target_level_unit
+			and ScriptUnit.has_extension(target_level_unit, "health_station_system")
+		local human_units = self._side and self._side.valid_human_units or nil
+		local human_count = human_units and #human_units or 0
+		local bot_health_pct = _health.current_health_percent(unit)
+		local total_damage_pct = math.max(1 - bot_health_pct, 0)
+		local permanent_damage_pct = _health.permanent_damage_taken_percent
+				and _health.permanent_damage_taken_percent(unit)
+			or 0
+		local charge_amount = health_station_extension
+				and health_station_extension.charge_amount
+				and health_station_extension:charge_amount()
+			or 0
+		local skip_station_use, skip_reason = _should_skip_health_station_use(
+			bot_health_pct,
+			total_damage_pct,
+			permanent_damage_pct,
+			charge_amount,
+			human_count > 0
+		)
+
+		if skip_station_use then
+			_apply_health_station_deferral(health_station_component)
+			if skip_reason == "corruption_only" then
+				_log(
+					"healing_station:" .. tostring(unit),
+					"deferred health station because corruption is the only damage"
+				)
+			elseif skip_reason == "high_health" then
+				_log("healing_station:" .. tostring(unit), "deferred health station because bot health is above 80%")
+			elseif skip_reason == "reserve_last_charge" then
+				_log(
+					"healing_station:" .. tostring(unit),
+					"deferred health station to leave the last charge for humans"
+				)
+			end
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
 		local side = self._side
 		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
-		local bot_health_pct = _health.current_health_percent(unit)
 		local preserve_wounded_state = _bot_preserves_wounded_state(unit)
 
 		if
@@ -263,9 +332,9 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 end
 
 function M.register_hooks()
-	-- The issue body also mentioned pocketable health pickups, but the decompiled
-	-- Lua path is currently dead for bots (`bots_mule_pickup` is not set on the
-	-- relevant templates). Don't hook a dead path and claim behavior we can't prove.
+	-- Pocketable wound-cure / ally-handoff behavior stays outside healing_deferral.
+	-- Sprint 4 ships medicae discipline here, while supported carried stims/crates
+	-- are handled in pocketable_pickup.lua.
 end
 
 function M.install_bot_group_hooks(BotGroup)
@@ -326,6 +395,7 @@ end
 M.any_human_needs_healing = _any_human_needs_healing
 M.should_defer_healing = _should_defer_healing
 M.should_defer_resource = _should_defer_resource
+M.should_skip_health_station_use = _should_skip_health_station_use
 M.bot_preserves_wounded_state = _bot_preserves_wounded_state
 M.apply_health_station_deferral = _apply_health_station_deferral
 M.apply_health_deployable_deferral = _apply_health_deployable_deferral

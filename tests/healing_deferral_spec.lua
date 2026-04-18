@@ -259,6 +259,28 @@ describe("healing_deferral", function()
 		end)
 	end)
 
+	describe("should_skip_health_station_use", function()
+		it("skips medicae when corruption is the only damage", function()
+			assert.is_true(HealingDeferral.should_skip_health_station_use(0.7, 0.3, 0.3, 4, true))
+		end)
+
+		it("skips medicae when health is above the 80 percent cap", function()
+			assert.is_true(HealingDeferral.should_skip_health_station_use(0.85, 0.15, 0, 4, true))
+		end)
+
+		it("skips medicae when only one charge remains for humans", function()
+			assert.is_true(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, true))
+		end)
+
+		it("allows medicae when meaningful health is missing and spare charges remain", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 2, true))
+		end)
+
+		it("does not reserve the last charge when no humans are present", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, false))
+		end)
+	end)
+
 	describe("apply deferral", function()
 		it("clears health station demand", function()
 			local component = {
