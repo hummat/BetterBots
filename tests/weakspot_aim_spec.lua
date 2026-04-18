@@ -1,12 +1,63 @@
+local test_helper = require("tests.test_helper")
+
 local saved_script_unit = rawget(_G, "ScriptUnit")
 local saved_unit = rawget(_G, "Unit")
+local saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
+local saved_vector3 = rawget(_G, "Vector3")
+local saved_quaternion = rawget(_G, "Quaternion")
 
 local WeakspotAim = dofile("scripts/mods/BetterBots/weakspot_aim.lua")
+
+local vec_mt = {}
+
+vec_mt.__sub = function(a, b)
+	return setmetatable({ x = a.x - b.x, y = a.y - b.y, z = a.z - b.z }, vec_mt)
+end
+
+local function vec(x, y, z)
+	return setmetatable({ x = x, y = y, z = z }, vec_mt)
+end
+
+local function install_bulwark_math_globals()
+	_G.Vector3 = {
+		angle = function(a, b)
+			local dot = a.x * b.x + a.y * b.y + a.z * b.z
+			local length_a = math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
+			local length_b = math.sqrt(b.x * b.x + b.y * b.y + b.z * b.z)
+
+			if length_a == 0 or length_b == 0 then
+				return 0
+			end
+
+			local cos_theta = dot / (length_a * length_b)
+			cos_theta = math.max(-1, math.min(1, cos_theta))
+
+			return math.acos(cos_theta)
+		end,
+		normalize = function(v)
+			local length = math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+
+			if length == 0 then
+				return vec(0, 0, 0)
+			end
+
+			return vec(v.x / length, v.y / length, v.z / length)
+		end,
+	}
+	_G.Quaternion = {
+		forward = function(rotation)
+			return rotation.forward
+		end,
+	}
+end
 
 describe("weakspot_aim", function()
 	after_each(function()
 		_G.ScriptUnit = saved_script_unit
 		_G.Unit = saved_unit
+		_G.POSITION_LOOKUP = saved_position_lookup
+		_G.Vector3 = saved_vector3
+		_G.Quaternion = saved_quaternion
 	end)
 
 	describe("_breed_override_for", function()
@@ -220,6 +271,280 @@ describe("weakspot_aim", function()
 			assert.is_nil(node)
 			assert.equals("j_head", scratchpad.aim_at_node)
 			assert.equals("j_head", scratchpad.aim_at_node_charged)
+		end)
+
+		it("provisionally overrides to j_head for Crusher when the bot is behind the target", function()
+			install_bulwark_math_globals()
+
+			local crusher_breed = { name = "chaos_ogryn_executor" }
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(crusher_breed)
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, -10, 0) },
+			}
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.equals("j_head", node)
+			assert.equals("j_head", scratchpad.aim_at_node)
+			assert.equals("j_head", scratchpad.aim_at_node_charged)
+		end)
+
+		it("does not override Crusher when the bot is in front of the target", function()
+			install_bulwark_math_globals()
+
+			local crusher_breed = { name = "chaos_ogryn_executor" }
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(crusher_breed)
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, 10, 0) },
+			}
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
+		end)
+
+		it("restores the baseline when Crusher rear exposure disappears", function()
+			install_bulwark_math_globals()
+
+			local crusher_breed = { name = "chaos_ogryn_executor" }
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(crusher_breed)
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, -10, 0) },
+			}
+
+			WeakspotAim.apply_override("target_unit", scratchpad)
+			assert.equals("j_head", scratchpad.aim_at_node)
+
+			scratchpad.first_person_component.position = vec(0, 10, 0)
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
+		end)
+
+		it("overrides to j_head for Bulwark when the bot is outside the shield blocking angle", function()
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local shield_extension = {
+				is_blocking = function()
+					return true
+				end,
+			}
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return shield_extension
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(-10, 0, 0) },
+			}
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.equals("j_head", node)
+			assert.equals("j_head", scratchpad.aim_at_node)
+			assert.equals("j_head", scratchpad.aim_at_node_charged)
+		end)
+
+		it("overrides to j_head for Bulwark when the shield is open", function()
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local shield_extension = {
+				is_blocking = function()
+					return false
+				end,
+			}
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return shield_extension
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, 10, 0) },
+			}
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.equals("j_head", node)
+			assert.equals("j_head", scratchpad.aim_at_node)
+			assert.equals("j_head", scratchpad.aim_at_node_charged)
+		end)
+
+		it("restores the vanilla baseline when a Bulwark turns to block the bot from the front again", function()
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local shield_blocking = true
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return {
+							is_blocking = function()
+								return shield_blocking
+							end,
+						}
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(-10, 0, 0) },
+			}
+
+			WeakspotAim.apply_override("target_unit", scratchpad)
+			assert.equals("j_head", scratchpad.aim_at_node)
+
+			scratchpad.first_person_component.position = vec(0, 10, 0)
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
 		end)
 	end)
 

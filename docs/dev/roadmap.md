@@ -141,7 +141,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 |---|------|-------|
 | F1 | Talent/buff context extension | Additive fields in `build_context()` — `has_talent()`, `current_stacks()`. Prerequisite for `#38`. Pure additive. |
 | 13 | Navmesh charge/dash validation | GwNav raycast before committing charge direction. Darktide uses navigation destination vector, not `aim_position` (per March 8 audit correction on issue). Applies to `ogryn_charge`, `adamant_charge`, `zealot_targeted_dash`. Existing rescue-aim path at `ability_queue.lua:359` is a complementary layer, not a substitute. |
-| 92 | Per-breed weakspot aim map | Hook `BtBotShootAction._set_new_aim_target` + breed→node override table. Ships atop `#91` MVP allowlist in `ranged_meta_data.lua:224`. Independent of `#41`. Per-breed node names need verification from `breeds/*` source. |
+| 92 | Per-breed weakspot aim override | Hook `BtBotShootAction._set_new_aim_target` atop the `#91` MVP allowlist in `ranged_meta_data.lua:224`. Implemented in code for Scab Mauler (`j_spine`), Bulwark exposed-head routing (`j_head` only when the shield is open or the bot is outside the 70° blocking cone), and a **provisional** Crusher rear-arc proxy (`j_head` only when the bot is behind the target). The Crusher path is documented assumption, not rig-verified fact: the original back-of-head claim still lacks a confirmed node name in decompiled source. Independent of `#41`. |
 | 86 | Tier 3 revive cover — timing investigation | **Done 2026-04-17.** Scope-exit at the `enter` hook confirmed by two independent investigations. `PlayerCharacterStateInteracting.on_enter` interrupts any in-flight ability/weapon action and force-wields `slot_unarmed`, killing Tier 3 sequences on revive entry. Viable-but-substantial architecture (approach-phase hook via `on_refresh_destination` + gated `can_revive`) documented on the issue and moved to Post-1.0. |
 
 #### Sprint 2 — Keystone-aware layer (shipped-roster coverage)
@@ -229,7 +229,7 @@ Hard cut order (first to drop):
 - Broad `#24`: complex healing-item ping negotiation beyond F2 primitive + medicae + basic distribution
 - Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide), `toggle_special` chainaxe energy management
 - Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type
-- Broad `#92`: Bulwark angle-aware aim (shield direction tracking)
+- Broad `#92`: replace the provisional Crusher rear-arc proxy with a rig-verified node or stronger live evidence
 - Keystone extensions beyond shipped roster: Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt
 
 ### Validation-gated — slot into any batch when testable

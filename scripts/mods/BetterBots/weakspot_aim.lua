@@ -8,8 +8,8 @@
 -- `BtBotShootAction._set_new_aim_target` to pin scratchpad.aim_at_node
 -- to the correct node.
 --
--- Per-target cost: one breed lookup + one Unit.has_node guard on target
--- acquisition, not per frame.
+-- Per-target cost: one breed lookup, an extra shield/angle check only for
+-- Bulwarks, and one Unit.has_node guard on target acquisition, not per frame.
 
 local _mod -- luacheck: ignore 231
 local _debug_log
@@ -18,6 +18,13 @@ local _is_enabled
 
 local M = {}
 
+local BULWARK_BREED_NAME = "chaos_ogryn_bulwark"
+local BULWARK_WEAKSPOT_NODE = "j_head"
+local BULWARK_BLOCKING_ANGLE = math.rad(70)
+local CRUSHER_BREED_NAME = "chaos_ogryn_executor"
+local CRUSHER_PROVISIONAL_WEAKSPOT_NODE = "j_head"
+local CRUSHER_REAR_ARC_MIN_ANGLE = math.pi / 2
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -25,11 +32,12 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 end
 
--- Breed → override node map. Entries live here only when:
+-- Static breed → override node map. Entries live here only when:
 --  * MVP 50/50 head/spine meaningfully loses shots, AND
 --  * a single safe fallback node is verifiable on the breed rig.
--- Breeds with angle-aware weakspots (Bulwark shield) or unverified back-of-
--- head nodes (Crusher) are deliberately omitted and stay on the #91 MVP.
+-- Angle-aware weakspots (Bulwark shield exposure) are handled separately.
+-- Crusher's claimed back-of-head weakspot is still unverified at the rig-node
+-- level, so the code below only uses a documented provisional rear-arc proxy.
 local BREED_WEAKSPOT_OVERRIDE = {
 	-- Scab Mauler: helmet is super_armor, torso is armored. Head shots glance
 	-- off; spine is the reliable finesse node.
@@ -43,6 +51,88 @@ function M._breed_override_for(breed_name)
 		return nil
 	end
 	return BREED_WEAKSPOT_OVERRIDE[breed_name]
+end
+
+local function target_forward_angle_to_bot(target_unit, scratchpad)
+	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
+	if
+		not target_position
+		or not scratchpad
+		or not scratchpad.first_person_component
+		or not scratchpad.first_person_component.position
+		or not Unit
+		or not Unit.local_rotation
+		or not Quaternion
+		or not Quaternion.forward
+		or not Vector3
+		or not Vector3.normalize
+		or not Vector3.angle
+	then
+		return nil
+	end
+
+	local target_rotation = Unit.local_rotation(target_unit, 1)
+	local target_forward = target_rotation and Quaternion.forward(target_rotation)
+	if not target_forward then
+		return nil
+	end
+
+	local to_bot = scratchpad.first_person_component.position - target_position
+	local to_bot_normalized = Vector3.normalize(to_bot)
+
+	return Vector3.angle(target_forward, to_bot_normalized)
+end
+
+local function resolve_bulwark_override(target_unit, scratchpad)
+	if
+		not target_unit
+		or not scratchpad
+		or not scratchpad.first_person_component
+		or not scratchpad.first_person_component.position
+	then
+		return nil
+	end
+
+	local shield_extension = ScriptUnit.has_extension(target_unit, "shield_system")
+	if not shield_extension or not shield_extension.is_blocking then
+		return nil
+	end
+	if not shield_extension:is_blocking() then
+		return BULWARK_WEAKSPOT_NODE
+	end
+
+	local angle = target_forward_angle_to_bot(target_unit, scratchpad)
+
+	if angle and angle >= BULWARK_BLOCKING_ANGLE then
+		return BULWARK_WEAKSPOT_NODE
+	end
+
+	return nil
+end
+
+local function resolve_crusher_override(target_unit, scratchpad)
+	local angle = target_forward_angle_to_bot(target_unit, scratchpad)
+
+	-- Provisional proxy: the issue claims Crusher's weakspot is the back of the
+	-- head, but the decompiled rig does not expose a verified back-head node. We
+	-- therefore only route to `j_head` from the rear arc, where head aim is at
+	-- least directionally consistent with that claim.
+	if angle and angle >= CRUSHER_REAR_ARC_MIN_ANGLE then
+		return CRUSHER_PROVISIONAL_WEAKSPOT_NODE
+	end
+
+	return nil
+end
+
+local function resolve_override(target_unit, scratchpad, breed_name)
+	if breed_name == BULWARK_BREED_NAME then
+		return resolve_bulwark_override(target_unit, scratchpad)
+	end
+	if breed_name == CRUSHER_BREED_NAME then
+		return resolve_crusher_override(target_unit, scratchpad)
+	end
+
+	return breed_name and BREED_WEAKSPOT_OVERRIDE[breed_name] or nil
 end
 
 -- `BtBotShootAction.enter` picks one node from the weapon's `aim_at_node`
@@ -98,7 +188,7 @@ function M.apply_override(target_unit, scratchpad)
 		return nil
 	end
 	local breed_name = resolve_breed_name(target_unit)
-	local override = breed_name and BREED_WEAKSPOT_OVERRIDE[breed_name] or nil
+	local override = resolve_override(target_unit, scratchpad, breed_name)
 	if override and Unit and Unit.has_node and not Unit.has_node(target_unit, override) then
 		override = nil
 	end

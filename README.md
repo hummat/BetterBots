@@ -150,7 +150,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 
 **Planned for v1.0.0 (final release)**
 - [ ] Navmesh validation for charge/dash abilities
-- [ ] Per-breed weakspot aim map (Mauler, Crusher, Bulwark)
+- [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
 - [ ] Talent-aware bot behavior (Zealot Martyrdom, Psyker Warp Siphon, Venting Shriek, Veteran VoC)
 - [ ] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
 - [ ] Melee activated specials (power sword, thunder hammer, force sword)

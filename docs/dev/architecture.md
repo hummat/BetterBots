@@ -156,11 +156,11 @@ This mod targets bot ability activation in three paths:
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
 29a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
-    - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`); on retarget to a non-override breed it restores the cached baseline, so the j_spine override does not leak across targets
+    - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`), to `j_head` for Bulwark only when the shield is open or the bot is outside the Bulwark's 70° blocking cone, and provisionally to `j_head` for Crusher only when the bot is in the rear arc; when the exposure disappears or the bot retargets away, it restores the cached baseline so overrides do not leak across targets
     - baseline capture is lazy: the first `apply_override` call snapshots the current `scratchpad.aim_at_node` / `aim_at_node_charged` **before** mutation. An `enter`-level post-hook would be too late because vanilla `enter` calls `_set_new_aim_target` (and therefore our post-hook) before it returns, which on a Mauler-first acquisition would stamp the baseline with the already-overridden `j_spine`
-    - Crusher / Bulwark stay on the #91 MVP until rig nodes are verified or angle-aware logic lands
+    - the Crusher path is explicitly provisional: the original "back-of-head node" claim is still not backed by the decompiled rig, so BetterBots does **not** invent a fake node name; it uses rear-arc `j_head` as a documented proxy until live validation or rig evidence says otherwise
     - guards with `Unit.has_node` before assignment; silently skips on nil target/extension or disabled setting (`enable_weakspot_aim`)
-    - per-target cost: one breed lookup + one `Unit.has_node` check on acquisition, not per frame
+    - per-target cost: one breed lookup, extra facing/shield checks only for Bulwark/Crusher, and one `Unit.has_node` check on acquisition, not per frame
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`auto` / `off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`auto` / `off` / `light` / `medium` / `strong` / `custom`)
     - `auto` resolves independently from current mission difficulty: Sedition/Uprising → `slow`/`light`, Malice → `medium`/`medium`, Heresy → `fast`/`medium`, Damnation/Havoc → `fast`/`strong`
