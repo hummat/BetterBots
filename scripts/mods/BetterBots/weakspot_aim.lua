@@ -8,8 +8,9 @@
 -- `BtBotShootAction._set_new_aim_target` to pin scratchpad.aim_at_node
 -- to the correct node.
 --
--- Per-target cost: one breed lookup, an extra shield/angle check only for
--- Bulwarks, and one Unit.has_node guard on target acquisition, not per frame.
+-- Per-target cost: one breed lookup on acquisition for static breeds, plus a
+-- live re-check for the two stateful breeds (Bulwark/Crusher) while the target
+-- stays locked so shield/facing changes do not go stale mid-burst.
 
 local _mod -- luacheck: ignore 231
 local _debug_log
@@ -21,6 +22,7 @@ local M = {}
 local BULWARK_BREED_NAME = "chaos_ogryn_bulwark"
 local BULWARK_WEAKSPOT_NODE = "j_head"
 local BULWARK_BLOCKING_ANGLE = math.rad(70)
+local BLOCK_ANGLE_DISTANCE_SQUARED_EPSILON = 0.01
 local CRUSHER_BREED_NAME = "chaos_ogryn_executor"
 local CRUSHER_PROVISIONAL_WEAKSPOT_NODE = "j_head"
 local CRUSHER_REAR_ARC_MIN_ANGLE = math.pi / 2
@@ -53,6 +55,27 @@ function M._breed_override_for(breed_name)
 	return BREED_WEAKSPOT_OVERRIDE[breed_name]
 end
 
+local function requires_live_refresh(breed_name)
+	return breed_name == BULWARK_BREED_NAME or breed_name == CRUSHER_BREED_NAME
+end
+
+local function flat_normalized_xy(x, y)
+	if not Vector3 or not Vector3.normalize then
+		return nil
+	end
+
+	local distance_squared = x * x + y * y
+	if distance_squared < BLOCK_ANGLE_DISTANCE_SQUARED_EPSILON then
+		return nil
+	end
+
+	return Vector3.normalize({
+		x = x,
+		y = y,
+		z = 0,
+	})
+end
+
 local function target_forward_angle_to_bot(target_unit, scratchpad)
 	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
 	if
@@ -61,26 +84,41 @@ local function target_forward_angle_to_bot(target_unit, scratchpad)
 		or not scratchpad.first_person_component
 		or not scratchpad.first_person_component.position
 		or not Unit
-		or not Unit.local_rotation
 		or not Quaternion
 		or not Quaternion.forward
 		or not Vector3
-		or not Vector3.normalize
 		or not Vector3.angle
 	then
 		return nil
 	end
 
-	local target_rotation = Unit.local_rotation(target_unit, 1)
+	local target_rotation = nil
+	if Unit.local_rotation then
+		target_rotation = Unit.local_rotation(target_unit, 1)
+	elseif Unit.world_rotation then
+		target_rotation = Unit.world_rotation(target_unit, 1)
+	end
 	local target_forward = target_rotation and Quaternion.forward(target_rotation)
 	if not target_forward then
 		return nil
 	end
 
-	local to_bot = scratchpad.first_person_component.position - target_position
-	local to_bot_normalized = Vector3.normalize(to_bot)
+	local target_forward_flat_normalized = flat_normalized_xy(target_forward.x or 0, target_forward.y or 0)
+	if not target_forward_flat_normalized then
+		return nil
+	end
 
-	return Vector3.angle(target_forward, to_bot_normalized)
+	local bot_position = scratchpad.first_person_component.position
+	local to_bot_flat_normalized = flat_normalized_xy(
+		(bot_position.x or 0) - (target_position.x or 0),
+		(bot_position.y or 0) - (target_position.y or 0)
+	)
+
+	if not to_bot_flat_normalized then
+		return 0
+	end
+
+	return Vector3.angle(target_forward_flat_normalized, to_bot_flat_normalized)
 end
 
 local function resolve_bulwark_override(target_unit, scratchpad)
@@ -164,6 +202,15 @@ local function resolve_breed_name(target_unit)
 	return breed and breed.name or nil
 end
 
+local function current_breed_name(target_unit, scratchpad)
+	local target_breed = scratchpad and scratchpad.target_breed
+	if target_breed and target_breed.name then
+		return target_breed.name
+	end
+
+	return resolve_breed_name(target_unit)
+end
+
 local function restore_baseline(scratchpad)
 	local baseline = scratchpad.__bb_weakspot_baseline_aim_at_node
 	if baseline == nil then
@@ -187,7 +234,7 @@ function M.apply_override(target_unit, scratchpad)
 		restore_baseline(scratchpad)
 		return nil
 	end
-	local breed_name = resolve_breed_name(target_unit)
+	local breed_name = current_breed_name(target_unit, scratchpad)
 	local override = resolve_override(target_unit, scratchpad, breed_name)
 	if override and Unit and Unit.has_node and not Unit.has_node(target_unit, override) then
 		override = nil
@@ -210,6 +257,19 @@ function M.apply_override(target_unit, scratchpad)
 	return override
 end
 
+function M.refresh_live_override(target_unit, scratchpad)
+	if not scratchpad then
+		return nil
+	end
+
+	local breed_name = current_breed_name(target_unit, scratchpad)
+	if not requires_live_refresh(breed_name) then
+		return nil
+	end
+
+	return M.apply_override(target_unit, scratchpad)
+end
+
 local SENTINEL = "__bb_weakspot_aim_installed"
 
 -- Called from `weapon_action.lua`'s existing `bt_bot_shoot_action` hook_require
@@ -228,6 +288,15 @@ function M.install_on_shoot_action(BtBotShootAction)
 	_mod:hook_safe(BtBotShootAction, "_set_new_aim_target", function(_self, _t, target_unit, scratchpad, _action_data)
 		M.apply_override(target_unit, scratchpad)
 	end)
+	_mod:hook(
+		BtBotShootAction,
+		"_aim_position",
+		function(func, self, self_unit, scratchpad, action_data, dt, current_position, current_rotation, target_unit)
+			M.refresh_live_override(target_unit, scratchpad)
+
+			return func(self, self_unit, scratchpad, action_data, dt, current_position, current_rotation, target_unit)
+		end
+	)
 end
 
 return M

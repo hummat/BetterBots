@@ -552,8 +552,11 @@ describe("weakspot_aim", function()
 		local function make_hook_recorder()
 			local hooks = {}
 			local mock_mod = {
+				hook = function(_self, target, method, handler)
+					hooks[#hooks + 1] = { type = "hook", target = target, method = method, handler = handler }
+				end,
 				hook_safe = function(_self, target, method, handler)
-					hooks[#hooks + 1] = { target = target, method = method, handler = handler }
+					hooks[#hooks + 1] = { type = "hook_safe", target = target, method = method, handler = handler }
 				end,
 			}
 			return hooks, mock_mod
@@ -604,6 +607,91 @@ describe("weakspot_aim", function()
 			assert.equals("j_spine", scratchpad.aim_at_node_charged)
 		end)
 
+		it("re-evaluates Bulwark exposure while the target stays locked", function()
+			local hooks, mock_mod = make_hook_recorder()
+			WeakspotAim.init({
+				mod = mock_mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				is_enabled = function()
+					return true
+				end,
+			})
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local shield_blocking = true
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return {
+							is_blocking = function()
+								return shield_blocking
+							end,
+						}
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local BtBotShootAction = {}
+			WeakspotAim.install_on_shoot_action(BtBotShootAction)
+
+			local set_new_target_hook
+			local reevaluate_hook
+			for _, h in ipairs(hooks) do
+				if h.method == "_set_new_aim_target" then
+					set_new_target_hook = h
+				elseif h.method == "_aim_position" then
+					reevaluate_hook = h
+				end
+			end
+
+			assert.is_not_nil(set_new_target_hook)
+			assert.is_not_nil(reevaluate_hook, "expected a per-frame reevaluation hook")
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(-10, 0, 0) },
+				target_breed = bulwark_breed,
+			}
+
+			set_new_target_hook.handler({}, 0.5, "target_unit", scratchpad, {})
+			assert.equals("j_head", scratchpad.aim_at_node)
+
+			scratchpad.first_person_component.position = vec(0, 10, 0)
+			local seen_node
+			reevaluate_hook.handler(function(_self, _unit, live_scratchpad)
+				seen_node = live_scratchpad.aim_at_node
+				return 0, 0, nil, nil, nil
+			end, {}, "bot_unit", scratchpad, {}, 0.016, vec(0, 0, 0), nil, "target_unit")
+
+			assert.equals("j_spine", seen_node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
+		end)
+
 		it("is idempotent against double-install (hot reload)", function()
 			local hooks, mock_mod = make_hook_recorder()
 			WeakspotAim.init({
@@ -621,7 +709,7 @@ describe("weakspot_aim", function()
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 
-			assert.equals(1, #hooks) -- one _set_new_aim_target hook, not two
+			assert.equals(2, #hooks) -- one _set_new_aim_target hook and one _aim_position hook
 		end)
 
 		it("does not own a mod:hook_require registration (weapon_action consolidates)", function()
@@ -633,6 +721,7 @@ describe("weakspot_aim", function()
 				hook_require = function(_self, path)
 					required_paths[#required_paths + 1] = path
 				end,
+				hook = function() end,
 				hook_safe = function() end,
 			}
 
@@ -650,6 +739,57 @@ describe("weakspot_aim", function()
 			WeakspotAim.install_on_shoot_action({})
 
 			assert.equals(0, #required_paths)
+		end)
+	end)
+
+	describe("bulwark angle handling", function()
+		it("does not treat elevated frontal positions as exposed", function()
+			install_bulwark_math_globals()
+
+			local bulwark_breed = { name = "chaos_ogryn_bulwark" }
+			local shield_extension = {
+				is_blocking = function()
+					return true
+				end,
+			}
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(bulwark_breed)
+					end
+					if system_name == "shield_system" then
+						return shield_extension
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return { forward = vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, 1, 10) },
+			}
+
+			local node = WeakspotAim.apply_override("target_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
 		end)
 	end)
 end)
