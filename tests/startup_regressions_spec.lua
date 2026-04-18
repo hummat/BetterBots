@@ -426,10 +426,14 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 		patch_pickups = function() end,
 		sync_live_bot_groups = function() end,
+		should_block_pickup_order = function()
+			return false
+		end,
 	})
 	modules.PocketablePickup = make_runtime_module("PocketablePickup", install_calls, {
 		patch_pickups = function() end,
 	})
+	modules.SmartTagOrders = make_runtime_module("SmartTagOrders", install_calls)
 	modules.BotProfiles = make_runtime_module("BotProfiles", install_calls, {
 		reset = function() end,
 		register_hooks = function()
@@ -529,6 +533,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/ammo_policy"] = modules.AmmoPolicy,
 		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
 		["BetterBots/scripts/mods/BetterBots/pocketable_pickup"] = modules.PocketablePickup,
+		["BetterBots/scripts/mods/BetterBots/smart_tag_orders"] = modules.SmartTagOrders,
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
@@ -793,6 +798,8 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
+		assert.is_truthy(source:find("SmartTagOrders%.init%(", 1))
+		assert.is_truthy(source:find("SmartTagOrders%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.init%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.handle%(", 1))
 		assert.is_truthy(source:find("GestaltInjector%.init%(", 1))
@@ -835,6 +842,14 @@ describe("startup regressions", function()
 		assert.equals(harness.modules.ChargeNavValidation, ability_wire.refs.ChargeNavValidation)
 		assert.equals(harness.modules.CombatAbilityIdentity, ability_wire.refs.CombatAbilityIdentity)
 		assert.equals(harness.modules.HumanLikeness, ability_wire.refs.HumanLikeness)
+
+		local smart_tag_init = find_named_call(harness.init_calls, "SmartTagOrders")
+		assert.is_truthy(smart_tag_init)
+		assert.equals(harness.modules.Debug.bot_slot_for_unit, smart_tag_init.deps.bot_slot_for_unit)
+
+		local smart_tag_wire = find_named_call(harness.wire_calls, "SmartTagOrders")
+		assert.is_truthy(smart_tag_wire)
+		assert.is_function(smart_tag_wire.refs.should_block_pickup_order)
 
 		local revive_wire = find_named_call(harness.wire_calls, "ReviveAbility")
 		assert.equals(harness.modules.MetaData, revive_wire.refs.MetaData)

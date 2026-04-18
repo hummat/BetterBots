@@ -185,7 +185,7 @@ Sprint 4 stopped being "invent a missing primitive" once the decompiled source w
 | # | Issue | Notes |
 |---|-------|-------|
 | 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
-| 96 | Smart-tag item interaction bridge | Route explicit non-enemy smart-tag interactions into bot pickup/drop orders. Sits atop `#24` + `#88` pickup paths — queue after those ship. |
+| 96 | Smart-tag item interaction bridge | **Code-complete 2026-04-18; in-game validation pending.** `smart_tag_orders.lua` hooks `SmartTagSystem.trigger_tag_interaction` after vanilla processing and routes explicit item-tag interactions for ammo, books, and supported pocketables back into `BotOrder.pickup(...)`, reusing existing `MulePickup`/`PocketablePickup` policy gates and choosing the nearest eligible bot. Grenade refills, health stations, and location-style interactions stay out of scope for the MVP. |
 | 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
 | 101 | Weapon-slot wield timeout on BB-locked swap | **Code-complete 2026-04-18; in-game validation pending.** Grenade + item fallbacks now query shared BetterBots slot-lock state and fast-retry with `reason = "slot_locked"` instead of waiting out the full wield timeout when another BB sequence is holding a different slot. Fits coordination-polish neighborhood; not load-bearing. |
 

@@ -325,6 +325,9 @@ assert(MulePickup, "BetterBots: failed to load mule_pickup module")
 local PocketablePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/pocketable_pickup")
 assert(PocketablePickup, "BetterBots: failed to load pocketable_pickup module")
 
+local SmartTagOrders = mod:io_dofile("BetterBots/scripts/mods/BetterBots/smart_tag_orders")
+assert(SmartTagOrders, "BetterBots: failed to load smart_tag_orders module")
+
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
 
@@ -779,6 +782,17 @@ PocketablePickup.init({
 	end,
 })
 
+SmartTagOrders.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_enabled = function()
+		return Settings.is_feature_enabled("smart_tag_orders")
+	end,
+})
+
 MulePickup.init({
 	mod = mod,
 	debug_log = _debug_log,
@@ -792,6 +806,10 @@ MulePickup.init({
 	end,
 	should_allow_mule_pickup = PocketablePickup.should_allow_mule_pickup,
 	should_block_pickup_order = PocketablePickup.should_block_pickup_order,
+})
+
+SmartTagOrders.wire({
+	should_block_pickup_order = MulePickup.should_block_pickup_order,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -942,6 +960,7 @@ ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 AmmoPolicy.register_hooks()
 MulePickup.register_hooks()
+SmartTagOrders.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()

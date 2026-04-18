@@ -115,6 +115,9 @@ This mod targets bot ability activation in three paths:
     - proactive pocketable assignment is human-first: BetterBots refuses to claim a supported pocketable while any human still has the matching slot open, unless the pickup came from an explicit bot order
     - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled, rejects unsupported pocketables entirely, and leaves supported pocketable orders intact when the feature is enabled
     - `update_dispatcher.lua` runs the carried pocketable state machine once the bot already owns the item: combat stims self-use on high-threat entry, and ammo/medical crates auto-deploy only when at least two allies are in coherency, no enemy is currently engaged, and the team actually needs the resource
+    - `smart_tag_orders.lua` hooks `SmartTagSystem.trigger_tag_interaction` after vanilla processing and routes explicit item-tag interactions back into the existing `BotOrder.pickup(...)` path instead of inventing a second order system
+    - smart-tag routing is intentionally narrow for the MVP: ammo, tomes/grimoires, and supported pocketables only; grenade refills, health stations, and location-style interactions are ignored
+    - the routing layer reuses `MulePickup.should_block_pickup_order(...)` so existing BetterBots policy gates still apply (unsupported pocketables, disabled books, human-slot-open pocketables), selects the nearest eligible live bot on the interactor's side, and is guarded by the `enable_smart_tag_orders` setting plus a class-table hot-reload sentinel on `SmartTagSystem`
 23. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights

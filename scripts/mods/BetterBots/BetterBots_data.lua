@@ -119,6 +119,11 @@ return {
 						default_value = DEFAULTS.enable_pocketable_support,
 					},
 					{
+						setting_id = "enable_smart_tag_orders",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_smart_tag_orders,
+					},
+					{
 						setting_id = "enable_weakspot_aim",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_weakspot_aim,

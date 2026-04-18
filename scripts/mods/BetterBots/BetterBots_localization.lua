@@ -305,6 +305,13 @@ return {
 		en = "Lets bots carry supported stims and crates, then self-use or deploy them conservatively. "
 			.. "Bots still leave matching empty pocket slots to humans.",
 	},
+	enable_smart_tag_orders = {
+		en = "Respond to smart-tag pickup orders",
+	},
+	enable_smart_tag_orders_description = {
+		en = "Routes explicit smart-tag interactions on ammo, books, and supported pocketables "
+			.. "into the existing bot pickup-order path.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},

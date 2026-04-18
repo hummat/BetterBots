@@ -155,11 +155,11 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Talent-aware bot behavior (Sprint 2 MVP: Zealot Martyrdom, Psyker Warp Siphon/Venting Shriek, Veteran Focus Target tag ownership)
 - [x] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
 - [x] Melee activated specials (power sword, thunder hammer, force sword)
-- [ ] Pocketable pickup primitive + medicae/stim/med-kit discipline
-- [ ] Deployable crate carry and deploy (ammo + medical)
+- [x] Pocketable pickup primitive + medicae/stim/med-kit discipline
+- [x] Deployable crate carry and deploy (ammo + medical)
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
 - [ ] Communication wheel response (ForTheEmperor compat)
-- [ ] Smart-tag item interaction bridge
+- [x] Smart-tag item interaction bridge
 - [ ] Unified non-book resource arbitration
 
 **Post-1.0 (may never ship)**
@@ -334,6 +334,7 @@ scripts/mods/BetterBots/          # Mod source
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
+  smart_tag_orders.lua            #   Explicit smart-tag pickup-order bridge
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
