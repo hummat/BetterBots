@@ -143,6 +143,10 @@ check_anchor \
 	"scripts/extension_systems/input/bot_unit_input.lua" \
 	"BotUnitInput.set_aiming = function" \
 	"bot input aiming toggle"
+check_anchor \
+	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua" \
+	"BtBotShootAction._set_new_aim_target = function" \
+	"bot shoot aim-target hook (#92)"
 
 echo ""
 if ((errors > 0)); then

@@ -366,6 +366,7 @@ function M.register_hooks(deps)
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 	local should_block_weapon_action_input = deps.should_block_weapon_action_input
 	local observe_queued_weapon_action = deps.observe_queued_weapon_action
+	local install_weakspot_aim = deps.install_weakspot_aim
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -409,6 +410,10 @@ function M.register_hooks(deps)
 		function(BtBotShootAction)
 			local PlayerUnitVisualLoadout =
 				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+
+			if install_weakspot_aim then
+				install_weakspot_aim(BtBotShootAction)
+			end
 
 			_mod:hook_safe(BtBotShootAction, "enter", function(_self, unit, _breed, _blackboard, scratchpad)
 				if _is_enabled and not _is_enabled() then

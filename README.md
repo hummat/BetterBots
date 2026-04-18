@@ -316,6 +316,7 @@ scripts/mods/BetterBots/          # Mod source
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
   target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
+  weakspot_aim.lua                #   Per-breed ranged aim-node override (#92)
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection

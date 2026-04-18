@@ -154,6 +154,13 @@ This mod targets bot ability activation in three paths:
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
+29a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
+    - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
+    - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`); on retarget to a non-override breed it restores the cached baseline, so the j_spine override does not leak across targets
+    - baseline capture is lazy: the first `apply_override` call snapshots the current `scratchpad.aim_at_node` / `aim_at_node_charged` **before** mutation. An `enter`-level post-hook would be too late because vanilla `enter` calls `_set_new_aim_target` (and therefore our post-hook) before it returns, which on a Mauler-first acquisition would stamp the baseline with the already-overridden `j_spine`
+    - Crusher / Bulwark stay on the #91 MVP until rig nodes are verified or angle-aware logic lands
+    - guards with `Unit.has_node` before assignment; silently skips on nil target/extension or disabled setting (`enable_weakspot_aim`)
+    - per-target cost: one breed lookup + one `Unit.has_node` check on acquisition, not per frame
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`auto` / `off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`auto` / `off` / `light` / `medium` / `strong` / `custom`)
     - `auto` resolves independently from current mission difficulty: Sedition/Uprising → `slow`/`light`, Malice → `medium`/`medium`, Heresy → `fast`/`medium`, Damnation/Havoc → `fast`/`strong`

@@ -154,6 +154,13 @@ return {
 	enable_target_type_hysteresis_description = {
 		en = "Bots are less likely to keep flipping between melee and ranged when both choices are close.",
 	},
+	enable_weakspot_aim = {
+		en = "Aim for real weakspots on armored elites",
+	},
+	enable_weakspot_aim_description = {
+		en = "Bots aim for the torso on Scab Maulers so shots do not glance off the helmet. "
+			.. "Other armored elites keep vanilla aim until their weakspot nodes are verified.",
+	},
 	human_timing_profile = {
 		en = "Timing profile",
 	},

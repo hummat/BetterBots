@@ -70,6 +70,7 @@ local FEATURE_GATES = {
 	target_type_hysteresis = "enable_target_type_hysteresis",
 	ammo_policy = "enable_ammo_policy",
 	bot_tome_pickup = "enable_bot_tome_pickup",
+	weakspot_aim = "enable_weakspot_aim",
 }
 
 -- Preset system
@@ -106,6 +107,7 @@ M.DEFAULTS = {
 	enable_target_type_hysteresis = true,
 	enable_ammo_policy = true,
 	enable_bot_tome_pickup = true,
+	enable_weakspot_aim = true,
 	human_timing_profile = "auto",
 	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,

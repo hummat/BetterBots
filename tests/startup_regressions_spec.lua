@@ -445,6 +445,7 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("TargetTypeHysteresis", "install_bot_perception_hooks", target)
 		end,
 	})
+	modules.WeakspotAim = make_runtime_module("WeakspotAim", install_calls, {})
 	modules.EngagementLeash = make_runtime_module("EngagementLeash", install_calls, {
 		install_melee_hooks = function(target)
 			record_install("EngagementLeash", "install_melee_hooks", target)
@@ -518,6 +519,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
+		["BetterBots/scripts/mods/BetterBots/weakspot_aim"] = modules.WeakspotAim,
 		["BetterBots/scripts/mods/BetterBots/engagement_leash"] = modules.EngagementLeash,
 		["BetterBots/scripts/mods/BetterBots/revive_ability"] = modules.ReviveAbility,
 	}
@@ -1118,26 +1120,43 @@ describe("startup regressions", function()
 		local owners_by_target = {}
 		local duplicates = {}
 
+		local function record_owner(target, path)
+			local owners = owners_by_target[target]
+			if not owners then
+				owners = {}
+				owners_by_target[target] = owners
+			end
+
+			for i = 1, #owners do
+				if owners[i] == path then
+					return
+				end
+			end
+
+			owners[#owners + 1] = path
+		end
+
 		each_mod_source_file(function(path)
 			local source = read_file(path)
 
+			-- Collect `local IDENT = "LITERAL"` assignments so that
+			-- `hook_require(IDENT, cb)` resolves to the underlying path.
+			-- Without this step, wrapping the path in a module-local constant
+			-- silently bypasses the duplicate check (as happened with #92 in
+			-- weakspot_aim.lua before Codex caught the P0 at runtime).
+			local local_string_consts = {}
+			for ident, literal in source:gmatch('local%s+([%w_]+)%s*=%s*"([^"]+)"') do
+				local_string_consts[ident] = literal
+			end
+
 			for target in source:gmatch('hook_require%(%s*"([^"]+)"') do
-				local owners = owners_by_target[target]
-				if not owners then
-					owners = {}
-					owners_by_target[target] = owners
-				end
+				record_owner(target, path)
+			end
 
-				local already_listed = false
-				for i = 1, #owners do
-					if owners[i] == path then
-						already_listed = true
-						break
-					end
-				end
-
-				if not already_listed then
-					owners[#owners + 1] = path
+			for ident in source:gmatch("hook_require%(%s*([%w_]+)[,%)]") do
+				local resolved = local_string_consts[ident]
+				if resolved then
+					record_owner(resolved, path)
 				end
 			end
 		end)

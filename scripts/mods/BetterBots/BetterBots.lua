@@ -330,6 +330,9 @@ assert(HumanLikeness, "BetterBots: failed to load human_likeness module")
 local TargetTypeHysteresis = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_type_hysteresis")
 assert(TargetTypeHysteresis, "BetterBots: failed to load target_type_hysteresis module")
 
+local WeakspotAim = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weakspot_aim")
+assert(WeakspotAim, "BetterBots: failed to load weakspot_aim module")
+
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
 
@@ -372,6 +375,15 @@ TargetTypeHysteresis.init({
 		return Settings.is_feature_enabled("target_type_hysteresis")
 	end,
 	perf = Perf,
+})
+
+WeakspotAim.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	is_enabled = function()
+		return Settings.is_feature_enabled("weakspot_aim")
+	end,
 })
 
 EngagementLeash.init({
@@ -873,6 +885,7 @@ WeaponAction.register_hooks({
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
 	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
+	install_weakspot_aim = WeakspotAim.install_on_shoot_action,
 })
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()

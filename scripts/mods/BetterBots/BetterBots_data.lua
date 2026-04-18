@@ -114,6 +114,11 @@ return {
 						default_value = DEFAULTS.enable_target_type_hysteresis,
 					},
 					{
+						setting_id = "enable_weakspot_aim",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_weakspot_aim,
+					},
+					{
 						setting_id = "human_timing_profile",
 						type = "dropdown",
 						default_value = DEFAULTS.human_timing_profile,
