@@ -161,6 +161,11 @@ This mod targets bot ability activation in three paths:
     - the Crusher path is explicitly provisional: the original "back-of-head node" claim is still not backed by the decompiled rig, so BetterBots does **not** invent a fake node name; it uses rear-arc `j_head` as a documented proxy until live validation or rig evidence says otherwise
     - guards with `Unit.has_node` before assignment; silently skips on nil target/extension or disabled setting (`enable_weakspot_aim`)
     - per-target cost: one breed lookup, extra facing/shield checks only for Bulwark/Crusher, and one `Unit.has_node` check on acquisition, not per frame
+29b. Charge/dash nav validation (#13, via `charge_nav_validation.lua`):
+    - shared validator runs only after a charge/dash heuristic already wants to fire; it is not part of `build_context()` and does not add per-frame GwNav queries
+    - reads `BotNavigationExtension:destination()` and validates the launch vector with `NavQueries.ray_can_go(...)`, using the same 0.75 / 0.5 navmesh projection bounds as `BotNavigationExtension.move_to(...)`
+    - wired into both `BtBotActivateAbilityAction.enter` and `ability_queue.lua`, so the BT template path and BetterBots fallback path reject the same bad launch direction
+    - caches same-destination failures per bot for 0.5s; a refreshed destination bypasses the cache immediately, preventing repeated queries against an unchanged bad path while still allowing prompt retries after follow-path refresh
 30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`auto` / `off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`auto` / `off` / `light` / `medium` / `strong` / `custom`)
     - `auto` resolves independently from current mission difficulty: Sedition/Uprising → `slow`/`light`, Malice → `medium`/`medium`, Heresy → `fast`/`medium`, Damnation/Havoc → `fast`/`strong`
@@ -318,7 +323,7 @@ When implementing these issues, verify the change doesn't add per-frame engine c
 | Issue | Risk | What to watch |
 |---|---|---|
 | #4 Grenade/blitz support | **Low** | Same architecture — one more heuristic per bot. Context cache shared. |
-| #13 Navmesh validation for charges | **Medium-High** | Navmesh queries (`GwNavQueries`) are expensive. Must not run every frame — gate behind heuristic returning true, then validate once before queueing. Cache negative results with a cooldown. |
+| #13 Charge/dash nav validation | **Implemented** | Keep it as a post-heuristic one-shot check only. Do not move GwNav queries into `build_context()` or other per-frame hooks, and preserve the same-destination negative cache so repeated invalid launches do not spam `ray_can_go`. |
 | #15 Suppress dodge during ability hold | **Low** | One additional condition check in an existing hook. No new per-frame hook needed. |
 | #22 Utility-based ability scoring | **Low-Medium** | If it replaces if/else heuristics with a scoring pass over all abilities, context build is still cached. Scoring itself would be cheap. Risk is if it queries additional engine state per ability. |
 | #23 Smart melee attack selection | **Medium** | Could require reading weapon template data per frame. Keep reads cached and avoid per-frame `rawget` chains on large template tables. |

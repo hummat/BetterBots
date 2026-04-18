@@ -536,7 +536,7 @@ However, the BT node priority matters:
 
 ### Charge/Dash Abilities and Navigation
 
-For Tier 2 charge abilities (Zealot Dash, Ogryn Charge), the ability action queues
+For Tier 2 charge abilities (Zealot Dash, Ogryn Charge, Arbites Charge), the ability action queues
 `aim_pressed` followed by `aim_released`. During the charge:
 
 - The bot's character state changes (e.g., `lunging`, `sprinting`)
@@ -546,9 +546,12 @@ For Tier 2 charge abilities (Zealot Dash, Ogryn Charge), the ability action queu
 - If the charge moves the bot off the navmesh, `is_on_nav_mesh` becomes false
 - When the charge ends and the bot lands, navmesh position is recalculated
 
-**Potential issue:** A charge ability could move the bot to a position far from its
-navigation path, causing the path to become invalid. The live path check will detect this
-and trigger a re-path on the next `_update_path()` call.
+**BetterBots #13 fix:** BetterBots now validates the current launch vector before the
+charge starts. The shared `charge_nav_validation.lua` module reads
+`navigation_extension:destination()` and runs `NavQueries.ray_can_go(...)` once after
+the heuristic already wants to fire, from both the BT enter path and the fallback queue
+path. Same-destination failures cache for 0.5s, so bots do not spam GwNav queries while
+waiting for the follow destination to refresh.
 
 ### Teleport Interaction
 

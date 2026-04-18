@@ -17,6 +17,7 @@ local _ItemFallback
 local _Debug
 local _EventLog
 local _EngagementLeash
+local _ChargeNavValidation
 local _TeamCooldown
 local _CombatAbilityIdentity
 local _HumanLikeness
@@ -356,6 +357,26 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		end
 	end
 
+	if _ChargeNavValidation and _ChargeNavValidation.should_validate(ability_template_name) then
+		local nav_ok, nav_reason = _ChargeNavValidation.validate(unit, ability_template_name, "fallback")
+		if not nav_ok then
+			if _EventLog.is_enabled() then
+				_EventLog.emit({
+					t = fixed_t,
+					event = "blocked",
+					bot = _Debug.bot_slot_for_unit(unit),
+					ability = _equipped_combat_ability_name(unit),
+					template = ability_template_name,
+					source = "fallback",
+					rule = rule,
+					reason = nav_reason,
+				})
+			end
+			_finish_child_perf("ability_queue.queue", queue_t0)
+			return
+		end
+	end
+
 	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
 	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
 	if rule and RESCUE_CHARGE_RULES[rule] then
@@ -477,6 +498,7 @@ function M.wire(deps)
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
 	_EngagementLeash = deps.EngagementLeash
+	_ChargeNavValidation = deps.ChargeNavValidation
 	_TeamCooldown = deps.TeamCooldown
 	_CombatAbilityIdentity = deps.CombatAbilityIdentity
 	_HumanLikeness = deps.HumanLikeness

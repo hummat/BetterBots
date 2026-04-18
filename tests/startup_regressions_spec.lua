@@ -1,3 +1,4 @@
+local test_helper = require("tests.test_helper")
 local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
 local unpack_results = unpack
 if table and table.unpack then -- luacheck: ignore 143
@@ -446,6 +447,14 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 	})
 	modules.WeakspotAim = make_runtime_module("WeakspotAim", install_calls, {})
+	modules.ChargeNavValidation = make_runtime_module("ChargeNavValidation", install_calls, {
+		should_validate = function()
+			return false
+		end,
+		validate = function()
+			return true
+		end,
+	})
 	modules.EngagementLeash = make_runtime_module("EngagementLeash", install_calls, {
 		install_melee_hooks = function(target)
 			record_install("EngagementLeash", "install_melee_hooks", target)
@@ -520,6 +529,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
 		["BetterBots/scripts/mods/BetterBots/weakspot_aim"] = modules.WeakspotAim,
+		["BetterBots/scripts/mods/BetterBots/charge_nav_validation"] = modules.ChargeNavValidation,
 		["BetterBots/scripts/mods/BetterBots/engagement_leash"] = modules.EngagementLeash,
 		["BetterBots/scripts/mods/BetterBots/revive_ability"] = modules.ReviveAbility,
 	}
@@ -741,6 +751,14 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/companion_tag"%)', 1))
 	end)
 
+	it("loads charge_nav_validation through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/charge_nav_validation"%)', 1))
+	end)
+
 	it("initializes and registers extracted runtime modules", function()
 		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 
@@ -802,6 +820,7 @@ describe("startup regressions", function()
 		local ability_wire = find_named_call(harness.wire_calls, "AbilityQueue")
 		assert.equals(harness.modules.ItemFallback, ability_wire.refs.ItemFallback)
 		assert.equals(harness.modules.EngagementLeash, ability_wire.refs.EngagementLeash)
+		assert.equals(harness.modules.ChargeNavValidation, ability_wire.refs.ChargeNavValidation)
 		assert.equals(harness.modules.CombatAbilityIdentity, ability_wire.refs.CombatAbilityIdentity)
 		assert.equals(harness.modules.HumanLikeness, ability_wire.refs.HumanLikeness)
 
@@ -955,6 +974,57 @@ describe("startup regressions", function()
 		assert.equals("interrupted", forwarded[1].reason)
 		assert.equals(12, forwarded[1].t)
 		assert.equals(0.1, forwarded[1].time_in_action)
+	end)
+
+	it("blocks BtBotActivateAbilityAction.enter when charge nav validation fails", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local validated = {}
+		harness.modules.ChargeNavValidation.should_validate = function(template_name)
+			return template_name == "zealot_dash"
+		end
+		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source)
+			validated[#validated + 1] = {
+				unit = unit,
+				template_name = template_name,
+				source = source,
+			}
+			return false, "ray_blocked"
+		end
+
+		local called = 0
+		local action = {
+			enter = function()
+				called = called + 1
+			end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "zealot_dash" },
+		})
+		local input_extension = test_helper.make_player_input_extension()
+
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+				input_system = input_extension,
+			},
+		})
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		assert.equals(0, called)
+		assert.same({
+			{
+				unit = "bot_unit",
+				template_name = "zealot_dash",
+				source = "bt_enter",
+			},
+		}, validated)
 	end)
 
 	it("installs behavior hooks once and dispatches update/init through extracted modules", function()

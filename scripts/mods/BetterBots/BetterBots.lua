@@ -333,6 +333,9 @@ assert(TargetTypeHysteresis, "BetterBots: failed to load target_type_hysteresis 
 local WeakspotAim = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weakspot_aim")
 assert(WeakspotAim, "BetterBots: failed to load weakspot_aim module")
 
+local ChargeNavValidation = mod:io_dofile("BetterBots/scripts/mods/BetterBots/charge_nav_validation")
+assert(ChargeNavValidation, "BetterBots: failed to load charge_nav_validation module")
+
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
 
@@ -384,6 +387,12 @@ WeakspotAim.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("weakspot_aim")
 	end,
+})
+
+ChargeNavValidation.init({
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 })
 
 EngagementLeash.init({
@@ -797,6 +806,7 @@ AbilityQueue.wire({
 	Debug = Debug,
 	EventLog = EventLog,
 	EngagementLeash = EngagementLeash,
+	ChargeNavValidation = ChargeNavValidation,
 	TeamCooldown = TeamCooldown,
 	CombatAbilityIdentity = CombatAbilityIdentity,
 	HumanLikeness = HumanLikeness,
@@ -1110,6 +1120,12 @@ mod:hook_require(
 								nil,
 								"info"
 							)
+							return
+						end
+					end
+					if gate_template and ChargeNavValidation.should_validate(gate_template) then
+						local nav_ok = ChargeNavValidation.validate(unit, gate_template, "bt_enter")
+						if not nav_ok then
 							return
 						end
 					end

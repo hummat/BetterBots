@@ -336,7 +336,7 @@ The one exception is `adamant_whistle` (Ogryn rock throw), which has an `ability
 
 **Source:** `scripts/extension_systems/behavior/bot_behavior_extension.lua`, `scripts/extension_systems/behavior/utilities/bot_navigation.lua`
 
-**With mods:** BetterBots charge/dash abilities move bots off navmesh temporarily; live path recalculates on next frame. No navigation changes otherwise.
+**With mods:** BetterBots now validates the current navigation destination before charge/dash launch (`charge_nav_validation.lua` calls `NavQueries.ray_can_go(...)` from both BT enter and fallback). Once committed, charge/dash abilities still move bots off navmesh temporarily and the live path recalculates on the next frame.
 
 ---
 

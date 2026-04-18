@@ -149,7 +149,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Mule scripture/tome pickup (grimoires opt-in)
 
 **Planned for v1.0.0 (final release)**
-- [ ] Navmesh validation for charge/dash abilities
+- [x] Navmesh validation for charge/dash abilities
 - [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
 - [ ] Talent-aware bot behavior (Zealot Martyrdom, Psyker Warp Siphon, Venting Shriek, Veteran VoC)
 - [ ] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
@@ -313,6 +313,7 @@ scripts/mods/BetterBots/          # Mod source
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profiles.lua                #   Bot-optimized class profiles per slot
   bot_targeting.lua               #   Shared perception target resolver + helpers
+  charge_nav_validation.lua       #   Shared navmesh launch validation for charge/dash abilities (#13)
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
   target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
