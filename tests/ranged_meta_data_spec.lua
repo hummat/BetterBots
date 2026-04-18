@@ -44,12 +44,12 @@ describe("ranged_meta_data", function()
 			assert.equals("zoom_shoot", fb.aim_fire_action_input)
 		end)
 
-		it("falls back to hardcoded strings when actions missing", function()
+		it("falls back to hardcoded fire input and nil aim inputs when actions are missing", function()
 			local t = make_ranged_template({ actions = {} })
 			local fb = RangedMetaData._resolve_vanilla_fallback(t)
 			assert.equals("shoot", fb.fire_action_input)
-			assert.equals("zoom", fb.aim_action_input)
-			assert.equals("zoom_shoot", fb.aim_fire_action_input)
+			assert.is_nil(fb.aim_action_input)
+			assert.is_nil(fb.aim_fire_action_input)
 		end)
 
 		it("falls back when action exists but start_input is nil", function()
@@ -58,6 +58,36 @@ describe("ranged_meta_data", function()
 			})
 			local fb = RangedMetaData._resolve_vanilla_fallback(t)
 			assert.equals("shoot", fb.fire_action_input)
+			assert.is_nil(fb.aim_action_input)
+			assert.is_nil(fb.aim_fire_action_input)
+		end)
+
+		it("derives brace inputs for braced ranged weapons", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					brace_pressed = { input_sequence = { { input = "action_two_hold", value = true } } },
+					brace_release = { input_sequence = { { input = "action_two_hold", value = false } } },
+					shoot_braced = { input_sequence = { { input = "action_one_hold", value = true } } },
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_brace = {
+						start_input = "brace_pressed",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+			local fb = RangedMetaData._resolve_vanilla_fallback(t)
+
+			assert.equals("shoot_pressed", fb.fire_action_input)
+			assert.equals("brace_pressed", fb.aim_action_input)
+			assert.equals("shoot_braced", fb.aim_fire_action_input)
 		end)
 	end)
 
@@ -401,6 +431,34 @@ describe("ranged_meta_data", function()
 			RangedMetaData.sync_all()
 
 			assert.is_nil(templates.staff.attack_meta_data)
+		end)
+
+		it("replaces malformed attack_meta_data and restores it on disable", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+				},
+			})
+			template.attack_meta_data = "broken"
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.is_table(templates.staff.attack_meta_data)
+			assert.equals("shoot_pressed", templates.staff.attack_meta_data.fire_action_input)
+			assert.equals("rapid_left", templates.staff.attack_meta_data.fire_action_name)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("broken", templates.staff.attack_meta_data)
 		end)
 
 		it("restores original attack_meta_data fields when disabling ranged improvements", function()

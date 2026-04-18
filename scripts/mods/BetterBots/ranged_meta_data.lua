@@ -4,21 +4,86 @@ local _debug_log
 local _debug_enabled
 local _is_enabled
 local ABSENT = {}
+local is_valid_input
+local find_aim_fire_input
+local find_aim_action_for_fire
+
+local function actions_table(weapon_template)
+	local actions = weapon_template and weapon_template.actions or nil
+
+	return type(actions) == "table" and actions or nil
+end
+
+local function action_inputs_table(weapon_template)
+	local action_inputs = weapon_template and weapon_template.action_inputs or nil
+
+	return type(action_inputs) == "table" and action_inputs or nil
+end
+
+local function attack_meta_data_table(weapon_template)
+	if type(weapon_template) ~= "table" then
+		return nil
+	end
+
+	local attack_meta_data = weapon_template and weapon_template.attack_meta_data or nil
+
+	return type(attack_meta_data) == "table" and attack_meta_data or nil
+end
 
 local function resolve_vanilla_fallback(weapon_template)
-	local actions = weapon_template.actions or {}
-	local aim_action = actions["action_zoom"] or {}
-	local attack_action = actions["action_shoot"] or {}
-	local aim_attack_action = actions["action_shoot_zoomed"] or {}
+	local actions = actions_table(weapon_template) or {}
+	local has_action_inputs = action_inputs_table(weapon_template) ~= nil
+	local aim_action = type(actions["action_zoom"]) == "table" and actions["action_zoom"] or nil
+	local attack_action = type(actions["action_shoot"]) == "table" and actions["action_shoot"] or nil
+	local aim_attack_action = type(actions["action_shoot_zoomed"]) == "table" and actions["action_shoot_zoomed"] or nil
+	local fire_action_input = attack_action and attack_action.start_input or "shoot"
+	local aim_fire_action_input = aim_attack_action and aim_attack_action.start_input or nil
+	local aim_action_input = aim_action and aim_action.start_input or nil
+	local aim_action_from_actions = aim_action_input ~= nil
+	local aim_fire_from_actions = aim_fire_action_input ~= nil
+	local unaim_action_input = nil
+
+	if aim_fire_action_input == nil then
+		aim_fire_action_input = find_aim_fire_input(weapon_template)
+	end
+
+	if aim_fire_action_input then
+		local derived_aim_input, _, derived_unaim_input =
+			find_aim_action_for_fire(weapon_template, aim_fire_action_input)
+		aim_action_input = aim_action_input or derived_aim_input
+		unaim_action_input = derived_unaim_input
+	end
+
+	if has_action_inputs and not aim_action_from_actions and not is_valid_input(weapon_template, aim_action_input) then
+		aim_action_input = nil
+	end
+
+	if
+		has_action_inputs
+		and not aim_fire_from_actions
+		and not is_valid_input(weapon_template, aim_fire_action_input)
+	then
+		aim_fire_action_input = nil
+	end
+
+	if has_action_inputs and not is_valid_input(weapon_template, unaim_action_input) then
+		unaim_action_input = nil
+	end
+
 	return {
-		fire_action_input = attack_action.start_input or "shoot",
-		aim_action_input = aim_action.start_input or "zoom",
-		aim_fire_action_input = aim_attack_action.start_input or "zoom_shoot",
+		fire_action_input = fire_action_input,
+		aim_action_input = aim_action_input,
+		aim_fire_action_input = aim_fire_action_input,
+		unaim_action_input = unaim_action_input,
 	}
 end
 
-local function is_valid_input(weapon_template, input_name)
-	local action_inputs = weapon_template.action_inputs
+is_valid_input = function(weapon_template, input_name)
+	if type(input_name) ~= "string" then
+		return false
+	end
+
+	local action_inputs = action_inputs_table(weapon_template)
 	return action_inputs ~= nil and action_inputs[input_name] ~= nil
 end
 
@@ -28,7 +93,7 @@ local function needs_injection(weapon_template)
 end
 
 local function find_action_for_input(weapon_template, input_name)
-	for action_name, action in pairs(weapon_template.actions or {}) do
+	for action_name, action in pairs(actions_table(weapon_template) or {}) do
 		if action.start_input == input_name then
 			return action_name, action
 		end
@@ -39,7 +104,7 @@ end
 local FIRE_INPUT_PREFERENCE = { "shoot_pressed", "shoot_charge" }
 
 local function find_fire_input(weapon_template)
-	local action_inputs = weapon_template.action_inputs or {}
+	local action_inputs = action_inputs_table(weapon_template) or {}
 	local candidates = {}
 
 	for input_name, input_def in pairs(action_inputs) do
@@ -73,7 +138,7 @@ local function find_fire_input(weapon_template)
 end
 
 local function find_aim_input(weapon_template)
-	local action_inputs = weapon_template.action_inputs or {}
+	local action_inputs = action_inputs_table(weapon_template) or {}
 
 	for input_name, input_def in pairs(action_inputs) do
 		local seq = input_def.input_sequence
@@ -92,7 +157,7 @@ local function find_aim_input(weapon_template)
 end
 
 local function find_chain_target_action(weapon_template, input_name)
-	for _, action in pairs(weapon_template.actions or {}) do
+	for _, action in pairs(actions_table(weapon_template) or {}) do
 		local chain_entry = (action.allowed_chain_actions or {})[input_name]
 		if chain_entry and chain_entry.action_name then
 			return chain_entry.action_name
@@ -102,9 +167,9 @@ local function find_chain_target_action(weapon_template, input_name)
 end
 
 local function has_braced_chain_action(weapon_template, input_name)
-	local action_inputs = weapon_template.action_inputs or {}
+	local action_inputs = action_inputs_table(weapon_template) or {}
 
-	for _, action in pairs(weapon_template.actions or {}) do
+	for _, action in pairs(actions_table(weapon_template) or {}) do
 		local start_input = action.start_input
 		local start_def = start_input and action_inputs[start_input]
 		local seq = start_def and start_def.input_sequence
@@ -123,8 +188,8 @@ local function has_braced_chain_action(weapon_template, input_name)
 	return false
 end
 
-local function find_aim_fire_input(weapon_template)
-	local action_inputs = weapon_template.action_inputs or {}
+find_aim_fire_input = function(weapon_template)
+	local action_inputs = action_inputs_table(weapon_template) or {}
 
 	for input_name, input_def in pairs(action_inputs) do
 		local seq = input_def.input_sequence
@@ -162,7 +227,7 @@ local function find_aim_fire_input(weapon_template)
 end
 
 local function has_hold_start_input(weapon_template, input_name)
-	local input_def = (weapon_template.action_inputs or {})[input_name]
+	local input_def = (action_inputs_table(weapon_template) or {})[input_name]
 	local seq = input_def and input_def.input_sequence
 	local first = seq and seq[1]
 
@@ -170,7 +235,7 @@ local function has_hold_start_input(weapon_template, input_name)
 end
 
 local function find_unaim_action_for_action(weapon_template, action)
-	local actions = weapon_template.actions or {}
+	local actions = actions_table(weapon_template) or {}
 	local unaim_input = action and action.stop_input
 	if unaim_input then
 		local unaim_action_name = find_action_for_input(weapon_template, unaim_input)
@@ -189,12 +254,12 @@ local function find_unaim_action_for_action(weapon_template, action)
 	return nil, nil
 end
 
-local function find_aim_action_for_fire(weapon_template, aim_fire_input)
+find_aim_action_for_fire = function(weapon_template, aim_fire_input)
 	if not aim_fire_input then
 		return nil, nil, nil, nil
 	end
 
-	for action_name, action in pairs(weapon_template.actions or {}) do
+	for action_name, action in pairs(actions_table(weapon_template) or {}) do
 		local start_input = action.start_input
 		local allowed_chain_actions = action.allowed_chain_actions or {}
 
@@ -295,7 +360,7 @@ end
 
 local function build_meta_data(weapon_template)
 	local fallback = resolve_vanilla_fallback(weapon_template)
-	local attack_meta_data = weapon_template.attack_meta_data or {}
+	local attack_meta_data = attack_meta_data_table(weapon_template) or {}
 	local meta = {}
 	local changed = false
 
@@ -352,7 +417,11 @@ local function inject(WeaponTemplates)
 					if template.attack_meta_data == change.injected_table then
 						template.attack_meta_data = nil
 					end
-				elseif change.mode == "fields" and template.attack_meta_data then
+				elseif change.mode == "replace_invalid" then
+					if template.attack_meta_data == change.injected_table then
+						template.attack_meta_data = change.original_value
+					end
+				elseif change.mode == "fields" and type(template.attack_meta_data) == "table" then
 					for key, original_value in pairs(change.original_fields or {}) do
 						if original_value == ABSENT then
 							template.attack_meta_data[key] = nil
@@ -377,6 +446,10 @@ local function inject(WeaponTemplates)
 		if not change then
 			change = { mode = mode }
 			state.changes[template] = change
+		end
+		if mode == "replace_invalid" then
+			change.mode = "replace_invalid"
+			return change
 		end
 		if mode == "fields" and change.mode ~= "replace" then
 			change.mode = "fields"
@@ -408,13 +481,14 @@ local function inject(WeaponTemplates)
 		if type(template) == "table" and has_keyword(template, "ranged") then
 			local corrections = build_meta_data(template)
 			if corrections then
-				if template.attack_meta_data then
+				local existing_attack_meta_data = attack_meta_data_table(template)
+				if existing_attack_meta_data then
 					local merged = 0
 					for k, v in pairs(corrections) do
-						if template.attack_meta_data[k] == nil then
+						if existing_attack_meta_data[k] == nil then
 							local change = ensure_change(template, "fields")
-							record_original_field(change, template.attack_meta_data, k)
-							template.attack_meta_data[k] = v
+							record_original_field(change, existing_attack_meta_data, k)
+							existing_attack_meta_data[k] = v
 							merged = merged + 1
 						end
 					end
@@ -424,8 +498,15 @@ local function inject(WeaponTemplates)
 						skipped = skipped + 1
 					end
 				else
+					local replace_change
+					if template.attack_meta_data == nil then
+						replace_change = ensure_change(template, "replace")
+					else
+						replace_change = ensure_change(template, "replace_invalid")
+						replace_change.original_value = template.attack_meta_data
+					end
 					template.attack_meta_data = corrections
-					ensure_change(template, "replace").injected_table = corrections
+					replace_change.injected_table = corrections
 					injected = injected + 1
 				end
 			else
@@ -440,44 +521,44 @@ local function inject(WeaponTemplates)
 	-- wrong, so derive the charge action and its matching aimed fire input.
 	local charge_overrides = 0
 	for _, template in pairs(WeaponTemplates) do -- luacheck: ignore 213
-		if type(template) == "table" and has_keyword(template, "ranged") and template.attack_meta_data then
-			local fallback = resolve_vanilla_fallback(template)
+		local existing_attack_meta_data = attack_meta_data_table(template)
+		if type(template) == "table" and has_keyword(template, "ranged") and existing_attack_meta_data then
 			local aim_fire_input, aim_fire_action = find_aim_fire_input(template)
-			if aim_fire_input and not is_valid_input(template, fallback.aim_fire_action_input) then
+			if aim_fire_input and existing_attack_meta_data.aim_fire_action_input ~= aim_fire_input then
 				local changed = false
 				local change = ensure_change(template, "fields")
 				local aim_input, aim_action, unaim_input, unaim_action =
 					find_aim_action_for_fire(template, aim_fire_input)
 
-				if template.attack_meta_data.aim_fire_action_input ~= aim_fire_input then
-					record_original_field(change, template.attack_meta_data, "aim_fire_action_input")
-					record_original_field(change, template.attack_meta_data, "aim_fire_action_name")
-					template.attack_meta_data.aim_fire_action_input = aim_fire_input
-					template.attack_meta_data.aim_fire_action_name = aim_fire_action
+				if existing_attack_meta_data.aim_fire_action_input ~= aim_fire_input then
+					record_original_field(change, existing_attack_meta_data, "aim_fire_action_input")
+					record_original_field(change, existing_attack_meta_data, "aim_fire_action_name")
+					existing_attack_meta_data.aim_fire_action_input = aim_fire_input
+					existing_attack_meta_data.aim_fire_action_name = aim_fire_action
 					changed = true
 				end
 
-				if aim_input and template.attack_meta_data.aim_action_input ~= aim_input then
-					record_original_field(change, template.attack_meta_data, "aim_action_input")
-					template.attack_meta_data.aim_action_input = aim_input
+				if aim_input and existing_attack_meta_data.aim_action_input ~= aim_input then
+					record_original_field(change, existing_attack_meta_data, "aim_action_input")
+					existing_attack_meta_data.aim_action_input = aim_input
 					changed = true
 				end
 
-				if aim_action and template.attack_meta_data.aim_action_name ~= aim_action then
-					record_original_field(change, template.attack_meta_data, "aim_action_name")
-					template.attack_meta_data.aim_action_name = aim_action
+				if aim_action and existing_attack_meta_data.aim_action_name ~= aim_action then
+					record_original_field(change, existing_attack_meta_data, "aim_action_name")
+					existing_attack_meta_data.aim_action_name = aim_action
 					changed = true
 				end
 
-				if unaim_input and template.attack_meta_data.unaim_action_input ~= unaim_input then
-					record_original_field(change, template.attack_meta_data, "unaim_action_input")
-					template.attack_meta_data.unaim_action_input = unaim_input
+				if unaim_input and existing_attack_meta_data.unaim_action_input ~= unaim_input then
+					record_original_field(change, existing_attack_meta_data, "unaim_action_input")
+					existing_attack_meta_data.unaim_action_input = unaim_input
 					changed = true
 				end
 
-				if unaim_action and template.attack_meta_data.unaim_action_name ~= unaim_action then
-					record_original_field(change, template.attack_meta_data, "unaim_action_name")
-					template.attack_meta_data.unaim_action_name = unaim_action
+				if unaim_action and existing_attack_meta_data.unaim_action_name ~= unaim_action then
+					record_original_field(change, existing_attack_meta_data, "unaim_action_name")
+					existing_attack_meta_data.unaim_action_name = unaim_action
 					changed = true
 				end
 

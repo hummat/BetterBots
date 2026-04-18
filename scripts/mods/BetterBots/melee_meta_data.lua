@@ -137,7 +137,11 @@ local function inject(WeaponTemplates)
 					if template.attack_meta_data == change.injected_table then
 						template.attack_meta_data = nil
 					end
-				elseif change.mode == "fields" and template.attack_meta_data then
+				elseif change.mode == "replace_invalid" then
+					if template.attack_meta_data == change.injected_table then
+						template.attack_meta_data = change.original_value
+					end
+				elseif change.mode == "fields" and type(template.attack_meta_data) == "table" then
 					for attack_input, original_fields in pairs(change.original_fields or {}) do
 						local entry = template.attack_meta_data[attack_input]
 						if type(entry) == "table" then
@@ -167,6 +171,10 @@ local function inject(WeaponTemplates)
 		if not change then
 			change = { mode = mode }
 			state.changes[template] = change
+		end
+		if mode == "replace_invalid" then
+			change.mode = "replace_invalid"
+			return change
 		end
 		if mode == "fields" and change.mode ~= "replace" then
 			change.mode = "fields"
@@ -201,7 +209,9 @@ local function inject(WeaponTemplates)
 					template.attack_meta_data = change.injected_table
 				end
 				skipped = skipped + 1
-			elseif template.attack_meta_data then
+			elseif change and change.mode == "replace_invalid" then
+				skipped = skipped + 1
+			elseif type(template.attack_meta_data) == "table" then
 				local meta = build_meta_data(template, _armored_type)
 				local merged = 0
 				if meta then
@@ -227,8 +237,15 @@ local function inject(WeaponTemplates)
 			else
 				local meta = build_meta_data(template, _armored_type)
 				if meta then
+					local replace_change
+					if template.attack_meta_data == nil then
+						replace_change = ensure_change(template, "replace")
+					else
+						replace_change = ensure_change(template, "replace_invalid")
+						replace_change.original_value = template.attack_meta_data
+					end
 					template.attack_meta_data = meta
-					ensure_change(template, "replace").injected_table = meta
+					replace_change.injected_table = meta
 					injected = injected + 1
 				end
 			end

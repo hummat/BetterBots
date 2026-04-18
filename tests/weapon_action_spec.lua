@@ -286,6 +286,32 @@ describe("weapon_action", function()
 		assert.equals("action_unbrace", scratchpad.unaim_action_name)
 	end)
 
+	it("clears stale zoom inputs when the current weapon has no aim chain", function()
+		local weapon_template = {
+			action_inputs = {
+				shoot_pressed = { input_sequence = { { input = "action_one_pressed", value = true } } },
+			},
+			actions = {
+				action_shoot = { start_input = "shoot_pressed" },
+			},
+		}
+		local scratchpad = {
+			aim_fire_action_input = "shoot_pressed",
+			aim_action_input = "zoom",
+			aim_action_name = "action_zoom",
+			unaim_action_input = "unzoom",
+			unaim_action_name = "action_unzoom",
+		}
+
+		local changed = WeaponAction._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
+
+		assert.is_true(changed)
+		assert.is_nil(scratchpad.aim_action_input)
+		assert.is_nil(scratchpad.aim_action_name)
+		assert.is_nil(scratchpad.unaim_action_input)
+		assert.is_nil(scratchpad.unaim_action_name)
+	end)
+
 	it("logs stream action confirmations for flamer and purgatus queue inputs", function()
 		local logged_flamer = WeaponAction.log_stream_action(3, "flamer_p1_m1", "shoot_braced")
 		local logged_purgatus = WeaponAction.log_stream_action(3, "forcestaff_p2_m1", "trigger_charge_flame")
@@ -339,6 +365,65 @@ describe("weapon_action", function()
 		assert.equals(0, forwarded_calls)
 		assert.is_nil(observed_action_input)
 		assert.is_truthy(find_debug_log("blocked foreign weapon action charge_release while keeping psyker_smite"))
+	end)
+
+	it("drops unsupported queued zoom inputs for the current template", function()
+		local forwarded_calls = 0
+		local observed_action_input
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function()
+				forwarded_calls = forwarded_calls + 1
+				return 1
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "plasmagun_p1_m1" },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function(_unit, action_input)
+				observed_action_input = action_input
+			end,
+		})
+
+		local result = PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+			_action_input_parsers = {
+				weapon_action = {
+					_ACTION_INPUT_SEQUENCE_CONFIGS = {
+						plasmagun_p1_m1 = {
+							brace_pressed = true,
+							shoot_charge = true,
+						},
+					},
+				},
+			},
+		}, "weapon_action", "zoom", nil)
+
+		assert.is_nil(result)
+		assert.equals(0, forwarded_calls)
+		assert.is_nil(observed_action_input)
+		assert.is_truthy(find_debug_log("dropped unsupported queued weapon action zoom"))
 	end)
 
 	it("logs weakspot aim selections when the head/spine table is active", function()

@@ -96,6 +96,52 @@ local function _has_hold_start_input(weapon_template, input_name)
 	return first and first.input == "action_two_hold" and first.value == true
 end
 
+local function _weapon_template_supports_input(weapon_template, input_name)
+	if type(input_name) ~= "string" then
+		return false
+	end
+
+	local action_inputs = weapon_template and weapon_template.action_inputs or nil
+
+	return type(action_inputs) == "table" and action_inputs[input_name] ~= nil or false
+end
+
+local function _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad)
+	if not scratchpad then
+		return false
+	end
+
+	local changed = false
+
+	if
+		scratchpad.aim_action_input
+		and not _weapon_template_supports_input(weapon_template, scratchpad.aim_action_input)
+	then
+		scratchpad.aim_action_input = nil
+		changed = true
+	end
+
+	if scratchpad.aim_action_input == nil and scratchpad.aim_action_name ~= nil then
+		scratchpad.aim_action_name = nil
+		changed = true
+	end
+
+	if
+		scratchpad.unaim_action_input
+		and not _weapon_template_supports_input(weapon_template, scratchpad.unaim_action_input)
+	then
+		scratchpad.unaim_action_input = nil
+		changed = true
+	end
+
+	if scratchpad.unaim_action_input == nil and scratchpad.unaim_action_name ~= nil then
+		scratchpad.unaim_action_name = nil
+		changed = true
+	end
+
+	return changed
+end
+
 local function _find_bt_shoot_aim_chain(weapon_template, aim_fire_input)
 	for action_name, action in pairs(weapon_template and weapon_template.actions or {}) do
 		local start_input = action.start_input
@@ -226,14 +272,18 @@ function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 end
 
 function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
-	if not weapon_template or not scratchpad or not scratchpad.aim_fire_action_input then
+	if not weapon_template or not scratchpad then
 		return false
+	end
+
+	if not scratchpad.aim_fire_action_input then
+		return _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad)
 	end
 
 	local aim_input, aim_action_name, unaim_input, unaim_action_name =
 		_find_bt_shoot_aim_chain(weapon_template, scratchpad.aim_fire_action_input)
 	if not aim_input then
-		return false
+		return _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad)
 	end
 
 	local changed = false
@@ -259,6 +309,28 @@ function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
 	end
 
 	return changed
+end
+
+local function _current_weapon_action_template_name(unit)
+	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
+	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action") or nil
+
+	return weapon_action_component and weapon_action_component.template_name or nil
+end
+
+local function _parser_accepts_weapon_action_input(action_input_extension, template_name, action_input)
+	local parser = action_input_extension
+		and action_input_extension._action_input_parsers
+		and action_input_extension._action_input_parsers.weapon_action
+	local sequence_configs = parser
+		and parser._ACTION_INPUT_SEQUENCE_CONFIGS
+		and parser._ACTION_INPUT_SEQUENCE_CONFIGS[template_name]
+
+	if sequence_configs == nil then
+		return true
+	end
+
+	return sequence_configs[action_input] ~= nil
 end
 
 function M.init(deps)
@@ -600,6 +672,32 @@ function M.register_hooks(deps)
 										.. " (raw_input="
 										.. tostring(raw_input)
 										.. ")"
+								)
+							end
+							if perf_t0 then
+								_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
+							end
+							return nil
+						end
+					end
+
+					if unit and id == "weapon_action" and (action_input == "zoom" or action_input == "unzoom") then
+						local template_name = _current_weapon_action_template_name(unit)
+						if
+							template_name
+							and not _parser_accepts_weapon_action_input(self, template_name, action_input)
+						then
+							if _debug_enabled() then
+								_debug_log(
+									"drop_unsupported_weapon_action:"
+										.. tostring(template_name)
+										.. ":"
+										.. tostring(action_input),
+									_fixed_time(),
+									"dropped unsupported queued weapon action "
+										.. tostring(action_input)
+										.. " for "
+										.. tostring(template_name)
 								)
 							end
 							if perf_t0 then

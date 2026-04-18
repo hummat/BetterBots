@@ -53,6 +53,14 @@ describe("melee_attack_choice", function()
 		assert.equals("light_attack", chosen.action_inputs[2].action_input)
 	end)
 
+	it("falls back to the vanilla light-only default when attack_meta_data is not a table", function()
+		local MeleeAttackChoice = load_module()
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data("broken", 1, 1, ARMORED)
+
+		assert.equals("light_attack", chosen.action_inputs[2].action_input)
+	end)
+
 	it("prefers medium-arc control swings against a small crowd when armor is equal", function()
 		local MeleeAttackChoice = load_module()
 		local weapon_meta_data = {

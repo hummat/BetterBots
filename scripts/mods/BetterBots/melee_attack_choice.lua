@@ -91,7 +91,7 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 end
 
 local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemies, armored_type)
-	local meta_data = weapon_meta_data or DEFAULT_ATTACK_META_DATA
+	local meta_data = type(weapon_meta_data) == "table" and weapon_meta_data or DEFAULT_ATTACK_META_DATA
 	local best_attack_input
 	local best_attack_meta_data
 	local best_utility = -math.huge
@@ -127,7 +127,9 @@ local function _enemy_bucket(num_enemies)
 end
 
 local function _chosen_attack_input(weapon_meta_data, chosen_attack_meta_data)
-	for attack_input, attack_meta_data in pairs(weapon_meta_data or DEFAULT_ATTACK_META_DATA) do
+	local meta_data = type(weapon_meta_data) == "table" and weapon_meta_data or DEFAULT_ATTACK_META_DATA
+
+	for attack_input, attack_meta_data in pairs(meta_data) do
 		if attack_meta_data == chosen_attack_meta_data then
 			return attack_input
 		end
