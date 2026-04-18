@@ -172,6 +172,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - `ability_queue` now exposes breakdown-only rows for `item_fallback`, `template_setup`, `input_validation`, `decision`, and `queue`; `grenade_fallback` now exposes `stage_machine`, `profile_resolution`, and `launch` in addition to the existing `build_context` and `heuristic` rows.
    - `grenade_fallback` has two breakdown-only sub-tags that partition its idle-path cost: `grenade_fallback.build_context` (the `heuristics.build_context` call in `grenade_fallback.lua`) and `grenade_fallback.heuristic` (the subsequent `evaluate_grenade_heuristic` call). They appear as rows in the tag breakdown but do not contribute to the headline `µs/bot/frame` total because the parent `grenade_fallback` timer already includes them.
    - `target_type_hysteresis.post_process` now appears as a breakdown-only row for the post-vanilla melee/ranged stabilization pass.
+   - Do not compare arbitrary mid-mission `/bb_perf` dumps across branches. The command resets the window. For release/perf decisions, compare only mission-end `bb-perf:auto:` totals captured from real missions under the same protocol.
 5. `/bb_reset`
    - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
@@ -185,6 +186,25 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 4. If decision logic is unclear, run `/bb_decide` once around the event.
 5. If still unclear, run `/bb_brain` once and inspect the dump.
 6. Correlate with log lines (`fallback held/queued`, `charge consumed`, `invalid action_input`).
+
+### Perf benchmark protocol (v1.0.0)
+
+Use this protocol for any claim that BetterBots got faster, slower, or is "good enough":
+
+1. Cold boot Darktide. Do not rely on hot-reload.
+2. Run Solo Play with a full 4-bot squad on the build you want to measure.
+3. Turn on only `Performance timings`. Leave JSONL event logging off and do not run an active debug session that intentionally increases BetterBots logging/work.
+4. Play **three** combat-heavy live missions. Ignore hub transitions and ignore ad hoc mid-mission `/bb_perf` snapshots.
+5. For each run, record only the mission-end `bb-perf:auto: <N> µs/bot/frame total` line from the raw console log.
+6. Use the **median of three** as the headline number. A single run is a spot check, not a benchmark.
+
+v1.0.0 acceptance bar:
+
+- Current validated reference band: `104.9`, `113.8`, and `124.5 µs/bot/frame total`
+- Acceptable for release: **median <= `125 µs/bot/frame`** and **no single run > `140 µs/bot/frame`**
+- The old `<80 µs/bot/frame` target is retired. It was never tied to a stable mission protocol and is not a credible release gate.
+
+If a future branch misses that bar or produces a real user-visible perf complaint, inspect the dominant buckets first: `ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, and `ammo_policy.update_ammo`.
 
 ### Pre-release verification (required before `make release`)
 

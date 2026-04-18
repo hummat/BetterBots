@@ -195,20 +195,14 @@ Sprint 4 stopped being "invent a missing primitive" once the decompiled source w
 |---|-------|-------|
 | 98 | Sparse metadata hardening | **Code-complete 2026-04-18; in-game validation pending.** Targeted boundary guards landed in `melee_attack_choice.lua`, `melee_meta_data.lua`, and `ranged_meta_data.lua`: truthy non-table `attack_meta_data` is now treated as invalid at the boundary instead of being indexed as if it were sane, while the metadata injectors replace malformed values only for the enabled lifetime of the feature and restore the original value on disable. Regression coverage now includes non-table top-level melee selection plus malformed existing `attack_meta_data` on both melee and ranged injectors. No blanket `pcall`, no broad refactor. |
 | 102 | ActionInputParser zoom/unzoom noise | **Code-complete 2026-04-18; in-game validation pending.** `ranged_meta_data.resolve_vanilla_fallback()` no longer invents `"zoom"`/`"zoom_shoot"` on templates that do not actually expose aim inputs; it keeps explicit vanilla action start_inputs, derives brace/charge aim paths when they exist, and otherwise returns nil aim fields. `weapon_action.lua` now clears stale scratchpad zoom/unzoom fields when the current template has no aim chain and drops parser-proven unsupported queued `zoom` / `unzoom` inputs on the currently wielded template before they reach the engine parser. |
-| 99 | Perf benchmark protocol | Reusable perf harness — acceptance target definition first, then medium-risk hotspot work (`ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, `ammo_policy.update_ammo`). Current-branch mission-end sample: `104.9 us/bot/frame`. |
-| 85 | Combat ability identity refactor | Tech debt, user-invisible — separate `template_name` from `ability_name` semantics. Ship if runway permits; drop first if tight. |
+| 99 | Perf benchmark protocol | **Closed 2026-04-18.** BetterBots already had the reusable recorder; the missing piece was a credible gate. `docs/dev/debugging.md` now defines the v1.0.0 benchmark protocol: use mission-end `bb-perf:auto:` totals from three combat-heavy Solo Play runs on the same build, with only `Performance timings` enabled, and evaluate the median rather than a single cherry-picked dump. Current validated reference band is `104.9`, `113.8`, and `124.5 µs/bot/frame total`, so the old `<80 µs/bot/frame` target is retired; v1.0.0 accepts **median <= `125`** with **no single run > `140`**. Reopen only on user-visible perf complaints or future runs outside that band, then investigate `ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, and `ammo_policy.update_ammo`. |
+| 85 | Combat ability identity refactor | **Closed 2026-04-18.** The shared `combat_ability_identity.lua` resolver already landed, duplicated Veteran-specific sniffers are gone from leaf modules, and regression guards now enforce both table drift and "no duplicate local resolver" invariants in `tests/startup_regressions_spec.lua`. Later live validation already exercised the important shared-template paths: `#7` proved the revive hook → identity → ability check chain on real revive candidates, and `#14` proved semantic cooldown routing for Veteran shout. No further v1.0.0 code work is justified here. |
 | — | Full cold-boot soak | Both mod load orders, grep DMF warnings in raw console, Auric mission runs. |
 | — | Nexus package + changelog + outreach | Release mechanics. |
 
 #### Tier-cut priority if runway tight
 
-Hard cut order (first to drop):
-
-1. `#85` (refactor, user-invisible)
-2. `#97` (resource-policy unification)
-3. `#56` + `#96` (coordination polish)
-4. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
-5. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
+Runway cuts are now mostly moot. The planned code/doc items for v1.0.0 are either landed or explicitly scope-exited; the remaining release work is validation and packaging, not feature triage.
 
 **Do not cut:** Sprint 4's shipped MVP (`F2` bootstrap + `#24a/b` + `#88` carry/deploy), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
 

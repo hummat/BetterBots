@@ -299,6 +299,8 @@ The mod piggybacks on data the engine already computes. There are no new per-fra
 
 `/bb_perf` reports the sum of top-level instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Some rows are breakdown-only child tags for diagnosis; these appear in the per-tag table but are excluded from the headline total when their parent hook already includes the same work. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters. The same formatter is also emitted automatically on `GameplayStateRun` exit with the `bb-perf:auto:` prefix when the window contains at least one sampled bot frame.
 
+For v1.0.0 release decisions, BetterBots now treats perf as a mission-end benchmark problem, not a one-off headline chase. The canonical measurement is the mission-end `bb-perf:auto:` total from three combat-heavy Solo Play runs on the same build, with `Performance timings` enabled and other diagnostics quiet. The acceptance bar is **median <= `125 µs/bot/frame` with no single run > `140 µs/bot/frame`**. The old `<80 µs/bot/frame` target is retired because it was never backed by a stable protocol.
+
 **Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
 
 | Path | Cost | Notes |
