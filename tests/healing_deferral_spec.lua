@@ -239,6 +239,24 @@ describe("healing_deferral", function()
 
 			assert.is_true(HealingDeferral.should_defer_resource("health_deployable", 0.8, true, settings))
 		end)
+
+		it("keeps Martyrdom bots off health stations even when no human needs healing", function()
+			local settings = {
+				mode = "stations_and_deployables",
+				emergency_threshold = 0.25,
+			}
+
+			assert.is_true(HealingDeferral.should_defer_resource("health_station", 0.05, false, settings, true))
+		end)
+
+		it("keeps Martyrdom bots off deployables even when critically low", function()
+			local settings = {
+				mode = "stations_and_deployables",
+				emergency_threshold = 0.25,
+			}
+
+			assert.is_true(HealingDeferral.should_defer_resource("health_deployable", 0.05, true, settings, true))
+		end)
 	end)
 
 	describe("apply deferral", function()

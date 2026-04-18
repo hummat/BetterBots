@@ -117,6 +117,20 @@ local function _should_defer_healing(bot_health_pct, human_needs_healing, emerge
 	return true
 end
 
+local function _bot_preserves_wounded_state(unit)
+	if not (unit and ScriptUnit and ScriptUnit.has_extension) then
+		return false
+	end
+
+	local talent_extension = ScriptUnit.has_extension(unit, "talent_system")
+	if not (talent_extension and talent_extension.talents) then
+		return false
+	end
+
+	local talents = talent_extension:talents()
+	return talents and talents.zealot_martyrdom ~= nil or false
+end
+
 local function _mode_allows_resource(mode, resource_kind)
 	if mode == "stations_and_deployables" then
 		return true
@@ -129,9 +143,18 @@ local function _mode_allows_resource(mode, resource_kind)
 	return false
 end
 
-local function _should_defer_resource(resource_kind, bot_health_pct, human_needs_healing, settings)
+local function _should_defer_resource(
+	resource_kind,
+	bot_health_pct,
+	human_needs_healing,
+	settings,
+	preserve_wounded_state
+)
 	if not (settings and _mode_allows_resource(settings.mode, resource_kind)) then
 		return false
+	end
+	if preserve_wounded_state then
+		return true
 	end
 
 	return _should_defer_healing(bot_health_pct, human_needs_healing, settings.emergency_threshold)
@@ -210,8 +233,17 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local side = self._side
 		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
 		local bot_health_pct = _health.current_health_percent(unit)
+		local preserve_wounded_state = _bot_preserves_wounded_state(unit)
 
-		if not _should_defer_resource("health_station", bot_health_pct, human_needs_healing, settings) then
+		if
+			not _should_defer_resource(
+				"health_station",
+				bot_health_pct,
+				human_needs_healing,
+				settings,
+				preserve_wounded_state
+			)
+		then
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
 			end
@@ -219,7 +251,11 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		end
 
 		_apply_health_station_deferral(health_station_component)
-		_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+		if preserve_wounded_state then
+			_log("healing_station:" .. tostring(unit), "deferred health station to preserve Martyrdom wounded state")
+		else
+			_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+		end
 		if perf_t0 then
 			_perf.finish("healing_deferral.health_stations", perf_t0)
 		end
@@ -253,20 +289,30 @@ function M.install_bot_group_hooks(BotGroup)
 
 		local side = self._side
 		local human_needs_healing = _any_human_needs_healing(side and side.valid_human_units, settings.human_threshold)
-		if not human_needs_healing then
-			if perf_t0 then
-				_perf.finish("healing_deferral.health_deployables", perf_t0)
-			end
-			return
-		end
 
 		for unit, data in pairs(bot_data) do
 			local pickup_component = data and data.pickup_component
 			if pickup_component and pickup_component.health_deployable then
 				local bot_health_pct = _health.current_health_percent(unit)
-				if _should_defer_resource("health_deployable", bot_health_pct, human_needs_healing, settings) then
+				local preserve_wounded_state = _bot_preserves_wounded_state(unit)
+				if
+					_should_defer_resource(
+						"health_deployable",
+						bot_health_pct,
+						human_needs_healing,
+						settings,
+						preserve_wounded_state
+					)
+				then
 					_apply_health_deployable_deferral(pickup_component)
-					_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
+					if preserve_wounded_state then
+						_log(
+							"healing_deployable:" .. tostring(unit),
+							"deferred medical crate to preserve Martyrdom wounded state"
+						)
+					else
+						_log("healing_deployable:" .. tostring(unit), "deferred medical crate to human player")
+					end
 				end
 			end
 		end
@@ -280,6 +326,7 @@ end
 M.any_human_needs_healing = _any_human_needs_healing
 M.should_defer_healing = _should_defer_healing
 M.should_defer_resource = _should_defer_resource
+M.bot_preserves_wounded_state = _bot_preserves_wounded_state
 M.apply_health_station_deferral = _apply_health_station_deferral
 M.apply_health_deployable_deferral = _apply_health_deployable_deferral
 M.resolve_settings = _resolve_settings

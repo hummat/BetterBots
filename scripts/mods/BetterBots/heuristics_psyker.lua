@@ -22,11 +22,39 @@ local PSYKER_SHOUT_THRESHOLDS = {
 	},
 }
 
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents
+	return talents and talents[talent_name] ~= nil or false
+end
+
+local function _resolve_shout_high_peril_threshold(context, thresholds)
+	local high_peril = thresholds.high_peril
+	local preserve_peril = false
+
+	if
+		_has_talent(context, "psyker_damage_based_on_warp_charge") or _has_talent(context, "psyker_warp_glass_cannon")
+	then
+		high_peril = high_peril + 0.10
+		preserve_peril = true
+	end
+
+	if _has_talent(context, "psyker_shout_vent_warp_charge") then
+		high_peril = high_peril + 0.05
+		preserve_peril = true
+	end
+
+	return math.min(high_peril, 0.95), preserve_peril
+end
+
 local function _can_activate_psyker_shout(context, thresholds)
 	if context.num_nearby == 0 then
 		return false, "psyker_shout_block_no_enemies"
 	end
-	if context.peril_pct and context.peril_pct >= thresholds.high_peril then
+	local high_peril_threshold, preserve_peril = _resolve_shout_high_peril_threshold(context, thresholds)
+	if context.peril_pct and context.peril_pct >= high_peril_threshold then
+		if preserve_peril then
+			return true, "psyker_shout_high_peril_talent_aware"
+		end
 		return true, "psyker_shout_high_peril"
 	end
 	if context.num_nearby >= thresholds.surrounded then
@@ -41,6 +69,9 @@ local function _can_activate_psyker_shout(context, thresholds)
 		and context.target_enemy_distance <= thresholds.priority_dist
 	then
 		return true, "psyker_shout_priority_target"
+	end
+	if preserve_peril and context.peril_pct and context.peril_pct >= thresholds.high_peril then
+		return false, "psyker_shout_hold_preserve_peril"
 	end
 	if
 		context.peril_pct

@@ -256,6 +256,37 @@ describe("heuristics", function()
 			assert.matches("emergency", rule)
 		end)
 
+		it("holds low-health-only stealth panic for Martyrdom", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					health_pct = 0.20,
+					talents = {
+						zealot_martyrdom = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("martyrdom_low_health", rule)
+		end)
+
+		it("still activates on low toughness emergency for Martyrdom", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					toughness_pct = 0.15,
+					health_pct = 0.20,
+					talents = {
+						zealot_martyrdom = 1,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("emergency", rule)
+		end)
+
 		it("activates when overwhelmed", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 5, toughness_pct = 0.45 }))
 			assert.is_true(ok)
@@ -294,6 +325,56 @@ describe("heuristics", function()
 
 		it("activates on high peril", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 1, peril_pct = 0.80 }))
+			assert.is_true(ok)
+			assert.matches("high_peril", rule)
+		end)
+
+		it("preserves peril longer with Warp Siphon damage talents", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.80,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("preserve_peril", rule)
+		end)
+
+		it("uses an even later peril threshold with vent-on-shout talent", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.85,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+						psyker_shout_vent_warp_charge = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("preserve_peril", rule)
+		end)
+
+		it("still vents at very high peril with the talent-aware threshold", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.90,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+						psyker_shout_vent_warp_charge = 1,
+					},
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("high_peril", rule)
 		end)

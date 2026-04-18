@@ -25,6 +25,11 @@ local ZEALOT_DASH_THRESHOLDS = {
 	},
 }
 
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents
+	return talents and talents[talent_name] ~= nil or false
+end
+
 local function _can_activate_zealot_dash(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if not context.target_enemy then
@@ -102,12 +107,13 @@ local ZEALOT_INVISIBILITY_THRESHOLDS = {
 }
 
 local function _can_activate_zealot_invisibility(context, thresholds)
+	local martyrdom = _has_talent(context, "zealot_martyrdom")
 	if context.num_nearby == 0 then
 		return false, "zealot_stealth_block_no_enemies"
 	end
 	if
 		(context.toughness_pct < thresholds.emergency_toughness and context.num_nearby >= 2)
-		or context.health_pct < thresholds.emergency_health
+		or (context.health_pct < thresholds.emergency_health and not martyrdom)
 	then
 		return true, "zealot_stealth_emergency"
 	end
@@ -123,6 +129,9 @@ local function _can_activate_zealot_invisibility(context, thresholds)
 		and context.num_nearby >= thresholds.ally_nearby
 	then
 		return true, "zealot_stealth_ally_reposition"
+	end
+	if martyrdom and context.health_pct < thresholds.emergency_health then
+		return false, "zealot_stealth_hold_martyrdom_low_health"
 	end
 
 	return false, "zealot_stealth_hold"

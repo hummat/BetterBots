@@ -150,16 +150,16 @@ Not a Zealot-Martyrdom one-liner. BB ships three tuned builds in `bot_profiles.l
 
 | Build | Talent marker | Touchpoint |
 |---|---|---|
-| Zealot Martyrdom | `zealot_martyrdom` | Healing suppression + `zealot_invisibility` low-HP panic disable; wound-cure exception |
+| Zealot Martyrdom | `zealot_martyrdom` | Live healing suppression on stations/med-crates + `zealot_invisibility` low-HP panic disable; pocketable wound-cure path stays deferred with F2 |
 | Psyker Warp Siphon / glass cannon | `psyker_damage_based_on_warp_charge` + `psyker_warp_glass_cannon` | Raise peril vent threshold to preserve warp-charge-scaled damage |
 | Psyker Venting Shriek cadence | `psyker_shout_vent_warp_charge` | Shout as vent-trigger; cooldown shape differs from burst-damage shout |
-| Veteran VoC + Focus Target | existing stance path | Targeting weight pass — verify focus-target passive flows through |
+| Veteran VoC + Focus Target | existing stance path | Verify tag ownership, then narrow ping override so Focus Target can still claim already-tagged priority targets |
 
 Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor) remain post-1.0.
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 38 | Talent-aware behavior | Full shipped-roster coverage per table above. Detection via `talent_extension:talents()` + `buff_extension:current_stacks()`. Graceful degrade when talent missing (non-BB profiles). Validation surface = load BB + Solo Play + each class slot. |
+| 38 | Talent-aware behavior | **Code-complete 2026-04-18; in-game validation pending.** Shipped-roster coverage per table above, implemented as a narrow MVP: Martyrdom keeps live healing seams blocked and disables Shroudfield's low-HP-only panic, Psyker shout preserves more peril when warp-charge damage talents are present and vents later with `psyker_shout_vent_warp_charge`, Veteran Focus Target can override an existing tag once to claim `enemy_over_here_veteran`. Detection via `talent_extension:talents()` + `buff_extension:current_stacks()`. Graceful degrade when talent missing (non-BB profiles). |
 
 #### Sprint 3 — Close-range ranged gap + melee identity
 

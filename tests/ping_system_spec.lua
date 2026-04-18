@@ -215,6 +215,52 @@ describe("ping_system", function()
 			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(opportunity_target))
 	end)
 
+	it("lets Focus Target veterans override an existing tag on a priority target", function()
+		local priority_target = { name = "priority" }
+		local blackboard = {
+			perception = {
+				priority_target_enemy = priority_target,
+			},
+		}
+
+		local set_contextual_unit_tag_mock = spy.new(function() end)
+
+		_G.ScriptUnit.has_extension = function(unit, extension_name)
+			if unit == bot_unit and extension_name == "talent_system" then
+				return test_helper.make_player_talent_extension({
+					talents = {
+						veteran_improved_tag = 1,
+					},
+				})
+			elseif extension_name == "smart_tag_system" then
+				return test_helper.make_smart_tag_extension(123)
+			elseif extension_name == "perception_system" then
+				return test_helper.make_minion_perception_extension({
+					has_line_of_sight = true,
+				})
+			elseif extension_name == "unit_data_system" then
+				return test_helper.make_minion_unit_data_extension({
+					name = "renegade_grenadier",
+					tags = { elite = true },
+				})
+			end
+			return nil
+		end
+
+		_G.Managers.state.extension.system = function(_, system_name)
+			if system_name == "smart_tag_system" then
+				return { set_contextual_unit_tag = set_contextual_unit_tag_mock }
+			end
+			return nil
+		end
+
+		PingSystem.update(bot_unit, blackboard)
+
+		assert
+			.spy(set_contextual_unit_tag_mock)
+			.was_called_with(match.is_table(), match.is_ref(bot_unit), match.is_ref(priority_target))
+	end)
+
 	it("does not normal-ping when an Arbites bot with a live companion sees a valid companion target", function()
 		local priority_target = { name = "priority" }
 		local blackboard = {
