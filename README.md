@@ -153,8 +153,8 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Navmesh validation for charge/dash abilities
 - [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
 - [x] Talent-aware bot behavior (Sprint 2 MVP: Zealot Martyrdom, Psyker Warp Siphon/Venting Shriek, Veteran Focus Target tag ownership)
-- [ ] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
-- [ ] Melee activated specials (power sword, thunder hammer, force sword)
+- [x] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
+- [x] Melee activated specials (power sword, thunder hammer, force sword)
 - [ ] Pocketable pickup primitive + medicae/stim/med-kit discipline
 - [ ] Deployable crate carry and deploy (ammo + medical)
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)

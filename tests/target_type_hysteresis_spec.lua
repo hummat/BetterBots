@@ -144,11 +144,33 @@ local function run_hooked_selection(opts)
 			}
 		end
 
+		if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+			return {
+				weapon_template_from_slot = function(_visual_loadout_extension, slot_name)
+					if slot_name == "slot_secondary" then
+						return opts.bot_secondary_weapon_template
+					end
+
+					return nil
+				end,
+			}
+		end
+
 		return saved_require(path)
 	end)
 
 	_G.ScriptUnit = {
 		has_extension = function(unit, system_name)
+			if unit == "bot_1" and system_name == "unit_data_system" then
+				return test_helper.make_player_unit_data_extension({
+					inventory = { wielded_slot = opts.bot_wielded_slot or "slot_secondary" },
+				})
+			end
+
+			if unit == "bot_1" and system_name == "visual_loadout_system" then
+				return { unit = unit }
+			end
+
 			if unit == "target_1" and system_name == "unit_data_system" then
 				return test_helper.make_minion_unit_data_extension(opts.target_breed or {
 					name = "renegade_gunner",
@@ -208,6 +230,20 @@ local function run_hooked_selection(opts)
 				perf_tags[#perf_tags + 1] = { tag = tag, token = token }
 			end,
 		},
+		close_range_ranged_policy = opts.close_range_ranged_policy or function(weapon_template)
+			local keywords = weapon_template and weapon_template.keywords or {}
+			for i = 1, #keywords do
+				if keywords[i] == "flamer" then
+					return {
+						family = "flamer",
+						hold_ranged_target_distance_sq = 100,
+						hipfire_distance_sq = 100,
+					}
+				end
+			end
+
+			return nil
+		end,
 	})
 
 	RuntimeHysteresis.install_bot_perception_hooks(bot_perception_extension)
@@ -445,6 +481,34 @@ describe("target_type_hysteresis", function()
 		assert.equals(2, result.perception_component.target_enemy_distance)
 		assert.equals(1.3, result.perception_component.target_enemy_reevaluation_t)
 		assert.is_truthy(find_debug_log(result.debug_logs, "type hold melee over raw ranged"))
+	end)
+
+	it("preserves ranged targeting for close-range flamer families under melee pressure", function()
+		local result = run_hooked_selection({
+			t = 1,
+			previous_target_type = "ranged",
+			target_distance_sq = 25,
+			bot_secondary_weapon_template = {
+				name = "flamer_p1_m1",
+				keywords = { "ranged", "flamer", "p1" },
+			},
+			bot_selection = {
+				slot_weight = function()
+					return 10
+				end,
+				melee_distance_weight = function()
+					return 8
+				end,
+				ranged_distance_weight = function()
+					return 0
+				end,
+				line_of_sight_weight = function()
+					return 0
+				end,
+			},
+		})
+
+		assert.equals("ranged", result.perception_component.target_enemy_type)
 	end)
 
 	it("eagerly patches an already-loaded BotPerceptionExtension", function()

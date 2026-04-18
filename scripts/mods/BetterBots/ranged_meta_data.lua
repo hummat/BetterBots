@@ -221,6 +221,54 @@ local function has_keyword(weapon_template, keyword)
 	return false
 end
 
+local CLOSE_RANGE_RANGED_DISTANCE_SQ = 10 * 10
+local CLOSE_RANGE_RANGED_POLICIES = {
+	flamer = {
+		family = "flamer",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
+	shotgun = {
+		family = "shotgun",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
+	heavystubber = {
+		family = "heavystubber",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
+	forcestaff_p2_m1 = {
+		family = "forcestaff_p2_m1",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
+}
+
+local function close_range_ranged_policy(weapon_template)
+	if type(weapon_template) ~= "table" then
+		return nil
+	end
+
+	if weapon_template.name == "forcestaff_p2_m1" then
+		return CLOSE_RANGE_RANGED_POLICIES.forcestaff_p2_m1
+	end
+
+	if has_keyword(weapon_template, "flamer") then
+		return CLOSE_RANGE_RANGED_POLICIES.flamer
+	end
+
+	if has_keyword(weapon_template, "shotgun") then
+		return CLOSE_RANGE_RANGED_POLICIES.shotgun
+	end
+
+	if has_keyword(weapon_template, "heavystubber") then
+		return CLOSE_RANGE_RANGED_POLICIES.heavystubber
+	end
+
+	return nil
+end
+
 local WEAKSPOT_AIM_NODES = { -- (#91)
 	"j_head",
 	"j_spine",
@@ -480,5 +528,6 @@ return {
 	_find_aim_input = find_aim_input,
 	_find_aim_fire_input = find_aim_fire_input,
 	_find_aim_action_for_fire = find_aim_action_for_fire,
+	close_range_ranged_policy = close_range_ranged_policy,
 	_should_inject_weakspot_aim = should_inject_weakspot_aim,
 }

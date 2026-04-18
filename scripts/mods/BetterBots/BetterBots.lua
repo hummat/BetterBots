@@ -374,6 +374,7 @@ TargetTypeHysteresis.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
 	is_enabled = function()
 		return Settings.is_feature_enabled("target_type_hysteresis")
 	end,
@@ -633,6 +634,7 @@ WeaponAction.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	perf = Perf,
+	close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,

@@ -11,6 +11,7 @@ local _bot_slot_for_unit
 local _perf
 local _ammo
 local _is_enabled
+local _close_range_ranged_policy
 local _missing_shoot_extension_warned = {}
 
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
@@ -269,6 +270,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_missing_shoot_extension_warned = {}
 	_stream_action_logged_combos = {}
 end
@@ -410,6 +412,7 @@ function M.register_hooks(deps)
 		function(BtBotShootAction)
 			local PlayerUnitVisualLoadout =
 				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+			local _close_range_ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
 
 			if install_weakspot_aim then
 				install_weakspot_aim(BtBotShootAction)
@@ -457,7 +460,51 @@ function M.register_hooks(deps)
 					)
 				end
 
+				scratchpad.close_range_ranged_policy = _close_range_ranged_policy
+						and _close_range_ranged_policy(weapon_template)
+					or nil
 				M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+			end)
+
+			_mod:hook(BtBotShootAction, "_should_aim", function(func, self, t, scratchpad, action_data)
+				if _is_enabled and not _is_enabled() then
+					return func(self, t, scratchpad, action_data)
+				end
+
+				local should_aim = func(self, t, scratchpad, action_data)
+				if not should_aim then
+					return false
+				end
+
+				local policy = scratchpad and scratchpad.close_range_ranged_policy
+				local perception_component = scratchpad and scratchpad.perception_component or nil
+				local target_enemy_distance = perception_component and perception_component.target_enemy_distance or nil
+				local target_enemy_distance_sq = target_enemy_distance and target_enemy_distance * target_enemy_distance
+					or nil
+
+				if
+					not policy
+					or not policy.hipfire_distance_sq
+					or not target_enemy_distance_sq
+					or target_enemy_distance_sq > policy.hipfire_distance_sq
+				then
+					return should_aim
+				end
+
+				if not _close_range_ads_logged_scratchpads[scratchpad] and _debug_enabled() then
+					_close_range_ads_logged_scratchpads[scratchpad] = true
+					_debug_log(
+						"close_range_hipfire:" .. tostring(scratchpad),
+						_fixed_time(),
+						"close-range hipfire suppressed ADS (family="
+							.. tostring(policy.family or "?")
+							.. ", distance="
+							.. string.format("%.2f", target_enemy_distance)
+							.. ")"
+					)
+				end
+
+				return false
 			end)
 
 			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)

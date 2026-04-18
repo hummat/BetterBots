@@ -86,6 +86,20 @@ local function reset(opts)
 			return 3
 		end,
 		ammo = ammo,
+		close_range_ranged_policy = opts.close_range_ranged_policy or function(weapon_template)
+			local keywords = weapon_template and weapon_template.keywords or {}
+			for i = 1, #keywords do
+				if keywords[i] == "flamer" then
+					return {
+						family = "flamer",
+						hold_ranged_target_distance_sq = 100,
+						hipfire_distance_sq = 100,
+					}
+				end
+			end
+
+			return nil
+		end,
 	})
 end
 
@@ -702,6 +716,166 @@ describe("weapon_action", function()
 		assert.is_nil(result)
 		assert.equals(0, forwarded_calls)
 		assert.is_truthy(find_debug_log("blocked shoot_pressed"))
+	end)
+
+	it("skips ADS for close-range hipfire families when the target is near", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_should_aim = function()
+				return true
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			perception_component = {
+				target_ally = nil,
+				target_ally_needs_aid = false,
+				target_ally_distance = 0,
+				target_enemy_distance = 5,
+			},
+			ranged_gestalt = "killshot",
+		}
+		local action_data = {
+			gestalt_behaviors = {
+				killshot = { wants_aim = true },
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "flamer_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+			visual_loadout_system = {},
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return {
+							name = "flamer_p1_m1",
+							keywords = { "ranged", "flamer", "p1" },
+							actions = {},
+						}
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction.enter({}, bot_unit, nil, nil, scratchpad)
+		local should_aim = BtBotShootAction._should_aim({}, 0, scratchpad, action_data)
+
+		rawset(_G, "require", saved_require)
+
+		assert.is_false(should_aim)
+	end)
+
+	it("preserves ADS for close-range families once the target is outside the hipfire window", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_should_aim = function()
+				return true
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			perception_component = {
+				target_ally = nil,
+				target_ally_needs_aid = false,
+				target_ally_distance = 0,
+				target_enemy_distance = 20,
+			},
+			ranged_gestalt = "killshot",
+		}
+		local action_data = {
+			gestalt_behaviors = {
+				killshot = { wants_aim = true },
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "flamer_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+			visual_loadout_system = {},
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return {
+							name = "flamer_p1_m1",
+							keywords = { "ranged", "flamer", "p1" },
+							actions = {},
+						}
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction.enter({}, bot_unit, nil, nil, scratchpad)
+		local should_aim = BtBotShootAction._should_aim({}, 0, scratchpad, action_data)
+
+		rawset(_G, "require", saved_require)
+
+		assert.is_true(should_aim)
 	end)
 
 	it("logs ADS confirmation on _start_aiming once per scratchpad", function()

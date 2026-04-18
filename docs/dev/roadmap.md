@@ -165,8 +165,8 @@ Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broke
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 41 (narrow) | Weapon-family close-range classifier | Purgatus/flamer/shotgun/stubber — hip-fire gestalt + skip melee transition under close-range pressure. Closes Nexus Auric Psyker-dies-most field report. Broad enemy-aware fire cadence stays post-1.0. Touches `target_type_hysteresis.lua`, `ranged_meta_data.lua`, `weapon_action.lua`, vanilla `_should_aim` — med-high blast radius even when narrowed. |
-| 33 (narrow) | Activate_special melee | Power sword, thunder hammer, force sword — pre-engagement `special_action` input when facing elite/specialist + charges available. `damage_profile_special_active` is 2–3× damage + rending + AP per Mar 15 comment on issue. Biggest unshipped lethality lift. Ranged specials + `toggle_special` chainaxe energy mgmt stay post-1.0. |
+| 41 (narrow) | Weapon-family close-range classifier | **Code-complete 2026-04-18; in-game validation pending.** Narrow family policy landed in `ranged_meta_data.lua`, then wired into both `target_type_hysteresis.lua` and the vanilla `BtBotShootAction._should_aim` hook. Supported close-range families: flamer, Purgatus (`forcestaff_p2_m1`), shotgun, heavy stubber. Under close pressure those families keep ranged target type instead of falling back to melee, and suppress ADS inside the configured hipfire window. Broad enemy-aware fire cadence stays post-1.0. |
+| 33 (narrow) | Activate_special melee | **Code-complete 2026-04-18; in-game validation pending.** `melee_attack_choice.lua` now caches supported weapon-special metadata during `BtBotMeleeAction.enter` and prepends `special_action` before the chosen attack when a powered melee family (`forcesword_`, `powersword_`, `thunderhammer_`) is engaging an elite or specialist and the special is not already active. Ranged specials + `toggle_special` chainaxe energy mgmt stay post-1.0. |
 
 #### Sprint 4 — Pocketable pickup primitive + consumable features
 

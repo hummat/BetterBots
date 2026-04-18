@@ -136,6 +136,129 @@ local function _chosen_attack_input(weapon_meta_data, chosen_attack_meta_data)
 	return "unknown"
 end
 
+local SUPPORTED_SPECIAL_WEAPON_PREFIXES = {
+	"forcesword_",
+	"powersword_",
+	"thunderhammer_",
+}
+
+local SUPPORTED_SPECIAL_ACTION_KINDS = {
+	activate_special = true,
+	toggle_special_with_block = true,
+}
+
+local function _starts_with(value, prefix)
+	return type(value) == "string" and string.sub(value, 1, #prefix) == prefix
+end
+
+local function _supports_special_action_weapon(weapon_template)
+	local weapon_name = weapon_template and weapon_template.name or nil
+
+	for i = 1, #SUPPORTED_SPECIAL_WEAPON_PREFIXES do
+		if _starts_with(weapon_name, SUPPORTED_SPECIAL_WEAPON_PREFIXES[i]) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function _resolve_special_action_meta(weapon_template)
+	if not _supports_special_action_weapon(weapon_template) then
+		return nil
+	end
+
+	for action_name, action in pairs(weapon_template.actions or {}) do
+		if action.start_input == "special_action" and SUPPORTED_SPECIAL_ACTION_KINDS[action.kind] then
+			local start_attack = (action.allowed_chain_actions or {}).start_attack
+
+			return {
+				action_input = "special_action",
+				action_name = action_name,
+				chain_time = start_attack and start_attack.chain_time or action.activation_time or 0,
+			}
+		end
+	end
+
+	return nil
+end
+
+local function _is_priority_special_target(target_breed)
+	local tags = target_breed and target_breed.tags or nil
+
+	return tags and (tags.elite or tags.special) or false
+end
+
+local function _can_activate_special(scratchpad)
+	local weapon_extension = scratchpad and scratchpad.weapon_extension or nil
+
+	if not weapon_extension or not weapon_extension.action_input_is_currently_valid then
+		return false
+	end
+
+	return weapon_extension:action_input_is_currently_valid("weapon_action", "special_action", nil, _fixed_time())
+end
+
+local function _prepend_special_action(chosen_attack_meta_data, special_action_meta)
+	local action_inputs = chosen_attack_meta_data and chosen_attack_meta_data.action_inputs or nil
+
+	if
+		type(action_inputs) ~= "table"
+		or type(action_inputs[1]) ~= "table"
+		or action_inputs[1].action_input ~= "start_attack"
+	then
+		return chosen_attack_meta_data
+	end
+
+	local wrapped = {}
+	for key, value in pairs(chosen_attack_meta_data) do
+		wrapped[key] = value
+	end
+
+	local wrapped_action_inputs = {
+		{
+			action_input = special_action_meta.action_input,
+			timing = 0,
+		},
+	}
+
+	for i = 1, #action_inputs do
+		local source = action_inputs[i]
+		local copy = {}
+
+		for key, value in pairs(source) do
+			copy[key] = value
+		end
+
+		if i == 1 then
+			copy.timing = special_action_meta.chain_time or 0
+		end
+
+		wrapped_action_inputs[#wrapped_action_inputs + 1] = copy
+	end
+
+	wrapped.action_inputs = wrapped_action_inputs
+
+	return wrapped
+end
+
+local function _maybe_wrap_special_attack(target_breed, scratchpad, chosen_attack_meta_data)
+	local special_action_meta = scratchpad and scratchpad.special_action_meta or nil
+	local inventory_slot_component = scratchpad and scratchpad.inventory_slot_component or nil
+
+	if
+		not special_action_meta
+		or not inventory_slot_component
+		or inventory_slot_component.special_active
+		or not _is_priority_special_target(target_breed)
+		or not _can_activate_special(scratchpad)
+	then
+		return chosen_attack_meta_data, false
+	end
+
+	return _prepend_special_action(chosen_attack_meta_data, special_action_meta), true
+end
+
 local function _armor_api()
 	if _armor then
 		return _armor
@@ -171,6 +294,21 @@ end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
 function M.install_melee_hooks(BtBotMeleeAction)
+	_mod:hook(BtBotMeleeAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
+		func(self, unit, breed, blackboard, scratchpad, action_data, t)
+
+		if _is_enabled and not _is_enabled() then
+			return
+		end
+
+		local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+		local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory") or nil
+		local wielded_slot = inventory_component and inventory_component.wielded_slot or nil
+
+		scratchpad.inventory_slot_component = wielded_slot and unit_data_extension:read_component(wielded_slot) or nil
+		scratchpad.special_action_meta = _resolve_special_action_meta(scratchpad.weapon_template)
+	end)
+
 	_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
 		if _is_enabled and not _is_enabled() then
 			return func(self, target_unit, target_breed, scratchpad)
@@ -182,6 +320,9 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		local chosen =
 			choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
 		local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
+		local wrapped_special
+
+		chosen, wrapped_special = _maybe_wrap_special_attack(target_breed, scratchpad, chosen)
 
 		if
 			_debug_enabled()
@@ -228,6 +369,17 @@ function M.install_melee_hooks(BtBotMeleeAction)
 					.. tostring(scratchpad),
 				_fixed_time(),
 				"melee light-bias selected light attack for unarmored horde target"
+			)
+		end
+
+		if _debug_enabled() and wrapped_special then
+			_debug_log(
+				"melee_special_prelude:"
+					.. tostring(weapon_template.name or weapon_template.display_name or "weapon")
+					.. ":"
+					.. tostring(scratchpad),
+				_fixed_time(),
+				"melee special prelude queued before " .. tostring(chosen_attack)
 			)
 		end
 
