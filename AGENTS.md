@@ -37,6 +37,23 @@ Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
 **Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95. Current audited surface + source-line evidence: `docs/dev/mock-api-audit.md`.
 
+**Bug-catch audit (mandatory for every bug fix).** Every time a bug surfaces — Codex/Claude review finding, runtime crash, Nexus report, in-game regression, DMF warning — the fix is not complete until you have asked *"should the harness have caught this?"* and acted on the answer.
+
+Required steps before closing the task:
+
+1. **Reproduce the miss.** Temporarily restore the buggy code on a scratch branch or via `git stash`, run the relevant subset of `make check` (or the spec in question), and confirm it still passes. Silence proves the gap is real.
+2. **Classify the gap.** Is it (a) a test that never existed, (b) a test that exists but has a blind spot (regex only matches literals, fake bypasses real runtime guard, mock exposes methods the real class lacks, patch-check missing an anchor), or (c) a test that runs but asserts nothing meaningful? All three count.
+3. **Close it for the class, not the instance.** A stronger regex that handles the specific variable name is not the fix; a resolver that handles any indirection is. Ask whether the next bug of the same shape would be caught.
+4. **Drive the change with TDD.** New/strengthened test goes red against the original bug, green with the fix. This is non-negotiable — a harness improvement that was not seen to fail has the same credibility as untested production code.
+5. **Ship harness + code together.** Same commit, same PR. Never merge the fix and defer the harness. The next commit will always be "more urgent."
+
+Historical worked examples (keep for pattern-matching):
+
+- *Duplicate `hook_require` path (#92 Sprint 1, 2026-04-18):* the bootstrap `rejects duplicate hook_require targets` check missed a case where one of the two registrations used a module-local constant instead of a string literal — regex only matched `hook_require("…"`. Strengthened by resolving `local IDENT = "…"` declarations per-file and mapping `hook_require(IDENT, …)` calls through that table. `tests/startup_regressions_spec.lua` ~line 1119.
+- *Mock fidelity (#95):* see the rule above. The fix was an audit doc (`docs/dev/mock-api-audit.md`) + per-spec discipline, not just a per-crash mock patch.
+
+If the bug cannot be caught by a static check or spec — for example, an engine-side rename that a unit test could never see — escalate it to `scripts/patch-check.sh` as an anchor instead. That is still "strengthening the harness," just at the contract layer.
+
 ## Debugging
 
 Every new feature must include enough `_debug_log` calls to verify correctness from a single in-game session. Not exhaustive or verbose — just sufficient to confirm each code path fires when expected. This logging is **permanent** — it exists to catch regressions and validate working state across releases, not just during initial development. Before marking a feature complete, audit: can you grep `bb-log` output and tell with certainty that it works?
