@@ -19,6 +19,7 @@ local _combat_ability_component
 local _interaction_component
 local _weapon_action_component
 local _weapon_templates
+local _query_weapon_switch_lock
 
 local unit = "bot_unit_1"
 
@@ -85,6 +86,9 @@ local function reset()
 	_combat_ability_component = { active = false }
 	_interaction_component = { target_unit = nil }
 	_weapon_action_component = { template_name = "dummy_primary" }
+	_query_weapon_switch_lock = function()
+		return false
+	end
 	_weapon_templates = {
 		dummy_primary = {
 			action_inputs = {
@@ -174,6 +178,9 @@ local function reset()
 		end,
 		is_item_ability_enabled = function()
 			return _item_enabled_result
+		end,
+		query_weapon_switch_lock = function(unit_arg)
+			return _query_weapon_switch_lock(unit_arg)
 		end,
 	})
 end
@@ -325,11 +332,12 @@ describe("item_fallback", function()
 		_inventory_component.wielded_slot = "slot_combat_ability"
 		_combat_ability_component.active = true
 
-		local should_lock, ability_name, reason = ItemFallback.should_lock_weapon_switch(unit)
+		local should_lock, ability_name, reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
 
 		assert.is_true(should_lock)
 		assert.equals("zealot_relic", ability_name)
 		assert.equals("active", reason)
+		assert.equals("slot_combat_ability", slot_to_keep)
 	end)
 
 	it("does not lock active relic weapon switches while interaction is pending", function()
@@ -367,6 +375,44 @@ describe("item_fallback", function()
 		local should_lock = ItemFallback.should_lock_weapon_switch(unit)
 
 		assert.is_false(should_lock)
+	end)
+
+	it("fast-retries when another locked slot blocks combat-ability wield", function()
+		local state = {}
+		local combat_ability = make_item_ability("zealot_relic")
+
+		_query_weapon_switch_lock = function()
+			return true, "veteran_frag_grenade", "sequence", "slot_grenade_ability"
+		end
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.is_nil(state.item_stage)
+		assert.equals(10.35, state.next_try_t)
+		assert.equals(0, #_queued_inputs)
+		assert.is_not_nil(find_log("fallback item blocked zealot_relic (slot locked by veteran_frag_grenade sequence)"))
+		assert.same({
+			t = 10,
+			event = "blocked",
+			bot = 5,
+			ability = "zealot_relic",
+			rule = "zealot_relic_hazard",
+			stage = nil,
+			profile = nil,
+			attempt_id = nil,
+			reason = "slot_locked",
+			blocked_by = "veteran_frag_grenade",
+			lock_reason = "sequence",
+			held_slot = "slot_grenade_ability",
+		}, _events[1])
 	end)
 
 	it("retries and rotates when combat-ability wield is lost before followup", function()

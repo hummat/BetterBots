@@ -801,6 +801,14 @@ ItemFallback.wire({
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
 	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
 	is_item_ability_enabled = Settings.is_item_ability_enabled,
+	query_weapon_switch_lock = function(unit)
+		local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+		if should_lock then
+			return should_lock, ability_name, lock_reason, slot_to_keep
+		end
+
+		return GrenadeFallback.should_lock_weapon_switch(unit)
+	end,
 })
 
 Debug.wire({
@@ -879,6 +887,14 @@ GrenadeFallback.wire({
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
 	bot_targeting = BotTargeting,
+	query_weapon_switch_lock = function(unit)
+		local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+		if should_lock then
+			return should_lock, ability_name, lock_reason, slot_to_keep
+		end
+
+		return GrenadeFallback.should_lock_weapon_switch(unit)
+	end,
 })
 
 local function _should_lock_weapon_switch(unit)

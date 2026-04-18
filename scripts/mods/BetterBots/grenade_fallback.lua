@@ -22,6 +22,7 @@ local _equipped_grenade_ability
 local _is_combat_ability_active
 local _is_grenade_enabled
 local _normalize_grenade_context
+local _query_weapon_switch_lock
 local _resolve_bot_target_unit_fn
 local _resolve_grenade_projectile_data
 local _solve_ballistic_rotation
@@ -38,6 +39,7 @@ local AIM_DELAY_S = 0.15 -- Minimum hold before queueing aim_hold (lets wield an
 local DEFAULT_THROW_DELAY_S = 0.3 -- Default hold after aim_hold before releasing
 local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
 local RETRY_COOLDOWN_S = 2.0 -- Shared cooldown after a throw attempt finishes or aborts
+local SLOT_LOCK_RETRY_S = 0.35 -- Fast retry when another BetterBots sequence is holding a different slot
 local BALLISTIC_GRAVITY_EPSILON = 0.5 -- Gravity below this treated as non-ballistic (flat aim)
 local ACCEPTABLE_ACCURACY = 0.1 -- Trajectory solver convergence tolerance (radians)
 
@@ -601,6 +603,24 @@ local function should_lock_weapon_switch(unit)
 	return true, grenade_name or "grenade_ability", "sequence", "slot_grenade_ability"
 end
 
+local function _foreign_weapon_switch_lock(unit, desired_slot)
+	if not _query_weapon_switch_lock then
+		return false
+	end
+
+	local should_lock, blocking_ability, lock_reason, slot_to_keep = _query_weapon_switch_lock(unit)
+	if not should_lock then
+		return false
+	end
+
+	slot_to_keep = slot_to_keep or desired_slot
+	if slot_to_keep == desired_slot then
+		return false
+	end
+
+	return true, blocking_ability or "ability", lock_reason or "sequence", slot_to_keep
+end
+
 local function _expected_weapon_action_input(state)
 	if not state or not state.stage then
 		return nil
@@ -684,6 +704,33 @@ local function _abort_missing_action_input(unit, state, fixed_t, input_name, sta
 	)
 	_reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 	_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
+end
+
+local function _abort_slot_locked(unit, state, fixed_t, blocking_ability, lock_reason, held_slot, perf_tag, start_clock)
+	if _debug_enabled() then
+		_debug_log(
+			"grenade_slot_locked:" .. tostring(unit),
+			fixed_t,
+			"grenade blocked during "
+				.. tostring(state.stage)
+				.. " by "
+				.. tostring(blocking_ability)
+				.. " "
+				.. tostring(lock_reason)
+				.. " (held_slot="
+				.. tostring(held_slot)
+				.. ")"
+		)
+	end
+
+	_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, {
+		reason = "slot_locked",
+		blocked_by = blocking_ability,
+		lock_reason = lock_reason,
+		held_slot = held_slot,
+	})
+	_reset_state(unit, state, fixed_t + SLOT_LOCK_RETRY_S)
+	_finish_child_perf(perf_tag, start_clock)
 end
 
 local function _describe_action_component_state(unit, component_name)
@@ -849,6 +896,22 @@ local function try_queue(unit, blackboard)
 				end
 			end
 			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
+			return
+		end
+
+		local blocked, blocking_ability, lock_reason, held_slot =
+			_foreign_weapon_switch_lock(unit, "slot_grenade_ability")
+		if blocked then
+			_abort_slot_locked(
+				unit,
+				state,
+				fixed_t,
+				blocking_ability,
+				lock_reason,
+				held_slot,
+				"grenade_fallback.stage_machine",
+				stage_t0
+			)
 			return
 		end
 
@@ -1499,6 +1562,23 @@ local function try_queue(unit, blackboard)
 			return
 		end
 
+		local blocked, blocking_ability, lock_reason, held_slot =
+			_foreign_weapon_switch_lock(unit, "slot_grenade_ability")
+		if blocked then
+			state.stage = "wield"
+			_abort_slot_locked(
+				unit,
+				state,
+				fixed_t,
+				blocking_ability,
+				lock_reason,
+				held_slot,
+				"grenade_fallback.launch",
+				launch_t0
+			)
+			return
+		end
+
 		-- Item-based grenade: wield the grenade slot first.
 		state.stage = "wield"
 		state.deadline_t = fixed_t + WIELD_TIMEOUT_S
@@ -1552,6 +1632,7 @@ return {
 		_is_combat_ability_active = refs.is_combat_ability_active
 		_is_grenade_enabled = refs.is_grenade_enabled
 		_normalize_grenade_context = refs.normalize_grenade_context
+		_query_weapon_switch_lock = refs.query_weapon_switch_lock
 		_resolve_grenade_projectile_data = refs.resolve_grenade_projectile_data
 			or _default_resolve_grenade_projectile_data
 		_solve_ballistic_rotation = refs.solve_ballistic_rotation or _default_solve_ballistic_rotation

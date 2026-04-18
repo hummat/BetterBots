@@ -89,6 +89,9 @@ local _is_suppressed_reason = nil
 local _combat_ability_active = false
 local _debug_enabled_result = false
 local _grenades_enabled_result = true
+local _query_weapon_switch_lock = function()
+	return false
+end
 
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
@@ -133,6 +136,9 @@ local function reset()
 	_combat_ability_active = false
 	_debug_enabled_result = false
 	_grenades_enabled_result = true
+	_query_weapon_switch_lock = function()
+		return false
+	end
 	_recorded_inputs = {}
 	_debug_logs = {}
 	_event_decisions = {}
@@ -243,6 +249,9 @@ local function reset()
 		end,
 		is_grenade_enabled = function()
 			return _grenades_enabled_result
+		end,
+		query_weapon_switch_lock = function(unit_arg)
+			return _query_weapon_switch_lock(unit_arg)
 		end,
 	})
 end
@@ -2246,6 +2255,29 @@ describe("grenade_fallback", function()
 			assert.equals(1, #blocked)
 			assert.equals("wield_timeout", blocked[1].reason)
 			assert.equals("wield", blocked[1].stage)
+		end)
+
+		it("emits slot_locked instead of wield_timeout when another ability holds a different slot", function()
+			_debug_enabled_result = true
+			_heuristic_result = true
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			_query_weapon_switch_lock = function()
+				return true, "zealot_relic", "active", "slot_combat_ability"
+			end
+
+			_mock_time = _mock_time + 0.1
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			local blocked = find_events("blocked")
+			assert.equals(1, #blocked)
+			assert.equals("slot_locked", blocked[1].reason)
+			assert.equals("wield", blocked[1].stage)
+			assert.equals("zealot_relic", blocked[1].blocked_by)
+			assert.equals("slot_combat_ability", blocked[1].held_slot)
+			assert.equals(10.45, _grenade_state_by_unit[unit].next_try_t)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.is_not_nil(find_debug_log("grenade blocked during wield by zealot_relic active"))
 		end)
 
 		it("emits blocked event on lost wield during aim", function()

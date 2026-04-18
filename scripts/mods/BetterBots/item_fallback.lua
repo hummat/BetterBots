@@ -14,6 +14,7 @@ local _ITEM_CHARGE_CONFIRM_TIMEOUT_S
 local _ITEM_DEFAULT_START_DELAY_S
 local _event_log
 local _bot_slot_for_unit
+local _query_weapon_switch_lock
 
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
 
@@ -285,6 +286,18 @@ local function _schedule_item_sequence_retry(state, fixed_t, rotate_profile)
 	_reset_item_sequence_state(state, fixed_t + _ITEM_SEQUENCE_RETRY_S)
 end
 
+local function _schedule_item_fast_retry(state, fixed_t)
+	local retry_t = fixed_t + ABILITY_STATE_FAIL_RETRY_S
+
+	if state.item_stage then
+		_reset_item_sequence_state(state)
+	end
+
+	if not state.next_try_t or retry_t < state.next_try_t then
+		state.next_try_t = retry_t
+	end
+end
+
 local function schedule_retry(unit, fixed_t, retry_delay_s)
 	local state = _fallback_state_by_unit[unit]
 	if not state then
@@ -357,6 +370,48 @@ local function _interaction_pending_or_active(unit_data_extension)
 	return interaction_component and interaction_component.target_unit ~= nil
 end
 
+local function _foreign_weapon_switch_lock(unit, desired_slot)
+	if not _query_weapon_switch_lock then
+		return false
+	end
+
+	local should_lock, blocking_ability, lock_reason, slot_to_keep = _query_weapon_switch_lock(unit)
+	if not should_lock then
+		return false
+	end
+
+	slot_to_keep = slot_to_keep or desired_slot
+	if slot_to_keep == desired_slot then
+		return false
+	end
+
+	return true, blocking_ability or "ability", lock_reason or "sequence", slot_to_keep
+end
+
+local function _block_item_for_slot_lock(unit, state, ability_name, fixed_t, blocking_ability, lock_reason, held_slot)
+	if _debug_enabled() then
+		_debug_log(
+			"fallback_item_slot_locked:" .. ability_name,
+			fixed_t,
+			"fallback item blocked "
+				.. ability_name
+				.. " (slot locked by "
+				.. tostring(blocking_ability)
+				.. " "
+				.. tostring(lock_reason)
+				.. ")"
+		)
+	end
+
+	_emit_item_event("blocked", unit, ability_name, state, fixed_t, {
+		reason = "slot_locked",
+		blocked_by = blocking_ability,
+		lock_reason = lock_reason,
+		held_slot = held_slot,
+	})
+	_schedule_item_fast_retry(state, fixed_t)
+end
+
 local function should_lock_weapon_switch(unit)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
@@ -377,7 +432,7 @@ local function should_lock_weapon_switch(unit)
 	local combat_ability_active = combat_ability_component and combat_ability_component.active == true
 
 	if combat_ability_active and LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY[ability_name] then
-		return true, ability_name, "active"
+		return true, ability_name, "active", "slot_combat_ability"
 	end
 
 	local state = _fallback_state_by_unit[unit]
@@ -388,7 +443,7 @@ local function should_lock_weapon_switch(unit)
 		and staged_ability_name
 		and LOCK_WEAPON_SWITCH_DURING_ITEM_SEQUENCE[staged_ability_name]
 	then
-		return true, staged_ability_name, "sequence"
+		return true, staged_ability_name, "sequence", "slot_combat_ability"
 	end
 
 	return false
@@ -588,6 +643,13 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 
 	if state.item_stage == "waiting_wield" then
 		if wielded_slot ~= "slot_combat_ability" then
+			local blocked, blocking_ability, lock_reason, held_slot =
+				_foreign_weapon_switch_lock(unit, "slot_combat_ability")
+			if blocked then
+				_block_item_for_slot_lock(unit, state, ability_name, fixed_t, blocking_ability, lock_reason, held_slot)
+				return
+			end
+
 			if fixed_t >= (state.item_wield_deadline_t or 0) then
 				if _debug_enabled() then
 					_debug_log(
@@ -914,6 +976,12 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		return
 	end
 
+	local blocked, blocking_ability, lock_reason, held_slot = _foreign_weapon_switch_lock(unit, "slot_combat_ability")
+	if blocked then
+		_block_item_for_slot_lock(unit, state, ability_name, fixed_t, blocking_ability, lock_reason, held_slot)
+		return
+	end
+
 	_queue_weapon_action_input(state, "combat_ability")
 	state.item_stage = "waiting_wield"
 	state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
@@ -951,6 +1019,7 @@ M.wire = function(refs)
 	_fallback_state_snapshot = refs.fallback_state_snapshot
 	_evaluate_item_heuristic = refs.evaluate_item_heuristic
 	_is_item_ability_enabled = refs.is_item_ability_enabled
+	_query_weapon_switch_lock = refs.query_weapon_switch_lock
 end
 
 M.try_queue_item = try_queue_item
