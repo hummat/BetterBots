@@ -88,6 +88,12 @@ function mod:hook_require(path, callback)
 end
 
 local function _fixed_time()
+	local managers_state = Managers and Managers.state
+	local extension_manager = managers_state and managers_state.extension
+	if not extension_manager or not extension_manager.latest_fixed_t then
+		return 0
+	end
+
 	return FixedFrame.get_latest_fixed_time() or 0
 end
 

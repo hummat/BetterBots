@@ -152,6 +152,12 @@ local function make_bootstrap_harness(module_overrides)
 		enable_perf_timing = false,
 	}
 	module_overrides = module_overrides or {}
+	local fixed_frame_module = module_overrides.__fixed_frame
+		or {
+			get_latest_fixed_time = function()
+				return 0
+			end,
+		}
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -483,9 +489,9 @@ local function make_bootstrap_harness(module_overrides)
 	})
 
 	for module_name, override in pairs(module_overrides) do
-		if override.__strict then
+		if module_name ~= "__fixed_frame" and override.__strict then
 			modules[module_name] = override
-		else
+		elseif module_name ~= "__fixed_frame" then
 			local module = assert(modules[module_name], "unknown fake module override: " .. tostring(module_name))
 			for key, value in pairs(override) do
 				module[key] = value
@@ -620,11 +626,7 @@ local function make_bootstrap_harness(module_overrides)
 			rawset(_G, "BLACKBOARDS", {})
 			rawset(_G, "require", function(path)
 				if path == "scripts/utilities/fixed_frame" then
-					return {
-						get_latest_fixed_time = function()
-							return 0
-						end,
-					}
+					return fixed_frame_module
 				end
 				if path == "scripts/settings/damage/armor_settings" then
 					return {
@@ -678,6 +680,26 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/log_levels"%)', 1))
+	end)
+
+	it("keeps fixed_time bootstrap-safe before extension managers exist", function()
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					error("fixed_frame unavailable during bootstrap")
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(0, fixed_time_seen)
 	end)
 
 	it("loads shared helper modules through mod io", function()
