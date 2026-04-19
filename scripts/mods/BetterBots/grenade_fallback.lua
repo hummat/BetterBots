@@ -24,6 +24,7 @@ local _is_grenade_enabled
 local _normalize_grenade_context
 local _query_weapon_switch_lock
 local _resolve_bot_target_unit_fn
+local _resolve_precision_target_unit_fn
 local _resolve_grenade_projectile_data
 local _solve_ballistic_rotation
 
@@ -138,6 +139,10 @@ local ASSAIL_AIMED_PROFILE = {
 	allow_external_wield_cleanup = true,
 	confirmation_action = "action_rapid_zoomed",
 	require_charge_confirmation = true,
+}
+
+local PRECISION_TARGET_GRENADE_NAMES = {
+	psyker_smite = true,
 }
 
 local EXCLUDED_FLAT_GRENADE_NAMES = {
@@ -346,7 +351,11 @@ local function _resolve_template_entry(grenade_name, context, rule)
 	return ASSAIL_FAST_PROFILE
 end
 
-local function _resolve_aim_unit(context)
+local function _resolve_aim_unit(context, grenade_name)
+	if PRECISION_TARGET_GRENADE_NAMES[grenade_name] and _resolve_precision_target_unit_fn then
+		return _resolve_precision_target_unit_fn(context)
+	end
+
 	if _resolve_bot_target_unit_fn then
 		return _resolve_bot_target_unit_fn(context)
 	end
@@ -361,12 +370,12 @@ local function _resolve_aim_unit(context)
 		or context.urgent_target_enemy
 end
 
-local function _prepare_grenade_context(unit, context)
+local function _prepare_grenade_context(unit, context, grenade_name)
 	if not context then
 		return nil
 	end
 
-	local aim_unit = _resolve_aim_unit(context)
+	local aim_unit = _resolve_aim_unit(context, grenade_name)
 	if _normalize_grenade_context then
 		context = _normalize_grenade_context(unit, context, aim_unit)
 	end
@@ -830,7 +839,7 @@ local function try_queue(unit, blackboard)
 	local active_context
 	if state.stage and state.stage ~= "wait_unwield" then
 		active_context = _build_context(unit, blackboard)
-		active_context = _prepare_grenade_context(unit, active_context)
+		active_context = _prepare_grenade_context(unit, active_context, state.grenade_name)
 		if not _refresh_bot_aim(unit, state, active_context, fixed_t) then
 			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
 			_emit_grenade_event("blocked", unit, state.grenade_name, state, fixed_t, { reason = "aim_lost" })
@@ -947,7 +956,8 @@ local function try_queue(unit, blackboard)
 		end
 
 		if fixed_t >= (state.wait_t or 0) then
-			local context = active_context or _prepare_grenade_context(unit, _build_context(unit, blackboard))
+			local context = active_context
+				or _prepare_grenade_context(unit, _build_context(unit, blackboard), state.grenade_name)
 			-- Pass `revalidation = true` so density-gated grenades get one
 			-- enemy's worth of hysteresis on the re-check; prevents every
 			-- frag attempt from losing the race when num_nearby dips
@@ -1390,7 +1400,7 @@ local function try_queue(unit, blackboard)
 	-- Resolve profile: number = default aim_hold/aim_released; table = custom profile.
 	local ctx_t0 = _perf and _perf.begin() or nil
 	local context = _build_context(unit, blackboard)
-	context = _prepare_grenade_context(unit, context)
+	context = _prepare_grenade_context(unit, context, grenade_name)
 	if ctx_t0 and _perf then
 		_perf.finish("grenade_fallback.build_context", ctx_t0, nil, { include_total = false })
 	end
@@ -1638,6 +1648,7 @@ return {
 		_solve_ballistic_rotation = refs.solve_ballistic_rotation or _default_solve_ballistic_rotation
 		local bot_targeting = refs.bot_targeting
 		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
+		_resolve_precision_target_unit_fn = bot_targeting and bot_targeting.resolve_precision_target_unit or nil
 	end,
 	try_queue = try_queue,
 	record_charge_event = record_charge_event,

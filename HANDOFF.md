@@ -1,34 +1,39 @@
 ## Current State
 
 - Branch: `dev/v1.0.0`
-- Sprint 1 is code-complete in repo docs.
-- `#13` and `#92` are labeled `needs-testing` on GitHub.
-- `#86` remains deferred; only the timing investigation is done.
+- Sprint 1 and the post-`v0.11.3` follow-up batch are code-complete locally.
+- `#103`, `#104`, and `#105` remain open and should stay `needs-testing` until in-game validation happens.
+- GitHub auth is currently broken (`gh auth status` reports invalid tokens for both `github.com` and `rmc-github.robotic.dlr.de`), so issue/PR state cannot be updated from this workstation until re-auth.
 
 ## This Session
 
-- Fixed `#13` validator geometry:
-  - targeted Zealot dash validates against the actual enemy target, not just nav destination
-  - rescue charges validate against the explicit ally aim point
-  - directional charges still fall back to `navigation_extension:destination()` when no better endpoint exists
-- Reordered fallback rescue aim so aim is applied before nav validation.
-- Added regression coverage for both bugs.
-- Synced docs to the corrected behavior.
-- Fixed the post-review blockers on top of that work:
-  - `charge_nav_validation.lua` now fails open when runtime deps are not wired, exposes a user kill switch (`enable_charge_nav_validation`), emits success logs, and blocks explicitly on missing `traverse_logic`
-  - BT-enter charge-nav blocks now emit structured `EventLog` entries, matching the fallback path
-  - `weakspot_aim.lua` now returns `nil` for degenerate flat-angle cases, includes the shooter unit in per-bot debug keys, and emits one-shot patch-drift warnings for missing Bulwark shield API / missing configured weakspot nodes
-  - added multi-bot isolation coverage for charge-nav negative cache and weakspot scratchpad state
+- Investigated the NexusMods Psyker complaint properly instead of hand-waving:
+  - BetterBots already supports Brain Burst (`psyker_smite`) and already has a global grenade/blitz toggle
+  - the real gaps were coarse Brain Burst arbitration, missing `psyker_smite_targeting_action_module` precision seeding, and missing explicit `forcestaff_p3_m1` close-range ranged-hold support
+- Implemented the Psyker follow-up pass:
+  - `bot_targeting.lua`: added `resolve_precision_target_unit()` with priority-slot ordering (`priority` → `opportunity` → `urgent` → `target`)
+  - `smart_targeting.lua`: now hooks both smart-target modules, including `psyker_smite_targeting_action_module`, and seeds them from the precision resolver
+  - `grenade_fallback.lua`: normalizes `psyker_smite` against the precision target before heuristic evaluation / queueing
+  - `heuristics_grenade.lua`: replaced the old generic Brain Burst wrapper with a dedicated rule that blocks under close melee pressure on non-hard targets and biases hard targets explicitly (`super_armor`, monsters, explicit priority targets)
+  - `ranged_meta_data.lua`: added explicit close-range ranged-hold policy for `forcestaff_p3_m1`
+- Fixed review-driven regressions and harness gaps on top of the post-`v0.11.3` batch:
+  - tightened zero-peril Scrier fallback, Gunlugger Armor Pen target binding, and chain super-armor scoring
+  - added hidden-failure diagnostics for supported-special-without-meta and nil talent contexts
+  - fixed a new smart-targeting log-key throttle bug so per-bot confirmation logs are not dropped across multiple bots
+- Updated Psyker docs to remove the stale “blitz not yet implemented” claim and to document the new Brain Burst / staff behavior.
 
 ## Verification
 
-- `make check` passes
+- `make check-ci` passes
 - latest local result before handoff:
-  - `1145 successes / 0 failures / 0 errors / 0 pending`
+  - `1251 successes / 0 failures / 0 errors / 0 pending`
+  - `doc-check: all checks passed`
 
 ## Next Steps
 
-1. Run in-game verification for `#13` and `#92`.
-2. If validation passes, decide whether to close or relabel `#13` / `#92`.
-3. Push the local review-fix commit set and open/update the PR once GitHub auth is healthy again.
-4. Start Sprint 2 (`#38`) after Sprint 1 field verification is done.
+1. Run in-game validation for the still-open follow-up issues:
+   - `#103`: chain-family melee special timing and target selection
+   - `#104`: Scrier/Gunlugger build-aware heuristics
+   - `#105`: autopistol/rippergun/Surge-staff close-range handling and Brain Burst pressure gating
+2. Once GitHub auth is fixed, make sure `#103` / `#104` / `#105` stay open with `needs-testing` until that field validation is recorded.
+3. If the Psyker complaint still reproduces after this pass, the next audit target is `forcestaff_p1_m1` / `forcestaff_p4_m1`, not Brain Burst again.

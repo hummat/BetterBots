@@ -43,6 +43,35 @@ describe("bot_targeting", function()
 		)
 	end)
 
+	it("resolves precision targets in ping-slot priority order", function()
+		local target = BotTargeting.resolve_precision_target_unit({
+			urgent_target_enemy = "urgent",
+			opportunity_target_enemy = "opportunity",
+			priority_target_enemy = "priority",
+			target_enemy = "target",
+		})
+
+		assert.equals("priority", target)
+	end)
+
+	it("falls back through precision slots when higher-priority precision target is missing", function()
+		assert.equals(
+			"opportunity",
+			BotTargeting.resolve_precision_target_unit({
+				opportunity_target_enemy = "opportunity",
+				urgent_target_enemy = "urgent",
+				target_enemy = "target",
+			})
+		)
+
+		assert.equals(
+			"target",
+			BotTargeting.resolve_precision_target_unit({
+				target_enemy = "target",
+			})
+		)
+	end)
+
 	it("detects elite/special/monster tags", function()
 		_G.ScriptUnit = {
 			has_extension = function()

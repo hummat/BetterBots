@@ -9,8 +9,13 @@ local _is_enabled
 local _logged_disabled = false
 local _last_logged_target_by_component = setmetatable({}, { __mode = "k" })
 local _resolve_bot_target_unit_fn
+local _resolve_precision_target_unit_fn
 
 local SMART_TARGETING_PATCH_SENTINEL = "__bb_smart_targeting_installed"
+local TARGETING_MODULE_PATHS = {
+	"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
+	"scripts/extension_systems/weapon/actions/modules/psyker_smite_targeting_action_module",
+}
 
 local function resolve_bot_target_unit(perception_component)
 	if _resolve_bot_target_unit_fn then
@@ -27,78 +32,97 @@ local function resolve_bot_target_unit(perception_component)
 		or perception_component.urgent_target_enemy
 end
 
-local function register_hooks()
-	_mod:hook_require(
-		"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
-		function(SmartTargetingActionModule)
-			if not SmartTargetingActionModule or rawget(SmartTargetingActionModule, SMART_TARGETING_PATCH_SENTINEL) then
-				return
+local function resolve_precision_target_unit(perception_component)
+	if _resolve_precision_target_unit_fn then
+		return _resolve_precision_target_unit_fn(perception_component)
+	end
+
+	if not perception_component then
+		return nil
+	end
+
+	return perception_component.priority_target_enemy
+		or perception_component.opportunity_target_enemy
+		or perception_component.urgent_target_enemy
+		or perception_component.target_enemy
+end
+
+local function install_fixed_update_hook(TargetingActionModule)
+	if not TargetingActionModule or rawget(TargetingActionModule, SMART_TARGETING_PATCH_SENTINEL) then
+		return
+	end
+
+	TargetingActionModule[SMART_TARGETING_PATCH_SENTINEL] = true
+
+	_mod:hook(TargetingActionModule, "fixed_update", function(func, self, dt, t)
+		if _is_enabled and not _is_enabled() then
+			if _debug_enabled() and not _logged_disabled then
+				_logged_disabled = true
+				_debug_log(
+					"smart_targeting_disabled",
+					_fixed_time(),
+					"smart blitz targeting disabled by setting",
+					nil,
+					"info"
+				)
 			end
-			SmartTargetingActionModule[SMART_TARGETING_PATCH_SENTINEL] = true
-
-			_mod:hook(SmartTargetingActionModule, "fixed_update", function(func, self, dt, t)
-				if _is_enabled and not _is_enabled() then
-					if _debug_enabled() and not _logged_disabled then
-						_logged_disabled = true
-						_debug_log(
-							"smart_targeting_disabled",
-							_fixed_time(),
-							"smart blitz targeting disabled by setting",
-							nil,
-							"info"
-						)
-					end
-					return func(self, dt, t)
-				end
-
-				local unit_data_extension = self and self._unit_data_extension
-				if unit_data_extension and unit_data_extension.is_resimulating then
-					return func(self, dt, t)
-				end
-
-				local smart_targeting_extension = self and self._smart_targeting_extension
-				local player = smart_targeting_extension and smart_targeting_extension._player
-				if not player or player:is_human_controlled() then
-					return func(self, dt, t)
-				end
-
-				local perception_component = unit_data_extension and unit_data_extension:read_component("perception")
-				local bot_target_unit = resolve_bot_target_unit(perception_component)
-				local targeting_data = smart_targeting_extension and smart_targeting_extension:targeting_data()
-				if not (bot_target_unit and targeting_data) then
-					return func(self, dt, t)
-				end
-
-				local original_target_unit = targeting_data.unit
-				if _debug_enabled() and _last_logged_target_by_component[self._component] ~= bot_target_unit then
-					_last_logged_target_by_component[self._component] = bot_target_unit
-					_debug_log(
-						"smart_targeting:" .. tostring(bot_target_unit),
-						_fixed_time(),
-						"smart targeting using bot perception target "
-							.. tostring(bot_target_unit)
-							.. " (already_seeded="
-							.. tostring(original_target_unit == bot_target_unit)
-							.. ")",
-						nil,
-						"info"
-					)
-				end
-
-				if original_target_unit == bot_target_unit then
-					return func(self, dt, t)
-				end
-
-				targeting_data.unit = bot_target_unit
-
-				local ok, err = pcall(func, self, dt, t)
-				targeting_data.unit = original_target_unit
-				if not ok then
-					error(err)
-				end
-			end)
+			return func(self, dt, t)
 		end
-	)
+
+		local unit_data_extension = self and self._unit_data_extension
+		if unit_data_extension and unit_data_extension.is_resimulating then
+			return func(self, dt, t)
+		end
+
+		local smart_targeting_extension = self and self._smart_targeting_extension
+		local player = smart_targeting_extension and smart_targeting_extension._player
+		if not player or player:is_human_controlled() then
+			return func(self, dt, t)
+		end
+
+		local bot_unit = self and (self._player_unit or self._unit) or nil
+
+		local perception_component = unit_data_extension and unit_data_extension:read_component("perception")
+		local bot_target_unit = resolve_precision_target_unit(perception_component)
+		local targeting_data = smart_targeting_extension and smart_targeting_extension:targeting_data()
+		if not (bot_target_unit and targeting_data) then
+			return func(self, dt, t)
+		end
+
+		local original_target_unit = targeting_data.unit
+		if _debug_enabled() and _last_logged_target_by_component[self._component] ~= bot_target_unit then
+			_last_logged_target_by_component[self._component] = bot_target_unit
+			_debug_log(
+				"smart_targeting:" .. tostring(bot_unit) .. ":" .. tostring(bot_target_unit),
+				_fixed_time(),
+				"smart targeting using bot perception target "
+					.. tostring(bot_target_unit)
+					.. " (already_seeded="
+					.. tostring(original_target_unit == bot_target_unit)
+					.. ")",
+				nil,
+				"info"
+			)
+		end
+
+		if original_target_unit == bot_target_unit then
+			return func(self, dt, t)
+		end
+
+		targeting_data.unit = bot_target_unit
+
+		local ok, err = pcall(func, self, dt, t)
+		targeting_data.unit = original_target_unit
+		if not ok then
+			error(err)
+		end
+	end)
+end
+
+local function register_hooks()
+	for i = 1, #TARGETING_MODULE_PATHS do
+		_mod:hook_require(TARGETING_MODULE_PATHS[i], install_fixed_update_hook)
+	end
 end
 
 return {
@@ -110,7 +134,9 @@ return {
 		_is_enabled = deps.is_enabled
 		local bot_targeting = deps.bot_targeting
 		_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
+		_resolve_precision_target_unit_fn = bot_targeting and bot_targeting.resolve_precision_target_unit or nil
 	end,
 	register_hooks = register_hooks,
 	resolve_bot_target_unit = resolve_bot_target_unit,
+	resolve_precision_target_unit = resolve_precision_target_unit,
 }

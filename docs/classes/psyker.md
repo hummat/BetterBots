@@ -205,12 +205,13 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 - `psyker_ability_increase_brain_burst_speed`: After combat ability, Brain Burst charges 75% faster and costs 50% less Peril for 10s
 - `psyker_empowered_ability` (keystone): Empowered Brain Burst costs 0% Peril, has increased attack speed and damage
 
-**Bot usage notes**: Brain Burst is the most straightforward blitz for bots.
+**Bot usage notes**: Brain Burst is the most straightforward blitz for bots, but it still needs selective use because the charge is long and stationary.
 - Item-based ability (wielded like weapon), so it requires wield/aim/fire sequence
 - Use against elites, specials, and bosses (high single-target damage)
 - Bot must track Peril -- each use adds significant Peril
 - Do not use when Peril is above ~80%
-- Prioritize: Snipers > Specials > Elites > Monsters
+- BetterBots now seeds Brain Burst precision targeting from the bot perception priority slots instead of inheriting the generic current target
+- BetterBots now blocks Brain Burst under close melee pressure on non-hard targets and keeps it biased toward super-armor / monsters / explicit priority enemies at range
 - **Tier 3 for bot implementation** (item-based, no `ability_template`)
 
 ### 2. Assail (Throwing Knives)

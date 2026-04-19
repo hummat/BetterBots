@@ -564,6 +564,62 @@ describe("grenade_fallback", function()
 			assert.equals("zoom", _grenade_state_by_unit[unit].aim_input)
 		end)
 
+		it("normalizes Smite to the precision-priority target before evaluating", function()
+			local seen_context
+			local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
+			local CombatAbilityIdentity = dofile("scripts/mods/BetterBots/combat_ability_identity.lua")
+			local Heuristics = test_helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = "super_armor",
+			})
+			_extensions.priority_enemy = {
+				unit_data_system = test_helper.make_minion_unit_data_extension({
+					name = "chaos_ogryn_bulwark",
+					tags = { elite = true },
+					game_object_type = "minion",
+					hit_zone_armor_override = {
+						center_mass = "super_armor",
+					},
+				}),
+			}
+			_G.POSITION_LOOKUP.priority_enemy = { x = 14, y = 0, z = 0 }
+
+			GrenadeFallback.wire({
+				build_context = function()
+					return {
+						num_nearby = 1,
+						target_enemy = "enemy_1",
+						target_enemy_distance = 10,
+						priority_target_enemy = "priority_enemy",
+						peril_pct = 0.2,
+					}
+				end,
+				evaluate_grenade_heuristic = function(_, context)
+					seen_context = context
+					return true, "grenade_smite_super_armor"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_smite" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+				bot_targeting = BotTargeting,
+				normalize_grenade_context = Heuristics.normalize_grenade_context,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals("priority_enemy", seen_context.target_enemy)
+			assert.is_true(seen_context.target_is_super_armor)
+			assert.equals(14, seen_context.target_enemy_distance)
+		end)
+
 		it("allows the expected Smite followup input", function()
 			GrenadeFallback.wire({
 				build_context = function()

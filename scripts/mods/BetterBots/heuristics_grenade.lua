@@ -32,6 +32,12 @@ local CHAIN_LIGHTNING_THRESHOLDS = {
 	conservative = { crowd = 5, mixed_nearby = 4 },
 }
 
+local SMITE_THRESHOLDS = {
+	aggressive = { hard_min_distance = 4, priority_min_distance = 7, melee_pressure = 4 },
+	balanced = { hard_min_distance = 5, priority_min_distance = 8, melee_pressure = 3 },
+	conservative = { hard_min_distance = 6, priority_min_distance = 9, melee_pressure = 2 },
+}
+
 local function _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
 	opts = opts or {}
 
@@ -187,12 +193,55 @@ local function _grenade_whistle(context)
 end
 
 local function _grenade_smite(context)
-	return _grenade_priority_target(context, "grenade_smite", {
-		max_peril = 0.85,
-		min_distance = 5,
-		skip_melee_engagement_block = true,
-		skip_priority_melee_pressure_block = true,
-	}, context.preset)
+	-- Brain Burst is a long stationary charge. Treat it as a selective
+	-- hard-target delete, not a generic "some priority target exists" blitz.
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "grenade_smite_block_dormant_daemonhost"
+	end
+
+	if context.peril_pct and context.peril_pct >= 0.85 then
+		return false, "grenade_smite_block_peril"
+	end
+
+	if not context.target_enemy then
+		return false, "grenade_smite_hold"
+	end
+
+	local t = SMITE_THRESHOLDS[context.preset] or SMITE_THRESHOLDS.balanced
+	local target_distance = context.target_enemy_distance or 0
+	local is_hard_target = context.target_is_super_armor or _is_monster_signal_allowed(context)
+	local is_explicit_priority_target = context.target_enemy == context.priority_target_enemy
+		or context.target_enemy == context.opportunity_target_enemy
+		or context.target_enemy == context.urgent_target_enemy
+
+	if target_distance < t.hard_min_distance then
+		return false, "grenade_smite_block_melee_range"
+	end
+
+	if context.num_nearby >= t.melee_pressure and not is_hard_target then
+		return false, "grenade_smite_block_melee_pressure"
+	end
+
+	if context.target_is_super_armor and target_distance >= t.hard_min_distance then
+		return true, "grenade_smite_super_armor"
+	end
+
+	if _is_monster_signal_allowed(context) and target_distance >= t.priority_min_distance then
+		return true, "grenade_smite_monster"
+	end
+
+	if
+		(context.target_is_elite_special or is_explicit_priority_target)
+		and target_distance >= t.priority_min_distance
+	then
+		return true, "grenade_smite_priority_target"
+	end
+
+	return false, "grenade_smite_hold"
 end
 
 local function _grenade_assail(context)

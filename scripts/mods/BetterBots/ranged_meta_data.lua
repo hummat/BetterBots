@@ -317,6 +317,10 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 		family = "forcestaff_p2_m1",
 		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
 	},
+	forcestaff_p3_m1 = {
+		family = "forcestaff_p3_m1",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
 }
 
 local function close_range_ranged_policy(weapon_template)
@@ -326,6 +330,10 @@ local function close_range_ranged_policy(weapon_template)
 
 	if weapon_template.name == "forcestaff_p2_m1" then
 		return CLOSE_RANGE_RANGED_POLICIES.forcestaff_p2_m1
+	end
+
+	if weapon_template.name == "forcestaff_p3_m1" then
+		return CLOSE_RANGE_RANGED_POLICIES.forcestaff_p3_m1
 	end
 
 	if has_keyword(weapon_template, "flamer") then

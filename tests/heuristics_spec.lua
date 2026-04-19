@@ -2358,7 +2358,7 @@ describe("heuristics", function()
 			assert.matches("peril", rule)
 		end)
 
-		it("keeps Smite opted out of the melee gate", function()
+		it("blocks Smite under close melee pressure on non-hard targets", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",
 				helper.make_context({
@@ -2369,8 +2369,23 @@ describe("heuristics", function()
 					peril_pct = 0.50,
 				})
 			)
+			assert.is_false(result)
+			assert.matches("melee_pressure", rule)
+		end)
+
+		it("still allows Smite on super-armor targets under moderate pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					num_nearby = 3,
+					target_enemy = "crusher",
+					target_is_super_armor = true,
+					target_enemy_distance = 7,
+					peril_pct = 0.50,
+				})
+			)
 			assert.is_true(result)
-			assert.matches("priority", rule)
+			assert.matches("super_armor", rule)
 		end)
 
 		it("uses Chain Lightning for low-peril crowd control", function()
@@ -3298,7 +3313,11 @@ describe("heuristics", function()
 						})
 					)
 					assert.is_true(result)
-					assert.matches("priority", rule)
+					if grenade.template == "psyker_smite" then
+						assert.matches("monster", rule)
+					else
+						assert.matches("priority", rule)
+					end
 				end)
 			end
 		end)
@@ -3394,7 +3413,7 @@ describe("heuristics", function()
 					})
 				)
 				assert.is_true(result)
-				assert.matches("priority", rule)
+				assert.matches("monster", rule)
 			end)
 		end)
 	end)

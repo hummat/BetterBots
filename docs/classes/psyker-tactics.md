@@ -113,13 +113,17 @@ IF has(psyker_overcharge_stance_infinite_casting)
 
 ---
 
-## Blitz (Tier 3 — not yet implemented)
+## Blitz (Tier 3 — implemented)
 
 | Blitz | USE WHEN | DON'T USE WHEN | Key constraint |
 |-------|----------|----------------|----------------|
 | Brain Burst | Special/elite at >8m, `peril_pct < 0.75` | `peril_pct >= 0.80`, surrounded (`num_nearby >= 3`), close range (<5m) | 3s charge time = vulnerable |
 | Assail | Freely — 10 charges, 3s regen. Special at any range. | Charges < 2, carapace armor | Most forgiving blitz |
 | Chain Lightning | `num_nearby >= 4` (horde CC), `peril_pct < 0.70` | `peril_pct >= 0.85`, single target | Best AoE CC in game |
+
+**Current BetterBots note:** all three Psyker blitzes are implemented. Brain Burst now has a dedicated long-charge rule instead of the generic priority-target dispatcher: it blocks at high Peril, blocks under close melee pressure on non-hard targets, and keeps its hard-target bias for super-armor / monsters. Its precision target is seeded from the bot perception priority slots rather than blindly inheriting `target_enemy`.
+
+**Current staff note:** explicit close-range ranged-hold support exists for Purgatus (`forcestaff_p2_m1`) and Surge / electrokinetic (`forcestaff_p3_m1`). Other force staves still rely on the general ranged/melee logic.
 
 ---
 
