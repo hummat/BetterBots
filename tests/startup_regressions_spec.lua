@@ -73,6 +73,18 @@ local function find_echo(echoes, pattern)
 	return nil
 end
 
+local function count_echoes(echoes, pattern)
+	local count = 0
+
+	for i = 1, #echoes do
+		if string.find(echoes[i], pattern, 1, true) then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 local function sorted_keys(map)
 	local keys = {}
 
@@ -135,6 +147,7 @@ local function make_bootstrap_harness(module_overrides)
 	local saved_require = require
 	local saved_script_unit = rawget(_G, "ScriptUnit")
 	local saved_blackboards = rawget(_G, "BLACKBOARDS")
+	local saved_managers = rawget(_G, "Managers")
 	local hook_require_callbacks = {}
 	local install_calls = {
 		init_calls = {},
@@ -152,12 +165,18 @@ local function make_bootstrap_harness(module_overrides)
 		enable_perf_timing = false,
 	}
 	module_overrides = module_overrides or {}
+	if module_overrides.__settings then
+		for key, value in pairs(module_overrides.__settings) do
+			settings[key] = value
+		end
+	end
 	local fixed_frame_module = module_overrides.__fixed_frame
 		or {
 			get_latest_fixed_time = function()
 				return 0
 			end,
 		}
+	local managers = module_overrides.__managers
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -180,6 +199,11 @@ local function make_bootstrap_harness(module_overrides)
 			return "off"
 		end,
 	})
+	if module_overrides.LogLevels then
+		for key, value in pairs(module_overrides.LogLevels) do
+			modules.LogLevels[key] = value
+		end
+	end
 
 	modules.SharedRules = {}
 	modules.BotTargeting = {}
@@ -489,9 +513,12 @@ local function make_bootstrap_harness(module_overrides)
 	})
 
 	for module_name, override in pairs(module_overrides) do
-		if module_name ~= "__fixed_frame" and override.__strict then
+		if module_name == "__fixed_frame" or module_name == "__managers" or module_name == "__settings" then
+			-- test-only harness knobs, not runtime modules
+			local _ = override
+		elseif override.__strict then
 			modules[module_name] = override
-		elseif module_name ~= "__fixed_frame" then
+		else
 			local module = assert(modules[module_name], "unknown fake module override: " .. tostring(module_name))
 			for key, value in pairs(override) do
 				module[key] = value
@@ -624,6 +651,7 @@ local function make_bootstrap_harness(module_overrides)
 				end,
 			})
 			rawset(_G, "BLACKBOARDS", {})
+			rawset(_G, "Managers", managers)
 			rawset(_G, "require", function(path)
 				if path == "scripts/utilities/fixed_frame" then
 					return fixed_frame_module
@@ -647,6 +675,7 @@ local function make_bootstrap_harness(module_overrides)
 			rawset(_G, "get_mod", saved_get_mod)
 			rawset(_G, "ScriptUnit", saved_script_unit)
 			rawset(_G, "BLACKBOARDS", saved_blackboards)
+			rawset(_G, "Managers", saved_managers)
 
 			assert.is_true(ok, tostring(loaded))
 			return fake_mod
@@ -700,6 +729,95 @@ describe("startup regressions", function()
 		harness:load()
 
 		assert.equals(0, fixed_time_seen)
+	end)
+
+	it("keeps fixed_time bootstrap-safe when the extension manager lacks latest_fixed_t", function()
+		local fixed_frame_calls = 0
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__managers = {
+				state = {
+					extension = {},
+				},
+			},
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					fixed_frame_calls = fixed_frame_calls + 1
+					error("FixedFrame should not be touched without latest_fixed_t")
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(0, fixed_time_seen)
+		assert.equals(0, fixed_frame_calls)
+	end)
+
+	it("calls FixedFrame when the extension manager exposes latest_fixed_t", function()
+		local fixed_frame_calls = 0
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__managers = {
+				state = {
+					extension = {
+						latest_fixed_t = 123.45,
+					},
+				},
+			},
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					fixed_frame_calls = fixed_frame_calls + 1
+					return 123.45
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(123.45, fixed_time_seen)
+		assert.equals(1, fixed_frame_calls)
+	end)
+
+	it("emits a one-shot debug breadcrumb when fixed_time is unavailable during bootstrap", function()
+		local harness = make_bootstrap_harness({
+			__settings = {
+				enable_debug_logs = 2,
+			},
+			LogLevels = {
+				resolve_setting = function(value)
+					return value
+				end,
+				should_log = function(_current, _level)
+					return true
+				end,
+				level_name = function()
+					return "debug"
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					deps.fixed_time()
+					deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		local breadcrumb = find_echo(harness.echoes, "fixed_time unavailable during bootstrap")
+		assert.is_not_nil(breadcrumb)
+		assert.equals(1, count_echoes(harness.echoes, "fixed_time unavailable during bootstrap"))
 	end)
 
 	it("loads shared helper modules through mod io", function()

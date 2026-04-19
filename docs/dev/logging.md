@@ -58,6 +58,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 
 - `BetterBots loaded`
 - `BetterBots DEBUG: logging enabled (level=<debug|trace>)` (`startup:logging`; only appears when debug logs are set to `Debug` or `Trace`)
+- `BetterBots DEBUG: fixed_time unavailable during bootstrap; using 0 until extension manager is ready` (one-shot bootstrap breadcrumb from `_fixed_time()`; expected only before `Managers.state.extension.latest_fixed_t` is live)
 - `BetterBots DEBUG: settings: preset=..., sprint_dist=..., chase_range=..., tag_bonus=..., horde_bias=..., smart_targeting=..., dh_avoidance=...` (`startup:settings`; concise startup summary, intentionally not a full config dump)
 - `patched <bt_bot_conditions|bt_conditions>.can_activate_ability (version=<N>)` (startup patch confirmation for the condition hooks)
 - `ability template metadata patch installed (version=<N>, injected=<N>, overridden=<N>)` (startup debug/info confirmation that the ability template metadata patch ran)
@@ -138,6 +139,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active and selected an actual runtime node)
 - `shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system` (one-shot diagnostic from the `BtBotShootAction.enter` hook; BetterBots could not normalize ADS/brace inputs for that bot)
 - `BetterBots: shoot scratchpad normalization skipped for <unit> because unit_data_system or visual_loadout_system is missing` (one-shot warning counterpart to the debug line above; emitted even when debug logging is off so operators can see why `#43` diagnostics were incomplete for a bot)
+- `BetterBots: bt_bot_shoot_action hook_require resolved nil` (one-shot warning that the engine handed BetterBots a nil `BtBotShootAction` target during delayed hook installation; this is abnormal and should be investigated before trusting any shoot-action diagnostics)
 - `BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled` (one-shot warning that `scripts/utilities/ammo` failed to load, so the dead-zone fire confirmation log for `#51` is unavailable in this session)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)

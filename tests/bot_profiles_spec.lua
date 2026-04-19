@@ -118,6 +118,15 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo_armor_pen)
 		end)
 
+		it("keeps removed trap talents and absent secondary weapon overrides out of the shipped lineup", function()
+			local profiles = BotProfiles._get_profiles()
+
+			assert.is_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
+			assert.is_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
+			assert.is_nil(profiles.ogryn.weapon_overrides.slot_secondary)
+		end)
+
 		it("every template has required fields", function()
 			local profiles = BotProfiles._get_profiles()
 			for class_name, profile in pairs(profiles) do
@@ -187,6 +196,17 @@ describe("bot_profiles", function()
 					class_name .. " ranged should be a full content path"
 				)
 			end
+		end)
+
+		it("defines an ogryn primary weapon override payload for synthesized quality gear", function()
+			local profiles = BotProfiles._get_profiles()
+			local override = profiles.ogryn.weapon_overrides and profiles.ogryn.weapon_overrides.slot_primary
+
+			assert.is_table(override)
+			assert.is_table(override.traits)
+			assert.is_true(#override.traits > 0)
+			assert.is_table(override.perks)
+			assert.is_true(#override.perks > 0)
 		end)
 	end)
 
@@ -487,6 +507,110 @@ describe("bot_profiles", function()
 				assert.is_not_nil(resolved.visual_loadout.slot_gear_head, "head visual slot must still exist")
 				assert.is_not_nil(resolved.loadout_item_ids.slot_body_face, "face loadout_item_ids must still exist")
 				assert.is_not_nil(resolved.loadout_item_data.slot_body_face, "face loadout_item_data must still exist")
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
+		it("synthesizes ogryn primary weapon overrides through MasterItems.get_item_instance", function()
+			local saved_require = require
+			local seen_slot_primary_gear
+
+			local ok, err = pcall(function()
+				local fake_master_items = {
+					get_cached = function()
+						return {
+							ogryn_primary = { id = "ogryn_primary" },
+							ogryn_secondary = { id = "ogryn_secondary" },
+						}
+					end,
+					get_item_or_fallback = function(item_id)
+						return {
+							name = item_id,
+							source = "fallback",
+						}
+					end,
+					get_item_instance = function(gear)
+						if gear.slots and gear.slots[1] == "slot_primary" then
+							seen_slot_primary_gear = gear
+						end
+
+						return {
+							name = gear.masterDataInstance.id,
+							gear_id = gear.masterDataInstance.id,
+							source = "instance",
+						}
+					end,
+				}
+
+				local fake_archetypes = {
+					ogryn = { name = "ogryn", breed = "ogryn" },
+				}
+
+				local fake_weapon_templates = {
+					ogryn_club_p2_m3 = {
+						base_stats = {
+							damage_stat = {},
+							cleave_stat = {},
+							finesse_stat = {},
+						},
+					},
+				}
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function(_profile, _id)
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return fake_weapon_templates
+					end
+
+					return saved_require(modname)
+				end)
+
+				_mock_settings.bot_slot_1_profile = "ogryn"
+				_mock_settings.bot_weapon_quality = "max"
+
+				local profile = {
+					archetype = "veteran",
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+					},
+					talents = {},
+					bot_gestalts = {
+						melee = "linesman",
+						ranged = "killshot",
+					},
+				}
+
+				local resolved, swapped = BotProfiles.resolve_profile(profile)
+
+				assert.is_true(swapped)
+				assert.equals("instance", resolved.loadout.slot_primary.source)
+				assert.equals("fallback", resolved.loadout.slot_secondary.source)
+				assert.is_not_nil(seen_slot_primary_gear)
+				assert.equals(
+					"content/items/weapons/player/melee/ogryn_club_p2_m3",
+					seen_slot_primary_gear.masterDataInstance.id
+				)
+				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.base_stats)
+				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.base_stats > 0)
+				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.traits)
+				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.traits > 0)
+				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.perks)
+				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.perks > 0)
 			end)
 
 			rawset(_G, "require", saved_require)

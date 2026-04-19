@@ -879,6 +879,164 @@ describe("weapon_action", function()
 		rawset(_G, "require", saved_require)
 	end)
 
+	it("stores the shooter unit on the scratchpad in the BtBotShootAction.enter post-hook", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local scratchpad = {}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction.enter({}, "bot_1", nil, nil, scratchpad)
+
+		rawset(_G, "require", saved_require)
+
+		assert.equals("bot_1", scratchpad.__bb_weakspot_self_unit)
+	end)
+
+	it("reinstalls bt_bot_shoot_action hooks after init resets the module-local guard", function()
+		local saved_require = require
+		local BtBotShootActionA = {
+			__name = "BtBotShootAction",
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local BtBotShootActionB = {
+			__name = "BtBotShootAction",
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+
+		reset({
+			mod = make_classname_duplicate_detecting_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = {
+					BtBotShootActionA,
+				},
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		reset({
+			mod = make_classname_duplicate_detecting_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = {
+					BtBotShootActionB,
+				},
+			}),
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		rawset(_G, "require", saved_require)
+	end)
+
+	it("warns when bt_bot_shoot_action hook_require resolves nil", function()
+		reset({
+			mod = {
+				hook_require = function(_, _path, callback)
+					callback(nil)
+				end,
+				hook = function() end,
+				hook_safe = function() end,
+				echo = function(_, message)
+					_echoes[#_echoes + 1] = message
+				end,
+				warning = function(_, message)
+					_warnings[#_warnings + 1] = message
+				end,
+			},
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		assert.is_truthy(find_warning("bt_bot_shoot_action hook_require resolved nil"))
+	end)
+
 	it("translates warp reload to vent before forwarding queued actions", function()
 		local forwarded_action_input
 		local PlayerUnitActionInputExtension = {

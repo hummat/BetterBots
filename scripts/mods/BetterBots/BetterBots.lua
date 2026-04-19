@@ -30,6 +30,7 @@ local _resolve_decision_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_hits_logged_by_unit = setmetatable({}, { __mode = "k" })
 local _suppression_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_state = { emitted = false }
+local _fixed_time_bootstrap_unavailable_logged = false
 local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
@@ -87,16 +88,6 @@ function mod:hook_require(path, callback)
 	return _original_hook_require(self, path, callback)
 end
 
-local function _fixed_time()
-	local managers_state = Managers and Managers.state
-	local extension_manager = managers_state and managers_state.extension
-	if not extension_manager or not extension_manager.latest_fixed_t then
-		return 0
-	end
-
-	return FixedFrame.get_latest_fixed_time() or 0
-end
-
 local function _refresh_debug_log_level()
 	_log_level = LogLevels.resolve_setting(mod:get(DEBUG_SETTING_ID))
 end
@@ -119,6 +110,24 @@ local function _debug_log(key, fixed_t, message, min_interval_s, level)
 
 	_last_debug_log_t_by_key[key] = t
 	mod:echo("BetterBots DEBUG: " .. message:gsub("%%", "%%%%"))
+end
+
+local function _fixed_time()
+	local managers_state = Managers and Managers.state
+	local extension_manager = managers_state and managers_state.extension
+	if not extension_manager or not extension_manager.latest_fixed_t then
+		if not _fixed_time_bootstrap_unavailable_logged and _debug_enabled() then
+			_fixed_time_bootstrap_unavailable_logged = true
+			_debug_log(
+				"bootstrap:fixed_time_unavailable",
+				0,
+				"fixed_time unavailable during bootstrap; using 0 until extension manager is ready"
+			)
+		end
+		return 0
+	end
+
+	return FixedFrame.get_latest_fixed_time()
 end
 
 _refresh_debug_log_level()

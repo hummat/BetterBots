@@ -92,7 +92,7 @@ Sprint 2 / #104 evidence:
   - remaining gap: no `ogryn_gunlugger_armor_pen_target` confirmation in this run
 
 Sprint 3 / #103 + #105 evidence:
-- Powered melee special prelude: PASS
+- Powered melee special prelude: PARTIAL PASS
   - visual: unknown
   - queue log: yes
   - key lines / timestamps: repeated `melee special prelude queued before ... (family=powered)` from 13:50:15 onward
@@ -101,7 +101,7 @@ Sprint 3 / #103 + #105 evidence:
   - queue log: yes
   - key lines / timestamps: repeated `melee special prelude queued before heavy_attack (family=chain)` and later `light_attack (family=chain)` from 13:51:02 onward
   - remaining gap: current lineup only proves the equipped chain-family path, not all chain subfamilies
-- Autopistol close-range ADS suppression: PASS
+- Autopistol close-range ADS suppression: PARTIAL PASS
   - visual: unknown
   - key lines / timestamps: `close-range hipfire suppressed ADS (family=autopistol, distance=7.95)` at 13:51:32
 - Rippergun / `forcestaff_p3_m1` close-range ranged hold: UNKNOWN

@@ -444,7 +444,7 @@ return {
 		en = "Psyker - Electrokinetic Staff + Force Sword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Ripper Gun + Bully Club",
+		en = "Ogryn - Rippergun + Bully Club",
 	},
 	bot_weapon_quality = {
 		en = "Bot weapon quality",

@@ -75,8 +75,10 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `resolve_decision cache hit ` | Same-frame `Heuristics.resolve_decision(...)` reuse fired for a bot/template; direct runtime proof for the final `#82` BT↔fallback cache path |
 | `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
+| `fixed_time unavailable during bootstrap` | `_fixed_time()` is intentionally returning `0` during bootstrap because the extension manager is not ready yet; one-shot breadcrumb, not a failure |
 | `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
 | `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |
+| `bt_bot_shoot_action hook_require resolved nil` | Abnormal delayed-hook install failure for `BtBotShootAction`; shoot-action diagnostics/hooks are suspect until this is explained |
 | `ammo utility unavailable; dead-zone ranged fire detection disabled` | `scripts/utilities/ammo` failed to load, so the dead-zone ranged-fire confirmation log for `#51` is unavailable in this session |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
 | `grenade pickup permitted: all eligible humans above reserve` | BetterBots reserved a world grenade pickup for the bot because no eligible human grenade user was below reserve; one-shot per bot+pickup reservation episode |

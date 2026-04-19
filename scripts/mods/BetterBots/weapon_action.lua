@@ -19,6 +19,7 @@ local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
 local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
 local _shoot_action_hooks_installed = false
+local _missing_bt_bot_shoot_action_warned = false
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
@@ -345,6 +346,7 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_missing_shoot_extension_warned = {}
+	_missing_bt_bot_shoot_action_warned = false
 	_stream_action_logged_combos = {}
 	_shoot_action_hooks_installed = false
 end
@@ -479,16 +481,20 @@ function M.register_hooks(deps)
 		end
 	end)
 
-	-- ADS verification log plus the _may_fire() validation fix.
+	-- Shoot-action hooks: weakspot handoff, scratchpad cleanup, close-range ADS
+	-- policy, and the _may_fire() validation fix.
 	local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
-			if
-				not BtBotShootAction
-				or _shoot_action_hooks_installed
-				or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL)
-			then
+			if not BtBotShootAction then
+				if not _missing_bt_bot_shoot_action_warned and _mod and _mod.warning then
+					_missing_bt_bot_shoot_action_warned = true
+					_mod:warning("BetterBots: bt_bot_shoot_action hook_require resolved nil")
+				end
+				return
+			end
+			if _shoot_action_hooks_installed or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) then
 				return
 			end
 			_shoot_action_hooks_installed = true
@@ -508,6 +514,9 @@ function M.register_hooks(deps)
 				end
 
 				if scratchpad then
+					-- This is a post-hook, so the first _set_new_aim_target call inside
+					-- vanilla enter cannot rely on __bb_weakspot_self_unit functionally.
+					-- Today the field is only used for weakspot logging context.
 					scratchpad.__bb_weakspot_self_unit = unit
 				end
 

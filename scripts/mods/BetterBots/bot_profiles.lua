@@ -1,7 +1,8 @@
 -- bot_profiles.lua — hardcoded default class profiles for bots (#45)
 -- Replaces vanilla all-veteran profiles with class-diverse loadouts so players
 -- without leveled characters can still benefit from BetterBots' ability support.
--- Weapon and talent choices sourced from hadrons-blessing bot-optimized builds (2026-04-07).
+-- Weapon and talent choices are curated around bot-friendly passives and
+-- class identity, then resolved into engine item objects at spawn time.
 --
 -- Profile resolution: vanilla bot profiles are pre-baked by bot_character_profiles.lua
 -- (items resolved, parse_profile called) BEFORE reaching add_bot. We must resolve our
@@ -30,11 +31,11 @@ local SLOT_SETTING_IDS = {
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
--- Shipped validation-first lineup for fast post-v1.0.0 Solo Play coverage (2026-04-19):
---   veteran: validation lineup (VoC + Focus Target + power sword + bolter)
---   zealot:  validation lineup (Fury + Martyrdom + heavy eviscerator + autopistol)
---   psyker:  validation lineup (Scrier's + Brain Rupture + force sword + electro staff)
---   ogryn:   validation lineup (Point-Blank Barrage + armor-pen + rippergun)
+-- Current shipped lineup:
+--   veteran: Voice of Command + Focus Target + power sword + bolter
+--   zealot:  Fury + Martyrdom + heavy eviscerator + autopistol
+--   psyker:  Scrier's Gaze + Brain Rupture + force sword + electrokinetic staff
+--   ogryn:   Point-Blank Barrage + armor-pen + rippergun
 -- All talent keys verified against decompiled tree layouts.
 -- Stat node names verified against class-specific tree files.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
@@ -52,11 +53,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-veteran (Voice of Command + Focus Target)
-		-- Removed: veteran_dodging_grants_crit (bots can't dodge),
-		-- veteran_replenish_toughness_on_weakspot_kill (bots aim at spine),
-		-- veteran_increased_weakspot_damage (near-zero value for bots).
-		-- Replaced with: flanking damage, ranged cleave, deployable bonus, bleed-on-hit.
+		-- Veteran keeps Voice of Command + Focus Target, but the passive package
+		-- avoids dodge- and weakspot-dependent talents because bots do not play
+		-- around those inputs reliably enough to justify the points.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			veteran_combat_ability_stagger_nearby_enemies = 1,
@@ -125,13 +124,10 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Validation-first Zealot profile: Fury of the Faithful + Martyrdom with a
-		-- chain-family melee weapon and an autopistol so the post-v1.0.0 identity work
-		-- can be exercised in a single run.
-		-- Removed: zealot_toughness_on_dodge, zealot_increased_crit_and_weakspot_damage_after_dodge,
-		-- zealot_reduced_damage_after_dodge (all require dodge input — bots never dodge).
-		-- Aura: Benediction (TDR in coherency) over Beacon of Purity — bots take constant
-		-- toughness damage, making DR more valuable than corruption healing.
+		-- Zealot pairs Fury + Martyrdom with a chain-family melee weapon and an
+		-- autopistol. The passive package avoids dodge-gated talents because bots
+		-- never dodge, and it keeps Benediction because coherency DR is more
+		-- valuable to bot squads than corruption healing.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			zealot_dash = 1,
@@ -197,9 +193,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Validation-first Psyker profile: Scrier's Gaze + Brain Rupture on the
-		-- electrokinetic staff path so the post-v1.0.0 blitz/staff/stance follow-ups
-		-- all have a live-loadout way to fire.
+		-- Psyker pairs Scrier's Gaze + Brain Rupture with the electrokinetic
+		-- staff so the shipped blitz, staff, and stance logic all have a coherent
+		-- live loadout to drive.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			psyker_combat_ability_stance = 1,
@@ -241,10 +237,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			slot_primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
 			slot_secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
 		},
-		-- Validation-first Ogryn profile: keep the Bully Club chassis but swap the
-		-- ranged slot to a rippergun so the widened close-range ranged-family policy
-		-- is exercised on the same build that carries Point-Blank Barrage.
-		-- Bully Club: massive stagger, still a solid fallback if the bot gets forced into melee.
+		-- Ogryn keeps the Bully Club chassis and pairs Point-Blank Barrage with a
+		-- rippergun so the close-range ranged-family logic sits on a build that
+		-- still has a sturdy melee fallback.
 		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
