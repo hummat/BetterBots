@@ -164,6 +164,10 @@ local function _resolve_ogryn_gunlugger_tuning(context, thresholds)
 	return tuning
 end
 
+local function _current_target_is_priority(context)
+	return context and context.target_enemy ~= nil and context.target_enemy == context.priority_target_enemy
+end
+
 local function _can_activate_ogryn_gunlugger(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	local tuning = _resolve_ogryn_gunlugger_tuning(context, thresholds)
@@ -178,7 +182,7 @@ local function _can_activate_ogryn_gunlugger(context, thresholds)
 		and target_distance
 		and target_distance > tuning.commit_target_distance
 		and context.num_nearby <= tuning.high_threat_max_enemies
-		and (context.target_is_super_armor or context.target_is_monster or context.priority_target_enemy)
+		and (context.target_is_super_armor or context.target_is_monster or _current_target_is_priority(context))
 	then
 		return true, "ogryn_gunlugger_armor_pen_target"
 	end

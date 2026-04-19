@@ -95,6 +95,7 @@ local function _resolve_psyker_stance_tuning(context, thresholds)
 	local tuning = {
 		threat_cr = thresholds.threat_cr,
 		combat_density = thresholds.combat_density,
+		bot_no_peril_combat_density = math.max(2, thresholds.combat_density),
 		target_peril_floor = 0.35,
 		target_peril_ceiling = 0.85,
 		block_peril_floor = 0.20,
@@ -170,7 +171,7 @@ local function _can_activate_psyker_stance(context, thresholds)
 		end
 		return true, "psyker_stance_threat_window"
 	end
-	if bot_no_peril and context.num_nearby >= tuning.combat_density then
+	if bot_no_peril and context.num_nearby >= tuning.bot_no_peril_combat_density then
 		if tuning.build_aggressive then
 			return true, "psyker_stance_combat_density_build"
 		end

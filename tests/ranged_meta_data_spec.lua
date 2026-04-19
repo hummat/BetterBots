@@ -149,6 +149,26 @@ describe("ranged_meta_data", function()
 			assert.equals(100, policy.hold_ranged_target_distance_sq)
 			assert.is_nil(policy.hipfire_distance_sq)
 		end)
+
+		it("keeps shotgun family resolution intact after the new keyword branches", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "shotgun_p1_m1",
+				keywords = { "ranged", "shotgun", "p1" },
+			})
+
+			assert.equals("shotgun", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(100, policy.hipfire_distance_sq)
+		end)
+
+		it("returns nil for weapons outside the explicit close-range family set", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "lasgun_p1_m1",
+				keywords = { "ranged", "lasgun", "p1" },
+			})
+
+			assert.is_nil(policy)
+		end)
 	end)
 
 	describe("find_fire_input", function()

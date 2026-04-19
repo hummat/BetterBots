@@ -479,6 +479,23 @@ describe("heuristics", function()
 			assert.matches("target_window", rule)
 		end)
 
+		it("keeps Warp Unbound as the final high-peril ceiling when combined with reduced-warp-charge", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.95,
+					opportunity_target_enemy = "opp_unit",
+					talents = {
+						psyker_overcharge_reduced_warp_charge = true,
+						psyker_overcharge_stance_infinite_casting = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("target_window", rule)
+		end)
+
 		it("lowers the threat gate for Disrupt Destiny or weakspot-kill Scrier builds", function()
 			local ok, rule = evaluate(
 				T,
@@ -488,6 +505,22 @@ describe("heuristics", function()
 					challenge_rating_sum = 3.2,
 					talents = {
 						psyker_new_mark_passive = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("threat_window_build", rule)
+		end)
+
+		it("treats weakspot-kill Scrier builds as aggressive even without Disrupt Destiny", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.50,
+					challenge_rating_sum = 3.2,
+					talents = {
+						psyker_overcharge_weakspot_kill_bonuses = true,
 					},
 				})
 			)
@@ -532,6 +565,22 @@ describe("heuristics", function()
 			)
 			assert.is_true(ok)
 			assert.matches("combat_density", rule)
+		end)
+
+		it("does not spend Scrier's Gaze on a lone enemy in the zero-peril fallback for aggressive builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0,
+					challenge_rating_sum = 2.0,
+					talents = {
+						psyker_new_mark_passive = true,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
 		end)
 
 		it("still blocks at peril 0 with low threat", function()
@@ -765,6 +814,45 @@ describe("heuristics", function()
 			assert.matches("armor_pen_target", rule)
 		end)
 
+		it("allows armor-pen builds to spend Point-Blank Barrage on the current priority target", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy = "priority_unit",
+					priority_target_enemy = "priority_unit",
+					target_enemy_distance = 8,
+					challenge_rating_sum = 1.0,
+					talents = {
+						ogryn_special_ammo_armor_pen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("armor_pen_target", rule)
+		end)
+
+		it(
+			"does not spend armor-pen Barrage on a non-priority current target just because another priority enemy exists",
+			function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 1,
+						target_enemy = "current_unit",
+						priority_target_enemy = "other_priority_unit",
+						target_enemy_distance = 8,
+						challenge_rating_sum = 1.0,
+						talents = {
+							ogryn_special_ammo_armor_pen = true,
+						},
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_low_threat", rule)
+			end
+		)
+
 		it("lets fire-shots builds trigger on medium-range crowd pressure", function()
 			local ok, rule = evaluate(
 				T,
@@ -815,6 +903,24 @@ describe("heuristics", function()
 			)
 			assert.is_true(ok)
 			assert.matches("toughness_regen_sustain", rule)
+		end)
+
+		it("does not use toughness-regen sustain when toughness is above the threshold", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.65,
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_ranged_stance_toughness_regen = true,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
 		end)
 	end)
 

@@ -53,6 +53,18 @@ describe("melee_attack_choice", function()
 		assert.equals(weapon_meta_data.heavy_attack, chosen)
 	end)
 
+	it("treats super-armor targets as armored for attack scoring", function()
+		local MeleeAttackChoice = load_module()
+		local weapon_meta_data = {
+			light_attack = attack_meta({ arc = 0, penetrating = false }),
+			heavy_attack = attack_meta({ arc = 2, penetrating = true }),
+		}
+
+		local chosen = MeleeAttackChoice.choose_attack_meta_data(weapon_meta_data, SUPER_ARMOR, 1, ARMORED, SUPER_ARMOR)
+
+		assert.equals(weapon_meta_data.heavy_attack, chosen)
+	end)
+
 	it("falls back to the vanilla light-only default when attack_meta_data is missing", function()
 		local MeleeAttackChoice = load_module()
 
@@ -173,7 +185,6 @@ describe("melee_attack_choice", function()
 
 		table.sort(hooked_methods)
 		assert.same({ "_choose_attack", "enter" }, hooked_methods)
-		_G.Armor = nil
 	end)
 
 	it("installs melee hooks only once per shared BtBotMeleeAction table", function()
@@ -263,7 +274,6 @@ describe("melee_attack_choice", function()
 		assert.equals(light_attack, chosen)
 		assert.equals(1, #debug_logs)
 		assert.matches("melee choice light_attack vs unarmored target", debug_logs[1].message, 1, true)
-		_G.Armor = nil
 	end)
 
 	it("prepends special_action before elite-target attacks for supported powered weapons", function()
@@ -336,7 +346,6 @@ describe("melee_attack_choice", function()
 		assert.equals(0.65, chosen.action_inputs[2].timing)
 		assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
 		assert.equals(heavy_attack.max_range, chosen.max_range)
-		_G.Armor = nil
 	end)
 
 	it("skips the special-action prelude when the powered state is already active", function()
@@ -405,7 +414,6 @@ describe("melee_attack_choice", function()
 		end, nil, "target_unit", { tags = { elite = true } }, scratchpad)
 
 		assert.equals(heavy_attack, chosen)
-		_G.Armor = nil
 	end)
 
 	it("resolves chainaxe toggle specials during enter and prepends them for elite targets", function()
@@ -514,6 +522,77 @@ describe("melee_attack_choice", function()
 		assert.equals("special_action", chosen.action_inputs[1].action_input)
 		assert.equals("start_attack", chosen.action_inputs[2].action_input)
 		assert.equals(0.4, chosen.action_inputs[2].timing)
+		assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
+	end)
+
+	it("prepends chain specials for super-armor targets and keeps the heavy opener", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return SUPER_ARMOR
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "chainsword_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.3,
+				family = "chain",
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", {}, scratchpad)
+
+		assert.equals("special_action", chosen.action_inputs[1].action_input)
 		assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
 	end)
 
@@ -653,6 +732,145 @@ describe("melee_attack_choice", function()
 		local chosen = choose_attack_handler(function()
 			error("original _choose_attack should not run")
 		end, nil, "target_unit", { tags = { special = true } }, scratchpad)
+
+		assert.equals(heavy_attack, chosen)
+	end)
+
+	it("does not prepend specials when inventory_slot_component is missing", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "chainsword_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.3,
+				family = "chain",
+			},
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { tags = { elite = true } }, scratchpad)
+
+		assert.equals(heavy_attack, chosen)
+	end)
+
+	it("does not prepend specials when special_action is currently invalid", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "chainsword_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.3,
+				family = "chain",
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return false
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { tags = { elite = true } }, scratchpad)
 
 		assert.equals(heavy_attack, chosen)
 	end)

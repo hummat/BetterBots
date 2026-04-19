@@ -58,9 +58,14 @@ local function normalize_attack_meta_data(attack_meta_data)
 	return attack_meta_data
 end
 
-local function _score_attack(attack_input, attack_meta_data, target_armor, num_enemies, armored_type)
+local function _is_armored_bucket(target_armor, armored_type, super_armor_type)
+	return target_armor == armored_type or (super_armor_type ~= nil and target_armor == super_armor_type)
+end
+
+local function _score_attack(attack_input, attack_meta_data, target_armor, num_enemies, armored_type, super_armor_type)
 	local outnumbered = num_enemies > 1
 	local massively_outnumbered = num_enemies > 3
+	local armored_bucket = _is_armored_bucket(target_armor, armored_type, super_armor_type)
 	local utility = 0
 	local arc = attack_meta_data.arc or 0
 	local penetrating = not not attack_meta_data.penetrating
@@ -74,25 +79,19 @@ local function _score_attack(attack_input, attack_meta_data, target_armor, num_e
 		utility = utility + 4
 	end
 
-	if target_armor ~= armored_type or penetrating then
+	if not armored_bucket or penetrating then
 		utility = utility + 8
 	end
 
 	local horde_bias = _melee_horde_light_bias and _melee_horde_light_bias() or 4
-	if
-		horde_bias > 0
-		and outnumbered
-		and target_armor ~= armored_type
-		and attack_input == "light_attack"
-		and not no_damage
-	then
+	if horde_bias > 0 and outnumbered and not armored_bucket and attack_input == "light_attack" and not no_damage then
 		utility = utility + horde_bias
 	end
 
 	return utility
 end
 
-local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemies, armored_type)
+local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemies, armored_type, super_armor_type)
 	local meta_data = type(weapon_meta_data) == "table" and weapon_meta_data or DEFAULT_ATTACK_META_DATA
 	local best_attack_input
 	local best_attack_meta_data
@@ -101,8 +100,14 @@ local function choose_attack_meta_data(weapon_meta_data, target_armor, num_enemi
 	for attack_input, attack_meta_data in pairs(meta_data) do
 		local normalized_attack_meta_data = normalize_attack_meta_data(attack_meta_data)
 		if normalized_attack_meta_data then
-			local utility =
-				_score_attack(attack_input, normalized_attack_meta_data, target_armor, num_enemies, armored_type)
+			local utility = _score_attack(
+				attack_input,
+				normalized_attack_meta_data,
+				target_armor,
+				num_enemies,
+				armored_type,
+				super_armor_type
+			)
 			local prefer_light_tie = utility == best_utility
 				and attack_input == "light_attack"
 				and best_attack_input ~= "light_attack"
@@ -375,19 +380,22 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		local armor = _armor_api()
 		local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
 		local weapon_template = scratchpad.weapon_template or {}
-		local chosen =
-			choose_attack_meta_data(weapon_template.attack_meta_data, target_armor, num_enemies, _armored_type)
+		local chosen = choose_attack_meta_data(
+			weapon_template.attack_meta_data,
+			target_armor,
+			num_enemies,
+			_armored_type,
+			_super_armor_type
+		)
 		local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
 		local wrapped_special
 
 		chosen, wrapped_special = _maybe_wrap_special_attack(target_breed, target_armor, scratchpad, chosen)
+		local armored_bucket = _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 
-		if
-			_debug_enabled()
-			and ((target_armor ~= _armored_type and num_enemies > 1) or target_armor == _armored_type)
-		then
+		if _debug_enabled() and ((not armored_bucket and num_enemies > 1) or armored_bucket) then
 			local weapon_name = tostring(weapon_template.name or weapon_template.display_name or "weapon")
-			local armor_bucket = target_armor == _armored_type and "armored" or "unarmored"
+			local armor_bucket = armored_bucket and "armored" or "unarmored"
 			local choice_key = weapon_name
 				.. ":"
 				.. tostring(chosen_attack)
@@ -416,7 +424,7 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			end
 		elseif
 			_debug_enabled()
-			and target_armor ~= _armored_type
+			and not armored_bucket
 			and num_enemies > 1
 			and chosen == (weapon_template.attack_meta_data or {}).light_attack
 		then
