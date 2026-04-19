@@ -30,11 +30,11 @@ local SLOT_SETTING_IDS = {
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
--- Bot-optimized builds sourced from hadrons-blessing (2026-04-07):
---   veteran: bot-veteran (VoC + Focus Target, no dodge/weakspot talents)
---   zealot:  bot-zealot  (Chorus + Martyrdom, no dodge talents)
---   psyker:  bot-psyker  (Venting Shriek + Warp Siphon + Voidblast staff)
---   ogryn:   bot-ogryn   (Indomitable + Heavy Hitter + Rumbler)
+-- Shipped validation-first lineup for fast post-v1.0.0 Solo Play coverage (2026-04-19):
+--   veteran: validation lineup (VoC + Focus Target + power sword + bolter)
+--   zealot:  validation lineup (Fury + Martyrdom + heavy eviscerator + autopistol)
+--   psyker:  validation lineup (Scrier's + Brain Rupture + force sword + electro staff)
+--   ogryn:   validation lineup (Point-Blank Barrage + armor-pen + rippergun)
 -- All talent keys verified against decompiled tree layouts.
 -- Stat node names verified against class-specific tree files.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
@@ -45,49 +45,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "veteran_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/combatsword_p2_m1",
-			slot_secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
-		},
-		-- Weapon overrides: blessings (traits) and perks from bot-veteran build.
-		-- Rampage (increased_melee_damage_on_multiple_hits) + cleave stacking on sword.
-		-- Rising Heat + Gets Hot! on plasma: damage scales with heat, overheat management.
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_combatsword_p2/increased_melee_damage_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_combatsword_p2/increased_attack_cleave_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_berserker_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_plasmagun_p1/power_bonus_scaled_on_heat",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_plasmagun_p1/reduced_overheat_on_critical_strike",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_berserker_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
-				},
-			},
+			slot_primary = "content/items/weapons/player/melee/powersword_p1_m2",
+			slot_secondary = "content/items/weapons/player/ranged/bolter_p1_m1",
 		},
 		bot_gestalts = {
 			melee = "linesman",
@@ -143,46 +102,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "female",
 		selected_voice = "zealot_female_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/powersword_2h_p1_m2",
-			slot_secondary = "content/items/weapons/player/ranged/flamer_p1_m1",
-		},
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_powersword_2h_p1/reduce_fixed_overheat_amount",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_powersword_2h_p1/chained_weakspot_hits_increase_finesse_and_reduce_overheat",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_elite_enemy_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_flamer_p1/power_bonus_on_continuous_fire",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_flamer_p1/armor_rending_from_dot_burning",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
+			slot_primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/autopistol_p1_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",
@@ -204,17 +125,16 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-zealot (Chorus + Martyrdom)
-		-- Switched from Blazing Piety to Martyrdom: bots take constant damage and
-		-- naturally maintain the low-health state that Martyrdom rewards with stacking
-		-- damage, attack speed, and toughness bonuses.
+		-- Validation-first Zealot profile: Fury of the Faithful + Martyrdom with a
+		-- chain-family melee weapon and an autopistol so the post-v1.0.0 identity work
+		-- can be exercised in a single run.
 		-- Removed: zealot_toughness_on_dodge, zealot_increased_crit_and_weakspot_damage_after_dodge,
 		-- zealot_reduced_damage_after_dodge (all require dodge input — bots never dodge).
 		-- Aura: Benediction (TDR in coherency) over Beacon of Purity — bots take constant
 		-- toughness damage, making DR more valuable than corruption healing.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			zealot_bolstering_prayer = 1,
+			zealot_dash = 1,
 			zealot_throwing_knives = 1,
 			zealot_toughness_damage_reduction_coherency_improved = 1,
 			zealot_martyrdom = 1,
@@ -236,7 +156,6 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			zealot_additional_wounds = 1,
 			zealot_damage_vs_elites = 1,
 			-- Keystone/ability modifiers
-			zealot_channel_grants_damage = 1,
 			zealot_crits_grant_cd = 1,
 			zealot_martyrdom_grants_toughness = 1,
 			zealot_martyrdom_grants_attack_speed = 1,
@@ -255,50 +174,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p4_m1",
-		},
-		-- Weapon overrides: Voidblast staff (p4) replaces Surge (p3) — AoE blast is more
-		-- bot-friendly than chain lightning (no single-target tracking needed).
-		-- Force Greatsword m1 per hadrons-blessing export recommendation.
-		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_forcesword_2h_p1/warp_charge_power_bonus",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_forcesword_2h_p1/chained_hits_increases_melee_cleave",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_forcestaff_p4/warp_charge_critical_strike_chance_bonus",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_forcestaff_p4/faster_charge_on_chained_secondary_attacks",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
+			slot_primary = "content/items/weapons/player/melee/forcesword_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p3_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
@@ -320,24 +197,20 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-psyker (Venting Shriek + Warp Siphon + Voidblast)
-		-- Zero bot-unfriendly talents. Warpfire chain + soul stacking are passive.
-		-- Stat node names corrected (previous had 4 wrong suffixes that silently did nothing).
+		-- Validation-first Psyker profile: Scrier's Gaze + Brain Rupture on the
+		-- electrokinetic staff path so the post-v1.0.0 blitz/staff/stance follow-ups
+		-- all have a live-loadout way to fire.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			psyker_shout_vent_warp_charge = 1,
+			psyker_combat_ability_stance = 1,
 			psyker_brain_burst_improved = 1,
 			psyker_cooldown_aura_improved = 1,
-			psyker_passive_souls_from_elite_kills = 1,
+			psyker_new_mark_passive = 1,
 			-- Class talents (all passive/kill/crit-triggered)
 			psyker_toughness_on_vent = 1,
 			psyker_toughness_on_warp_kill = 1,
-			psyker_elite_kills_add_warpfire = 1,
 			psyker_crits_regen_toughness_movement_speed = 1,
 			psyker_crits_empower_next_attack = 1,
-			psyker_killing_enemy_with_warpfire_boosts = 1,
-			psyker_spread_warpfire_on_kill = 1,
-			psyker_2_tier_3_name_2 = 1,
 			psyker_warp_charge_reduces_toughness_damage_taken = 1,
 			psyker_damage_based_on_warp_charge = 1,
 			psyker_increased_vent_speed = 1,
@@ -346,10 +219,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			psyker_damage_vs_ogryns_and_monsters = 1,
 			-- Keystone/ability modifiers
 			psyker_smite_on_hit = 1,
-			psyker_shout_reduces_warp_charge_generation = 1,
-			psyker_warpfire_on_shout = 1,
-			psyker_toughness_on_soul = 1,
-			psyker_increased_max_souls = 1,
+			psyker_overcharge_weakspot_kill_bonuses = 1,
+			psyker_overcharge_reduced_warp_charge = 1,
+			psyker_overcharge_stance_infinite_casting = 1,
 			-- Stat nodes (names verified against psyker_tree.lua)
 			base_toughness_node_buff_medium_5 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
@@ -367,11 +239,12 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		selected_voice = "ogryn_a",
 		loadout = {
 			slot_primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m2",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
 		},
-		-- Weapon overrides: Bully Club + Rumbler replace Power Maul + Heavy Stubber.
-		-- Bully Club: massive stagger, synergizes with Heavy Hitter keystone heavy-attack rewards.
-		-- Rumbler (grenade launcher): AoE area denial, no aim or sustained-fire ramp-up needed.
+		-- Validation-first Ogryn profile: keep the Bully Club chassis but swap the
+		-- ranged slot to a rippergun so the widened close-range ranged-family policy
+		-- is exercised on the same build that carries Point-Blank Barrage.
+		-- Bully Club: massive stagger, still a solid fallback if the bot gets forced into melee.
 		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
@@ -390,24 +263,6 @@ local DEFAULT_PROFILE_TEMPLATES = {
 				perks = {
 					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
 					{ id = "content/items/perks/melee_common/wield_increase_resistant_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_ogryn_thumper_p1/power_bonus_on_continuous_fire",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_ogryn_thumper_p1/suppression_on_close_kill",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
 		},
@@ -431,14 +286,12 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-ogryn (Indomitable + Heavy Hitter + Bully Club + Rumbler)
-		-- Indomitable charge synergizes with BetterBots charge heuristics.
-		-- Heavy Hitter rewards heavy melee attacks (BetterBots biases heavies for armored).
-		-- Bleed chain: Batter + Delight in Destruction = passive DR from bleed stacking.
-		-- Stat node names corrected (previous had 2 wrong names that did nothing).
+		-- Validation-first Ogryn profile: Point-Blank Barrage with the armor-pen
+		-- modifier on a rippergun. Heavy Hitter stays as the passive melee spine so
+		-- the bot is not dead weight once ranged uptime collapses.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			ogryn_longer_charge = 1,
+			ogryn_special_ammo = 1,
 			ogryn_grenade_frag = 1,
 			ogryn_melee_damage_coherency_improved = 1,
 			ogryn_passive_heavy_hitter = 1,
@@ -459,8 +312,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			ogryn_stacking_attack_speed = 1,
 			ogryn_damage_reduction_after_elite_kill = 1,
 			-- Keystone/ability modifiers
-			ogryn_charge_toughness = 1,
-			ogryn_charge_trample = 1,
+			ogryn_special_ammo_armor_pen = 1,
 			ogryn_heavy_hitter_max_stacks_improves_attack_speed = 1,
 			ogryn_heavy_hitter_tdr = 1,
 			ogryn_heavy_hitter_stagger = 1,

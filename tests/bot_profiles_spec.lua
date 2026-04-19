@@ -82,6 +82,42 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.ogryn)
 		end)
 
+		it("ships the validation-first default lineup", function()
+			local profiles = BotProfiles._get_profiles()
+
+			assert.equals("content/items/weapons/player/melee/powersword_p1_m2", profiles.veteran.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/ranged/bolter_p1_m1", profiles.veteran.loadout.slot_secondary)
+			assert.is_not_nil(profiles.veteran.talents.veteran_improved_tag)
+			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
+
+			assert.equals(
+				"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+				profiles.zealot.loadout.slot_primary
+			)
+			assert.equals(
+				"content/items/weapons/player/ranged/autopistol_p1_m1",
+				profiles.zealot.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.zealot.talents.zealot_dash)
+			assert.is_not_nil(profiles.zealot.talents.zealot_martyrdom)
+
+			assert.equals("content/items/weapons/player/melee/forcesword_p1_m1", profiles.psyker.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/forcestaff_p3_m1",
+				profiles.psyker.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.psyker.talents.psyker_combat_ability_stance)
+			assert.is_not_nil(profiles.psyker.talents.psyker_brain_burst_improved)
+
+			assert.equals("content/items/weapons/player/melee/ogryn_club_p2_m3", profiles.ogryn.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
+				profiles.ogryn.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo_armor_pen)
+		end)
+
 		it("every template has required fields", function()
 			local profiles = BotProfiles._get_profiles()
 			for class_name, profile in pairs(profiles) do
@@ -352,13 +388,13 @@ describe("bot_profiles", function()
 				}
 
 				local fake_weapon_templates = {
-					powersword_2h_p1_m2 = {
+					chainsword_2h_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							finesse_stat = {},
 						},
 					},
-					flamer_p1_m1 = {
+					autopistol_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							charge_stat = {},

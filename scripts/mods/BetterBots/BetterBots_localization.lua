@@ -435,16 +435,16 @@ return {
 		en = "None (vanilla veteran)",
 	},
 	bot_profile_veteran = {
-		en = "Veteran - Plasma Gun + Devil's Claw Sword",
+		en = "Veteran - Boltgun + Power Sword",
 	},
 	bot_profile_zealot = {
-		en = "Zealot - Purgation Flamer + Relic Blade",
+		en = "Zealot - Autopistol + Heavy Eviscerator",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Surge Staff + Force Greatsword",
+		en = "Psyker - Electrokinetic Staff + Force Sword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Heavy Stubber + Power Maul",
+		en = "Ogryn - Ripper Gun + Bully Club",
 	},
 	bot_weapon_quality = {
 		en = "Bot weapon quality",

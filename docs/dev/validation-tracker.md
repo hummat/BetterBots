@@ -1060,6 +1060,11 @@ Profile loading:
   - all 4 classes loaded successfully after hot-reload
   - user confirmed "works" — bots spawned with correct archetypes and weapons
   - Tertium "None" yield fix (#68): profile.name guard prevents overwriting
+
+Later default-profile swap (2026-04-19):
+- The shipped built-in defaults were later retuned for validation coverage and no longer match the April 7 lineup above.
+- Current defaults: Veteran = VoC + Focus Target + boltgun + power sword; Zealot = Fury + Martyrdom + heavy eviscerator + autopistol; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + armor-pen rippergun + Bully Club.
+- That later swap has static coverage and profile-loading coverage, but it does not yet have a dedicated live mission entry in this tracker.
     Tertium/SoloPlay external profiles (validated in earlier run 0)
 
 Ability activation:
