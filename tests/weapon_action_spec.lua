@@ -134,6 +134,51 @@ local function make_hooking_mod(hook_targets)
 	}
 end
 
+local function make_duplicate_detecting_hooking_mod(hook_targets)
+	local installed = {}
+
+	local function install_hook(hook_type, target, method_name, installer)
+		local key = tostring(target) .. ":" .. tostring(method_name) .. ":" .. tostring(hook_type)
+		assert.is_nil(installed[key], "duplicate " .. hook_type .. " install for " .. tostring(method_name))
+		installed[key] = true
+		return installer()
+	end
+
+	return {
+		hook_require = function(_, path, callback)
+			local target = hook_targets[path]
+			if target then
+				callback(target)
+				callback(target)
+			end
+		end,
+		hook = function(_, target, method_name, handler)
+			return install_hook("hook", target, method_name, function()
+				local original = target[method_name]
+				target[method_name] = function(...)
+					return handler(original, ...)
+				end
+			end)
+		end,
+		hook_safe = function(_, target, method_name, handler)
+			return install_hook("hook_safe", target, method_name, function()
+				local original = target[method_name]
+				target[method_name] = function(...)
+					local result = original(...)
+					handler(...)
+					return result
+				end
+			end)
+		end,
+		echo = function(_, message)
+			_echoes[#_echoes + 1] = message
+		end,
+		warning = function(_, message)
+			_warnings[#_warnings + 1] = message
+		end,
+	}
+end
+
 local function find_debug_log(pattern)
 	for i = 1, #_debug_logs do
 		if string.find(_debug_logs[i].message, pattern, 1, true) then
@@ -579,6 +624,50 @@ describe("weapon_action", function()
 		rawset(_G, "require", saved_require)
 
 		assert.is_truthy(find_debug_log("shoot scratchpad normalization skipped"))
+	end)
+
+	it("does not reinstall bt_bot_shoot_action hooks when hook_require callback runs twice", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+
+		reset({
+			mod = make_duplicate_detecting_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		rawset(_G, "require", saved_require)
 	end)
 
 	it("translates warp reload to vent before forwarding queued actions", function()

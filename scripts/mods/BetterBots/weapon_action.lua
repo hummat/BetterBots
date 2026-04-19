@@ -17,6 +17,7 @@ local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
+local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
@@ -481,6 +482,11 @@ function M.register_hooks(deps)
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
+			if not BtBotShootAction or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) then
+				return
+			end
+			BtBotShootAction[SHOOT_ACTION_PATCH_SENTINEL] = true
+
 			local PlayerUnitVisualLoadout =
 				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
 			local _close_range_ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
