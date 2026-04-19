@@ -507,6 +507,10 @@ function M.register_hooks(deps)
 					return
 				end
 
+				if scratchpad then
+					scratchpad.__bb_weakspot_self_unit = unit
+				end
+
 				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 				local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
 				if not unit_data_extension or not visual_loadout_extension then

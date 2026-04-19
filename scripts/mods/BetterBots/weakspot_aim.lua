@@ -336,13 +336,6 @@ function M.install_on_shoot_action(BtBotShootAction)
 	end
 	BtBotShootAction[SENTINEL] = true
 
-	_mod:hook(BtBotShootAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
-		if scratchpad then
-			scratchpad.__bb_weakspot_self_unit = unit
-		end
-
-		return func(self, unit, breed, blackboard, scratchpad, action_data, t)
-	end)
 	_mod:hook_safe(BtBotShootAction, "_set_new_aim_target", function(_self, _t, target_unit, scratchpad, _action_data)
 		M.apply_override(target_unit, scratchpad, scratchpad and scratchpad.__bb_weakspot_self_unit or nil)
 	end)

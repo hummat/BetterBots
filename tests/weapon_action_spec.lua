@@ -229,6 +229,50 @@ local function make_classname_duplicate_detecting_hooking_mod(path_to_targets)
 	}
 end
 
+local function make_dmf_like_hooking_mod(path_to_targets)
+	local installed = {}
+
+	local function install_hook(target, method_name, handler, installer)
+		local key = tostring(target) .. ":" .. tostring(method_name)
+		assert.is_nil(installed[key], "dmf duplicate method hook for " .. tostring(method_name))
+		installed[key] = handler
+		return installer()
+	end
+
+	return {
+		hook_require = function(_, path, callback)
+			local target = path_to_targets[path]
+			if target then
+				callback(target)
+			end
+		end,
+		hook = function(_, target, method_name, handler)
+			return install_hook(target, method_name, handler, function()
+				local original = target[method_name]
+				target[method_name] = function(...)
+					return handler(original, ...)
+				end
+			end)
+		end,
+		hook_safe = function(_, target, method_name, handler)
+			return install_hook(target, method_name, handler, function()
+				local original = target[method_name]
+				target[method_name] = function(...)
+					local result = original(...)
+					handler(...)
+					return result
+				end
+			end)
+		end,
+		echo = function(_, message)
+			_echoes[#_echoes + 1] = message
+		end,
+		warning = function(_, message)
+			_warnings[#_warnings + 1] = message
+		end,
+	}
+end
+
 local function find_debug_log(pattern)
 	for i = 1, #_debug_logs do
 		if string.find(_debug_logs[i].message, pattern, 1, true) then
@@ -771,6 +815,65 @@ describe("weapon_action", function()
 				return false
 			end,
 			observe_queued_weapon_action = function() end,
+		})
+
+		rawset(_G, "require", saved_require)
+	end)
+
+	it("does not compete with weakspot aim for the same BtBotShootAction.enter hook slot", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_set_new_aim_target = function() end,
+			_aim_position = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local WeakspotAim = dofile("scripts/mods/BetterBots/weakspot_aim.lua")
+		local mod = make_dmf_like_hooking_mod({
+			["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+		})
+
+		reset({
+			mod = mod,
+		})
+		WeakspotAim.init({
+			mod = mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			is_enabled = function()
+				return true
+			end,
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+			install_weakspot_aim = WeakspotAim.install_on_shoot_action,
 		})
 
 		rawset(_G, "require", saved_require)

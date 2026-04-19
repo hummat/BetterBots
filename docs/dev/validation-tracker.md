@@ -62,6 +62,66 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-04-19-v1-0-0-smoke-01
+
+```text
+Run ID: 2026-04-19-v1-0-0-smoke-01
+Date (local): 2026-04-19
+Date (UTC): 2026-04-19
+Git commit: local (post weapon_action / weakspot_aim hook conflict fix)
+Log file: console-2026-04-19-13.47.30-9f74e98d-a19e-4398-b3bf-93c243233c93.log
+Bot lineup / abilities: validation-first shipped lineup — Veteran (Voice of Command + Focus Target + boltgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electro staff + force sword), Ogryn (Point-Blank Barrage + armor-pen + rippergun + Bully Club)
+Map + difficulty: live mission smoke run
+
+Regression checks:
+- fresh launch / startup load: PASS
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 13:50:23 / 13:51:37 / 13:55:05, plus `psyker_stance_combat_density_build` at 13:52:21
+- Ogryn Point-Blank Barrage: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_ranged_pack)` at 13:52:12 / 13:54:55 / 13:56:58
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+  - remaining gap: no `ogryn_gunlugger_armor_pen_target` confirmation in this run
+
+Sprint 3 / #103 + #105 evidence:
+- Powered melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=powered)` from 13:50:15 onward
+- Chain-family melee special prelude: PARTIAL PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before heavy_attack (family=chain)` and later `light_attack (family=chain)` from 13:51:02 onward
+  - remaining gap: current lineup only proves the equipped chain-family path, not all chain subfamilies
+- Autopistol close-range ADS suppression: PASS
+  - visual: unknown
+  - key lines / timestamps: `close-range hipfire suppressed ADS (family=autopistol, distance=7.95)` at 13:51:32
+- Rippergun / `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - no `close-range ranged family kept ranged target type` line for either family in this run
+
+Brain Burst / psyker_smite follow-up evidence:
+- Arbitration hold rules: PARTIAL PASS
+  - key lines / timestamps: `grenade_smite_block_melee_pressure`, `grenade_smite_block_melee_range`, and `grenade_smite_block_peril` all observed repeatedly from 13:50:19 onward
+  - remaining gap: no clean end-to-end positive execute trace on the intended hard target in this run; multiple `grenade aim aborted after revalidation` lines remain
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` line in this run
+
+Conclusion:
+- The `BtBotShootAction.enter` rehook warning is resolved in a real cold run: 0 BetterBots warnings, 0 Lua errors.
+- This run partially validates the validation-first lineup and the post-v0.11.3 follow-up batch, but it is not enough to close `#103`, `#104`, or `#105`.
+- Next targeted checks: weakspot aim, rippergun + `forcestaff_p3_m1` close-range hold, and a clean positive Brain Burst execution trace.
+```
+
 ### Run 2026-03-05-tier1-01
 
 ```text

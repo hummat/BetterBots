@@ -844,7 +844,7 @@ describe("weakspot_aim", function()
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 			WeakspotAim.install_on_shoot_action(BtBotShootAction)
 
-			assert.equals(3, #hooks) -- enter + _set_new_aim_target + _aim_position
+			assert.equals(2, #hooks) -- _set_new_aim_target + _aim_position
 		end)
 
 		it("does not own a mod:hook_require registration (weapon_action consolidates)", function()
