@@ -18,6 +18,7 @@ local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
 local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
+local _shoot_action_hooks_installed = false
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
@@ -345,6 +346,7 @@ function M.init(deps)
 	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_missing_shoot_extension_warned = {}
 	_stream_action_logged_combos = {}
+	_shoot_action_hooks_installed = false
 end
 
 local function _ammo_api()
@@ -482,9 +484,14 @@ function M.register_hooks(deps)
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
-			if not BtBotShootAction or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) then
+			if
+				not BtBotShootAction
+				or _shoot_action_hooks_installed
+				or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL)
+			then
 				return
 			end
+			_shoot_action_hooks_installed = true
 			BtBotShootAction[SHOOT_ACTION_PATCH_SENTINEL] = true
 
 			local PlayerUnitVisualLoadout =
