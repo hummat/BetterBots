@@ -304,6 +304,15 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
 		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
 	},
+	autopistol = {
+		family = "autopistol",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
+	rippergun = {
+		family = "rippergun",
+		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+	},
 	forcestaff_p2_m1 = {
 		family = "forcestaff_p2_m1",
 		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
@@ -329,6 +338,14 @@ local function close_range_ranged_policy(weapon_template)
 
 	if has_keyword(weapon_template, "heavystubber") then
 		return CLOSE_RANGE_RANGED_POLICIES.heavystubber
+	end
+
+	if has_keyword(weapon_template, "autopistol") then
+		return CLOSE_RANGE_RANGED_POLICIES.autopistol
+	end
+
+	if has_keyword(weapon_template, "rippergun") then
+		return CLOSE_RANGE_RANGED_POLICIES.rippergun
 	end
 
 	return nil

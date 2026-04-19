@@ -63,6 +63,8 @@ BLOCK IF peril_pct < 0.30 AND num_nearby < 3 AND toughness_pct > 0.50
 - Peril between 40-85% — activation vents 50%, too low wastes vent, too high ends stance immediately
 - `challenge_rating_sum >= 6.0` — significant threat justifies stance
 - Health > 25% — stance builds Peril, risky when low
+- On aggressive Scrier builds (`psyker_new_mark_passive` / `psyker_overcharge_weakspot_kill_bonuses`), earlier combat windows are valid — the current bot rule lowers the threat gate by 1.0 CR and the density gate by 1 enemy
+- On reduced-peril / Warp Unbound variants (`psyker_overcharge_reduced_warp_charge`, `psyker_overcharge_stance_infinite_casting`), the bot can hold stance activation deeper into the upper Peril band
 
 ### DON'T USE WHEN
 - Peril < 20% — wastes the 50% vent
@@ -79,7 +81,16 @@ BLOCK IF peril_pct < 0.20 OR peril_pct > 0.90
 BLOCK IF num_nearby == 0
 BLOCK IF health_pct < 0.25
 ```
-**Confidence:** MEDIUM — Peril boundaries are build-dependent.
+Build-aware follow-up now shipped in BetterBots:
+```
+IF has(psyker_new_mark_passive) OR has(psyker_overcharge_weakspot_kill_bonuses)
+   THEN threat_cr -= 1.0 (floor 2.0), combat_density -= 1 (floor 1)
+IF has(psyker_overcharge_reduced_warp_charge)
+   THEN target_peril_ceiling = 0.90, block_peril_ceiling = 0.95
+IF has(psyker_overcharge_stance_infinite_casting)
+   THEN target_peril_ceiling = 0.95, block_peril_ceiling = 0.97
+```
+**Confidence:** MEDIUM — build-aware first batch shipped; deeper vent/casting-state logic still remains open.
 
 ---
 

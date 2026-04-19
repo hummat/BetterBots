@@ -154,19 +154,21 @@ Not a Zealot-Martyrdom one-liner. BB ships three tuned builds in `bot_profiles.l
 | Psyker Warp Siphon / glass cannon | `psyker_damage_based_on_warp_charge` + `psyker_warp_glass_cannon` | Raise peril vent threshold to preserve warp-charge-scaled damage |
 | Psyker Venting Shriek cadence | `psyker_shout_vent_warp_charge` | Shout as vent-trigger; cooldown shape differs from burst-damage shout |
 | Veteran VoC + Focus Target | existing stance path | Verify tag ownership, then narrow ping override so Focus Target can still claim already-tagged priority targets |
+| Psyker Scrier's Gaze follow-up (`#104`) | `psyker_new_mark_passive`, `psyker_overcharge_weakspot_kill_bonuses`, `psyker_overcharge_reduced_warp_charge`, `psyker_overcharge_stance_infinite_casting` | Lower stance threat/density gates for aggressive mark/weakspot builds; widen upper peril ceilings for reduced-peril / Warp Unbound variants |
+| Ogryn Point-Blank Barrage follow-up (`#104`) | `ogryn_special_ammo_fire_shots`, `ogryn_special_ammo_armor_pen`, `ogryn_special_ammo_movement`, `ogryn_ranged_stance_toughness_regen` | Build-specific activation reasons for horde pressure, hard ranged targets, closer-range commitment, and low-toughness ranged sustain |
 
-Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor) remain post-1.0.
+Further keystone/build extensions beyond the current shipped batch (Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor, wider Veteran specialization coverage, deeper Scrier vent logic) remain post-1.0.
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 38 | Talent-aware behavior | **Code-complete 2026-04-18; in-game validation pending.** Shipped-roster coverage per table above, implemented as a narrow MVP: Martyrdom keeps live healing seams blocked and disables Shroudfield's low-HP-only panic, Psyker shout preserves more peril when warp-charge damage talents are present and vents later with `psyker_shout_vent_warp_charge`, Veteran Focus Target can override an existing tag once to claim `enemy_over_here_veteran`. Detection via `talent_extension:talents()` + `buff_extension:current_stacks()`. Graceful degrade when talent missing (non-BB profiles). |
+| 38 | Talent-aware behavior | **Code-complete 2026-04-18; post-1.0 follow-up `#104` landed 2026-04-19; in-game validation pending.** The base MVP still covers Martyrdom live-healing suppression + low-HP Shroudfield panic disable, Psyker shout peril preservation keyed off warp-charge damage talents plus `psyker_shout_vent_warp_charge`, and Veteran Focus Target's one-shot tag reclaim for `enemy_over_here_veteran`. The first broader build-aware follow-up now also tunes Scrier's Gaze for aggressive mark/weakspot builds and reduced-peril / Warp Unbound variants, and tunes Point-Blank Barrage for Fire Shots, Armor Pen, movement, and toughness-regen branches. Detection still degrades cleanly when talents are absent (non-BB profiles). |
 
 #### Sprint 3 — Close-range ranged gap + melee identity
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 41 (narrow) | Weapon-family close-range classifier | **Code-complete 2026-04-18; in-game validation pending.** Narrow family policy landed in `ranged_meta_data.lua`, then wired into both `target_type_hysteresis.lua` and the vanilla `BtBotShootAction._should_aim` hook. Supported close-range families: flamer, Purgatus (`forcestaff_p2_m1`), shotgun, heavy stubber. Under close pressure those families keep ranged target type instead of falling back to melee; ADS suppression applies to the true hipfire families, while Purgatus keeps its charge-fire path intact. Broad enemy-aware fire cadence stays post-1.0. |
-| 33 (narrow) | Activate_special melee | **Code-complete 2026-04-18; in-game validation pending.** `melee_attack_choice.lua` now caches supported weapon-special metadata during `BtBotMeleeAction.enter` and prepends `special_action` before the chosen attack when a powered melee family (`forcesword_`, `powersword_`, `thunderhammer_`) is engaging an elite or specialist and the special is not already active. Ranged specials + `toggle_special` chainaxe energy mgmt stay post-1.0. |
+| 41 (narrow) | Weapon-family close-range classifier | **Code-complete 2026-04-18; post-1.0 follow-up `#105` landed 2026-04-19; in-game validation pending.** Narrow family policy landed in `ranged_meta_data.lua`, then wired into both `target_type_hysteresis.lua` and the vanilla `BtBotShootAction._should_aim` hook. Supported close-range families are now flamer, Purgatus (`forcestaff_p2_m1`), shotgun, heavy stubber, autopistol/dual autopistols, and rippergun. Under close pressure those families keep ranged target type instead of falling back to melee; ADS suppression applies to the true hipfire families (including autopistols), while Purgatus and ripperguns preserve their non-hipfire fire paths. Broad enemy-aware fire cadence and any autogun subgroup expansion stay post-1.0. |
+| 33 (narrow) | Activate_special melee | **Code-complete 2026-04-18; post-1.0 follow-up `#103` landed 2026-04-19; in-game validation pending.** `melee_attack_choice.lua` now caches supported weapon-special metadata during `BtBotMeleeAction.enter` and prepends `special_action` before the chosen attack when the current family-specific rule says the target is worth it. Powered melee families (`forcesword_`, `powersword_`, `thunderhammer_`) keep the original elite/specialist trigger; chain-family `toggle_special` weapons (`chainaxe_`, `chainsword_`, `chainsword_2h_`) now arm only for elites plus captain/monster/boss or super-armor targets. Ranged specials stay post-1.0. |
 
 #### Sprint 4 — Pocketable pickup primitive + consumable features
 
@@ -221,10 +223,10 @@ Runway cuts are now mostly moot. The planned code/doc items for v1.0.0 are eithe
 **Broad-scope cuts (scope-exit, captured under parent issues):**
 
 - Broad `#24`: complex healing-item ping negotiation beyond F2 primitive + medicae + basic distribution
-- Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide), `toggle_special` chainaxe energy management
-- Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type
+- Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide) and richer per-family target policy beyond the current powered-vs-chain split
+- Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type, plus any autogun subgroup audit beyond the current family set
 - Broad `#92`: replace the provisional Crusher rear-arc proxy with a rig-verified node or stronger live evidence
-- Keystone extensions beyond shipped roster: Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt
+- Keystone/build extensions beyond the current shipped batch: deeper Scrier's Gaze vent logic, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt, broader Veteran specialization coverage
 
 ### Validation-gated — slot into any batch when testable
 

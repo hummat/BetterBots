@@ -7,6 +7,7 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _armored_type
+local _super_armor_type
 local _armor
 local _logged_choice_keys = {}
 local _melee_horde_light_bias
@@ -139,46 +140,67 @@ local function _chosen_attack_input(weapon_meta_data, chosen_attack_meta_data)
 	return "unknown"
 end
 
-local SUPPORTED_SPECIAL_WEAPON_PREFIXES = {
-	"forcesword_",
-	"powersword_",
-	"thunderhammer_",
-}
-
-local SUPPORTED_SPECIAL_ACTION_KINDS = {
-	activate_special = true,
-	toggle_special_with_block = true,
+local SPECIAL_WEAPON_POLICIES = {
+	{
+		family = "powered",
+		prefixes = {
+			"forcesword_",
+			"powersword_",
+			"thunderhammer_",
+		},
+		action_kinds = {
+			activate_special = true,
+			toggle_special_with_block = true,
+		},
+	},
+	{
+		family = "chain",
+		prefixes = {
+			"chainaxe_",
+			"chainsword_",
+		},
+		action_kinds = {
+			toggle_special = true,
+		},
+	},
 }
 
 local function _starts_with(value, prefix)
 	return type(value) == "string" and string.sub(value, 1, #prefix) == prefix
 end
 
-local function _supports_special_action_weapon(weapon_template)
+local function _resolve_special_weapon_policy(weapon_template)
 	local weapon_name = weapon_template and weapon_template.name or nil
 
-	for i = 1, #SUPPORTED_SPECIAL_WEAPON_PREFIXES do
-		if _starts_with(weapon_name, SUPPORTED_SPECIAL_WEAPON_PREFIXES[i]) then
-			return true
+	for i = 1, #SPECIAL_WEAPON_POLICIES do
+		local policy = SPECIAL_WEAPON_POLICIES[i]
+
+		for j = 1, #policy.prefixes do
+			if _starts_with(weapon_name, policy.prefixes[j]) then
+				return policy
+			end
 		end
 	end
 
-	return false
+	return nil
 end
 
 local function _resolve_special_action_meta(weapon_template)
-	if not _supports_special_action_weapon(weapon_template) then
+	local policy = _resolve_special_weapon_policy(weapon_template)
+
+	if not policy then
 		return nil
 	end
 
 	for action_name, action in pairs(weapon_template.actions or {}) do
-		if action.start_input == "special_action" and SUPPORTED_SPECIAL_ACTION_KINDS[action.kind] then
+		if action.start_input == "special_action" and policy.action_kinds[action.kind] then
 			local start_attack = (action.allowed_chain_actions or {}).start_attack
 
 			return {
 				action_input = "special_action",
 				action_name = action_name,
 				chain_time = start_attack and start_attack.chain_time or action.activation_time or 0,
+				family = policy.family,
 			}
 		end
 	end
@@ -186,10 +208,36 @@ local function _resolve_special_action_meta(weapon_template)
 	return nil
 end
 
-local function _is_priority_special_target(target_breed)
+local function _is_powered_special_target(target_breed)
 	local tags = target_breed and target_breed.tags or nil
 
 	return tags and (tags.elite or tags.special) or false
+end
+
+local function _is_chain_special_target(target_breed, target_armor)
+	local tags = target_breed and target_breed.tags or nil
+
+	if tags and (tags.elite or tags.monster or tags.captain) then
+		return true
+	end
+
+	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	return _super_armor_type ~= nil and target_armor == _super_armor_type
+end
+
+local function _is_priority_special_target(special_action_meta, target_breed, target_armor)
+	if not special_action_meta then
+		return false
+	end
+
+	if special_action_meta.family == "chain" then
+		return _is_chain_special_target(target_breed, target_armor)
+	end
+
+	return _is_powered_special_target(target_breed)
 end
 
 local function _can_activate_special(scratchpad)
@@ -245,7 +293,7 @@ local function _prepend_special_action(chosen_attack_meta_data, special_action_m
 	return wrapped
 end
 
-local function _maybe_wrap_special_attack(target_breed, scratchpad, chosen_attack_meta_data)
+local function _maybe_wrap_special_attack(target_breed, target_armor, scratchpad, chosen_attack_meta_data)
 	local special_action_meta = scratchpad and scratchpad.special_action_meta or nil
 	local inventory_slot_component = scratchpad and scratchpad.inventory_slot_component or nil
 
@@ -253,7 +301,7 @@ local function _maybe_wrap_special_attack(target_breed, scratchpad, chosen_attac
 		not special_action_meta
 		or not inventory_slot_component
 		or inventory_slot_component.special_active
-		or not _is_priority_special_target(target_breed)
+		or not _is_priority_special_target(special_action_meta, target_breed, target_armor)
 		or not _can_activate_special(scratchpad)
 	then
 		return chosen_attack_meta_data, false
@@ -291,6 +339,7 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_armored_type = deps.ARMOR_TYPE_ARMORED
+	_super_armor_type = deps.ARMOR_TYPE_SUPER_ARMOR
 	_is_enabled = deps.is_enabled
 	_melee_horde_light_bias = deps.melee_horde_light_bias
 end
@@ -331,7 +380,7 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
 		local wrapped_special
 
-		chosen, wrapped_special = _maybe_wrap_special_attack(target_breed, scratchpad, chosen)
+		chosen, wrapped_special = _maybe_wrap_special_attack(target_breed, target_armor, scratchpad, chosen)
 
 		if
 			_debug_enabled()
@@ -388,7 +437,11 @@ function M.install_melee_hooks(BtBotMeleeAction)
 					.. ":"
 					.. tostring(scratchpad),
 				_fixed_time(),
-				"melee special prelude queued before " .. tostring(chosen_attack)
+				"melee special prelude queued before "
+					.. tostring(chosen_attack)
+					.. " (family="
+					.. tostring((scratchpad.special_action_meta or {}).family or "powered")
+					.. ")"
 			)
 		end
 

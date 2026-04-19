@@ -71,7 +71,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip at the perception/math layer (#90) |
 | `close-range ranged family kept ranged target type` | Supported close-range ranged family overrode the normal melee fallback and kept the bot in ranged mode (#41 narrow) |
 | `close-range hipfire suppressed ADS` | Supported close-range ranged family stayed in hipfire instead of ADS inside the close-range window (#41 narrow) |
-| `melee special prelude queued before` | Powered melee special was armed before the chosen attack against an elite/specialist target (#33 narrow) |
+| `melee special prelude queued before` | Melee special was armed before the chosen attack; the `(family=powered|chain)` suffix tells you whether the narrow powered rule or the post-1.0 chain-family rule fired |
 | `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `resolve_decision cache hit ` | Same-frame `Heuristics.resolve_decision(...)` reuse fired for a bot/template; direct runtime proof for the final `#82` BT↔fallback cache path |
 | `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |

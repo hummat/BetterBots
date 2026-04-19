@@ -117,6 +117,40 @@ describe("ranged_meta_data", function()
 		end)
 	end)
 
+	describe("close_range_ranged_policy", function()
+		it("treats autopistol-family weapons as close-range hipfire ranged weapons", function()
+			local policy = RangedMetaData.close_range_ranged_policy(make_ranged_template({
+				keywords = { "ranged", "autopistol", "p1" },
+			}))
+
+			assert.equals("autopistol", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(100, policy.hipfire_distance_sq)
+		end)
+
+		it("covers dual autopistols through the same family policy", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "dual_autopistols_p1_m1",
+				keywords = { "ranged", "autopistol", "p1" },
+			})
+
+			assert.equals("autopistol", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(100, policy.hipfire_distance_sq)
+		end)
+
+		it("keeps ripperguns ranged at close range without forcing hipfire", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_rippergun_p1_m1",
+				keywords = { "ranged", "rippergun", "p1" },
+			})
+
+			assert.equals("rippergun", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.is_nil(policy.hipfire_distance_sq)
+		end)
+	end)
+
 	describe("find_fire_input", function()
 		it("finds single action_one_pressed input", function()
 			local t = make_ranged_template({

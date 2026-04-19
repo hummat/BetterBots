@@ -463,6 +463,38 @@ describe("heuristics", function()
 			assert.matches("threat_window", rule)
 		end)
 
+		it("widens the high-peril ceiling for Warp Unbound builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.95,
+					opportunity_target_enemy = "opp_unit",
+					talents = {
+						psyker_overcharge_stance_infinite_casting = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("target_window", rule)
+		end)
+
+		it("lowers the threat gate for Disrupt Destiny or weakspot-kill Scrier builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.50,
+					challenge_rating_sum = 3.2,
+					talents = {
+						psyker_new_mark_passive = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("threat_window_build", rule)
+		end)
+
 		it("bypasses peril gate when peril is 0 (bot no warp attacks)", function()
 			local ok, rule = evaluate(
 				T,
@@ -714,6 +746,75 @@ describe("heuristics", function()
 			)
 			assert.is_true(ok)
 			assert.matches("ranged_pack", rule)
+		end)
+
+		it("allows armor-pen builds to spend Point-Blank Barrage on hard range targets", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					challenge_rating_sum = 2.0,
+					target_is_super_armor = true,
+					talents = {
+						ogryn_special_ammo_armor_pen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("armor_pen_target", rule)
+		end)
+
+		it("lets fire-shots builds trigger on medium-range crowd pressure", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_distance = 7,
+					target_enemy_type = "melee",
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_special_ammo_fire_shots = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("fire_shots_pressure", rule)
+		end)
+
+		it("relaxes the close-range block for no-movement-penalty builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 3.5,
+					challenge_rating_sum = 3.0,
+					urgent_target_enemy = "urgent",
+					talents = {
+						ogryn_special_ammo_movement = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("urgent_target", rule)
+		end)
+
+		it("uses toughness-regen builds as ranged sustain instead of only damage burst", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.45,
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_ranged_stance_toughness_regen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("toughness_regen_sustain", rule)
 		end)
 	end)
 

@@ -91,6 +91,39 @@ local PSYKER_STANCE_THRESHOLDS = {
 	conservative = { threat_cr = 5.0, combat_density = 4 },
 }
 
+local function _resolve_psyker_stance_tuning(context, thresholds)
+	local tuning = {
+		threat_cr = thresholds.threat_cr,
+		combat_density = thresholds.combat_density,
+		target_peril_floor = 0.35,
+		target_peril_ceiling = 0.85,
+		block_peril_floor = 0.20,
+		block_peril_ceiling = 0.90,
+		build_aggressive = false,
+	}
+
+	if
+		_has_talent(context, "psyker_new_mark_passive")
+		or _has_talent(context, "psyker_overcharge_weakspot_kill_bonuses")
+	then
+		tuning.threat_cr = math.max(2.0, tuning.threat_cr - 1.0)
+		tuning.combat_density = math.max(1, tuning.combat_density - 1)
+		tuning.build_aggressive = true
+	end
+
+	if _has_talent(context, "psyker_overcharge_reduced_warp_charge") then
+		tuning.target_peril_ceiling = 0.90
+		tuning.block_peril_ceiling = 0.95
+	end
+
+	if _has_talent(context, "psyker_overcharge_stance_infinite_casting") then
+		tuning.target_peril_ceiling = 0.95
+		tuning.block_peril_ceiling = 0.97
+	end
+
+	return tuning
+end
+
 local function _can_activate_psyker_stance(context, thresholds)
 	if context.peril_pct == nil then
 		return nil, "psyker_stance_missing_peril"
@@ -105,23 +138,42 @@ local function _can_activate_psyker_stance(context, thresholds)
 	-- Some bot loadouts still report 0 peril in live combat, so keep a
 	-- threat-only fallback instead of hard-blocking on the human peril window.
 	local bot_no_peril = context.peril_pct == 0
+	local tuning = _resolve_psyker_stance_tuning(context, thresholds)
 
-	if not bot_no_peril and (context.peril_pct < 0.20 or context.peril_pct > 0.90) then
+	if
+		not bot_no_peril
+		and (context.peril_pct < tuning.block_peril_floor or context.peril_pct > tuning.block_peril_ceiling)
+	then
 		return false, "psyker_stance_block_peril_window"
 	end
 	if
 		(context.opportunity_target_enemy or context.urgent_target_enemy)
-		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+		and (
+			bot_no_peril
+			or (context.peril_pct >= tuning.target_peril_floor and context.peril_pct <= tuning.target_peril_ceiling)
+		)
 	then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_target_window_build"
+		end
 		return true, "psyker_stance_target_window"
 	end
 	if
-		context.challenge_rating_sum >= thresholds.threat_cr
-		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+		context.challenge_rating_sum >= tuning.threat_cr
+		and (
+			bot_no_peril
+			or (context.peril_pct >= tuning.target_peril_floor and context.peril_pct <= tuning.target_peril_ceiling)
+		)
 	then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_threat_window_build"
+		end
 		return true, "psyker_stance_threat_window"
 	end
-	if bot_no_peril and context.num_nearby >= thresholds.combat_density then
+	if bot_no_peril and context.num_nearby >= tuning.combat_density then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_combat_density_build"
+		end
 		return true, "psyker_stance_combat_density"
 	end
 

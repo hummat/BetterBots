@@ -137,8 +137,9 @@ This mod targets bot ability activation in three paths:
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
 26. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
-    - hook `BtBotMeleeAction._choose_attack`
+    - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
+    - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families: powered weapons keep the narrow elite/specialist trigger, while chain-family `toggle_special` weapons only arm for elite/captain/monster/boss or super-armor targets
 27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`

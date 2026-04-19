@@ -133,12 +133,12 @@ The Psyker's base combat ability is **Venting Shriek**. Two alternatives can be 
 - `psyker_overcharge_increased_movement_speed`: Increased movement speed during stance
 - `psyker_overcharge_weakspot_kill_bonuses`: Weakspot kills grant stacking finesse damage per kill
 
-**Bot usage notes**: Scrier's Gaze is harder for bots to use optimally. Recommended behavior:
-- Activate before engaging elites/bosses for the damage/crit buff
-- Simple activation pattern (single press, stance type)
-- Bot must monitor Peril during stance and be ready to vent or let stance expire
-- Best for ranged-focused bot builds where Peril generation is lower
-- 25s cooldown is the shortest of the three combat abilities
+**Bot usage notes**: Scrier's Gaze is harder for bots to use optimally, but BetterBots now has a first build-aware pass on top of the simple stance activation:
+- Base stance rule is still threat-window driven: fire on clear elite/monster pressure or real combat density, not on cooldown into empty space
+- `psyker_new_mark_passive` / `psyker_overcharge_weakspot_kill_bonuses` builds lower the threat/density gates so aggressive Disrupt Destiny / weakspot-kill variants spend stance earlier
+- `psyker_overcharge_reduced_warp_charge` widens the acceptable upper Peril window, and `psyker_overcharge_stance_infinite_casting` widens it further
+- Bot still needs to monitor Peril during stance and let the existing overcharge guard stop warp-weapon attacks near critical Peril
+- 25s cooldown is the shortest of the three combat abilities, so liberal use on valid combat windows is correct
 
 ### 3. Telekine Shield / Dome
 

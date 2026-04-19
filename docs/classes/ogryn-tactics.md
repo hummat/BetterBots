@@ -68,6 +68,9 @@ BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 - Monster visible with no melee pressure (`urgent_target AND num_nearby <= 1 AND target_dist > 5`)
 - 2+ elites/specials at range (`target_dist > 5 AND count_elites_or_specials >= 2`)
 - `challenge_rating_sum >= 6.0 AND target_dist > 5 AND num_nearby <= 2`
+- Fire Shots variant can also justify activation on medium-range crowd pressure, not just elite packs
+- Armor Pen variant is worth spending on hard ranged targets (super armor / monster / priority ranged pressure) even when the generic CR gate is not met yet
+- Toughness Regen variant can justify activation at low toughness when the bot has a ranged target and room to stand off
 
 ### DON'T USE WHEN
 - In melee (`num_nearby >= 3` or `target_dist < 4`) — locked into ranged weapon
@@ -82,7 +85,18 @@ BLOCK IF num_nearby >= 3
 BLOCK IF target_dist < 4
 BLOCK IF challenge_rating_sum < 2.0
 ```
-**Confidence:** MEDIUM — 80s CD demands very conservative use.
+Build-aware follow-up now shipped in BetterBots:
+```
+IF has(ogryn_special_ammo_fire_shots) AND target_dist > 5
+   AND num_nearby >= 2 AND challenge_rating_sum >= 2.0 THEN activate
+IF has(ogryn_special_ammo_armor_pen) AND target_dist > 5
+   AND (target_is_super_armor OR target_is_monster OR priority_target_enemy) THEN activate
+IF has(ogryn_ranged_stance_toughness_regen) AND target_dist > 5
+   AND toughness_pct < 0.60 AND target_enemy_type == "ranged" THEN activate
+IF has(ogryn_special_ammo_movement) THEN allow slightly closer commits
+   (block melee pressure threshold +1, minimum target distance 3m, commit distance 3m)
+```
+**Confidence:** MEDIUM — first build-aware batch shipped; longer-horizon weapon/loadout coupling is still open.
 
 ---
 

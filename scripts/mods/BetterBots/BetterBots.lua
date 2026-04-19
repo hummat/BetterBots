@@ -567,6 +567,7 @@ MeleeAttackChoice.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_enabled = function()
 		return Settings.is_feature_enabled("melee_improvements")
 	end,

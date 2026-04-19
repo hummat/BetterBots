@@ -136,33 +136,95 @@ local OGRYN_GUNLUGGER_THRESHOLDS = {
 	},
 }
 
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents
+	return talents and talents[talent_name] ~= nil or false
+end
+
+local function _resolve_ogryn_gunlugger_tuning(context, thresholds)
+	local tuning = {
+		block_melee_nearby = thresholds.block_melee_nearby,
+		block_low_threat_cr = thresholds.block_low_threat_cr,
+		high_threat_cr = thresholds.high_threat_cr,
+		high_threat_max_enemies = thresholds.high_threat_max_enemies,
+		min_target_distance = 4,
+		commit_target_distance = 5,
+		fire_shots = _has_talent(context, "ogryn_special_ammo_fire_shots"),
+		armor_pen = _has_talent(context, "ogryn_special_ammo_armor_pen"),
+		movement = _has_talent(context, "ogryn_special_ammo_movement"),
+		toughness_regen = _has_talent(context, "ogryn_ranged_stance_toughness_regen"),
+	}
+
+	if tuning.movement then
+		tuning.block_melee_nearby = tuning.block_melee_nearby + 1
+		tuning.min_target_distance = 3
+		tuning.commit_target_distance = 3
+	end
+
+	return tuning
+end
+
 local function _can_activate_ogryn_gunlugger(context, thresholds)
 	local target_distance = context.target_enemy_distance
-	if context.num_nearby >= thresholds.block_melee_nearby then
+	local tuning = _resolve_ogryn_gunlugger_tuning(context, thresholds)
+	if context.num_nearby >= tuning.block_melee_nearby then
 		return false, "ogryn_gunlugger_block_melee_pressure"
 	end
-	if target_distance and target_distance < 4 then
+	if target_distance and target_distance < tuning.min_target_distance then
 		return false, "ogryn_gunlugger_block_target_too_close"
 	end
-	if context.challenge_rating_sum < thresholds.block_low_threat_cr then
+	if
+		tuning.armor_pen
+		and target_distance
+		and target_distance > tuning.commit_target_distance
+		and context.num_nearby <= tuning.high_threat_max_enemies
+		and (context.target_is_super_armor or context.target_is_monster or context.priority_target_enemy)
+	then
+		return true, "ogryn_gunlugger_armor_pen_target"
+	end
+	if
+		tuning.fire_shots
+		and target_distance
+		and target_distance > tuning.commit_target_distance
+		and context.num_nearby >= 2
+		and context.challenge_rating_sum >= tuning.block_low_threat_cr
+	then
+		return true, "ogryn_gunlugger_fire_shots_pressure"
+	end
+	if
+		tuning.toughness_regen
+		and target_distance
+		and target_distance > tuning.commit_target_distance
+		and context.toughness_pct < 0.60
+		and context.target_enemy_type == "ranged"
+		and context.challenge_rating_sum >= tuning.block_low_threat_cr
+	then
+		return true, "ogryn_gunlugger_toughness_regen_sustain"
+	end
+	if context.challenge_rating_sum < tuning.block_low_threat_cr then
 		return false, "ogryn_gunlugger_block_low_threat"
 	end
-	if context.urgent_target_enemy and context.num_nearby <= 1 and target_distance and target_distance > 5 then
+	if
+		context.urgent_target_enemy
+		and context.num_nearby <= 1
+		and target_distance
+		and target_distance > tuning.commit_target_distance
+	then
 		return true, "ogryn_gunlugger_urgent_target"
 	end
 	if
 		context.target_enemy_type == "ranged"
 		and target_distance
-		and target_distance > 5
+		and target_distance > tuning.commit_target_distance
 		and (context.elite_count + context.special_count) >= 1
 	then
 		return true, "ogryn_gunlugger_ranged_pack"
 	end
 	if
-		context.challenge_rating_sum >= thresholds.high_threat_cr
+		context.challenge_rating_sum >= tuning.high_threat_cr
 		and target_distance
-		and target_distance > 5
-		and context.num_nearby <= thresholds.high_threat_max_enemies
+		and target_distance > tuning.commit_target_distance
+		and context.num_nearby <= tuning.high_threat_max_enemies
 	then
 		return true, "ogryn_gunlugger_high_threat"
 	end
