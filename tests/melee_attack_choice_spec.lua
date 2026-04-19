@@ -596,6 +596,81 @@ describe("melee_attack_choice", function()
 		assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
 	end)
 
+	it("logs supported special families missing action metadata once", function()
+		local MeleeAttackChoice = load_module()
+		local enter_handler
+		local debug_logs = {}
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "enter" then
+					enter_handler = handler
+				end
+			end,
+		}
+
+		_G.ScriptUnit = {
+			has_extension = function(_, system_name)
+				assert.equals("unit_data_system", system_name)
+				return {
+					read_component = function(_, component_name)
+						if component_name == "inventory" then
+							return { wielded_slot = "slot_primary" }
+						end
+						if component_name == "slot_primary" then
+							return { special_active = false }
+						end
+						return nil
+					end,
+				}
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function(key, fixed_t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					fixed_t = fixed_t,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local weapon_template = {
+			name = "chainaxe_p1_m1",
+			actions = {
+				action_toggle_special = {
+					start_input = "special_action",
+					kind = "activate_special",
+				},
+			},
+		}
+		local first_scratchpad = { weapon_template = weapon_template }
+		local second_scratchpad = { weapon_template = weapon_template }
+
+		enter_handler(function() end, nil, "bot_unit", nil, nil, first_scratchpad, nil, 13)
+		enter_handler(function() end, nil, "bot_unit", nil, nil, second_scratchpad, nil, 13)
+
+		assert.is_nil(first_scratchpad.special_action_meta)
+		assert.is_nil(second_scratchpad.special_action_meta)
+		assert.equals(1, #debug_logs)
+		assert.equals("special_action_meta_missing:chainaxe_p1_m1", debug_logs[1].key)
+		assert.matches(
+			"supported special family missing action metadata %(weapon=chainaxe_p1_m1, family=chain%)",
+			debug_logs[1].message
+		)
+	end)
+
 	it("resolves 2h chainsword specials through action_start_special", function()
 		local MeleeAttackChoice = load_module()
 		local enter_handler

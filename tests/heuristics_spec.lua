@@ -595,6 +595,48 @@ describe("heuristics", function()
 			assert.is_false(ok)
 			assert.matches("hold", rule)
 		end)
+
+		it("logs once when build-aware psyker heuristics receive a nil talents table", function()
+			local debug_logs = {}
+			local DiagnosticHeuristics = helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+			})
+			local first_context = ctx({
+				num_nearby = 3,
+				peril_pct = 0.50,
+				challenge_rating_sum = 6.0,
+			})
+			local second_context = ctx({
+				num_nearby = 3,
+				peril_pct = 0.50,
+				challenge_rating_sum = 6.0,
+			})
+
+			first_context.talents = nil
+			second_context.talents = nil
+
+			DiagnosticHeuristics.evaluate_heuristic(T, first_context)
+			DiagnosticHeuristics.evaluate_heuristic(T, second_context)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("missing_talents_context:psyker", debug_logs[1].key)
+			assert.matches(
+				"psyker heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				debug_logs[1].message,
+				1,
+				true
+			)
+		end)
 	end)
 
 	-- ogryn_charge
@@ -921,6 +963,50 @@ describe("heuristics", function()
 			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
+		end)
+
+		it("logs once when build-aware ogryn heuristics receive a nil talents table", function()
+			local debug_logs = {}
+			local DiagnosticHeuristics = helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+			})
+			local first_context = ctx({
+				num_nearby = 1,
+				target_enemy_distance = 8,
+				challenge_rating_sum = 3.0,
+				urgent_target_enemy = "urgent",
+			})
+			local second_context = ctx({
+				num_nearby = 1,
+				target_enemy_distance = 8,
+				challenge_rating_sum = 3.0,
+				urgent_target_enemy = "urgent",
+			})
+
+			first_context.talents = nil
+			second_context.talents = nil
+
+			DiagnosticHeuristics.evaluate_heuristic(T, first_context)
+			DiagnosticHeuristics.evaluate_heuristic(T, second_context)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("missing_talents_context:ogryn", debug_logs[1].key)
+			assert.matches(
+				"ogryn heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				debug_logs[1].message,
+				1,
+				true
+			)
 		end)
 	end)
 

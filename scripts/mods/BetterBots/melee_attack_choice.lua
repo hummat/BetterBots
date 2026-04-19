@@ -10,6 +10,7 @@ local _armored_type
 local _super_armor_type
 local _armor
 local _logged_choice_keys = {}
+local _logged_missing_special_action_meta = {}
 local _melee_horde_light_bias
 local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
@@ -208,6 +209,22 @@ local function _resolve_special_action_meta(weapon_template)
 				family = policy.family,
 			}
 		end
+	end
+
+	local weapon_name = weapon_template and weapon_template.name or "unknown"
+	if _debug_log and _debug_enabled and _debug_enabled() and not _logged_missing_special_action_meta[weapon_name] then
+		_logged_missing_special_action_meta[weapon_name] = true
+		_debug_log(
+			"special_action_meta_missing:" .. weapon_name,
+			_fixed_time and _fixed_time() or 0,
+			"supported special family missing action metadata (weapon="
+				.. tostring(weapon_name)
+				.. ", family="
+				.. tostring(policy.family)
+				.. ")",
+			nil,
+			"debug"
+		)
 	end
 
 	return nil

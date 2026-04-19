@@ -1,3 +1,7 @@
+local _debug_log
+local _debug_enabled
+local _missing_talents_context_logged = false
+
 local PSYKER_SHOUT_THRESHOLDS = {
 	aggressive = {
 		high_peril = 0.60,
@@ -24,7 +28,23 @@ local PSYKER_SHOUT_THRESHOLDS = {
 
 local function _has_talent(context, talent_name)
 	local talents = context and context.talents
-	return talents and talents[talent_name] ~= nil or false
+
+	if talents == nil then
+		if _debug_log and _debug_enabled and _debug_enabled() and not _missing_talents_context_logged then
+			_missing_talents_context_logged = true
+			_debug_log(
+				"missing_talents_context:psyker",
+				0,
+				"psyker heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				nil,
+				"debug"
+			)
+		end
+
+		return false
+	end
+
+	return talents[talent_name] ~= nil
 end
 
 local function _resolve_shout_high_peril_threshold(context, thresholds)
@@ -225,6 +245,11 @@ local function _can_activate_force_field(context, thresholds)
 end
 
 return {
+	init = function(deps)
+		_debug_log = deps and deps.debug_log or nil
+		_debug_enabled = deps and deps.debug_enabled or nil
+		_missing_talents_context_logged = false
+	end,
 	template_heuristics = {
 		psyker_shout = _can_activate_psyker_shout,
 		psyker_overcharge_stance = _can_activate_psyker_stance,

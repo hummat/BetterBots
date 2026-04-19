@@ -1,3 +1,7 @@
+local _debug_log
+local _debug_enabled
+local _missing_talents_context_logged = false
+
 local OGRYN_CHARGE_THRESHOLDS = {
 	aggressive = {
 		opportunity_min_dist = 4,
@@ -138,7 +142,23 @@ local OGRYN_GUNLUGGER_THRESHOLDS = {
 
 local function _has_talent(context, talent_name)
 	local talents = context and context.talents
-	return talents and talents[talent_name] ~= nil or false
+
+	if talents == nil then
+		if _debug_log and _debug_enabled and _debug_enabled() and not _missing_talents_context_logged then
+			_missing_talents_context_logged = true
+			_debug_log(
+				"missing_talents_context:ogryn",
+				0,
+				"ogryn heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				nil,
+				"debug"
+			)
+		end
+
+		return false
+	end
+
+	return talents[talent_name] ~= nil
 end
 
 local function _resolve_ogryn_gunlugger_tuning(context, thresholds)
@@ -237,6 +257,11 @@ local function _can_activate_ogryn_gunlugger(context, thresholds)
 end
 
 return {
+	init = function(deps)
+		_debug_log = deps and deps.debug_log or nil
+		_debug_enabled = deps and deps.debug_enabled or nil
+		_missing_talents_context_logged = false
+	end,
 	template_heuristics = {
 		ogryn_charge = _can_activate_ogryn_charge,
 		ogryn_charge_increased_distance = _can_activate_ogryn_charge,

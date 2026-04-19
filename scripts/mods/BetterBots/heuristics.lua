@@ -362,6 +362,20 @@ return {
 			is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
 		})
 
+		if deps.psyker_module.init then
+			deps.psyker_module.init({
+				debug_log = deps.debug_log,
+				debug_enabled = deps.debug_enabled,
+			})
+		end
+
+		if deps.ogryn_module.init then
+			deps.ogryn_module.init({
+				debug_log = deps.debug_log,
+				debug_enabled = deps.debug_enabled,
+			})
+		end
+
 		_veteran_module.init({
 			combat_ability_identity = deps.combat_ability_identity,
 		})
