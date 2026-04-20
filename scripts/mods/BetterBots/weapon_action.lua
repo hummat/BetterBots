@@ -10,6 +10,7 @@ local _bot_slot_for_unit
 local _perf
 local _ammo
 local _is_enabled
+local _is_weakspot_aim_enabled
 local _close_range_ranged_policy
 local _missing_shoot_extension_warned = {}
 
@@ -26,6 +27,7 @@ local _missing_bt_bot_shoot_action_warned = false
 local _weapon_logged_combos = {}
 local _stream_action_logged_combos = {}
 local _weakspot_aim_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _stale_shoot_action_logged_scratchpads = setmetatable({}, { __mode = "k" })
 
 local STREAM_CONFIRM_ACTIONS = {
 	flamer_p1_m1 = {
@@ -247,6 +249,9 @@ function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 	if not (_debug_enabled and _debug_enabled()) then
 		return false
 	end
+	if _is_weakspot_aim_enabled and not _is_weakspot_aim_enabled() then
+		return false
+	end
 
 	if _weakspot_aim_logged_scratchpads[scratchpad] then
 		return true
@@ -320,6 +325,13 @@ local function _current_weapon_action_template_name(unit)
 	return weapon_action_component and weapon_action_component.template_name or nil
 end
 
+local function _scratchpad_player_unit(scratchpad)
+	local action_input_extension = scratchpad and scratchpad.action_input_extension or nil
+	local unit = action_input_extension and action_input_extension._betterbots_player_unit or nil
+
+	return unit or scratchpad and scratchpad.__bb_weakspot_self_unit or nil
+end
+
 local function _parser_accepts_weapon_action_input(action_input_extension, template_name, action_input)
 	local parser = action_input_extension
 		and action_input_extension._action_input_parsers
@@ -335,6 +347,47 @@ local function _parser_accepts_weapon_action_input(action_input_extension, templ
 	return sequence_configs[action_input] ~= nil
 end
 
+local function _should_suppress_stale_shoot_action(scratchpad, action_input)
+	local action_input_extension = scratchpad and scratchpad.action_input_extension or nil
+	local unit = _scratchpad_player_unit(scratchpad)
+	local template_name = _current_weapon_action_template_name(unit)
+	if not action_input_extension or not template_name then
+		return false, template_name
+	end
+	if type(action_input) ~= "string" then
+		return true, template_name
+	end
+
+	return not _parser_accepts_weapon_action_input(action_input_extension, template_name, action_input), template_name
+end
+
+local function _log_stale_shoot_action(scratchpad, phase, action_input, template_name)
+	if not (_debug_enabled and _debug_enabled()) or not scratchpad then
+		return
+	end
+
+	local logged_phases = _stale_shoot_action_logged_scratchpads[scratchpad]
+	if not logged_phases then
+		logged_phases = {}
+		_stale_shoot_action_logged_scratchpads[scratchpad] = logged_phases
+	end
+	if logged_phases[phase] then
+		return
+	end
+	logged_phases[phase] = true
+
+	_debug_log(
+		"stale_shoot_action:" .. tostring(phase) .. ":" .. tostring(template_name or "unknown"),
+		_fixed_time(),
+		"suppressed stale shoot "
+			.. tostring(phase)
+			.. " input "
+			.. tostring(action_input)
+			.. " for "
+			.. tostring(template_name or "unknown")
+	)
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -344,6 +397,9 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_is_weakspot_aim_enabled = deps.is_weakspot_aim_enabled or function()
+		return true
+	end
 	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_missing_shoot_extension_warned = {}
 	_missing_bt_bot_shoot_action_warned = false
@@ -443,6 +499,7 @@ function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 	local should_block_weapon_action_input = deps.should_block_weapon_action_input
+	local rewrite_weapon_action_input = deps.rewrite_weapon_action_input
 	local observe_queued_weapon_action = deps.observe_queued_weapon_action
 	local install_weakspot_aim = deps.install_weakspot_aim
 
@@ -585,6 +642,17 @@ function M.register_hooks(deps)
 					or not target_enemy_distance_sq
 					or target_enemy_distance_sq > policy.hipfire_distance_sq
 				then
+					local suppress, template_name =
+						_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.aim_action_input)
+					if suppress then
+						_log_stale_shoot_action(
+							scratchpad,
+							"aim",
+							scratchpad and scratchpad.aim_action_input,
+							template_name
+						)
+						return false
+					end
 					return should_aim
 				end
 
@@ -604,7 +672,28 @@ function M.register_hooks(deps)
 				return false
 			end)
 
-			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
+			_mod:hook(BtBotShootAction, "_start_aiming", function(func, self, t, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, t, scratchpad)
+				end
+
+				local suppress, template_name =
+					_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.aim_action_input)
+				if suppress then
+					if scratchpad then
+						scratchpad.aiming_shot = false
+						scratchpad.aim_done_t = 0
+					end
+					_log_stale_shoot_action(
+						scratchpad,
+						"aim",
+						scratchpad and scratchpad.aim_action_input,
+						template_name
+					)
+					return nil
+				end
+
+				local result = func(self, t, scratchpad)
 				if scratchpad and not _ads_logged_scratchpads[scratchpad] then
 					_ads_logged_scratchpads[scratchpad] = true
 					if _debug_enabled() then
@@ -612,6 +701,31 @@ function M.register_hooks(deps)
 						_mod:echo("BetterBots DEBUG: bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
 					end
 				end
+				return result
+			end)
+
+			_mod:hook(BtBotShootAction, "_stop_aiming", function(func, self, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, scratchpad)
+				end
+
+				local suppress, template_name =
+					_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.unaim_action_input)
+				if suppress then
+					if scratchpad and scratchpad.aiming_shot then
+						scratchpad.aiming_shot = false
+						scratchpad.aim_done_t = 0
+					end
+					_log_stale_shoot_action(
+						scratchpad,
+						"unaim",
+						scratchpad and scratchpad.unaim_action_input,
+						template_name
+					)
+					return nil
+				end
+
+				return func(self, scratchpad)
 			end)
 
 			-- #43: vanilla _may_fire() validates fire_action_input even though
@@ -681,6 +795,7 @@ function M.register_hooks(deps)
 					end
 					local perf_t0 = _perf and _perf.begin()
 					local unit = self._betterbots_player_unit
+					local original_action_input = action_input
 					if unit and id == "weapon_action" and action_input == "wield" then
 						local should_block, ability_name = should_block_wield_input(unit)
 						if should_block then
@@ -703,6 +818,15 @@ function M.register_hooks(deps)
 								_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
 							end
 							return nil
+						end
+					end
+
+					if unit and id == "weapon_action" and rewrite_weapon_action_input then
+						local rewritten_action_input, rewritten_raw_input =
+							rewrite_weapon_action_input(unit, action_input, raw_input)
+						action_input = rewritten_action_input or action_input
+						if rewritten_raw_input ~= nil then
+							raw_input = rewritten_raw_input
 						end
 					end
 
@@ -847,7 +971,7 @@ function M.register_hooks(deps)
 					local result = func(self, id, action_input, raw_input)
 					if result ~= nil and id == "weapon_action" and unit then
 						if observe_queued_weapon_action then
-							observe_queued_weapon_action(unit, action_input)
+							observe_queued_weapon_action(unit, action_input, original_action_input)
 						end
 					end
 					if result ~= nil and id == "weapon_action" and unit and _debug_enabled() then

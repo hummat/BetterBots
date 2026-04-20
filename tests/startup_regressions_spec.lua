@@ -399,6 +399,7 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 	})
 	modules.WeaponAction = make_runtime_module("WeaponAction", install_calls)
+	modules.RangedSpecialAction = make_runtime_module("RangedSpecialAction", install_calls)
 	modules.SustainedFire = make_runtime_module("SustainedFire", install_calls, {
 		install_bot_unit_input_hooks = function(target)
 			record_install("SustainedFire", "install_bot_unit_input_hooks", target)
@@ -561,6 +562,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/airlock_guard"] = modules.AirlockGuard,
 		["BetterBots/scripts/mods/BetterBots/vfx_suppression"] = modules.VfxSuppression,
 		["BetterBots/scripts/mods/BetterBots/weapon_action"] = modules.WeaponAction,
+		["BetterBots/scripts/mods/BetterBots/ranged_special_action"] = modules.RangedSpecialAction,
 		["BetterBots/scripts/mods/BetterBots/sustained_fire"] = modules.SustainedFire,
 		["BetterBots/scripts/mods/BetterBots/condition_patch"] = modules.ConditionPatch,
 		["BetterBots/scripts/mods/BetterBots/ability_queue"] = modules.AbilityQueue,
@@ -1063,6 +1065,10 @@ describe("startup regressions", function()
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
 		assert.is_function(weapon_register.args[1].should_block_wield_input)
 		assert.is_function(weapon_register.args[1].should_block_weapon_action_input)
+		assert.is_function(weapon_register.args[1].rewrite_weapon_action_input)
+
+		local ranged_special_init = find_named_call(harness.init_calls, "RangedSpecialAction")
+		assert.equals(harness.modules.Debug.bot_slot_for_unit, ranged_special_init.deps.bot_slot_for_unit)
 
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
 			attack = function() end,

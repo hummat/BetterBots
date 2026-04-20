@@ -295,6 +295,13 @@ function M.wire(refs)
 	_needs_ammo_pickup = refs.needs_ammo_pickup
 end
 
+local function _dispatch_from_hook(interactor_unit, target_unit, optional_alternate)
+	local ok, err = pcall(M.try_dispatch, interactor_unit, target_unit, optional_alternate)
+	if not ok and _mod and _mod.warning then
+		_mod:warning("BetterBots: smart-tag pickup routing failed: " .. tostring(err))
+	end
+end
+
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/smart_tag/smart_tag_system", function(SmartTagSystem)
 		if not SmartTagSystem or rawget(SmartTagSystem, SMART_TAG_SYSTEM_SENTINEL) then
@@ -303,19 +310,33 @@ function M.register_hooks()
 
 		SmartTagSystem[SMART_TAG_SYSTEM_SENTINEL] = true
 
-		_mod:hook(
-			SmartTagSystem,
-			"set_tag",
-			function(func, self, template_name, tagger_unit, target_unit, target_location)
-				local result = func(self, template_name, tagger_unit, target_unit, target_location)
-				local ok, err = pcall(M.try_dispatch, tagger_unit, target_unit, nil)
-				if not ok and _mod and _mod.warning then
-					_mod:warning("BetterBots: smart-tag pickup routing failed: " .. tostring(err))
-				end
+		if type(SmartTagSystem.set_contextual_unit_tag) == "function" then
+			_mod:hook(
+				SmartTagSystem,
+				"set_contextual_unit_tag",
+				function(func, self, tagger_unit, target_unit, alternate)
+					local result = func(self, tagger_unit, target_unit, alternate)
 
-				return result
-			end
-		)
+					_dispatch_from_hook(tagger_unit, target_unit, alternate)
+
+					return result
+				end
+			)
+		end
+
+		if type(SmartTagSystem.trigger_tag_interaction) == "function" then
+			_mod:hook(
+				SmartTagSystem,
+				"trigger_tag_interaction",
+				function(func, self, tag_id, interactor_unit, target_unit, optional_alternate)
+					local result = func(self, tag_id, interactor_unit, target_unit, optional_alternate)
+
+					_dispatch_from_hook(interactor_unit, target_unit, optional_alternate)
+
+					return result
+				end
+			)
+		end
 	end)
 end
 

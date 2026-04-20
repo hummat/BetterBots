@@ -100,6 +100,9 @@ local function reset(opts)
 
 			return nil
 		end,
+		is_weakspot_aim_enabled = opts.is_weakspot_aim_enabled or function()
+			return true
+		end,
 	})
 end
 
@@ -590,6 +593,37 @@ describe("weapon_action", function()
 		assert.is_truthy(find_debug_log("weakspot aim selected j_head (weapon=lasgun_p1_m1, bot=3)"))
 	end)
 
+	it("does not log weakspot aim selections when weakspot aim is disabled", function()
+		local unit = "bot_1"
+		local weapon_template = {
+			attack_meta_data = {
+				aim_at_node = { "j_head", "j_spine" },
+			},
+		}
+		local scratchpad = {
+			aim_at_node = "j_head",
+		}
+
+		reset({
+			is_weakspot_aim_enabled = function()
+				return false
+			end,
+		})
+
+		_extensions[unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "lasgun_p1_m1" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+		}
+
+		local logged = WeaponAction.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
+
+		assert.is_false(logged)
+		assert.is_falsy(find_debug_log("weakspot aim selected j_head (weapon=lasgun_p1_m1, bot=3)"))
+	end)
+
 	it("warns once when the ammo utility require keeps failing", function()
 		local saved_require = require
 		local unit = "bot_1"
@@ -670,6 +704,59 @@ describe("weapon_action", function()
 		assert.equals(bot_unit, observed_unit)
 		assert.equals("shoot_braced", observed_action_input)
 		assert.is_truthy(find_debug_log("stream action queued for flamer_p1_m1 via shoot_braced"))
+	end)
+
+	it("applies weapon_action rewrites before forwarding queued inputs", function()
+		local forwarded_id, forwarded_action_input, forwarded_raw_input
+		local observed_action_input, observed_original_action_input
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function(_self, id, action_input, raw_input)
+				forwarded_id = id
+				forwarded_action_input = action_input
+				forwarded_raw_input = raw_input
+				return 0
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			rewrite_weapon_action_input = function(unit, action_input, raw_input)
+				assert.equals(bot_unit, unit)
+				assert.equals("shoot_pressed", action_input)
+				assert.equals("keep", raw_input)
+				return "special_action", raw_input
+			end,
+			observe_queued_weapon_action = function(_unit, action_input, original_action_input)
+				observed_action_input = action_input
+				observed_original_action_input = original_action_input
+			end,
+		})
+
+		PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", "keep")
+
+		assert.equals("weapon_action", forwarded_id)
+		assert.equals("special_action", forwarded_action_input)
+		assert.equals("keep", forwarded_raw_input)
+		assert.equals("special_action", observed_action_input)
+		assert.equals("shoot_pressed", observed_original_action_input)
 	end)
 
 	it("logs when shoot scratchpad normalization is skipped because bot extensions are missing", function()
@@ -1707,6 +1794,119 @@ describe("weapon_action", function()
 		rawset(_G, "require", saved_require)
 
 		assert.is_truthy(find_echo("bot ADS confirmed"))
+	end)
+
+	it("suppresses stale aim inputs when the live weapon no longer supports aiming", function()
+		local saved_require = require
+		local queued_calls = {}
+		local BtBotShootAction = {
+			enter = function() end,
+			_should_aim = function()
+				return true
+			end,
+			_start_aiming = function(_self, t, scratchpad)
+				if not scratchpad.aiming_shot then
+					scratchpad.aiming_shot = true
+					scratchpad.aim_done_t = t + 0.2
+					scratchpad.action_input_extension:bot_queue_action_input(
+						"weapon_action",
+						scratchpad.aim_action_input,
+						nil
+					)
+				end
+			end,
+			_stop_aiming = function(_self, scratchpad)
+				if scratchpad.aiming_shot then
+					scratchpad.aiming_shot = false
+					scratchpad.aim_done_t = 0
+					scratchpad.action_input_extension:bot_queue_action_input(
+						"weapon_action",
+						scratchpad.unaim_action_input,
+						nil
+					)
+				end
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			ranged_gestalt = "killshot",
+			aim_action_input = "zoom",
+			unaim_action_input = "zoom_release",
+			action_input_extension = {
+				_betterbots_player_unit = bot_unit,
+				_action_input_parsers = {
+					weapon_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							chainaxe_p1_m2 = {
+								start_attack = true,
+								light_attack = true,
+							},
+						},
+					},
+				},
+				bot_queue_action_input = function(_, id, action_input, raw_input)
+					queued_calls[#queued_calls + 1] = {
+						id = id,
+						action_input = action_input,
+						raw_input = raw_input,
+					}
+				end,
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "chainaxe_p1_m2" },
+			}),
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		assert.is_false(BtBotShootAction._should_aim({}, 0, scratchpad, { gestalt_behaviors = {} }))
+
+		BtBotShootAction._start_aiming({}, 0, scratchpad)
+		scratchpad.aiming_shot = true
+		scratchpad.aim_done_t = 1
+		BtBotShootAction._stop_aiming({}, scratchpad)
+
+		rawset(_G, "require", saved_require)
+
+		assert.equals(0, #queued_calls)
+		assert.is_false(scratchpad.aiming_shot)
+		assert.equals(0, scratchpad.aim_done_t)
+		assert.is_nil(find_echo("bot ADS confirmed"))
 	end)
 
 	it("redirects wield_slot to slot_combat_ability while lock is active", function()

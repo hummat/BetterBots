@@ -310,6 +310,9 @@ assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
 assert(WeaponAction, "BetterBots: failed to load weapon_action module")
 
+local RangedSpecialAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_special_action")
+assert(RangedSpecialAction, "BetterBots: failed to load ranged_special_action module")
+
 local SustainedFire = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sustained_fire")
 assert(SustainedFire, "BetterBots: failed to load sustained_fire module")
 
@@ -667,6 +670,22 @@ WeaponAction.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
+	is_weakspot_aim_enabled = function()
+		return Settings.is_feature_enabled("weakspot_aim")
+	end,
+})
+
+RangedSpecialAction.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
 })
 
 SustainedFire.init({
@@ -987,6 +1006,15 @@ local function _should_block_weapon_action_input(unit, action_input)
 	return GrenadeFallback.should_block_weapon_action_input(unit, action_input)
 end
 
+local function _rewrite_weapon_action_input(unit, action_input, raw_input)
+	return RangedSpecialAction.rewrite_weapon_action_input(unit, action_input, raw_input)
+end
+
+local function _observe_queued_weapon_action(unit, action_input, original_action_input)
+	SustainedFire.observe_queued_weapon_action(unit, action_input)
+	RangedSpecialAction.observe_queued_weapon_action(unit, action_input, original_action_input)
+end
+
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 TargetTypeHysteresis.register_hooks()
@@ -1000,7 +1028,8 @@ WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
-	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
+	rewrite_weapon_action_input = _rewrite_weapon_action_input,
+	observe_queued_weapon_action = _observe_queued_weapon_action,
 	install_weakspot_aim = WeakspotAim.install_on_shoot_action,
 })
 ConditionPatch.register_hooks()

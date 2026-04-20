@@ -122,6 +122,74 @@ Conclusion:
 - Next targeted checks: weakspot aim, rippergun + `forcestaff_p3_m1` close-range hold, and a clean positive Brain Burst execution trace.
 ```
 
+### Run 2026-04-20-v1-0-0-followup-01
+
+```text
+Run ID: 2026-04-20-v1-0-0-followup-01
+Date (local): 2026-04-20
+Date (UTC): 2026-04-20
+Git commit: 0cecb61 (dev/v1.0.0, local dirty)
+Log file: console-2026-04-20-18.30.47-c687b3e8-22d8-4beb-b875-379986fd2fd4.log
+Bot lineup / abilities: current defaults at run time — Veteran (Voice of Command + Focus Target + precision lasgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
+Map + difficulty: live mission follow-up run
+
+Regression checks:
+- fresh launch / startup load: PASS
+  - dedicated new console log file for the session
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 18:34:20 / 18:35:18 / 18:37:29 / 18:39:07
+- Ogryn Point-Blank Barrage: PASS (targeted armor-pen follow-up)
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_armor_pen_target)` at 18:34:46 / 18:36:11
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+
+Sprint 3 / #103 + #105 evidence:
+- 1H power sword melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=powersword_1h)` from 18:34:12 onward
+- Chain-family melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=chain)` from 18:34:21 onward
+- 1H force sword melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=forcesword_1h)` from 18:34:22 onward
+- Autopistol close-range ADS suppression: PASS
+  - visual: unknown
+  - key lines / timestamps: `close-range hipfire suppressed ADS (family=autopistol, distance=9.57)` at 18:33:36
+- Rippergun / `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - no `close-range ranged family kept ranged target type` line for either family in this run
+- Shotgun special-shell support: UNKNOWN
+  - no `armed shotgun special for` / `spent shotgun special for` lines in this run
+
+Brain Burst / psyker_smite follow-up evidence:
+- Proc-cover suppression: PASS
+  - key lines / timestamps: repeated `grenade held psyker_smite (rule=grenade_smite_block_proc_cover, ...)` from 18:33:19 onward, plus `grenade aim aborted after revalidation (rule=grenade_smite_block_proc_cover)` at 18:35:48 / 18:38:11
+- Positive executes preserved: PARTIAL PASS
+  - key lines / timestamps: `grenade queued wield for psyker_smite (rule=grenade_smite_monster)` at 18:34:49 / 18:35:06, `grenade external action confirmed for psyker_smite` at 18:34:52 (close); `grenade queued wield for psyker_smite (rule=grenade_smite_priority_target)` at 18:35:15 / 18:35:23 / 18:38:03 with `grenade external action confirmed for psyker_smite` at 18:35:26 (mid) / 18:38:05 (far)
+  - remaining gap: no explicit bomber-specific confirmation in this run
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` line in this run despite the Veteran precision-lasgun default swap
+
+Conclusion:
+- The new Brain Burst proc-cover carve-out is working in a live run: manual casts are being suppressed by `grenade_smite_block_proc_cover` without removing positive monster / priority-target executes.
+- The melee special family split is live for `powersword_1h`, `chain`, and `forcesword_1h`.
+- `ogryn_gunlugger_armor_pen_target` now has positive live evidence.
+- This run still does not close `#92`, shotgun support validation, or the close-range rippergun / `forcestaff_p3_m1` hold path.
+```
+
 ### Run 2026-03-05-tier1-01
 
 ```text
@@ -1121,9 +1189,9 @@ Profile loading:
   - user confirmed "works" — bots spawned with correct archetypes and weapons
   - Tertium "None" yield fix (#68): profile.name guard prevents overwriting
 
-Later default-profile swap (2026-04-19):
+Later default-profile swap (2026-04-20):
 - The shipped built-in defaults were later retuned for validation coverage and no longer match the April 7 lineup above.
-- Current defaults: Veteran = VoC + Focus Target + boltgun + power sword; Zealot = Fury + Martyrdom + heavy eviscerator + autopistol; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + armor-pen rippergun + Bully Club.
+- Current defaults: Veteran = VoC + Focus Target + precision lasgun + chainsword; Zealot = Fury + Martyrdom + chainaxe + stub revolver; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + armor-pen rippergun + Bully Club.
 - That later swap has static coverage and profile-loading coverage, but it does not yet have a dedicated live mission entry in this tracker.
     Tertium/SoloPlay external profiles (validated in earlier run 0)
 

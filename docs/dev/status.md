@@ -154,7 +154,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 | #70 | Arbites whistle ignores dog position | **Closed** | Validated in run `0`: `grenade_whistle_block_companion_far` held invalid whistles while valid whistles still consumed charges |
 | #71 | Ogryn grenade mid-horde | **Closed** | April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` approvals only above 4m. That is the requested fix. |
 | #72 | Configurable ammo policy | **Closed** | April 7 logs exercised both the lowered ranged fire gate and the pickup gate in runtime under different threshold settings. |
-| — | Bot build overhaul | **Closed** | All 4 class profiles were redesigned and then retuned again on 2026-04-19 to a validation-first shipped lineup. Current defaults: Veteran = VoC + Focus Target + boltgun + power sword; Zealot = Fury + Martyrdom + heavy eviscerator + autopistol; Psyker = Scrier's + Brain Rupture + electro staff + force sword; Ogryn = Point-Blank Barrage + armor-pen + rippergun + Bully Club. In-game loading confirmed; full mission validation of the new lineup is still pending. |
+| — | Bot build overhaul | **Closed** | All 4 class profiles were redesigned and then retuned again on 2026-04-20 to a validation-first shipped lineup. Current defaults: Veteran = VoC + Focus Target + precision lasgun + chainsword; Zealot = Fury + Martyrdom + chainaxe + stub revolver; Psyker = Scrier's + Brain Rupture + electro staff + force sword; Ogryn = Point-Blank Barrage + armor-pen + rippergun + Bully Club. In-game loading confirmed; full mission validation of the new lineup is still pending. |
 
 **Unit tests**: 632 tests via busted.
 

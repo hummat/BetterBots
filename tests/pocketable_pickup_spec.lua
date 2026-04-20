@@ -179,6 +179,26 @@ describe("pocketable_pickup", function()
 		assert.equals("human_slot_open", reason)
 	end)
 
+	it("allows ordered pocketables even when a human matching slot is empty", function()
+		init_module()
+		local pickup_unit = { pickup_type = "syringe_power_boost_pocketable" }
+
+		human_units = {
+			{ inventory = { slot_pocketable = "crate_item", slot_pocketable_small = "not_equipped" } },
+		}
+
+		local allowed, reason = PocketablePickup.should_allow_mule_pickup(unit, pickup_unit, nil, {
+			pickup_orders = {
+				slot_pocketable_small = {
+					unit = pickup_unit,
+				},
+			},
+		})
+
+		assert.is_true(allowed)
+		assert.is_nil(reason)
+	end)
+
 	it("queues wield then self-use for a carried combat stim in high-threat combat", function()
 		init_module()
 

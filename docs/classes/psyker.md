@@ -212,6 +212,7 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 - Do not use when Peril is above ~80%
 - BetterBots now seeds Brain Burst precision targeting from the bot perception priority slots instead of inheriting the generic current target
 - BetterBots now blocks Brain Burst under close melee pressure on non-hard targets and keeps it biased toward super-armor / monsters / explicit priority enemies at range
+- When `psyker_smite_on_hit` is equipped, BetterBots de-prioritizes manual Brain Burst on ordinary elites/specials that the proc already covers, but still keeps manual casts live for bombers, super-armor, monsters, and explicit long-range priority targets
 - **Tier 3 for bot implementation** (item-based, no `ability_template`)
 
 ### 2. Assail (Throwing Knives)

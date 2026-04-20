@@ -38,6 +38,12 @@ local SMITE_THRESHOLDS = {
 	conservative = { hard_min_distance = 6, priority_min_distance = 9, melee_pressure = 2 },
 }
 
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents or nil
+
+	return type(talents) == "table" and talents[talent_name] ~= nil
+end
+
 local function _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
 	opts = opts or {}
 
@@ -217,6 +223,7 @@ local function _grenade_smite(context)
 	local is_explicit_priority_target = context.target_enemy == context.priority_target_enemy
 		or context.target_enemy == context.opportunity_target_enemy
 		or context.target_enemy == context.urgent_target_enemy
+	local has_smite_on_hit = _has_talent(context, "psyker_smite_on_hit")
 
 	if target_distance < t.hard_min_distance then
 		return false, "grenade_smite_block_melee_range"
@@ -232,6 +239,17 @@ local function _grenade_smite(context)
 
 	if _is_monster_signal_allowed(context) and target_distance >= t.priority_min_distance then
 		return true, "grenade_smite_monster"
+	end
+
+	if
+		has_smite_on_hit
+		and context.target_is_elite_special
+		and not context.target_is_bomber
+		and not context.target_is_super_armor
+		and not _is_monster_signal_allowed(context)
+		and not is_explicit_priority_target
+	then
+		return false, "grenade_smite_block_proc_cover"
 	end
 
 	if

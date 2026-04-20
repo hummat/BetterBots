@@ -32,7 +32,7 @@ Current status:
 | `perception_system` (bot) | `BotPerceptionExtension` | `enemies_in_proximity()` | `scripts/extension_systems/perception/bot_perception_extension.lua:94` | |
 | `perception_system` (minion) | `MinionPerceptionExtension` | `has_line_of_sight()` | `scripts/extension_systems/perception/minion_perception_extension.lua:181` | |
 | `smart_tag_system` via `ScriptUnit.has_extension(unit, ...)` | `SmartTagExtension` | `tag_id()` | `scripts/extension_systems/smart_tag/smart_tag_extension.lua:262` | Same system name, different object than manager lookup |
-| `smart_tag_system` via `Managers.state.extension:system(...)` | `SmartTagSystem` | `set_tag()`, `set_contextual_unit_tag()`, `unit_tag()` | `scripts/extension_systems/smart_tag/smart_tag_system.lua:152`, `:202`, `:318` | `unit_tag()` returns `SmartTag` objects |
+| `smart_tag_system` via `Managers.state.extension:system(...)` | `SmartTagSystem` | `set_tag()`, `set_contextual_unit_tag()`, `trigger_tag_interaction()`, `unit_tag()` | `scripts/extension_systems/smart_tag/smart_tag_system.lua:152`, `:202`, `:229`, `:318` | `unit_tag()` returns `SmartTag` objects |
 | `smart_tag` object returned by `SmartTagSystem:unit_tag()` | `SmartTag` | `template()`, `tagger_player()` | `scripts/extension_systems/smart_tag/smart_tag.lua:46`, `:84` | Used by target-selection tests |
 | `companion_spawner_system` | `CompanionSpawnerExtension` | `companion_units()`, `should_have_companion()` | `scripts/extension_systems/companion_spawner/companion_spawner_extension.lua:292`, `:316` | No `companion_unit()` method exists |
 | `coherency_system` | `UnitCoherencyExtension` | `current_radius()` | `scripts/extension_systems/coherency/unit_coherency_extension.lua:148` | |

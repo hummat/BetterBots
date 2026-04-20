@@ -50,6 +50,7 @@ function M.make_context(overrides)
 		target_ally_distance = nil,
 		target_ally_unit = nil,
 		target_is_elite_special = false,
+		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,

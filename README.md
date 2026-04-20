@@ -25,6 +25,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
+- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, and supported shotgun special shells
 - Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
@@ -156,7 +157,7 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
 - [x] Talent-aware bot behavior (Sprint 2 MVP: Zealot Martyrdom, Psyker Warp Siphon/Venting Shriek, Veteran Focus Target tag ownership)
 - [x] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
-- [x] Melee activated specials (power sword, thunder hammer, force sword)
+- [x] Melee activated specials (power sword, thunder hammer, force sword, chain weapons)
 - [x] Pocketable pickup primitive + medicae/stim/med-kit discipline
 - [x] Deployable crate carry and deploy (ammo + medical)
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
@@ -325,6 +326,7 @@ scripts/mods/BetterBots/          # Mod source
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
   weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix
+  ranged_special_action.lua       #   Shotgun special-shell preload policy + arm/spend logging
   sustained_fire.lua              #   Held-input bridge for sustained-fire ranged weapons
   ping_system.lua                 #   Bot elite/special pinging
   companion_tag.lua               #   Arbites Cyber-Mastiff companion-command smart tag

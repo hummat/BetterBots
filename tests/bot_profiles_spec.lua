@@ -85,17 +85,14 @@ describe("bot_profiles", function()
 		it("ships the validation-first default lineup", function()
 			local profiles = BotProfiles._get_profiles()
 
-			assert.equals("content/items/weapons/player/melee/powersword_p1_m2", profiles.veteran.loadout.slot_primary)
-			assert.equals("content/items/weapons/player/ranged/bolter_p1_m1", profiles.veteran.loadout.slot_secondary)
+			assert.equals("content/items/weapons/player/melee/chainsword_p1_m1", profiles.veteran.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/ranged/lasgun_p3_m2", profiles.veteran.loadout.slot_secondary)
 			assert.is_not_nil(profiles.veteran.talents.veteran_improved_tag)
 			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
 
+			assert.equals("content/items/weapons/player/melee/chainaxe_p1_m2", profiles.zealot.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/melee/chainsword_2h_p1_m1",
-				profiles.zealot.loadout.slot_primary
-			)
-			assert.equals(
-				"content/items/weapons/player/ranged/autopistol_p1_m1",
+				"content/items/weapons/player/ranged/stubrevolver_p1_m2",
 				profiles.zealot.loadout.slot_secondary
 			)
 			assert.is_not_nil(profiles.zealot.talents.zealot_dash)
@@ -414,7 +411,7 @@ describe("bot_profiles", function()
 							finesse_stat = {},
 						},
 					},
-					autopistol_p1_m1 = {
+					stubrevolver_p1_m2 = {
 						base_stats = {
 							damage_stat = {},
 							charge_stat = {},

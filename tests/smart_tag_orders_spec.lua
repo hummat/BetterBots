@@ -359,7 +359,7 @@ describe("smart_tag_orders", function()
 		assert.equals(0, #pickup_orders)
 	end)
 
-	it("routes pickup tags through the set_tag hook and ignores trigger_tag_interaction", function()
+	it("routes first-time pickup tags through the set_contextual_unit_tag hook", function()
 		target_unit.pickup_type = "tome"
 		pickup_defs.tome = {
 			slot_name = "slot_pocketable",
@@ -384,42 +384,92 @@ describe("smart_tag_orders", function()
 
 		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
 		local smart_tag_class = {}
-		smart_tag_class.set_tag = function(_self, template_name, tagger_unit, tagged_unit, target_location)
+		smart_tag_class.set_contextual_unit_tag = function(_self, tagger_unit, tagged_unit, alternate)
 			return {
-				template_name = template_name,
 				tagger_unit = tagger_unit,
 				tagged_unit = tagged_unit,
-				target_location = target_location,
+				alternate = alternate,
 			}
-		end
-		smart_tag_class.trigger_tag_interaction = function()
-			error("trigger_tag_interaction should not be hooked")
 		end
 
 		callback(smart_tag_class)
 
 		assert.equals(1, #hook_registrations)
-		assert.equals("set_tag", hook_registrations[1].method)
+		assert.equals("set_contextual_unit_tag", hook_registrations[1].method)
 
 		local result = hook_registrations[1].handler(
-			smart_tag_class.set_tag,
+			smart_tag_class.set_contextual_unit_tag,
 			smart_tag_class,
-			"pickup_tag",
 			human_unit,
 			target_unit,
 			nil
 		)
 
 		assert.same({
-			template_name = "pickup_tag",
 			tagger_unit = human_unit,
 			tagged_unit = target_unit,
-			target_location = nil,
+			alternate = nil,
 		}, result)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
-	it("pcall-wraps pickup routing errors inside the set_tag hook", function()
+	it("routes already-tagged pickup interactions through trigger_tag_interaction", function()
+		target_unit.pickup_type = "syringe_corruption_pocketable"
+		pickup_defs.syringe_corruption_pocketable = {
+			slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {
+			set_contextual_unit_tag = function() end,
+			trigger_tag_interaction = function(_self, tag_id, interactor_unit, tagged_unit, alternate)
+				return {
+					tag_id = tag_id,
+					interactor_unit = interactor_unit,
+					tagged_unit = tagged_unit,
+					alternate = alternate,
+				}
+			end,
+		}
+
+		callback(smart_tag_class)
+
+		local result = hook_registrations[2].handler(
+			smart_tag_class.trigger_tag_interaction,
+			smart_tag_class,
+			77,
+			human_unit,
+			target_unit,
+			nil
+		)
+
+		assert.same({
+			tag_id = 77,
+			interactor_unit = human_unit,
+			tagged_unit = target_unit,
+			alternate = nil,
+		}, result)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("pcall-wraps pickup routing errors inside the contextual pickup hook", function()
 		target_unit.pickup_type = "tome"
 		pickup_defs.tome = {
 			slot_name = "slot_pocketable",
@@ -449,7 +499,7 @@ describe("smart_tag_orders", function()
 
 		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
 		local smart_tag_class = {}
-		smart_tag_class.set_tag = function()
+		smart_tag_class.set_contextual_unit_tag = function()
 			return "original_result"
 		end
 
@@ -457,9 +507,8 @@ describe("smart_tag_orders", function()
 
 		local ok, result = pcall(
 			hook_registrations[1].handler,
-			smart_tag_class.set_tag,
+			smart_tag_class.set_contextual_unit_tag,
 			smart_tag_class,
-			"pickup_tag",
 			human_unit,
 			target_unit,
 			nil
@@ -476,14 +525,17 @@ describe("smart_tag_orders", function()
 		assert.is_function(callback)
 
 		local target = {
-			set_tag = function() end,
+			set_contextual_unit_tag = function() end,
+			trigger_tag_interaction = function() end,
 		}
 
 		callback(target)
 		callback(target)
 
-		assert.equals(1, #hook_registrations)
+		assert.equals(2, #hook_registrations)
 		assert.equals(target, hook_registrations[1].target)
-		assert.equals("set_tag", hook_registrations[1].method)
+		assert.equals("set_contextual_unit_tag", hook_registrations[1].method)
+		assert.equals(target, hook_registrations[2].target)
+		assert.equals("trigger_tag_interaction", hook_registrations[2].method)
 	end)
 end)

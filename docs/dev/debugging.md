@@ -71,10 +71,13 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip at the perception/math layer (#90) |
 | `close-range ranged family kept ranged target type` | Supported close-range ranged family overrode the normal melee fallback and kept the bot in ranged mode (#41 narrow) |
 | `close-range hipfire suppressed ADS` | Supported close-range ranged family stayed in hipfire instead of ADS inside the close-range window (#41 narrow) |
-| `melee special prelude queued before` | Melee special was armed before the chosen attack; the `(family=powered|chain)` suffix tells you whether the narrow powered rule or the post-1.0 chain-family rule fired |
+| `melee special prelude queued before` | Melee special was armed before the chosen attack; the `(family=...)` suffix now distinguishes `powersword_1h`, `powersword_2h`, `forcesword_1h`, `forcesword_2h`, `thunderhammer`, and `chain` |
+| `armed shotgun special for` | Supported shotgun special-shell loader rewrote a queued fire input into `special_action`; line includes template, current target breed, bot slot, and the original fire input |
+| `spent shotgun special for` | A previously armed supported shotgun later fired; line includes template, current spend-time target breed, bot slot, and fire input so wasted shells can be distinguished from good spends |
 | `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `resolve_decision cache hit ` | Same-frame `Heuristics.resolve_decision(...)` reuse fired for a bot/template; direct runtime proof for the final `#82` BT↔fallback cache path |
-| `weakspot aim selected` | Bot actually used the weakspot head/spine aim path at runtime (#91) |
+| `weakspot aim selected` | Bot entered `BtBotShootAction` with the head/spine weakspot aim table active while the `Weakspot aim` feature was enabled (#91) |
+| `suppressed stale shoot aim input` / `suppressed stale shoot unaim input` | `BtBotShootAction` tried to carry old ADS inputs onto a live non-aim weapon after a weapon/context change; BetterBots suppressed the stale queue instead of relying on the parser drop guard |
 | `fixed_time unavailable during bootstrap` | `_fixed_time()` is intentionally returning `0` during bootstrap because the extension manager is not ready yet; one-shot breadcrumb, not a failure |
 | `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
 | `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |

@@ -148,15 +148,51 @@ end
 
 local SPECIAL_WEAPON_POLICIES = {
 	{
-		family = "powered",
+		family = "powersword_1h",
 		prefixes = {
-			"forcesword_",
-			"powersword_",
-			"thunderhammer_",
+			"powersword_p1_",
+			"powersword_p2_",
 		},
 		action_kinds = {
 			activate_special = true,
 			toggle_special_with_block = true,
+		},
+	},
+	{
+		family = "powersword_2h",
+		prefixes = {
+			"powersword_2h_",
+		},
+		action_kinds = {
+			toggle_special = true,
+			toggle_special_with_block = true,
+		},
+	},
+	{
+		family = "forcesword_1h",
+		prefixes = {
+			"forcesword_p1_",
+		},
+		action_kinds = {
+			activate_special = true,
+		},
+	},
+	{
+		family = "forcesword_2h",
+		prefixes = {
+			"forcesword_2h_",
+		},
+		action_kinds = {
+			activate_special = true,
+		},
+	},
+	{
+		family = "thunderhammer",
+		prefixes = {
+			"thunderhammer_",
+		},
+		action_kinds = {
+			activate_special = true,
 		},
 	},
 	{
@@ -230,36 +266,97 @@ local function _resolve_special_action_meta(weapon_template)
 	return nil
 end
 
-local function _is_powered_special_target(target_breed)
+local function _is_power_sword_target(scratchpad, target_breed, target_armor)
 	local tags = target_breed and target_breed.tags or nil
+	local num_nearby = scratchpad and scratchpad.num_enemies_in_proximity or 0
 
-	return tags and (tags.elite or tags.special) or false
-end
-
-local function _is_chain_special_target(target_breed, target_armor)
-	local tags = target_breed and target_breed.tags or nil
-
-	if tags and (tags.elite or tags.monster or tags.captain) then
+	if target_breed and target_breed.is_boss then
 		return true
 	end
 
+	if tags and (tags.monster or tags.captain or tags.elite or tags.special) then
+		return true
+	end
+
+	if _super_armor_type ~= nil and target_armor == _super_armor_type then
+		return true
+	end
+
+	return num_nearby >= 2
+end
+
+local function _is_force_sword_target(target_breed, target_armor)
+	local tags = target_breed and target_breed.tags or nil
+
 	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	if tags and (tags.elite or tags.special or tags.monster or tags.captain) then
 		return true
 	end
 
 	return _super_armor_type ~= nil and target_armor == _super_armor_type
 end
 
-local function _is_priority_special_target(special_action_meta, target_breed, target_armor)
+local function _is_thunder_hammer_target(target_breed, target_armor)
+	local tags = target_breed and target_breed.tags or nil
+
+	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	if tags and (tags.monster or tags.captain) then
+		return true
+	end
+
+	if _super_armor_type ~= nil and target_armor == _super_armor_type then
+		return true
+	end
+
+	return tags and tags.elite and _is_armored_bucket(target_armor, _armored_type, _super_armor_type) or false
+end
+
+local function _is_chain_special_target(target_breed, target_armor)
+	local tags = target_breed and target_breed.tags or nil
+
+	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	if tags and (tags.monster or tags.captain) then
+		return true
+	end
+
+	if _super_armor_type ~= nil and target_armor == _super_armor_type then
+		return true
+	end
+
+	return tags and tags.elite and _is_armored_bucket(target_armor, _armored_type, _super_armor_type) or false
+end
+
+local function _is_priority_special_target(special_action_meta, scratchpad, target_breed, target_armor)
 	if not special_action_meta then
 		return false
+	end
+
+	if special_action_meta.family == "powersword_1h" or special_action_meta.family == "powersword_2h" then
+		return _is_power_sword_target(scratchpad, target_breed, target_armor)
+	end
+
+	if special_action_meta.family == "forcesword_1h" or special_action_meta.family == "forcesword_2h" then
+		return _is_force_sword_target(target_breed, target_armor)
+	end
+
+	if special_action_meta.family == "thunderhammer" then
+		return _is_thunder_hammer_target(target_breed, target_armor)
 	end
 
 	if special_action_meta.family == "chain" then
 		return _is_chain_special_target(target_breed, target_armor)
 	end
 
-	return _is_powered_special_target(target_breed)
+	return false
 end
 
 local function _can_activate_special(scratchpad)
@@ -323,7 +420,7 @@ local function _maybe_wrap_special_attack(target_breed, target_armor, scratchpad
 		not special_action_meta
 		or not inventory_slot_component
 		or inventory_slot_component.special_active
-		or not _is_priority_special_target(special_action_meta, target_breed, target_armor)
+		or not _is_priority_special_target(special_action_meta, scratchpad, target_breed, target_armor)
 		or not _can_activate_special(scratchpad)
 	then
 		return chosen_attack_meta_data, false

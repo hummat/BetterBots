@@ -116,7 +116,7 @@ This mod targets bot ability activation in three paths:
     - proactive pocketable assignment is human-first: BetterBots refuses to claim a supported pocketable while any human still has the matching slot open, unless the pickup came from an explicit bot order
     - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled, rejects unsupported pocketables entirely, and leaves supported pocketable orders intact when the feature is enabled
     - `update_dispatcher.lua` runs the carried pocketable state machine once the bot already owns the item: combat stims self-use on high-threat entry, and ammo/medical crates auto-deploy only when at least two allies are in coherency, no enemy is currently engaged, and the team actually needs the resource
-    - `smart_tag_orders.lua` hooks `SmartTagSystem.set_tag` after vanilla processing and routes explicit item-tag interactions back into the existing `BotOrder.pickup(...)` path instead of inventing a second order system
+    - `smart_tag_orders.lua` hooks `SmartTagSystem.set_contextual_unit_tag` for first-time item pings and `SmartTagSystem.trigger_tag_interaction` for already-tagged items, then routes explicit item-tag interactions back into the existing `BotOrder.pickup(...)` path instead of inventing a second order system
     - smart-tag routing stays intentionally narrow for the MVP: ammo, world grenade refills, tomes/grimoires, and supported pocketables only; health stations and location-style interactions are ignored
     - the routing layer reuses `MulePickup.should_block_pickup_order(...)` so existing BetterBots policy gates still apply (unsupported pocketables, disabled books, human-slot-open pocketables), selects the nearest eligible live bot on the interactor's side, and is guarded by the `enable_smart_tag_orders` setting plus a class-table hot-reload sentinel on `SmartTagSystem`
 22b. Communication-wheel response (#56, via `com_wheel_response.lua` + `settings.lua` + resource policy hooks):
@@ -139,7 +139,8 @@ This mod targets bot ability activation in three paths:
 26. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
     - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
-    - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families: powered weapons keep the narrow elite/specialist trigger, while chain-family `toggle_special` weapons only arm for elite/captain/monster/boss or super-armor targets
+    - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families
+    - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, force swords stay targeted at elite/special/monster/super-armor value, thunder hammers widen to armored/heavy elites plus captain/monster/boss, and chain-family `toggle_special` weapons stay armor/heavy biased
 27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
@@ -151,8 +152,9 @@ This mod targets bot ability activation in three paths:
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
 29. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
-    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to `SustainedFire.observe_queued_weapon_action(...)`
-    - this avoids same-method hook clobbering between runtime weapon-action translation/protection and sustained-fire queue observation
+    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to downstream observers rather than letting multiple modules hook the method independently
+    - `SustainedFire.observe_queued_weapon_action(...)` remains one observer, and `ranged_special_action.lua` now shares the same seam for shotgun special-shell preload tracking
+    - the same hook also exposes a narrow rewrite seam before the queued input is forwarded, so `ranged_special_action.lua` can rewrite supported shotgun fire requests into `special_action` without owning the engine hook itself
     - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
     - `BetterBots.lua` also owns the shared `hook_require("...group/bot_group")` callback for healing deferral + mule pickup and wraps `mod:hook_require` with a duplicate-path guard so same-path registrations fail loudly instead of silently clobbering each other
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
@@ -163,6 +165,10 @@ This mod targets bot ability activation in three paths:
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted finesse families (lasgun, autogun, bolter, stub revolver) when the template leaves `aim_at_node` unset (#91 MVP)
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
+29a. Shotgun special-shell prelude (#33 follow-up, via `ranged_special_action.lua` + `weapon_action.lua`):
+    - rewrites queued `shoot_pressed` / `zoom_shoot` inputs into `special_action` for the verified `ranged_load_special` shotgun families only (`shotgun_p1_m1/m2/m3`, `shotgun_p4_m1/m2`)
+    - rewrite policy is target-value driven: visible elite/special/captain/monster/boss or armored/super-armor target required; ripperguns, `shotgun_p2_m1`, mauls, and bash/bayonet specials are out of scope
+    - state is tracked per bot unit so BetterBots can log both shell-arm and shell-spend with the current target breed name, which is the validation signal for “loaded and used on something worthwhile” versus “loaded and wasted on trash”
 30. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
@@ -175,6 +181,7 @@ This mod targets bot ability activation in three paths:
 31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
+    - the same `weapon_action.lua` hook stack also suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
     - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`), to `j_head` for Bulwark only when the shield is open or the bot is outside the Bulwark's 70° blocking cone, and provisionally to `j_head` for Crusher only when the bot is in the rear arc
     - an `_aim_position` wrapper re-evaluates the two stateful cases (Bulwark shield exposure, Crusher rear arc) while the target stays locked, so turning or shield-state changes update live instead of going stale for the rest of the burst; when the exposure disappears or the bot retargets away, BetterBots restores the cached baseline so overrides do not leak across targets
     - baseline capture is lazy: the first `apply_override` call snapshots the current `scratchpad.aim_at_node` / `aim_at_node_charged` **before** mutation. An `enter`-level post-hook would be too late because vanilla `enter` calls `_set_new_aim_target` (and therefore our post-hook) before it returns, which on a Mauler-first acquisition would stamp the baseline with the already-overridden `j_spine`

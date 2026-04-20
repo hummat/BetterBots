@@ -2344,6 +2344,37 @@ describe("heuristics", function()
 			assert.matches("priority", rule)
 		end)
 
+		it("de-prioritizes manual Smite on ordinary elite or special targets when smite-on-hit is equipped", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					talents = { psyker_smite_on_hit = 1 },
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 12,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("proc_cover", rule)
+		end)
+
+		it("keeps manual Smite live for bombers when smite-on-hit is equipped", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					talents = { psyker_smite_on_hit = 1 },
+					target_enemy = "poxburster",
+					target_is_elite_special = true,
+					target_is_bomber = true,
+					target_enemy_distance = 12,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
 		it("holds Smite at high peril", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",

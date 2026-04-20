@@ -32,8 +32,8 @@ local SLOT_SETTING_IDS = {
 -- These get resolved to full item objects at hook time via MasterItems.
 --
 -- Current shipped lineup:
---   veteran: Voice of Command + Focus Target + power sword + bolter
---   zealot:  Fury + Martyrdom + heavy eviscerator + autopistol
+--   veteran: Voice of Command + Focus Target + chainsword + precision lasgun
+--   zealot:  Fury + Martyrdom + chainaxe + autopistol
 --   psyker:  Scrier's Gaze + Brain Rupture + force sword + electrokinetic staff
 --   ogryn:   Point-Blank Barrage + armor-pen + rippergun
 -- All talent keys verified against decompiled tree layouts.
@@ -46,8 +46,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "veteran_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/powersword_p1_m2",
-			slot_secondary = "content/items/weapons/player/ranged/bolter_p1_m1",
+			slot_primary = "content/items/weapons/player/melee/chainsword_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/lasgun_p3_m2",
 		},
 		bot_gestalts = {
 			melee = "linesman",
@@ -101,8 +101,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "female",
 		selected_voice = "zealot_female_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/autopistol_p1_m1",
+			slot_primary = "content/items/weapons/player/melee/chainaxe_p1_m2",
+			slot_secondary = "content/items/weapons/player/ranged/stubrevolver_p1_m2",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",

@@ -235,6 +235,7 @@ local function normalize_grenade_context(unit, context, target_unit)
 	normalized.target_enemy_distance = nil
 	normalized.target_enemy_type = nil
 	normalized.target_is_elite_special = false
+	normalized.target_is_bomber = false
 	normalized.target_is_monster = false
 	normalized.target_is_dormant_daemonhost = false
 	normalized.target_daemonhost_aggro_state = nil
@@ -254,6 +255,7 @@ local function normalize_grenade_context(unit, context, target_unit)
 
 	local tags = target_breed.tags
 	normalized.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
+	normalized.target_is_bomber = _is_tagged(tags, "bomber")
 	normalized.target_is_monster = _is_tagged(tags, "monster")
 	normalized.target_is_super_armor = _breed_has_super_armor(target_breed)
 
@@ -313,6 +315,7 @@ local function build_context(unit, blackboard)
 		target_ally_distance = nil,
 		target_ally_unit = nil,
 		target_is_elite_special = false,
+		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
@@ -468,6 +471,7 @@ local function build_context(unit, blackboard)
 		if target_breed then
 			local tags = target_breed.tags
 			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
+			context.target_is_bomber = _is_tagged(tags, "bomber")
 			context.target_is_monster = _is_tagged(tags, "monster")
 			context.target_is_super_armor = _breed_has_super_armor(target_breed)
 			-- #17: flag dormant daemonhosts so monster-aware heuristics refuse
