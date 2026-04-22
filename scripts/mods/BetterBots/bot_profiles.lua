@@ -28,6 +28,91 @@ local SLOT_SETTING_IDS = {
 	"bot_slot_5_profile",
 }
 
+local ATTACHMENT_SLOT_NAMES = {
+	"slot_attachment_1",
+	"slot_attachment_2",
+	"slot_attachment_3",
+}
+
+-- Verified via 2026-04-22 live /curio_dump in Mourningstar: the current
+-- attachment-slot Blessed Bullet base item is the Reliquary gadget variant.
+local BLESSED_BULLET_GADGET_ID = "content/items/gadgets/defensive_gadget_11"
+local BLESSED_BULLET_DISPLAY_NAME = "Blessed Bullet (Reliquary)"
+
+local function _trait_id(family, effect_name)
+	return "content/items/traits/bespoke_" .. family .. "/" .. effect_name
+end
+
+local function _perk_id(category, perk_name)
+	return "content/items/perks/" .. category .. "/" .. perk_name
+end
+
+local function _trait_override(id)
+	return {
+		id = id,
+		rarity = 4,
+		value = 1,
+	}
+end
+
+local function _perk_override(id)
+	return {
+		id = id,
+		rarity = 4,
+		value = 1,
+	}
+end
+
+local function _copy_item_overrides(entries)
+	local copy = {}
+
+	if type(entries) ~= "table" then
+		return copy
+	end
+
+	for index, entry in ipairs(entries) do
+		copy[index] = {
+			id = entry.id,
+			rarity = entry.rarity,
+			value = entry.value ~= nil and entry.value or 1,
+		}
+	end
+
+	return copy
+end
+
+local function _ensure_loadout_metadata(profile)
+	profile.loadout_item_ids = profile.loadout_item_ids or {}
+	profile.loadout_item_data = profile.loadout_item_data or {}
+
+	for slot_name, item in pairs(profile.loadout or {}) do
+		local item_name = item and item.name
+
+		if item_name and not profile.loadout_item_ids[slot_name] then
+			profile.loadout_item_ids[slot_name] = item_name .. slot_name
+		end
+
+		if item_name and not profile.loadout_item_data[slot_name] then
+			profile.loadout_item_data[slot_name] = {
+				id = item_name,
+			}
+		end
+	end
+end
+
+local function _default_curio_entry()
+	return {
+		name = BLESSED_BULLET_DISPLAY_NAME,
+		master_item_id = BLESSED_BULLET_GADGET_ID,
+		traits = {
+			{ id = "gadget_innate_toughness_increase", rarity = 4 },
+			{ id = "gadget_cooldown_reduction", rarity = 4 },
+			{ id = "gadget_damage_reduction_vs_gunners", rarity = 4 },
+			{ id = "gadget_stamina_regeneration", rarity = 4 },
+		},
+	}
+end
+
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
@@ -52,6 +137,33 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		bot_gestalts = {
 			melee = "linesman",
 			ranged = "killshot",
+		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("chainsword_p1", "increased_melee_damage_on_multiple_hits")),
+					_trait_override(_trait_id("chainsword_p1", "bleed_on_activated_hit")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("lasgun_p3", "burninating_on_crit")),
+					_trait_override(_trait_id("lasgun_p3", "followup_shots_ranged_damage")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "increase_crit_chance")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
 		},
 		-- Veteran keeps Voice of Command + Focus Target, but the passive package
 		-- avoids dodge- and weakspot-dependent talents because bots do not play
@@ -124,6 +236,33 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("chainaxe_p1", "bleed_on_activated_hit")),
+					_trait_override(_trait_id("chainaxe_p1", "targets_receive_rending_debuff")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("stubrevolver_p1", "rending_on_crit")),
+					_trait_override(_trait_id("stubrevolver_p1", "crit_chance_based_on_aim_time")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
 		-- Zealot pairs Fury + Martyrdom with a chain-family melee weapon and a
 		-- stub revolver. The passive package avoids dodge-gated talents because bots
 		-- never dodge, and it keeps Benediction because coherency DR is more
@@ -193,6 +332,33 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("forcesword_p1", "can_block_ranged")),
+					_trait_override(_trait_id("forcesword_p1", "stacking_rending_on_weakspot")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
+					_perk_override(_perk_id("melee_common", "reduced_block_cost")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("forcestaff_p3", "faster_charge_on_chained_secondary_attacks_parent")),
+					_trait_override(_trait_id("forcestaff_p3", "warp_charge_critical_strike_chance_bonus")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_resistant_damage")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
 		-- Psyker pairs Scrier's Gaze + Brain Rupture with the electrokinetic
 		-- staff so the shipped blitz, staff, and stance logic all have a coherent
 		-- live loadout to drive.
@@ -260,6 +426,16 @@ local DEFAULT_PROFILE_TEMPLATES = {
 					{ id = "content/items/perks/melee_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("ogryn_rippergun_p1", "toughness_on_continuous_fire")),
+					_trait_override(_trait_id("ogryn_rippergun_p1", "power_bonus_on_continuous_fire")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_berserker_damage")),
+				},
+			},
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/ogryn/attachment_base/male_arms",
@@ -280,6 +456,11 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		bot_gestalts = {
 			melee = "linesman",
 			ranged = "killshot",
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
 		},
 		-- Validation-first Ogryn profile: Point-Blank Barrage with the armor-pen
 		-- modifier on a rippergun. Heavy Hitter stays as the passive melee spine so
@@ -410,6 +591,44 @@ local function _resolve_profile_template(class_name)
 		end
 	end
 
+	local item_overrides = {}
+	local weapon_overrides = template.weapon_overrides or {}
+
+	for slot_name, overrides in pairs(weapon_overrides) do
+		item_overrides[slot_name] = {
+			traits = _copy_item_overrides(overrides.traits),
+			perks = _copy_item_overrides(overrides.perks),
+		}
+	end
+
+	if template.curios then
+		for index, curio in ipairs(template.curios) do
+			local slot_name = ATTACHMENT_SLOT_NAMES[index]
+
+			if not slot_name then
+				break
+			end
+
+			if curio.master_item_id then
+				profile.loadout[slot_name] = curio.master_item_id
+				item_overrides[slot_name] = {
+					traits = _copy_item_overrides(curio.traits),
+					perks = _copy_item_overrides(curio.perks),
+				}
+			elseif _debug_enabled() then
+				_debug_log(
+					"bot_profiles:gadget_missing:" .. class_name .. ":" .. slot_name,
+					0,
+					"skipping runtime curio for "
+						.. slot_name
+						.. " (missing master_item_id for "
+						.. tostring(curio.name)
+						.. ")"
+				)
+			end
+		end
+	end
+
 	-- Resolve all template strings to item objects.
 	-- For weapon slots with overrides (blessings/perks), use get_item_instance with a
 	-- synthetic gear table so overrides are merged onto the base item via the proxy metatable.
@@ -449,44 +668,47 @@ local function _resolve_profile_template(class_name)
 		target_power = AUTO_POWER_BY_CHALLENGE[challenge] or 380
 	end
 
-	local weapon_overrides = template.weapon_overrides
 	for slot_name, item_id in pairs(profile.loadout) do
-		local overrides = weapon_overrides and weapon_overrides[slot_name]
+		local overrides = item_overrides[slot_name]
 		if overrides then
-			-- Read the master item definition to discover its stat names,
-			-- then construct a base_stats array with uniform quality value.
-			-- Discover stat names from the weapon template (NOT the MasterItems catalog —
-			-- the catalog doesn't carry base_stats). Extract template name from the content
-			-- path and look it up in WeaponTemplates.
-			local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
-			local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
-			local weapon_template = template_name and WeaponTemplates[template_name]
-			local base_stats_override = {}
-			if weapon_template and weapon_template.base_stats then
-				for stat_name, _ in pairs(weapon_template.base_stats) do
-					base_stats_override[#base_stats_override + 1] = { name = stat_name }
-				end
-			end
-			local num_stats = math.max(1, #base_stats_override)
-			local total_stat_points = target_power / 10 * 6 + 80
-			local stat_value = math.min(1.0, total_stat_points / num_stats / 100)
-			for _, stat in ipairs(base_stats_override) do
-				stat.value = stat_value
-			end
+			local master_overrides = {
+				traits = _copy_item_overrides(overrides.traits),
+				perks = _copy_item_overrides(overrides.perks),
+			}
+			local is_weapon_slot = slot_name == "slot_primary" or slot_name == "slot_secondary"
 
-			-- baseItemLevel for display: use total_stat_points (matches total_stats_value)
-			local base_item_level = math.floor(total_stat_points + 0.5)
+			if is_weapon_slot then
+				-- Read the master item definition to discover its stat names,
+				-- then construct a base_stats array with uniform quality value.
+				-- Discover stat names from the weapon template (NOT the MasterItems catalog —
+				-- the catalog doesn't carry base_stats). Extract template name from the content
+				-- path and look it up in WeaponTemplates.
+				local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
+				local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
+				local weapon_template = template_name and WeaponTemplates[template_name]
+				local base_stats_override = {}
+				if weapon_template and weapon_template.base_stats then
+					for stat_name, _ in pairs(weapon_template.base_stats) do
+						base_stats_override[#base_stats_override + 1] = { name = stat_name }
+					end
+				end
+				local num_stats = math.max(1, #base_stats_override)
+				local total_stat_points = target_power / 10 * 6 + 80
+				local stat_value = math.min(1.0, total_stat_points / num_stats / 100)
+				for _, stat in ipairs(base_stats_override) do
+					stat.value = stat_value
+				end
+
+				-- baseItemLevel for display: use total_stat_points (matches total_stats_value)
+				master_overrides.baseItemLevel = math.floor(total_stat_points + 0.5)
+				master_overrides.base_stats = base_stats_override
+			end
 
 			local gear_id = "betterbots_" .. class_name .. "_" .. slot_name
 			local gear = {
 				masterDataInstance = {
 					id = item_id,
-					overrides = {
-						baseItemLevel = base_item_level,
-						base_stats = base_stats_override,
-						traits = overrides.traits or {},
-						perks = overrides.perks or {},
-					},
+					overrides = master_overrides,
 				},
 				slots = { slot_name },
 			}
@@ -504,32 +726,50 @@ local function _resolve_profile_template(class_name)
 			profile.loadout[slot_name] = item
 
 			if _debug_enabled() then
-				local stat_names = {}
-				for _, s in ipairs(base_stats_override) do
-					stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
+				if is_weapon_slot then
+					local stat_names = {}
+					local base_stats_override = master_overrides.base_stats or {}
+					local stat_value = base_stats_override[1] and base_stats_override[1].value or 0
+
+					for _, s in ipairs(base_stats_override) do
+						stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
+					end
+
+					_debug_log(
+						"bot_profiles:weapon:" .. class_name .. ":" .. slot_name,
+						0,
+						slot_name
+							.. " quality="
+							.. tostring(quality_setting)
+							.. " power="
+							.. tostring(target_power)
+							.. " stat_value="
+							.. string.format("%.2f", stat_value)
+							.. " baseItemLevel="
+							.. tostring(master_overrides.baseItemLevel)
+							.. " stats="
+							.. tostring(#base_stats_override)
+							.. " ("
+							.. table.concat(stat_names, ",")
+							.. ")"
+							.. " traits="
+							.. tostring(#(master_overrides.traits or {}))
+							.. " perks="
+							.. tostring(#(master_overrides.perks or {}))
+					)
+				else
+					_debug_log(
+						"bot_profiles:gadget:" .. class_name .. ":" .. slot_name,
+						0,
+						slot_name
+							.. " item="
+							.. tostring(item_id)
+							.. " traits="
+							.. tostring(#(master_overrides.traits or {}))
+							.. " perks="
+							.. tostring(#(master_overrides.perks or {}))
+					)
 				end
-				_debug_log(
-					"bot_profiles:weapon:" .. class_name .. ":" .. slot_name,
-					0,
-					slot_name
-						.. " quality="
-						.. tostring(quality_setting)
-						.. " power="
-						.. tostring(target_power)
-						.. " stat_value="
-						.. string.format("%.2f", stat_value)
-						.. " baseItemLevel="
-						.. tostring(base_item_level)
-						.. " stats="
-						.. tostring(#base_stats_override)
-						.. " ("
-						.. table.concat(stat_names, ",")
-						.. ")"
-						.. " traits="
-						.. tostring(#(overrides.traits or {}))
-						.. " perks="
-						.. tostring(#(overrides.perks or {}))
-				)
 			end
 		else
 			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
@@ -560,6 +800,8 @@ local function _resolve_profile_template(class_name)
 		end
 		return nil
 	end
+
+	_ensure_loadout_metadata(profile)
 
 	-- The package synchronizer client iterates visual_loadout to resolve item packages.
 	-- Bot profiles don't have visual_loadout natively — vanilla bots get it set elsewhere.
@@ -659,45 +901,30 @@ local function resolve_profile(profile)
 	for k, v in pairs(resolved.bot_gestalts or {}) do
 		profile.bot_gestalts[k] = v
 	end
-	profile.loadout.slot_primary = resolved.loadout.slot_primary
-	profile.loadout.slot_secondary = resolved.loadout.slot_secondary
-	if resolved.loadout_item_ids then
-		profile.loadout_item_ids = profile.loadout_item_ids or {}
-		profile.loadout_item_ids.slot_primary = resolved.loadout_item_ids.slot_primary
-		profile.loadout_item_ids.slot_secondary = resolved.loadout_item_ids.slot_secondary
-	end
-	if resolved.loadout_item_data then
-		profile.loadout_item_data = profile.loadout_item_data or {}
-		profile.loadout_item_data.slot_primary = resolved.loadout_item_data.slot_primary
-		profile.loadout_item_data.slot_secondary = resolved.loadout_item_data.slot_secondary
-	end
-	-- Apply cosmetic slot overrides (e.g. ogryn body meshes)
-	local template = DEFAULT_PROFILE_TEMPLATES[choice]
-	if template and template.cosmetic_overrides then
-		for slot_name in pairs(template.cosmetic_overrides) do
-			if resolved.loadout[slot_name] then
-				profile.loadout[slot_name] = resolved.loadout[slot_name]
-				if resolved.loadout_item_ids and resolved.loadout_item_ids[slot_name] then
-					profile.loadout_item_ids[slot_name] = resolved.loadout_item_ids[slot_name]
-				end
-				if resolved.loadout_item_data and resolved.loadout_item_data[slot_name] then
-					profile.loadout_item_data[slot_name] = resolved.loadout_item_data[slot_name]
-				end
-			end
-		end
-	end
+	profile.loadout_item_ids = profile.loadout_item_ids or {}
+	profile.loadout_item_data = profile.loadout_item_data or {}
+	profile.visual_loadout = profile.visual_loadout or {}
 
-	-- visual_loadout mirrors loadout for package resolution
-	if profile.visual_loadout then
-		profile.visual_loadout.slot_primary = resolved.loadout.slot_primary
-		profile.visual_loadout.slot_secondary = resolved.loadout.slot_secondary
-		if template and template.cosmetic_overrides then
-			for slot_name in pairs(template.cosmetic_overrides) do
-				if resolved.loadout[slot_name] then
-					profile.visual_loadout[slot_name] = resolved.loadout[slot_name]
-				end
-			end
+	for slot_name, item in pairs(resolved.loadout or {}) do
+		profile.loadout[slot_name] = item
+
+		local item_name = item and item.name
+		local item_id = resolved.loadout_item_ids and resolved.loadout_item_ids[slot_name] or nil
+		local item_data = resolved.loadout_item_data and resolved.loadout_item_data[slot_name] or nil
+
+		profile.loadout_item_ids[slot_name] = item_id
+			or (item_name and item_name .. slot_name)
+			or profile.loadout_item_ids[slot_name]
+
+		if item_data then
+			profile.loadout_item_data[slot_name] = item_data
+		elseif item_name and not profile.loadout_item_data[slot_name] then
+			profile.loadout_item_data[slot_name] = {
+				id = item_name,
+			}
 		end
+
+		profile.visual_loadout[slot_name] = item
 	end
 
 	-- Guard against 1.11+ profile overwrite (#65): the network-sync pipeline

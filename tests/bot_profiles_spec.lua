@@ -64,6 +64,9 @@ local VANILLA_PROFILE = {
 	talents = {},
 }
 
+local EXPECTED_CURIO_NAME = "Blessed Bullet (Reliquary)"
+local EXPECTED_CURIO_MASTER_ITEM_ID = "content/items/gadgets/defensive_gadget_11"
+
 describe("bot_profiles", function()
 	before_each(function()
 		_mock_settings = {}
@@ -115,13 +118,12 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo_armor_pen)
 		end)
 
-		it("keeps removed trap talents and absent secondary weapon overrides out of the shipped lineup", function()
+		it("keeps removed trap talents out of the shipped lineup", function()
 			local profiles = BotProfiles._get_profiles()
 
 			assert.is_nil(profiles.zealot.talents.zealot_bolstering_prayer)
 			assert.is_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
 			assert.is_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
-			assert.is_nil(profiles.ogryn.weapon_overrides.slot_secondary)
 		end)
 
 		it("every template has required fields", function()
@@ -195,15 +197,53 @@ describe("bot_profiles", function()
 			end
 		end)
 
-		it("defines an ogryn primary weapon override payload for synthesized quality gear", function()
+		it("defines synthesized quality gear payloads for both weapon slots on every profile", function()
 			local profiles = BotProfiles._get_profiles()
-			local override = profiles.ogryn.weapon_overrides and profiles.ogryn.weapon_overrides.slot_primary
 
-			assert.is_table(override)
-			assert.is_table(override.traits)
-			assert.is_true(#override.traits > 0)
-			assert.is_table(override.perks)
-			assert.is_true(#override.perks > 0)
+			for class_name, profile in pairs(profiles) do
+				assert.is_table(profile.weapon_overrides, class_name .. " missing weapon_overrides")
+
+				for _, slot_name in ipairs({ "slot_primary", "slot_secondary" }) do
+					local override = profile.weapon_overrides[slot_name]
+
+					assert.is_table(override, class_name .. " missing override for " .. slot_name)
+					assert.is_table(override.traits, class_name .. " missing traits for " .. slot_name)
+					assert.is_true(#override.traits > 0, class_name .. " traits empty for " .. slot_name)
+					assert.is_table(override.perks, class_name .. " missing perks for " .. slot_name)
+					assert.is_true(#override.perks > 0, class_name .. " perks empty for " .. slot_name)
+				end
+			end
+		end)
+
+		it("declares explicit curio metadata with concrete runtime gadget IDs", function()
+			local profiles = BotProfiles._get_profiles()
+
+			for class_name, profile in pairs(profiles) do
+				assert.is_table(profile.curios, class_name .. " missing curios metadata")
+				assert.equals(3, #profile.curios, class_name .. " should declare exactly 3 curios")
+
+				for index, curio in ipairs(profile.curios) do
+					assert.equals(EXPECTED_CURIO_NAME, curio.name, class_name .. " curio " .. index .. " name")
+					assert.equals(
+						EXPECTED_CURIO_MASTER_ITEM_ID,
+						curio.master_item_id,
+						class_name .. " curio " .. index .. " master item id"
+					)
+					assert.is_table(curio.traits, class_name .. " curio " .. index .. " missing traits")
+					assert.equals(4, #curio.traits, class_name .. " curio " .. index .. " should declare 4 traits")
+					assert.equals("gadget_innate_toughness_increase", curio.traits[1].id)
+					assert.equals("gadget_cooldown_reduction", curio.traits[2].id)
+					assert.equals("gadget_damage_reduction_vs_gunners", curio.traits[3].id)
+					assert.equals("gadget_stamina_regeneration", curio.traits[4].id)
+					for trait_index, trait in ipairs(curio.traits) do
+						assert.equals(
+							4,
+							trait.rarity,
+							class_name .. " curio " .. index .. " trait " .. trait_index .. " rarity"
+						)
+					end
+				end
+			end
 		end)
 	end)
 
@@ -510,16 +550,29 @@ describe("bot_profiles", function()
 			assert.is_true(ok, err)
 		end)
 
-		it("synthesizes ogryn primary weapon overrides through MasterItems.get_item_instance", function()
+		it("synthesizes authored weapon and gadget overrides through MasterItems.get_item_instance", function()
 			local saved_require = require
-			local seen_slot_primary_gear
+			local seen_gears = {}
 
 			local ok, err = pcall(function()
 				local fake_master_items = {
 					get_cached = function()
 						return {
-							ogryn_primary = { id = "ogryn_primary" },
-							ogryn_secondary = { id = "ogryn_secondary" },
+							zealot_primary = {
+								id = "zealot_primary",
+								name = "zealot_primary",
+								item_type = "WEAPON_MELEE",
+							},
+							zealot_secondary = {
+								id = "zealot_secondary",
+								name = "zealot_secondary",
+								item_type = "WEAPON_RANGED",
+							},
+							[EXPECTED_CURIO_MASTER_ITEM_ID] = {
+								id = EXPECTED_CURIO_MASTER_ITEM_ID,
+								name = EXPECTED_CURIO_MASTER_ITEM_ID,
+								item_type = "GADGET",
+							},
 						}
 					end,
 					get_item_or_fallback = function(item_id)
@@ -529,28 +582,40 @@ describe("bot_profiles", function()
 						}
 					end,
 					get_item_instance = function(gear)
-						if gear.slots and gear.slots[1] == "slot_primary" then
-							seen_slot_primary_gear = gear
-						end
+						local slot_name = gear.slots and gear.slots[1]
+						seen_gears[slot_name] = gear
 
 						return {
 							name = gear.masterDataInstance.id,
 							gear_id = gear.masterDataInstance.id,
+							item_type = slot_name and string.find(slot_name, "slot_attachment_", 1, true) and "GADGET"
+								or nil,
 							source = "instance",
+							traits = gear.masterDataInstance.overrides and gear.masterDataInstance.overrides.traits
+								or nil,
+							perks = gear.masterDataInstance.overrides and gear.masterDataInstance.overrides.perks
+								or nil,
 						}
 					end,
 				}
 
 				local fake_archetypes = {
-					ogryn = { name = "ogryn", breed = "ogryn" },
+					zealot = { name = "zealot", breed = "human" },
 				}
 
 				local fake_weapon_templates = {
-					ogryn_club_p2_m3 = {
+					chainaxe_p1_m2 = {
 						base_stats = {
 							damage_stat = {},
 							cleave_stat = {},
 							finesse_stat = {},
+						},
+					},
+					stubrevolver_p1_m2 = {
+						base_stats = {
+							damage_stat = {},
+							finesse_stat = {},
+							ammo_stat = {},
 						},
 					},
 				}
@@ -576,7 +641,17 @@ describe("bot_profiles", function()
 					return saved_require(modname)
 				end)
 
-				_mock_settings.bot_slot_1_profile = "ogryn"
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = mock_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.reset()
+
+				_mock_settings.bot_slot_1_profile = "zealot"
 				_mock_settings.bot_weapon_quality = "max"
 
 				local profile = {
@@ -585,6 +660,9 @@ describe("bot_profiles", function()
 						slot_primary = "bot_combatsword_linesman_p1",
 						slot_secondary = "bot_lasgun_killshot",
 					},
+					visual_loadout = {},
+					loadout_item_ids = {},
+					loadout_item_data = {},
 					talents = {},
 					bot_gestalts = {
 						melee = "linesman",
@@ -592,22 +670,41 @@ describe("bot_profiles", function()
 					},
 				}
 
-				local resolved, swapped = BotProfiles.resolve_profile(profile)
+				local resolved, swapped = Profiles.resolve_profile(profile)
 
 				assert.is_true(swapped)
 				assert.equals("instance", resolved.loadout.slot_primary.source)
-				assert.equals("fallback", resolved.loadout.slot_secondary.source)
-				assert.is_not_nil(seen_slot_primary_gear)
+				assert.equals("instance", resolved.loadout.slot_secondary.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_1.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_2.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_3.source)
 				assert.equals(
-					"content/items/weapons/player/melee/ogryn_club_p2_m3",
-					seen_slot_primary_gear.masterDataInstance.id
+					"content/items/weapons/player/melee/chainaxe_p1_m2",
+					seen_gears.slot_primary.masterDataInstance.id
 				)
-				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.base_stats)
-				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.base_stats > 0)
-				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.traits)
-				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.traits > 0)
-				assert.is_table(seen_slot_primary_gear.masterDataInstance.overrides.perks)
-				assert.is_true(#seen_slot_primary_gear.masterDataInstance.overrides.perks > 0)
+				assert.equals(
+					"content/items/weapons/player/ranged/stubrevolver_p1_m2",
+					seen_gears.slot_secondary.masterDataInstance.id
+				)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.base_stats > 0)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.traits)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.traits > 0)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.perks)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.perks > 0)
+				assert.is_table(seen_gears.slot_secondary.masterDataInstance.overrides.base_stats)
+				assert.is_true(#seen_gears.slot_secondary.masterDataInstance.overrides.base_stats > 0)
+				assert.is_table(seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
+				assert.equals(4, #seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_1.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_2.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_3.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.visual_loadout.slot_attachment_1.name)
+				assert.equals(
+					EXPECTED_CURIO_MASTER_ITEM_ID .. "slot_attachment_1",
+					resolved.loadout_item_ids.slot_attachment_1
+				)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.loadout_item_data.slot_attachment_1.id)
 			end)
 
 			rawset(_G, "require", saved_require)
