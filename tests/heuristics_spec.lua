@@ -2820,6 +2820,7 @@ describe("heuristics", function()
 		local saved_position_lookup
 		local saved_script_unit
 		local saved_alive
+		local saved_unit
 		local liquid_results_return_mode
 		local liquid_area_system
 		local side_system
@@ -2828,6 +2829,7 @@ describe("heuristics", function()
 		local script_unit_extensions
 		local game_object_ids
 		local game_object_fields
+		local unit_alive_lookup
 
 		before_each(function()
 			liquid_results_return_mode = "table"
@@ -2839,9 +2841,11 @@ describe("heuristics", function()
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
 			saved_alive = rawget(_G, "ALIVE")
+			saved_unit = rawget(_G, "Unit")
 			script_unit_extensions = nil
 			game_object_ids = {}
 			game_object_fields = {}
+			unit_alive_lookup = {}
 
 			_G.Managers = {
 				state = {
@@ -2883,6 +2887,11 @@ describe("heuristics", function()
 			}
 			_G.ALIVE = {
 				mastiff = true,
+			}
+			_G.Unit = {
+				alive = function(unit)
+					return unit_alive_lookup[unit] == true
+				end,
 			}
 			_G.ScriptUnit = {
 				has_extension = function(unit, extension_name)
@@ -2931,6 +2940,7 @@ describe("heuristics", function()
 			_G.POSITION_LOOKUP = saved_position_lookup
 			_G.ScriptUnit = saved_script_unit
 			_G.ALIVE = saved_alive
+			_G.Unit = saved_unit
 			_G.GameSession = nil
 		end)
 
@@ -2977,6 +2987,23 @@ describe("heuristics", function()
 			assert.equals("mastiff", context.companion_unit)
 			assert.equals("dog_pos", context.companion_position)
 			assert.equals("target_pos", context.target_enemy_position)
+		end)
+
+		it("captures the live companion when ALIVE is missing but Unit.alive succeeds", function()
+			_G.ALIVE.mastiff = nil
+			unit_alive_lookup.mastiff = true
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals("mastiff", context.companion_unit)
+			assert.equals("dog_pos", context.companion_position)
 		end)
 
 		it("treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
@@ -3067,6 +3094,32 @@ describe("heuristics", function()
 				},
 			})
 			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "interacting" },
+						interacting_character_state = { interaction_template = "scanning" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("scanning", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects live ally interactions when ALIVE is missing but Unit.alive succeeds", function()
+			side_system = helper.make_side_system_double({
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			})
+			unit_alive_lookup.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
 					unit_data_system = helper.make_player_unit_data_extension({

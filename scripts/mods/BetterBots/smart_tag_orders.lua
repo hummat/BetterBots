@@ -137,9 +137,16 @@ local function _classify_pickup_target(target_unit)
 	return nil, "unsupported_pickup_family"
 end
 
-local function _bot_is_alive(unit)
+local function _bot_is_alive(unit, player)
 	if ALIVE ~= nil then
-		return ALIVE[unit] == true
+		local alive = ALIVE[unit]
+		if alive ~= nil then
+			return alive == true
+		end
+	end
+
+	if player and player.unit_is_alive then
+		return player:unit_is_alive()
 	end
 
 	if Unit and Unit.alive then
@@ -150,13 +157,13 @@ local function _bot_is_alive(unit)
 end
 
 local function _eligible_bot_for_family(bot_unit, descriptor)
-	if not _bot_is_alive(bot_unit) then
-		return false, "bot_dead"
-	end
-
 	local player = Managers and Managers.player and Managers.player:player_by_unit(bot_unit)
 	if not player or (player.is_human_controlled and player:is_human_controlled()) then
 		return false, "not_bot"
+	end
+
+	if not _bot_is_alive(bot_unit, player) then
+		return false, "bot_dead"
 	end
 
 	if descriptor.family == "ammo" then

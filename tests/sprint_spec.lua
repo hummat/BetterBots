@@ -4,6 +4,7 @@ local test_helper = require("tests.test_helper")
 local _extensions = {}
 local _positions = {}
 local _alive = {}
+local _unit_alive = {}
 local _saved_globals = {}
 local Sprint
 
@@ -102,6 +103,9 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	for k in pairs(_unit_alive) do
+		_unit_alive[k] = nil
+	end
 	for k in pairs(_blackboards) do
 		_blackboards[k] = nil
 	end
@@ -114,6 +118,7 @@ describe("sprint", function()
 		_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
 		_saved_globals.POSITION_LOOKUP = rawget(_G, "POSITION_LOOKUP")
 		_saved_globals.ALIVE = rawget(_G, "ALIVE")
+		_saved_globals.Unit = rawget(_G, "Unit")
 		_saved_globals.Vector3 = rawget(_G, "Vector3")
 		_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
 		_saved_globals.Managers = rawget(_G, "Managers")
@@ -136,6 +141,12 @@ describe("sprint", function()
 				return _alive[unit]
 			end,
 		})
+
+		_G.Unit = {
+			alive = function(unit)
+				return _unit_alive[unit] == true
+			end,
+		}
 
 		_G.Vector3 = {
 			distance_squared = function(a, b)
@@ -338,6 +349,22 @@ describe("sprint", function()
 			_positions[unit] = pos(0, 0, 0)
 			_positions[follow] = pos(20, 0, 0)
 			_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			assert.is_true(ok)
+			assert.equals("catch_up", reason)
+		end)
+
+		it("sprints to catch up when ALIVE is missing for a live follow unit", function()
+			local unit = "bot1"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(20, 0, 0)
+			_unit_alive[follow] = true
 			setup_perception(unit, {})
 			setup_side_system(unit, {})
 			local self_obj = make_self({

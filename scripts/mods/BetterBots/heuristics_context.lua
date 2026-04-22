@@ -39,6 +39,21 @@ local function _zero_stacks()
 	return 0
 end
 
+local function _unit_is_alive(unit)
+	if ALIVE ~= nil then
+		local alive = ALIVE[unit]
+		if alive ~= nil then
+			return alive == true
+		end
+	end
+
+	if Unit and Unit.alive then
+		return Unit.alive(unit)
+	end
+
+	return false
+end
+
 local function _scan_interacting_allies(side, fixed_t)
 	if _interacting_cache_t == fixed_t and _interacting_cache_side == side then
 		return _interacting_units, _interacting_profiles, _interacting_types
@@ -59,7 +74,7 @@ local function _scan_interacting_allies(side, fixed_t)
 
 	for i = 1, #player_units do
 		local ally_unit = player_units[i]
-		if (not ALIVE) or ALIVE[ally_unit] then
+		if _unit_is_alive(ally_unit) then
 			local ally_data = ScriptUnit.has_extension(ally_unit, "unit_data_system")
 			if ally_data then
 				local profile = nil
@@ -346,7 +361,7 @@ local function build_context(unit, blackboard)
 	if companion_units then
 		for i = 1, #companion_units do
 			local companion_unit = companion_units[i]
-			if companion_unit and (not ALIVE or ALIVE[companion_unit]) then
+			if companion_unit and _unit_is_alive(companion_unit) then
 				context.companion_unit = companion_unit
 				context.companion_position = POSITION_LOOKUP and POSITION_LOOKUP[companion_unit] or nil
 				break

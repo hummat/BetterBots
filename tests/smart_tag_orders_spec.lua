@@ -370,6 +370,75 @@ describe("smart_tag_orders", function()
 		assert.is_truthy(debug_logs[1].message:find("slot_full", 1, true))
 	end)
 
+	it("falls back to player liveness when ALIVE is missing for a live bot", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("does not report the human tagger as a dead bot candidate", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "occupied" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("no_eligible_bot", reason)
+		assert.is_truthy(debug_logs[1].message:find("bot=1:slot_full", 1, true))
+		assert.is_nil(debug_logs[1].message:find("bot=0", 1, true))
+		assert.is_nil(debug_logs[1].message:find("bot_dead", 1, true))
+	end)
+
 	it("ignores companion-order interactions", function()
 		target_unit.pickup_type = "tome"
 		pickup_defs.tome = {
