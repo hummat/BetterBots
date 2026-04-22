@@ -85,45 +85,48 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.ogryn)
 		end)
 
-		it("ships the validation-first default lineup", function()
+		it("ships the configured default lineup", function()
 			local profiles = BotProfiles._get_profiles()
 
-			assert.equals("content/items/weapons/player/melee/chainsword_p1_m1", profiles.veteran.loadout.slot_primary)
-			assert.equals("content/items/weapons/player/ranged/lasgun_p3_m2", profiles.veteran.loadout.slot_secondary)
+			assert.equals("content/items/weapons/player/melee/powersword_p1_m2", profiles.veteran.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/plasmagun_p1_m1",
+				profiles.veteran.loadout.slot_secondary
+			)
 			assert.is_not_nil(profiles.veteran.talents.veteran_improved_tag)
 			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
 
-			assert.equals("content/items/weapons/player/melee/chainaxe_p1_m2", profiles.zealot.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/stubrevolver_p1_m2",
-				profiles.zealot.loadout.slot_secondary
+				"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+				profiles.zealot.loadout.slot_primary
 			)
-			assert.is_not_nil(profiles.zealot.talents.zealot_dash)
-			assert.is_not_nil(profiles.zealot.talents.zealot_martyrdom)
+			assert.equals("content/items/weapons/player/ranged/bolter_p1_m2", profiles.zealot.loadout.slot_secondary)
+			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_not_nil(profiles.zealot.talents.zealot_fanatic_rage)
 
-			assert.equals("content/items/weapons/player/melee/forcesword_p1_m1", profiles.psyker.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/melee/combatsword_p3_m2", profiles.psyker.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/forcestaff_p3_m1",
+				"content/items/weapons/player/ranged/forcestaff_p1_m1",
 				profiles.psyker.loadout.slot_secondary
 			)
-			assert.is_not_nil(profiles.psyker.talents.psyker_combat_ability_stance)
-			assert.is_not_nil(profiles.psyker.talents.psyker_brain_burst_improved)
+			assert.is_not_nil(profiles.psyker.talents.psyker_shout_vent_warp_charge)
+			assert.is_not_nil(profiles.psyker.talents.psyker_grenade_throwing_knives)
 
-			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m3", profiles.ogryn.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m1", profiles.ogryn.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
+				"content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
 				profiles.ogryn.loadout.slot_secondary
 			)
-			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo)
-			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo_armor_pen)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_longer_charge)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_grenade_friend_rock)
 		end)
 
-		it("keeps removed trap talents out of the shipped lineup", function()
+		it("locks in the requested meta pivots for the shipped lineup", function()
 			local profiles = BotProfiles._get_profiles()
 
-			assert.is_nil(profiles.zealot.talents.zealot_bolstering_prayer)
-			assert.is_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
-			assert.is_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
+			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_not_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
+			assert.is_not_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
 		end)
 
 		it("every template has required fields", function()
@@ -451,7 +454,7 @@ describe("bot_profiles", function()
 							finesse_stat = {},
 						},
 					},
-					stubrevolver_p1_m2 = {
+					bolter_p1_m2 = {
 						base_stats = {
 							damage_stat = {},
 							charge_stat = {},
@@ -604,14 +607,14 @@ describe("bot_profiles", function()
 				}
 
 				local fake_weapon_templates = {
-					chainaxe_p1_m2 = {
+					chainsword_2h_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							cleave_stat = {},
 							finesse_stat = {},
 						},
 					},
-					stubrevolver_p1_m2 = {
+					bolter_p1_m2 = {
 						base_stats = {
 							damage_stat = {},
 							finesse_stat = {},
@@ -679,11 +682,11 @@ describe("bot_profiles", function()
 				assert.equals("instance", resolved.loadout.slot_attachment_2.source)
 				assert.equals("instance", resolved.loadout.slot_attachment_3.source)
 				assert.equals(
-					"content/items/weapons/player/melee/chainaxe_p1_m2",
+					"content/items/weapons/player/melee/chainsword_2h_p1_m1",
 					seen_gears.slot_primary.masterDataInstance.id
 				)
 				assert.equals(
-					"content/items/weapons/player/ranged/stubrevolver_p1_m2",
+					"content/items/weapons/player/ranged/bolter_p1_m2",
 					seen_gears.slot_secondary.masterDataInstance.id
 				)
 				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
@@ -719,28 +722,28 @@ describe("bot_profiles", function()
 			-- override lists back out through MasterItems.get_item_instance.
 			local class_expectations = {
 				veteran = {
-					primary = "content/items/weapons/player/melee/chainsword_p1_m1",
-					secondary = "content/items/weapons/player/ranged/lasgun_p3_m2",
-					primary_template = "chainsword_p1_m1",
-					secondary_template = "lasgun_p3_m2",
+					primary = "content/items/weapons/player/melee/powersword_p1_m2",
+					secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
+					primary_template = "powersword_p1_m2",
+					secondary_template = "plasmagun_p1_m1",
 				},
 				zealot = {
-					primary = "content/items/weapons/player/melee/chainaxe_p1_m2",
-					secondary = "content/items/weapons/player/ranged/stubrevolver_p1_m2",
-					primary_template = "chainaxe_p1_m2",
-					secondary_template = "stubrevolver_p1_m2",
+					primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
+					secondary = "content/items/weapons/player/ranged/bolter_p1_m2",
+					primary_template = "chainsword_2h_p1_m1",
+					secondary_template = "bolter_p1_m2",
 				},
 				psyker = {
-					primary = "content/items/weapons/player/melee/forcesword_p1_m1",
-					secondary = "content/items/weapons/player/ranged/forcestaff_p3_m1",
-					primary_template = "forcesword_p1_m1",
-					secondary_template = "forcestaff_p3_m1",
+					primary = "content/items/weapons/player/melee/combatsword_p3_m2",
+					secondary = "content/items/weapons/player/ranged/forcestaff_p1_m1",
+					primary_template = "combatsword_p3_m2",
+					secondary_template = "forcestaff_p1_m1",
 				},
 				ogryn = {
-					primary = "content/items/weapons/player/melee/ogryn_club_p1_m3",
-					secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
-					primary_template = "ogryn_club_p1_m3",
-					secondary_template = "ogryn_thumper_p1_m1",
+					primary = "content/items/weapons/player/melee/ogryn_club_p1_m1",
+					secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
+					primary_template = "ogryn_club_p1_m1",
+					secondary_template = "ogryn_rippergun_p1_m3",
 				},
 			}
 
@@ -918,8 +921,8 @@ describe("bot_profiles", function()
 					end
 					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
 						return {
-							chainaxe_p1_m2 = { base_stats = { damage_stat = {} } },
-							stubrevolver_p1_m2 = { base_stats = { damage_stat = {} } },
+							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
 						}
 					end
 					return saved_require(modname)
@@ -1130,8 +1133,8 @@ describe("bot_profiles", function()
 					end
 					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
 						return {
-							chainaxe_p1_m2 = { base_stats = { damage_stat = {} } },
-							stubrevolver_p1_m2 = { base_stats = { damage_stat = {} } },
+							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
 						}
 					end
 					return saved_require(modname)

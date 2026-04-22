@@ -3,6 +3,26 @@
 **From:** Codex (GPT-5, OpenAI API)  
 **Date:** 2026-04-20
 
+## Session Update — 2026-04-22 default roster refresh
+
+- Shipped BetterBots default profiles were retuned to the requested curated lineup sourced from hadrons-blessing canonical builds:
+  - Veteran: Voice of Command + Focus Target with power sword + plasma gun
+  - Zealot: Chorus + Blazing Piety with heavy eviscerator + boltgun
+  - Psyker: Venting Shriek + Warp Siphon with duelling sword + voidstrike staff
+  - Ogryn: Indomitable + Heavy Hitter with latrine shovel + ripper gun
+- Main files:
+  - [scripts/mods/BetterBots/bot_profiles.lua](/run/media/matthias/1274B04B74B032F9/git/BetterBots/scripts/mods/BetterBots/bot_profiles.lua)
+  - [scripts/mods/BetterBots/BetterBots_localization.lua](/run/media/matthias/1274B04B74B032F9/git/BetterBots/scripts/mods/BetterBots/BetterBots_localization.lua)
+  - [tests/bot_profiles_spec.lua](/run/media/matthias/1274B04B74B032F9/git/BetterBots/tests/bot_profiles_spec.lua)
+- One authored Veteran stat node key was invalid against the actual tree manifest. It was corrected from `base_melee_damage_node_buff_medium_1` to `base_melee_damage_node_buff_high_1`.
+- Arbites / Hive Scum were intentionally not added to the shipped profile surface yet. They remain comment-only backlog placeholders because the built-in profile UI and hadrons-blessing sync/export contract still target the core 4 classes.
+
+## Verification — 2026-04-22
+
+- Passed:
+  - `make test`
+    - `1331 successes / 0 failures / 0 errors / 0 pending`
+
 ## Branch
 - `dev/v1.0.0`
 - Base HEAD before local wrap-up commit: `0cecb61`
@@ -104,4 +124,3 @@
   - objective: force Mauler / Bulwark / Crusher ranged windows
   - grep after run:
     - `./bb-log raw 'weakspot aim selected|weakspot override applied|smart-tag pickup routed|dormant_daemonhost'`
-
