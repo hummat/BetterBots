@@ -124,3 +124,27 @@
   - objective: force Mauler / Bulwark / Crusher ranged windows
   - grep after run:
     - `./bb-log raw 'weakspot aim selected|weakspot override applied|smart-tag pickup routed|dormant_daemonhost'`
+
+## Session Update — 2026-04-22 profile naming audit follow-up
+
+- Psyker shipped-profile naming drift was corrected:
+  - `forcestaff_p1_m1` is now labeled `Voidblast` consistently in:
+    - `scripts/mods/BetterBots/bot_profiles.lua`
+    - `scripts/mods/BetterBots/BetterBots_localization.lua`
+    - `docs/knowledge/weapon-blessings.md`
+    - `docs/dev/status.md`
+    - `docs/dev/validation-tracker.md`
+- Root cause of the miss:
+  - the test harness pinned profile loadout IDs but did not pin the human-readable shipped profile labels, so a stale `Voidstrike` string survived while the underlying `forcestaff_p1_m1` template was already correct.
+- Harness fix shipped with the content fix:
+  - `tests/bot_profiles_spec.lua` now asserts all four shipped dropdown/profile labels, including `Psyker - Voidblast Staff + Duelling Sword`.
+
+## Verification — 2026-04-22 naming fix
+
+- Passed:
+  - `lua /usr/lib/luarocks/rocks-5.5/busted/2.3.0-1/bin/busted tests/bot_profiles_spec.lua`
+    - `34 successes / 0 failures / 0 errors / 0 pending`
+  - `make doc-check`
+    - `doc-check: all checks passed`
+  - user-ran `make check`
+    - `1332 successes / 0 failures / 0 errors / 0 pending`

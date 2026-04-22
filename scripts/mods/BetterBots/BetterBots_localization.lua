@@ -441,7 +441,7 @@ return {
 		en = "Zealot - Boltgun + Heavy Eviscerator",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Voidstrike Staff + Duelling Sword",
+		en = "Psyker - Voidblast Staff + Duelling Sword",
 	},
 	bot_profile_ogryn = {
 		en = "Ogryn - Ripper Gun + Latrine Shovel",

@@ -864,11 +864,11 @@ Date (UTC): 2026-03-11
 Git commit: 8cce4bd (fresh launch, no hot-reload)
 Log file: console-2026-03-11-20.01.33-7a0c9c5e-47ea-4b35-994c-aca0c09fc50b.log
 Bot lineup / abilities: Arbites (whistle), Psyker (smite), Zealot (throwing knives), Ogryn (cluster grenades)
-  Bot 2: forcestaff_p1_m1 (Voidstrike)
+  Bot 2: forcestaff_p1_m1 (Voidblast)
 Map + difficulty: Standard mission
 
 Staff charged fire (#43):
-- p1 Voidstrike (trigger_explosion): PASS
+- p1 Voidblast (trigger_explosion): PASS
   - _may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion (20:04:16.133)
   - bot=2, weapon_template=forcestaff_p1_m1
 - All 4 staves now confirmed PASS (p2 Purgatus in earlier session, p3/p4 in earlier session, p1 this session)

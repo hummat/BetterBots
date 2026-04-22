@@ -119,7 +119,7 @@ end
 -- Current shipped lineup:
 --   veteran: Voice of Command + Focus Target + power sword + plasma gun
 --   zealot:  Chorus + Blazing Piety + heavy eviscerator + boltgun
---   psyker:  Venting Shriek + Warp Siphon + duelling sword + voidstrike staff
+--   psyker:  Venting Shriek + Warp Siphon + duelling sword + voidblast staff
 --   ogryn:   Indomitable + Heavy Hitter + latrine shovel + ripper gun
 -- Experimental backlog picks once the profile UI/export surface widens past the
 -- core 4 classes:
@@ -361,7 +361,7 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			_default_curio_entry(),
 		},
 		-- Psyker now mirrors the requested Karen Mode loadout: Venting Shriek,
-		-- Assail, duelling sword, and Voidstrike staff.
+		-- Assail, duelling sword, and Voidblast staff.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			psyker_shout_vent_warp_charge = 1,

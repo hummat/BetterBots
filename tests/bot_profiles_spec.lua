@@ -30,6 +30,7 @@ local mock_mod = {
 }
 
 local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
 
 BotProfiles.init({
 	mod = mock_mod,
@@ -127,6 +128,13 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
 			assert.is_not_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
 			assert.is_not_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
+		end)
+
+		it("keeps the shipped profile labels aligned with the authored lineup", function()
+			assert.equals("Veteran - Plasma Gun + Power Sword", Localization.bot_profile_veteran.en)
+			assert.equals("Zealot - Boltgun + Heavy Eviscerator", Localization.bot_profile_zealot.en)
+			assert.equals("Psyker - Voidblast Staff + Duelling Sword", Localization.bot_profile_psyker.en)
+			assert.equals("Ogryn - Ripper Gun + Latrine Shovel", Localization.bot_profile_ogryn.en)
 		end)
 
 		it("every template has required fields", function()
