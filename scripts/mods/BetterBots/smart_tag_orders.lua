@@ -185,19 +185,31 @@ local function _eligible_bot_for_family(bot_unit, descriptor)
 	return false, "unsupported_family"
 end
 
+local function _eligible_bot_detail(bot_unit, reason)
+	if reason == "not_bot" then
+		return nil
+	end
+
+	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(bot_unit) or nil
+	local bot_label = bot_slot and ("bot=" .. tostring(bot_slot)) or tostring(bot_unit)
+
+	return bot_label .. ":" .. tostring(reason)
+end
+
 local function _select_nearest_eligible_bot(interactor_unit, target_unit, descriptor)
 	local side_units = _side_player_units(interactor_unit)
 	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit]
 	local best_bot
 	local best_distance_sq = math.huge
+	local rejection_details
 
 	if not (side_units and target_position) then
-		return nil, "missing_side_or_position"
+		return nil, "missing_side_or_position", nil
 	end
 
 	for i = 1, #side_units do
 		local bot_unit = side_units[i]
-		local eligible = _eligible_bot_for_family(bot_unit, descriptor)
+		local eligible, ineligible_reason = _eligible_bot_for_family(bot_unit, descriptor)
 
 		if eligible then
 			local bot_position = POSITION_LOOKUP and POSITION_LOOKUP[bot_unit]
@@ -208,14 +220,20 @@ local function _select_nearest_eligible_bot(interactor_unit, target_unit, descri
 					best_distance_sq = distance_sq
 				end
 			end
+		else
+			local detail = _eligible_bot_detail(bot_unit, ineligible_reason)
+			if detail then
+				rejection_details = rejection_details or {}
+				rejection_details[#rejection_details + 1] = detail
+			end
 		end
 	end
 
 	if not best_bot then
-		return nil, "no_eligible_bot"
+		return nil, "no_eligible_bot", rejection_details and table.concat(rejection_details, ", ") or nil
 	end
 
-	return best_bot, nil
+	return best_bot, nil, nil
 end
 
 function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
@@ -252,14 +270,17 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 		end
 	end
 
-	local bot_unit, select_reason = _select_nearest_eligible_bot(interactor_unit, target_unit, descriptor)
+	local bot_unit, select_reason, select_detail =
+		_select_nearest_eligible_bot(interactor_unit, target_unit, descriptor)
 	if not bot_unit then
+		local detail_suffix = select_detail and ", detail=" .. tostring(select_detail) or ""
 		_log(
 			"smart_tag_order_reject:" .. tostring(target_unit),
 			"smart-tag pickup ignored for "
 				.. tostring(descriptor.pickup_name)
 				.. " (reason="
 				.. tostring(select_reason)
+				.. detail_suffix
 				.. ")"
 		)
 		return false, select_reason

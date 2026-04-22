@@ -341,6 +341,35 @@ describe("smart_tag_orders", function()
 		assert.is_truthy(debug_logs[1].message:find("unsupported_pocketable", 1, true))
 	end)
 
+	it("logs per-bot reasons when no bot is eligible for a slot pickup", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "occupied" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("no_eligible_bot", reason)
+		assert.equals(0, #pickup_orders)
+		assert.is_truthy(debug_logs[1].message:find("slot_full", 1, true))
+	end)
+
 	it("ignores companion-order interactions", function()
 		target_unit.pickup_type = "tome"
 		pickup_defs.tome = {

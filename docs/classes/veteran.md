@@ -218,8 +218,9 @@ via the standard BT ability activation path. This is a **Tier 3** implementation
 
 **Bot usage notes:**
 - Throw into dense hordes for maximum value
+- Also worth committing into clustered elite/special pressure at safe range; the main value is the blast's control and team breathing room, with bleed acting as upside rather than the defining use case
 - Good for creating space when team is being overwhelmed
-- With bleed talent, useful against elites too
+- With `veteran_grenade_apply_bleed`, also worth throwing into dense elite packs at range
 - 3 charges means bot can be moderately generous with usage
 
 ### Smoke Grenade

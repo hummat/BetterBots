@@ -237,7 +237,8 @@ All Ogryn blitz abilities use `ability_type = "grenade_ability"`. They are **ite
 - `template_name` resolves to `"none"` -- **unreachable via current BT ability path** (Tier 3 problem).
 - Bots would need a different activation mechanism: equip grenade item, aim, throw.
 - B.F. Rock has self-regenerating charges -- safer for bots to spam.
-- Frag grenade has only 1 charge -- bots should reserve for high-value targets.
+- Standard box is also worth throwing into clustered elite/special pressure at safe range; it is not just a pure horde-clearing consumable.
+- Frag grenade has only 1 charge -- bots should reserve it for monsters or genuinely high-challenge mixed packs, not ordinary horde clear.
 
 ---
 

@@ -184,6 +184,7 @@ describe("pocketable_pickup", function()
 
 	it("leaves supported pocketables for humans when a matching slot is empty", function()
 		init_module()
+		inventory_component.slot_pocketable = "not_equipped"
 
 		human_units = {
 			{ inventory = { slot_pocketable = "not_equipped", slot_pocketable_small = "stim_item" } },
@@ -199,6 +200,7 @@ describe("pocketable_pickup", function()
 	it("allows ordered pocketables even when a human matching slot is empty", function()
 		init_module()
 		local pickup_unit = { pickup_type = "syringe_corruption_pocketable" }
+		inventory_component.slot_pocketable_small = "not_equipped"
 
 		human_units = {
 			{ inventory = { slot_pocketable = "crate_item", slot_pocketable_small = "not_equipped" } },
@@ -218,6 +220,7 @@ describe("pocketable_pickup", function()
 
 	it("allows corruption stim pickup when all human stim slots are occupied", function()
 		init_module()
+		inventory_component.slot_pocketable_small = "not_equipped"
 
 		human_units = {
 			{ inventory = { slot_pocketable_small = "stim_item" } },
@@ -229,6 +232,21 @@ describe("pocketable_pickup", function()
 
 		assert.is_true(allowed)
 		assert.is_nil(reason)
+	end)
+
+	it("rejects supported pocketables when the bot matching slot is already occupied", function()
+		init_module()
+
+		human_units = {
+			{ inventory = { slot_pocketable_small = "stim_item" } },
+			{ inventory = { slot_pocketable_small = "another_stim" } },
+		}
+
+		local allowed, reason =
+			PocketablePickup.should_allow_mule_pickup(unit, { pickup_type = "syringe_corruption_pocketable" }, nil, nil)
+
+		assert.is_false(allowed)
+		assert.equals("bot_slot_full", reason)
 	end)
 
 	it("does not block pickup orders for the supported corruption stim", function()

@@ -76,6 +76,56 @@ local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, p
 	return false, rule_prefix .. "_hold"
 end
 
+local function _grenade_frag(context, preset)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_frag")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, 6, 2.5, "grenade_frag", preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	local elite_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	local pressure_challenge = _has_talent(context, "veteran_grenade_apply_bleed") and 4.0 or 4.5
+
+	if
+		elite_pressure >= 2
+		and context.num_nearby >= 3
+		and context.challenge_rating_sum >= pressure_challenge
+		and (context.target_enemy_distance or 0) >= 6
+	then
+		return true, "grenade_frag_pressure"
+	end
+
+	return false, horde_rule
+end
+
+local function _grenade_ogryn_frag(context)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_ogryn_frag")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	if _is_monster_signal_allowed(context) and target_distance >= 6 then
+		return true, "grenade_ogryn_frag_monster"
+	end
+
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0) + (context.monster_count or 0)
+	if
+		priority_pressure >= 3
+		and context.num_nearby >= 4
+		and context.challenge_rating_sum >= 5.0
+		and target_distance >= 6
+	then
+		return true, "grenade_ogryn_frag_priority_pack"
+	end
+
+	return false, "grenade_ogryn_frag_hold"
+end
+
 local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	opts = opts or {}
 
@@ -150,6 +200,102 @@ local function _grenade_defensive(context, rule_prefix, preset)
 	end
 
 	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_disruption(context, rule_prefix, opts, preset)
+	opts = opts or {}
+
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix)
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local target_distance = context.target_enemy_distance or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	local pack_nearby = math.max(2, (opts.pack_nearby or 4) - interaction_offset)
+	local pack_challenge = opts.pack_challenge or 3.5
+	local min_distance = opts.min_distance or 6
+
+	if
+		priority_pressure >= (opts.pack_targets or 2)
+		and context.num_nearby >= pack_nearby
+		and context.challenge_rating_sum >= pack_challenge
+		and target_distance >= min_distance
+	then
+		return true, rule_prefix .. "_interrupt_pack"
+	end
+
+	local target_nearby = math.max(2, (opts.target_nearby or 3) - interaction_offset)
+	if context.target_is_elite_special and context.num_nearby >= target_nearby and target_distance >= min_distance then
+		return true, rule_prefix .. "_interrupt_target"
+	end
+
+	local crowd_nearby = math.max(3, (opts.crowd_nearby or 6) - interaction_offset)
+	if context.num_nearby >= crowd_nearby and context.challenge_rating_sum >= (opts.crowd_challenge or 2.5) then
+		return true, rule_prefix .. "_crowd"
+	end
+
+	return _grenade_defensive(context, rule_prefix, preset)
+end
+
+local function _grenade_denial(context, rule_prefix, min_nearby, min_challenge, opts, preset)
+	opts = opts or {}
+
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix)
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local min_distance = opts.min_distance or 6
+	if opts.use_monster and _is_monster_signal_allowed(context) and target_distance >= min_distance then
+		return true, rule_prefix .. "_monster"
+	end
+
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0) + (context.monster_count or 0)
+	local pack_nearby = math.max(3, (opts.pack_nearby or 4) - interaction_offset)
+	if
+		priority_pressure >= (opts.pack_targets or 2)
+		and context.num_nearby >= pack_nearby
+		and context.challenge_rating_sum >= (opts.pack_challenge or 4.0)
+		and target_distance >= min_distance
+	then
+		return true, rule_prefix .. "_priority_pack"
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, min_nearby, min_challenge, rule_prefix, preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	return false, horde_rule
+end
+
+local function _grenade_ogryn_box(context, preset)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_box")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	if
+		priority_pressure >= 2
+		and context.num_nearby >= 4
+		and context.challenge_rating_sum >= 4.5
+		and target_distance >= 8
+	then
+		return true, "grenade_box_priority_pack"
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, 5, 3.0, "grenade_box", preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	return false, horde_rule
 end
 
 local function _grenade_mine(context, rule_prefix, preset)
@@ -334,7 +480,7 @@ end
 
 local GRENADE_HEURISTICS = {
 	veteran_frag_grenade = function(context)
-		return _grenade_horde(context, 6, 2.5, "grenade_frag", context.preset)
+		return _grenade_frag(context, context.preset)
 	end,
 	veteran_krak_grenade = function(context)
 		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 }, context.preset)
@@ -346,7 +492,13 @@ local GRENADE_HEURISTICS = {
 		return _grenade_horde(context, 5, 2.5, "grenade_fire", context.preset)
 	end,
 	zealot_shock_grenade = function(context)
-		return _grenade_defensive(context, "grenade_shock", context.preset)
+		return _grenade_disruption(context, "grenade_shock", {
+			pack_nearby = 4,
+			pack_challenge = 3.5,
+			crowd_nearby = 5,
+			crowd_challenge = 2.5,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	zealot_throwing_knives = function(context)
 		return _grenade_priority_target(context, "grenade_knives", {
@@ -356,14 +508,12 @@ local GRENADE_HEURISTICS = {
 		}, context.preset)
 	end,
 	ogryn_grenade_box = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_box", context.preset)
+		return _grenade_ogryn_box(context, context.preset)
 	end,
 	ogryn_grenade_box_cluster = function(context)
 		return _grenade_horde(context, 5, 3.0, "grenade_box_cluster", context.preset)
 	end,
-	ogryn_grenade_frag = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_ogryn_frag", context.preset)
-	end,
+	ogryn_grenade_frag = _grenade_ogryn_frag,
 	ogryn_grenade_friend_rock = function(context)
 		return _grenade_priority_target(context, "grenade_rock", { min_distance = 6 }, context.preset)
 	end,
@@ -378,13 +528,31 @@ local GRENADE_HEURISTICS = {
 	end,
 	adamant_whistle = _grenade_whistle,
 	broker_flash_grenade = function(context)
-		return _grenade_defensive(context, "grenade_flash", context.preset)
+		return _grenade_disruption(context, "grenade_flash", {
+			pack_nearby = 4,
+			pack_challenge = 3.5,
+			crowd_nearby = 5,
+			crowd_challenge = 2.5,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	broker_flash_grenade_improved = function(context)
-		return _grenade_defensive(context, "grenade_flash", context.preset)
+		return _grenade_disruption(context, "grenade_flash", {
+			pack_nearby = 4,
+			pack_challenge = 3.5,
+			crowd_nearby = 5,
+			crowd_challenge = 2.5,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	broker_tox_grenade = function(context)
-		return _grenade_horde(context, 6, 3.0, "grenade_tox", context.preset)
+		return _grenade_denial(context, "grenade_tox", 6, 3.0, {
+			use_monster = true,
+			pack_targets = 2,
+			pack_nearby = 4,
+			pack_challenge = 4.0,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	broker_missile_launcher = function(context)
 		return _grenade_priority_target(context, "grenade_missile", { min_distance = 8 }, context.preset)

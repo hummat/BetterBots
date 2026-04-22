@@ -100,13 +100,13 @@ IF has(ogryn_special_ammo_movement) THEN allow slightly closer commits
 
 ---
 
-## Grenades (Tier 3 — not yet implemented)
+## Grenades (Tier 3 — implemented)
 
 | Grenade | USE WHEN | Key constraint | Confidence |
 |---------|----------|----------------|------------|
 | B.F. Rock | Special at >6m — spam freely (4 charges, 45s regen) | Most bot-friendly blitz | MEDIUM |
-| Big Box of Hurt | `num_nearby >= 5 AND challenge_rating_sum >= 3.0` | Keep 1 charge reserve | MEDIUM |
-| Demolition Frag | Monster OR `challenge_rating_sum >= 8.0` — panic button | Single charge, no regen | MEDIUM |
+| Big Box of Hurt | Dense horde, or mixed elite/special pressure at safe range | Impact profile is stronger than a generic horde grenade, but still worse than Rock for lone picks | MEDIUM |
+| Demolition Frag | Monster, or clustered elite/special pressure at safe range | Single charge, no regen — not a generic horde grenade | MEDIUM |
 
 ---
 

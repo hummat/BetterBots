@@ -62,6 +62,68 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-04-22-v1-0-0-followup-02
+
+```text
+Run ID: 2026-04-22-v1-0-0-followup-02
+Date (local): 2026-04-22
+Date (UTC): 2026-04-22
+Git commit: local (post corruption-stim pickup follow-up)
+Log file: console-2026-04-22-10.46.31-a0fff67f-573b-4d89-9e32-eb3b9675ed14.log
+Bot lineup / abilities: current validation-first defaults — Veteran (Voice of Command + Focus Target + precision lasgun + chainsword), Zealot (Fury + Martyrdom + chainaxe + stub revolver), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
+Map + difficulty: live mission test run (exact map/difficulty not recorded in log)
+
+Regression checks:
+- fresh launch / startup load: PASS
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 10:50:17 / 10:53:38 / 10:55:20, plus `psyker_stance_combat_density_build` at 10:51:45
+- Ogryn Point-Blank Barrage: PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_armor_pen_target)` at 10:50:27, `ogryn_gunlugger_ranged_pack` at 10:54:06, and `ogryn_gunlugger_high_threat` at 10:55:19
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+
+Sprint 3 / #103 + #105 evidence:
+- Chain-family melee special execution: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: `chainsword_p1_m1 action=special_action` at 10:50:17 and `chainaxe_p1_m2 action=special_action` at 10:50:19
+- Force sword melee special execution: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: `forcesword_p1_m1 action=special_action` at 10:50:18
+- Rippergun close-range ranged hold: PASS
+  - visual: unknown
+  - key lines / timestamps: repeated `ogryn_rippergun_p1_m2 action=zoom_shoot` / `holding sustained fire inputs` from 10:50:48 onward, with repeated same-window `type hold ranged over raw melee` lines
+- `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - key lines / timestamps: `forcestaff_p3_m1` did fire (`vent`, `charge`, `shoot_pressed`, later `grenade_ability`), but this run still has no isolated positive keep-ranged marker for the family
+
+Sprint 4 / pocketable carry evidence:
+- Combat stim pickup primitive: PASS
+  - key lines / timestamps: `assigned proactive mule pickup for syringe_power_boost_pocketable` at 10:52:49 and `mule pickup success: syringe_power_boost_pocketable (bot=5)` at 10:54:24
+- Smart-tag item bridge: PARTIAL PASS
+  - key lines / timestamps: repeated `smart-tag pickup ignored for syringe_power_boost_pocketable (reason=no_eligible_bot)` from 10:51:34 onward
+  - remaining gap: no positive `smart-tag pickup routed ...` line in this run
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` / `weakspot override applied` line in this run
+- Daemonhost avoidance (`#17`): UNKNOWN
+  - no real daemonhost spawn; only debug context lines with `target_is_dormant_daemonhost = false`
+
+Conclusion:
+- This run is enough to close `#103` and `#104`.
+- On a lenient close standard, it is also enough to close `#105`: autopistol already had live proof from the 2026-04-19 smoke run, and this run adds the missing rippergun live evidence.
+- This run is still not enough to close `#17`, `#92`, or `#96`, and it does not prove corruption-stim self-use yet.
+```
+
 ### Run 2026-04-19-v1-0-0-smoke-01
 
 ```text

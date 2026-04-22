@@ -2060,6 +2060,60 @@ describe("heuristics", function()
 			assert.matches("hold", rule)
 		end)
 
+		it("uses frag grenades on severe elite packs even without bleed talent", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 3,
+				challenge_rating_sum = 4.5,
+				target_enemy_distance = 8,
+				talents = {},
+			})
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("lets bleed lower the frag elite-pack threshold", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				special_count = 1,
+				challenge_rating_sum = 4.0,
+				target_enemy_distance = 8,
+			})
+			local baseline_result, baseline_rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_false(baseline_result)
+			assert.matches("hold", baseline_rule)
+
+			local local_ctx_bleed = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				special_count = 1,
+				challenge_rating_sum = 4.0,
+				target_enemy_distance = 8,
+				talents = {
+					veteran_grenade_apply_bleed = 1,
+				},
+			})
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx_bleed)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("holds frag grenades on small elite groups without enough pressure", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				challenge_rating_sum = 3.5,
+				target_enemy_distance = 8,
+				talents = {},
+			})
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
 		it("revalidation hysteresis relaxes frag horde threshold by one nearby", function()
 			-- Frag needs num_nearby >= 6 on the initial check. At 5 nearby
 			-- the default call should hold, but once the bot has committed
@@ -2149,6 +2203,68 @@ describe("heuristics", function()
 			assert.matches("horde", rule)
 		end)
 
+		it("uses standard Ogryn box on mixed elite packs outside melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					special_count = 1,
+					challenge_rating_sum = 4.5,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
+		end)
+
+		it("uses Ogryn frag as a scarce nuke against monsters", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					target_enemy = "plague_ogryn",
+					target_is_monster = true,
+					monster_count = 1,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("monster", rule)
+		end)
+
+		it("uses Ogryn frag on high-challenge mixed packs", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 3,
+					special_count = 1,
+					challenge_rating_sum = 6.0,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
+		end)
+
+		it("holds Ogryn frag on ordinary horde pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
 		it("blocks priority grenades under crowd pressure", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"ogryn_grenade_friend_rock",
@@ -2229,6 +2345,87 @@ describe("heuristics", function()
 			)
 			assert.is_true(result)
 			assert.matches("pressure", rule)
+		end)
+
+		it("uses zealot shock grenades to interrupt clustered elite pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "rager",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.90,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("interrupt", rule)
+		end)
+
+		it("uses broker flash grenades to interrupt clustered specials without needing low toughness", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("interrupt", rule)
+		end)
+
+		it("holds broker flash grenades on isolated priority targets in calm states", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 1,
+					special_count = 1,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("uses broker tox grenades on monsters at safe range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					target_enemy = "plague_ogryn",
+					target_is_monster = true,
+					monster_count = 1,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("monster", rule)
+		end)
+
+		it("uses broker tox grenades on high-challenge mixed packs", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 2,
+					special_count = 1,
+					challenge_rating_sum = 4.5,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
 		end)
 
 		it("blocks shock mine only in melee range", function()

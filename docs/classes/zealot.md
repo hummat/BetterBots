@@ -222,7 +222,7 @@ Three mutually exclusive grenade types.
 
 **What it does**: Throws a stun grenade that staggers and temporarily incapacitates enemies in an area.
 
-**Bot usage notes**: Standard grenade throw via `grenade_ability_pressed`. Use against dense packs, especially to interrupt dangerous enemy attacks or to stagger elites.
+**Bot usage notes**: Standard grenade throw via `grenade_ability_pressed`. Use against dense packs, especially to interrupt dangerous elite/special pressure or to create space when the fight starts collapsing.
 
 #### Talent Modifier
 - **Stunstorm Grenade** (internal: `zealot_improved_stun_grenade`; formerly: Improved Stun Grenade): +50% explosion radius

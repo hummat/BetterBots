@@ -423,6 +423,11 @@ function M.should_allow_mule_pickup(unit, pickup_unit, bot_group, data)
 		return false, "pocketable_disabled"
 	end
 
+	local inventory_component = _inventory_component(unit)
+	if not _slot_is_empty(inventory_component, entry.slot_name) then
+		return false, "bot_slot_full"
+	end
+
 	local pickup_orders = data and data.pickup_orders
 	local order = pickup_orders and pickup_orders[entry.slot_name]
 	if order and order.unit == pickup_unit then
