@@ -317,8 +317,8 @@ describe("smart_tag_orders", function()
 	end)
 
 	it("rejects slot pickups blocked by pickup policy", function()
-		target_unit.pickup_type = "syringe_corruption_pocketable"
-		pickup_defs.syringe_corruption_pocketable = {
+		target_unit.pickup_type = "motion_detection_mine_shock_pocketable"
+		pickup_defs.motion_detection_mine_shock_pocketable = {
 			inventory_slot_name = "slot_pocketable_small",
 		}
 		players_by_unit[human_unit] = {

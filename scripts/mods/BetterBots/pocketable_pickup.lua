@@ -53,6 +53,12 @@ local SUPPORTED_PICKUPS = {
 		wield_input = "wield_4",
 		use_input = "use_self",
 	},
+	syringe_corruption_pocketable = {
+		kind = "corruption_stim",
+		slot_name = "slot_pocketable_small",
+		wield_input = "wield_4",
+		use_input = "use_self",
+	},
 }
 local CARRIED_SLOT_ORDER = {
 	"slot_pocketable_small",
@@ -239,6 +245,17 @@ local function _stim_threat_high(context)
 	return false
 end
 
+local function _self_healing_needed(unit)
+	if not (_health and _health.current_health_percent) then
+		return false
+	end
+
+	local health_pct = _health.current_health_percent(unit) or 1
+	local corruption_pct = _health.permanent_damage_taken_percent and _health.permanent_damage_taken_percent(unit) or 0
+
+	return health_pct < MEDICAL_HEALTH_THRESHOLD or corruption_pct > MEDICAL_CORRUPTION_THRESHOLD
+end
+
 local function _scan_team_resource_need(unit)
 	local units = _allied_units and _allied_units(unit) or nil
 	if not units or #units == 0 then
@@ -288,6 +305,21 @@ local function _desired_action(unit, blackboard)
 	local context = _build_context and _build_context(unit, blackboard) or nil
 	if entry.kind == "stim" then
 		if _stim_threat_high(context) then
+			return {
+				pickup_name = pickup_name,
+				slot_name = slot_name,
+				wield_input = entry.wield_input,
+				use_input = entry.use_input,
+			}
+		end
+
+		return nil
+	end
+
+	if entry.kind == "corruption_stim" then
+		local safe_to_use = context and context.num_nearby == 0 and not context.target_enemy
+
+		if safe_to_use and _self_healing_needed(unit) then
 			return {
 				pickup_name = pickup_name,
 				slot_name = slot_name,

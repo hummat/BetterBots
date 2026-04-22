@@ -11,6 +11,18 @@ local function make_pickups()
 				name = "grimoire",
 				inventory_slot_name = "slot_pocketable",
 			},
+			medical_crate_pocketable = {
+				name = "medical_crate_pocketable",
+				inventory_slot_name = "slot_pocketable",
+				slot_name = "slot_pocketable",
+				bots_mule_pickup = true,
+			},
+			syringe_corruption_pocketable = {
+				name = "syringe_corruption_pocketable",
+				inventory_slot_name = "slot_pocketable_small",
+				slot_name = "slot_pocketable_small",
+				bots_mule_pickup = true,
+			},
 		},
 	}
 end
@@ -520,6 +532,7 @@ describe("mule_pickup", function()
 					slot_pocketable = {
 						[medical_unit] = 20,
 					},
+					slot_pocketable_small = {},
 				},
 				data = function()
 					return bot_data
@@ -650,6 +663,67 @@ describe("mule_pickup", function()
 		)
 
 		assert.is_truthy(find_debug_log("mule pickup success: tome (bot=3)"))
+	end)
+
+	it("logs supported pocketable pickup success after a successful pocketable interaction", function()
+		local PocketableInteraction = {
+			stop = function(_, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+				return {
+					world = world,
+					interactor_unit = interactor_unit,
+					target_unit = interaction_context and interaction_context.target_unit or nil,
+					t = t,
+					result = result,
+					interactor_is_server = interactor_is_server,
+				}
+			end,
+		}
+
+		MulePickup.init({
+			mod = fake_mod,
+			debug_enabled = function()
+				return true
+			end,
+			debug_log = function(key, _t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					message = message,
+				}
+			end,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot_2" and 2 or nil
+			end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			get_live_bot_groups = function()
+				return live_bot_groups
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+
+		local target_unit = { pickup_type = "syringe_corruption_pocketable" }
+		PocketableInteraction.stop(
+			PocketableInteraction,
+			"world",
+			"bot_2",
+			{ target_unit = target_unit },
+			10,
+			"success",
+			true
+		)
+
+		assert.is_truthy(find_debug_log("mule pickup success: syringe_corruption_pocketable (bot=2)"))
 	end)
 
 	it("installs PocketableInteraction hooks only once per shared class table", function()

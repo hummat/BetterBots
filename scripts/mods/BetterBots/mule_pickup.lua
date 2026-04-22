@@ -18,6 +18,7 @@ local _last_grimoire_patch_enabled
 local _blackboard_module
 local _warned_group_system_lookup_failure
 local _warned_blackboard_module_lookup_failure
+local _pickups_registry
 local BOT_GROUP_PATCH_SENTINEL = "__bb_mule_pickup_bot_group_installed"
 local INTERACTION_PATCH_SENTINEL = "__bb_mule_pickup_interaction_installed"
 
@@ -47,7 +48,12 @@ local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_nam
 		return
 	end
 
-	if pickup_name ~= TOME_PICKUP_NAME and pickup_name ~= GRIMOIRE_PICKUP_NAME then
+	local pickup_settings = pickup_name and _pickups_registry().by_name[pickup_name] or nil
+	local slot_name = pickup_settings and (pickup_settings.slot_name or pickup_settings.inventory_slot_name) or nil
+	local is_supported_mule_pocketable = pickup_settings
+		and pickup_settings.bots_mule_pickup
+		and (slot_name == "slot_pocketable" or slot_name == "slot_pocketable_small")
+	if pickup_name ~= TOME_PICKUP_NAME and pickup_name ~= GRIMOIRE_PICKUP_NAME and not is_supported_mule_pocketable then
 		return
 	end
 
@@ -57,7 +63,7 @@ local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_nam
 	)
 end
 
-local function _pickups_registry()
+function _pickups_registry()
 	if _pickups then
 		return _pickups
 	end

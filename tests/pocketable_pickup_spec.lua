@@ -19,6 +19,8 @@ describe("pocketable_pickup", function()
 	local inventory_component
 	local carried_templates
 	local pickups
+	local bot_health_pct
+	local bot_corruption_pct
 	local saved_script_unit
 
 	local function init_module()
@@ -61,9 +63,17 @@ describe("pocketable_pickup", function()
 			},
 			health_module = {
 				current_health_percent = function(target_unit)
+					if target_unit == unit then
+						return bot_health_pct
+					end
+
 					return target_unit.health_pct
 				end,
 				permanent_damage_taken_percent = function(target_unit)
+					if target_unit == unit then
+						return bot_corruption_pct
+					end
+
 					return target_unit.corruption_pct or 0
 				end,
 			},
@@ -104,8 +114,14 @@ describe("pocketable_pickup", function()
 					name = "syringe_power_boost_pocketable",
 					inventory_slot_name = "slot_pocketable_small",
 				},
+				syringe_corruption_pocketable = {
+					name = "syringe_corruption_pocketable",
+					inventory_slot_name = "slot_pocketable_small",
+				},
 			},
 		}
+		bot_health_pct = 1
+		bot_corruption_pct = 0
 		inventory_component = {
 			wielded_slot = "slot_primary",
 			slot_pocketable = "medical_item",
@@ -162,6 +178,7 @@ describe("pocketable_pickup", function()
 		assert.is_true(pickups.by_name.ammo_cache_pocketable.bots_mule_pickup)
 		assert.equals("slot_pocketable", pickups.by_name.ammo_cache_pocketable.slot_name)
 		assert.is_true(pickups.by_name.medical_crate_pocketable.bots_mule_pickup)
+		assert.is_true(pickups.by_name.syringe_corruption_pocketable.bots_mule_pickup)
 		assert.equals("slot_pocketable_small", pickups.by_name.syringe_power_boost_pocketable.slot_name)
 	end)
 
@@ -181,7 +198,7 @@ describe("pocketable_pickup", function()
 
 	it("allows ordered pocketables even when a human matching slot is empty", function()
 		init_module()
-		local pickup_unit = { pickup_type = "syringe_power_boost_pocketable" }
+		local pickup_unit = { pickup_type = "syringe_corruption_pocketable" }
 
 		human_units = {
 			{ inventory = { slot_pocketable = "crate_item", slot_pocketable_small = "not_equipped" } },
@@ -197,6 +214,43 @@ describe("pocketable_pickup", function()
 
 		assert.is_true(allowed)
 		assert.is_nil(reason)
+	end)
+
+	it("allows corruption stim pickup when all human stim slots are occupied", function()
+		init_module()
+
+		human_units = {
+			{ inventory = { slot_pocketable_small = "stim_item" } },
+			{ inventory = { slot_pocketable_small = "another_stim" } },
+		}
+
+		local allowed, reason =
+			PocketablePickup.should_allow_mule_pickup(unit, { pickup_type = "syringe_corruption_pocketable" }, nil, nil)
+
+		assert.is_true(allowed)
+		assert.is_nil(reason)
+	end)
+
+	it("does not block pickup orders for the supported corruption stim", function()
+		init_module()
+
+		local blocked, reason = PocketablePickup.should_block_pickup_order({
+			pickup_type = "syringe_corruption_pocketable",
+		})
+
+		assert.is_false(blocked)
+		assert.is_nil(reason)
+	end)
+
+	it("blocks unsupported pocketables on pickup order", function()
+		init_module()
+
+		local blocked, reason = PocketablePickup.should_block_pickup_order({
+			pickup_type = "motion_detection_mine_shock_pocketable",
+		})
+
+		assert.is_true(blocked)
+		assert.equals("unsupported_pocketable", reason)
 	end)
 
 	it("queues wield then self-use for a carried combat stim in high-threat combat", function()
@@ -223,6 +277,60 @@ describe("pocketable_pickup", function()
 			component = "weapon_action",
 			input = "use_self",
 		}, queued_inputs[2])
+	end)
+
+	it(
+		"queues wield then self-use for a carried corruption stim when the bot needs relief and combat is calm",
+		function()
+			init_module()
+
+			bot_corruption_pct = 0.20
+			build_context_result = test_helper.make_context({
+				num_nearby = 0,
+				target_enemy = nil,
+			})
+			carried_templates.slot_pocketable_small = {
+				pickup_name = "syringe_corruption_pocketable",
+				action_inputs = {
+					use_self = {},
+				},
+			}
+
+			PocketablePickup.try_queue(unit, { perception = {} })
+			assert.same({
+				component = "weapon_action",
+				input = "wield",
+				raw_input = "wield_4",
+			}, queued_inputs[1])
+
+			inventory_component.wielded_slot = "slot_pocketable_small"
+			fixed_t = fixed_t + 0.1
+			PocketablePickup.try_queue(unit, { perception = {} })
+
+			assert.same({
+				component = "weapon_action",
+				input = "use_self",
+			}, queued_inputs[2])
+		end
+	)
+
+	it("does not self-use a carried corruption stim while the bot is healthy", function()
+		init_module()
+
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			target_enemy = nil,
+		})
+		carried_templates.slot_pocketable_small = {
+			pickup_name = "syringe_corruption_pocketable",
+			action_inputs = {
+				use_self = {},
+			},
+		}
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.equals(0, #queued_inputs)
 	end)
 
 	it("queues wield then deploy for a carried medical crate when the team needs healing", function()
