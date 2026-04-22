@@ -2428,6 +2428,166 @@ describe("heuristics", function()
 			assert.matches("priority_pack", rule)
 		end)
 
+		it(
+			"fires disruption interrupt_target when priority pressure is low but the focused target is elite/special",
+			function()
+				-- Isolates the target-interrupt branch from interrupt_pack: priority_pressure
+				-- below pack_targets, challenge_rating_sum below pack_challenge, but a
+				-- focused elite/special in a ≥3 cluster at safe distance.
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"broker_flash_grenade",
+					helper.make_context({
+						num_nearby = 3,
+						special_count = 1,
+						elite_count = 0,
+						challenge_rating_sum = 1.0,
+						target_enemy = "trapper",
+						target_is_elite_special = true,
+						target_enemy_distance = 8,
+						toughness_pct = 0.95,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("interrupt_target", rule)
+			end
+		)
+
+		it("fires disruption crowd on pure trash pressure with no priority target", function()
+			-- Isolates the crowd branch: no elite/special, no focused priority
+			-- target, but a crowd at or above crowd_nearby and crowd_challenge.
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("relaxes disruption pack_nearby by one while an ally is interacting", function()
+			-- num_nearby = pack_nearby - 1. Without the ally relaxation the pack
+			-- branch must NOT fire; the -1 offset is the only thing that flips
+			-- the throw from hold to interrupt_pack.
+			local baseline_ok, baseline_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					challenge_rating_sum = 3.5,
+					target_enemy = "rager",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+			assert.matches("hold", baseline_rule)
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					challenge_rating_sum = 3.5,
+					target_enemy = "rager",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax pack_nearby by one")
+			assert.matches("interrupt_pack", ally_rule)
+		end)
+
+		it("relaxes disruption crowd_nearby by one while an ally is interacting", function()
+			-- num_nearby = crowd_nearby - 1. No elite/special, no focused priority,
+			-- so only the crowd branch (or the defensive fallback) can fire.
+			local baseline_ok = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax crowd_nearby by one")
+			assert.matches("crowd", ally_rule)
+		end)
+
+		it("relaxes denial pack_nearby by one while an ally is interacting", function()
+			-- num_nearby = pack_nearby - 1 for broker_tox (pack_nearby = 4, so num_nearby = 3).
+			-- Without the relaxation the priority_pack branch fails and horde fallback
+			-- (min_nearby 6) cannot fire at 3; should return false.
+			local baseline_ok = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					monster_count = 0,
+					challenge_rating_sum = 4.0,
+					target_enemy = "shocktrooper",
+					target_is_elite_special = true,
+					target_is_monster = false,
+					target_enemy_distance = 8,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					monster_count = 0,
+					challenge_rating_sum = 4.0,
+					target_enemy = "shocktrooper",
+					target_is_elite_special = true,
+					target_is_monster = false,
+					target_enemy_distance = 8,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax pack_nearby by one")
+			assert.matches("priority_pack", ally_rule)
+		end)
+
 		it("blocks shock mine only in melee range", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"adamant_shock_mine",

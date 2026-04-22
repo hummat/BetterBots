@@ -478,6 +478,14 @@ local function _grenade_chain_lightning(context)
 	return false, "grenade_chain_lightning_hold"
 end
 
+local BROKER_FLASH_DISRUPTION_OPTS = {
+	pack_nearby = 4,
+	pack_challenge = 3.5,
+	crowd_nearby = 5,
+	crowd_challenge = 2.5,
+	min_distance = 6,
+}
+
 local GRENADE_HEURISTICS = {
 	veteran_frag_grenade = function(context)
 		return _grenade_frag(context, context.preset)
@@ -528,22 +536,10 @@ local GRENADE_HEURISTICS = {
 	end,
 	adamant_whistle = _grenade_whistle,
 	broker_flash_grenade = function(context)
-		return _grenade_disruption(context, "grenade_flash", {
-			pack_nearby = 4,
-			pack_challenge = 3.5,
-			crowd_nearby = 5,
-			crowd_challenge = 2.5,
-			min_distance = 6,
-		}, context.preset)
+		return _grenade_disruption(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_flash_grenade_improved = function(context)
-		return _grenade_disruption(context, "grenade_flash", {
-			pack_nearby = 4,
-			pack_challenge = 3.5,
-			crowd_nearby = 5,
-			crowd_challenge = 2.5,
-			min_distance = 6,
-		}, context.preset)
+		return _grenade_disruption(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_tox_grenade = function(context)
 		return _grenade_denial(context, "grenade_tox", 6, 3.0, {

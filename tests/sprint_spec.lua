@@ -450,6 +450,32 @@ describe("sprint", function()
 			assert.equals("daemonhost_nearby", reason)
 		end)
 
+		it("scans daemonhost liveness without throwing when ALIVE is missing", function()
+			-- Guards the daemonhost scan's `ALIVE[enemy_unit]` dereference:
+			-- under a nil ALIVE global (e.g. early-spawn window or a future
+			-- engine rename) the path must fall back to Unit.alive instead of
+			-- raising through the sprint hook.
+			local unit = "bot1"
+			local dh = "daemonhost_no_alive"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(10, 0, 0)
+			-- No _alive[dh]; rely on Unit.alive fallback via _unit_alive.
+			_unit_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			setup_behavior(unit, {})
+
+			local saved_alive = rawget(_G, "ALIVE")
+			_G.ALIVE = nil
+			local self_obj = make_self()
+			local ok_call, ok, reason = pcall(Sprint.should_sprint, self_obj, unit, {})
+			_G.ALIVE = saved_alive
+
+			assert.is_true(ok_call, "daemonhost scan must not throw when ALIVE is nil")
+			assert.is_false(ok)
+			assert.equals("daemonhost_nearby", reason)
+		end)
+
 		it("blocks sprint near mutator daemonhost", function()
 			local unit = "bot1"
 			local dh = "mdh1"

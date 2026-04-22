@@ -351,6 +351,47 @@ describe("pocketable_pickup", function()
 		assert.equals(0, #queued_inputs)
 	end)
 
+	it("does not self-use a carried corruption stim on low HP with clean corruption", function()
+		init_module()
+
+		bot_health_pct = 0.45
+		bot_corruption_pct = 0
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			target_enemy = nil,
+		})
+		carried_templates.slot_pocketable_small = {
+			pickup_name = "syringe_corruption_pocketable",
+			action_inputs = {
+				use_self = {},
+			},
+		}
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.equals(0, #queued_inputs)
+	end)
+
+	it("holds a carried corruption stim while enemies are nearby even with heavy corruption", function()
+		init_module()
+
+		bot_corruption_pct = 0.30
+		build_context_result = test_helper.make_context({
+			num_nearby = 1,
+			target_enemy = nil,
+		})
+		carried_templates.slot_pocketable_small = {
+			pickup_name = "syringe_corruption_pocketable",
+			action_inputs = {
+				use_self = {},
+			},
+		}
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.equals(0, #queued_inputs)
+	end)
+
 	it("queues wield then deploy for a carried medical crate when the team needs healing", function()
 		init_module()
 

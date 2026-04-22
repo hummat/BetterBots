@@ -245,15 +245,16 @@ local function _stim_threat_high(context)
 	return false
 end
 
-local function _self_healing_needed(unit)
-	if not (_health and _health.current_health_percent) then
+-- Corruption stims only restore HP locked by permanent corruption damage; burning
+-- one on a bot with clean corruption is pure waste regardless of current HP.
+local function _corruption_healing_needed(unit)
+	if not (_health and _health.permanent_damage_taken_percent) then
 		return false
 	end
 
-	local health_pct = _health.current_health_percent(unit) or 1
-	local corruption_pct = _health.permanent_damage_taken_percent and _health.permanent_damage_taken_percent(unit) or 0
+	local corruption_pct = _health.permanent_damage_taken_percent(unit) or 0
 
-	return health_pct < MEDICAL_HEALTH_THRESHOLD or corruption_pct > MEDICAL_CORRUPTION_THRESHOLD
+	return corruption_pct > MEDICAL_CORRUPTION_THRESHOLD
 end
 
 local function _scan_team_resource_need(unit)
@@ -319,7 +320,7 @@ local function _desired_action(unit, blackboard)
 	if entry.kind == "corruption_stim" then
 		local safe_to_use = context and context.num_nearby == 0 and not context.target_enemy
 
-		if safe_to_use and _self_healing_needed(unit) then
+		if safe_to_use and _corruption_healing_needed(unit) then
 			return {
 				pickup_name = pickup_name,
 				slot_name = slot_name,

@@ -48,7 +48,8 @@ local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_nam
 		return
 	end
 
-	local pickup_settings = pickup_name and _pickups_registry().by_name[pickup_name] or nil
+	local registry = _pickups_registry()
+	local pickup_settings = pickup_name and registry and registry.by_name and registry.by_name[pickup_name] or nil
 	local slot_name = pickup_settings and (pickup_settings.slot_name or pickup_settings.inventory_slot_name) or nil
 	local is_supported_mule_pocketable = pickup_settings
 		and pickup_settings.bots_mule_pickup

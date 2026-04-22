@@ -403,6 +403,50 @@ describe("smart_tag_orders", function()
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
+	it("accumulates distinct rejection reasons across multiple bots", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		players_by_unit[bot_two] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "occupied" }
+		inventories_by_unit[bot_two] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one, bot_two }
+		_G.ALIVE[bot_one] = true
+		_G.ALIVE[bot_two] = false -- forces bot_dead branch ahead of slot inspection
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_two] = { x = 9, y = 0, z = 0 }
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("no_eligible_bot", reason)
+		assert.equals(0, #pickup_orders)
+		local message = debug_logs[1].message
+		assert.is_truthy(message:find("bot=1:slot_full", 1, true), "bot_one must report slot_full")
+		assert.is_truthy(message:find("bot=2:bot_dead", 1, true), "bot_two must report bot_dead")
+		-- Order preserved: bot_one comes before bot_two in side_units, so its detail is listed first.
+		assert.is_true(
+			message:find("bot=1:slot_full", 1, true) < message:find("bot=2:bot_dead", 1, true),
+			"rejection details must preserve side_units ordering"
+		)
+	end)
+
 	it("does not report the human tagger as a dead bot candidate", function()
 		target_unit.pickup_type = "syringe_power_boost_pocketable"
 		pickup_defs.syringe_power_boost_pocketable = {

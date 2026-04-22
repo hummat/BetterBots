@@ -572,6 +572,154 @@ describe("target_type_hysteresis", function()
 		end
 	end)
 
+	it("drops ranged targeting for each close-range family once distance exceeds its window", function()
+		-- Cases sit just outside each family's policy window (squared metres).
+		-- flamer/forcestaff_p2 = 12 m (144 sq), heavystubber = 11 m (121 sq),
+		-- autopistol = 10 m (100 sq), rippergun = 9 m (81 sq),
+		-- shotgun/forcestaff_p3 = 8 m (64 sq). Using +1 sq above each ceiling.
+		local cases = {
+			{
+				family = "flamer",
+				template = { name = "flamer_p1_m1", keywords = { "ranged", "flamer", "p1" } },
+				target_distance_sq = 145,
+			},
+			{
+				family = "shotgun",
+				template = { name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				target_distance_sq = 65,
+			},
+			{
+				family = "heavystubber",
+				template = {
+					name = "ogryn_heavystubber_p1_m1",
+					keywords = { "ranged", "heavystubber", "p1" },
+				},
+				target_distance_sq = 122,
+			},
+			{
+				family = "autopistol",
+				template = { name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+				target_distance_sq = 101,
+			},
+			{
+				family = "rippergun",
+				template = { name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+				target_distance_sq = 82,
+			},
+			{
+				family = "forcestaff_p2_m1",
+				template = { name = "forcestaff_p2_m1", keywords = { "ranged", "staff", "p2" } },
+				target_distance_sq = 145,
+			},
+			{
+				family = "forcestaff_p3_m1",
+				template = { name = "forcestaff_p3_m1", keywords = { "ranged", "staff", "p3" } },
+				target_distance_sq = 65,
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local result = run_hooked_selection({
+				t = 1,
+				debug_enabled = true,
+				previous_target_type = "ranged",
+				target_distance_sq = case.target_distance_sq,
+				bot_secondary_weapon_template = case.template,
+				close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+				bot_selection = {
+					slot_weight = function()
+						return 10
+					end,
+					melee_distance_weight = function()
+						return 8
+					end,
+					ranged_distance_weight = function()
+						return 0
+					end,
+					line_of_sight_weight = function()
+						return 0
+					end,
+				},
+			})
+
+			assert.equals(
+				"melee",
+				result.perception_component.target_enemy_type,
+				"family " .. case.family .. " should drop ranged beyond its window"
+			)
+			assert.is_nil(
+				find_debug_log(
+					result.debug_logs,
+					"close-range ranged family kept ranged target type (family=" .. case.family
+				),
+				"family " .. case.family .. " should not log the hold when beyond its window"
+			)
+		end
+	end)
+
+	it("preserves ranged targeting for families with wider windows than the shotgun boundary", function()
+		-- At 65 sq (~8.06 m) the shotgun/forcestaff_p3 windows have closed,
+		-- but flamer/heavystubber/autopistol/rippergun/forcestaff_p2 still hold.
+		local wider_than_shotgun = {
+			{
+				family = "flamer",
+				template = { name = "flamer_p1_m1", keywords = { "ranged", "flamer", "p1" } },
+			},
+			{
+				family = "heavystubber",
+				template = {
+					name = "ogryn_heavystubber_p1_m1",
+					keywords = { "ranged", "heavystubber", "p1" },
+				},
+			},
+			{
+				family = "autopistol",
+				template = { name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+			},
+			{
+				family = "rippergun",
+				template = { name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+			},
+			{
+				family = "forcestaff_p2_m1",
+				template = { name = "forcestaff_p2_m1", keywords = { "ranged", "staff", "p2" } },
+			},
+		}
+
+		for i = 1, #wider_than_shotgun do
+			local case = wider_than_shotgun[i]
+			local result = run_hooked_selection({
+				t = 1,
+				debug_enabled = true,
+				previous_target_type = "ranged",
+				target_distance_sq = 65,
+				bot_secondary_weapon_template = case.template,
+				close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+				bot_selection = {
+					slot_weight = function()
+						return 10
+					end,
+					melee_distance_weight = function()
+						return 8
+					end,
+					ranged_distance_weight = function()
+						return 0
+					end,
+					line_of_sight_weight = function()
+						return 0
+					end,
+				},
+			})
+
+			assert.equals(
+				"ranged",
+				result.perception_component.target_enemy_type,
+				"family " .. case.family .. " should still hold ranged at 65 sq"
+			)
+		end
+	end)
+
 	it("eagerly patches an already-loaded BotPerceptionExtension", function()
 		local RuntimeHysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
 		local saved_require = require

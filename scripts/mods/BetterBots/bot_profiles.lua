@@ -507,6 +507,20 @@ local DEFAULT_PROFILE_TEMPLATES = {
 -- Keyed by class name. Reset on GameplayStateRun enter (item catalog may change).
 local _resolved_profiles = {}
 
+-- Per-class throttle for profile-resolution failure warnings: once a class trips
+-- a given failure reason, the warning fires the first time unconditionally and
+-- the detailed payload still gates on debug flag.
+local _warned_resolution = {}
+local function _warn_resolution(key, message)
+	if _warned_resolution[key] then
+		return
+	end
+	_warned_resolution[key] = true
+	if _mod and _mod.warning then
+		_mod:warning("BetterBots: " .. message)
+	end
+end
+
 local function _get_slot_profile_choice(slot_index)
 	if not _mod then
 		return "none"
@@ -573,6 +587,14 @@ local function _resolve_profile_template(class_name)
 	-- so it must be the resolved table, not the raw string.
 	local archetype_table = Archetypes[template.archetype]
 	if not archetype_table then
+		_warn_resolution(
+			"bad_archetype:" .. class_name,
+			"profile resolution failed for "
+				.. class_name
+				.. " (unknown archetype '"
+				.. tostring(template.archetype)
+				.. "')"
+		)
 		if _debug_enabled() then
 			_debug_log(
 				"bot_profiles:bad_archetype",
@@ -615,16 +637,28 @@ local function _resolve_profile_template(class_name)
 					traits = _copy_item_overrides(curio.traits),
 					perks = _copy_item_overrides(curio.perks),
 				}
-			elseif _debug_enabled() then
-				_debug_log(
-					"bot_profiles:gadget_missing:" .. class_name .. ":" .. slot_name,
-					0,
+			else
+				_warn_resolution(
+					"gadget_missing:" .. class_name .. ":" .. slot_name,
 					"skipping runtime curio for "
 						.. slot_name
+						.. " on "
+						.. class_name
 						.. " (missing master_item_id for "
 						.. tostring(curio.name)
 						.. ")"
 				)
+				if _debug_enabled() then
+					_debug_log(
+						"bot_profiles:gadget_missing:" .. class_name .. ":" .. slot_name,
+						0,
+						"skipping runtime curio for "
+							.. slot_name
+							.. " (missing master_item_id for "
+							.. tostring(curio.name)
+							.. ")"
+					)
+				end
 			end
 		end
 	end
@@ -683,9 +717,23 @@ local function _resolve_profile_template(class_name)
 				-- Discover stat names from the weapon template (NOT the MasterItems catalog —
 				-- the catalog doesn't carry base_stats). Extract template name from the content
 				-- path and look it up in WeaponTemplates.
-				local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
+				-- pcall-wrap the require: if Fatshark renames the weapon-templates path in a
+				-- patch the mod must still fall back gracefully (warn once, skip the
+				-- base_stats override) instead of throwing through the add_bot hook.
+				local ok_wt, WeaponTemplates =
+					pcall(require, "scripts/settings/equipment/weapon_templates/weapon_templates")
 				local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
-				local weapon_template = template_name and WeaponTemplates[template_name]
+				local weapon_template = ok_wt
+						and type(WeaponTemplates) == "table"
+						and template_name
+						and WeaponTemplates[template_name]
+					or nil
+				if not ok_wt or type(WeaponTemplates) ~= "table" then
+					_warn_resolution(
+						"weapon_templates_unavailable",
+						"weapon_templates engine module unavailable; bot weapons ship without base_stats override"
+					)
+				end
 				local base_stats_override = {}
 				if weapon_template and weapon_template.base_stats then
 					for stat_name, _ in pairs(weapon_template.base_stats) do
@@ -714,6 +762,10 @@ local function _resolve_profile_template(class_name)
 			}
 			local item = MasterItems.get_item_instance(gear, gear_id)
 			if not item then
+				_warn_resolution(
+					"item_fail:" .. class_name .. ":" .. slot_name,
+					"failed to resolve weapon " .. tostring(item_id) .. " for " .. slot_name .. " on " .. class_name
+				)
 				if _debug_enabled() then
 					_debug_log(
 						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
@@ -774,6 +826,10 @@ local function _resolve_profile_template(class_name)
 		else
 			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
 			if not item then
+				_warn_resolution(
+					"item_fail:" .. class_name .. ":" .. slot_name,
+					"failed to resolve item " .. tostring(item_id) .. " for " .. slot_name .. " on " .. class_name
+				)
 				if _debug_enabled() then
 					_debug_log(
 						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
@@ -880,6 +936,18 @@ local function resolve_profile(profile)
 				"bot slot " .. tostring(slot_index) .. " failed to resolve profile for " .. tostring(choice)
 			)
 		end
+		return profile, false
+	end
+
+	-- Guard against partial-mutation: committing archetype/talents without resolved
+	-- primary+secondary weapons would leave the bot flagged as e.g. a zealot but
+	-- holding vanilla veteran weapons. Reject before touching `profile`.
+	local resolved_loadout = resolved.loadout
+	if not (resolved_loadout and resolved_loadout.slot_primary and resolved_loadout.slot_secondary) then
+		_warn_resolution(
+			"missing_weapon_slots:" .. tostring(choice),
+			"resolved profile for " .. tostring(choice) .. " is missing slot_primary or slot_secondary"
+		)
 		return profile, false
 	end
 
@@ -994,6 +1062,11 @@ local function reset()
 	-- Clear resolved cache — item catalog may have changed between missions
 	for k in pairs(_resolved_profiles) do
 		_resolved_profiles[k] = nil
+	end
+	-- Let resolution warnings fire again after a reset so a fresh mission surfaces
+	-- regressions that appeared between mission loads.
+	for k in pairs(_warned_resolution) do
+		_warned_resolution[k] = nil
 	end
 end
 

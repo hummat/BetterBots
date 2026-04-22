@@ -70,7 +70,7 @@ local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixe
 		if ai_units then
 			for i = 1, #ai_units do
 				local enemy_unit = ai_units[i]
-				if enemy_unit and ALIVE[enemy_unit] then
+				if enemy_unit and _unit_is_alive(enemy_unit) then
 					local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
 					if unit_data_ext then
 						local breed = unit_data_ext:breed()
