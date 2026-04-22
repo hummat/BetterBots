@@ -120,7 +120,7 @@ end
 --   veteran: Voice of Command + Focus Target + chainsword + precision lasgun
 --   zealot:  Fury + Martyrdom + chainaxe + stub revolver
 --   psyker:  Scrier's Gaze + Brain Rupture + force sword + electrokinetic staff
---   ogryn:   Point-Blank Barrage + armor-pen + rippergun
+--   ogryn:   Point-Blank Barrage + latrine shovel + Kickback
 -- All talent keys verified against decompiled tree layouts.
 -- Stat node names verified against class-specific tree files.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
@@ -400,26 +400,18 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "ogryn_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
+			slot_primary = "content/items/weapons/player/melee/ogryn_club_p1_m3",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
 		},
-		-- Ogryn keeps the Bully Club chassis and pairs Point-Blank Barrage with a
-		-- rippergun so the close-range ranged-family logic sits on a build that
-		-- still has a sturdy melee fallback.
+		-- Ogryn now runs the latrine shovel plus Kickback so the shipped validation
+		-- build exercises the new shovel fold-special logic and a sturdier
+		-- close-range shotgun profile under Point-Blank Barrage.
 		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					{
-						id = "content/items/traits/bespoke_ogryn_club_p2/staggered_targets_receive_increased_damage_debuff",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_ogryn_club_p2/toughness_recovery_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
+					_trait_override(_trait_id("ogryn_club_p1", "targets_receive_rending_debuff")),
+					_trait_override(_trait_id("ogryn_club_p1", "toughness_recovery_on_chained_attacks")),
 				},
 				perks = {
 					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
@@ -428,8 +420,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			},
 			slot_secondary = {
 				traits = {
-					_trait_override(_trait_id("ogryn_rippergun_p1", "toughness_on_continuous_fire")),
-					_trait_override(_trait_id("ogryn_rippergun_p1", "power_bonus_on_continuous_fire")),
+					_trait_override(_trait_id("ogryn_thumper_p1", "toughness_on_continuous_fire")),
+					_trait_override(_trait_id("ogryn_thumper_p1", "power_bonus_on_continuous_fire")),
 				},
 				perks = {
 					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
@@ -462,9 +454,9 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			_default_curio_entry(),
 			_default_curio_entry(),
 		},
-		-- Validation-first Ogryn profile: Point-Blank Barrage with the armor-pen
-		-- modifier on a rippergun. Heavy Hitter stays as the passive melee spine so
-		-- the bot is not dead weight once ranged uptime collapses.
+		-- Validation-first Ogryn profile: Point-Blank Barrage on a Kickback with
+		-- the latrine shovel as the melee spine. Heavy Hitter keeps the melee side
+		-- useful once ranged uptime collapses.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			ogryn_special_ammo = 1,

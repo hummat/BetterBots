@@ -15,6 +15,16 @@ local _melee_horde_light_bias
 local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
+local HIGH_HEALTH_BREEDS = {
+	-- Approximate "worth folding the latrine shovel for" table, sourced from
+	-- docs/knowledge/enemy-stats.md (Damnation/Auric HP). Keep this intentionally
+	-- narrow: only breeds that clearly sit above ordinary elite/special health.
+	cultist_mutant = true,
+	chaos_ogryn_gunner = true,
+	chaos_ogryn_bulwark = true,
+	chaos_ogryn_executor = true,
+	renegade_executor = true,
+}
 local DEFAULT_ATTACK_META_DATA = {
 	light_attack = {
 		arc = 0,
@@ -205,6 +215,16 @@ local SPECIAL_WEAPON_POLICIES = {
 			toggle_special = true,
 		},
 	},
+	{
+		family = "ogryn_latrine_shovel",
+		prefixes = {
+			"ogryn_club_p1_m2",
+			"ogryn_club_p1_m3",
+		},
+		action_kinds = {
+			toggle_special = true,
+		},
+	},
 }
 
 local function _starts_with(value, prefix)
@@ -335,6 +355,33 @@ local function _is_chain_special_target(target_breed, target_armor)
 	return tags and tags.elite and _is_armored_bucket(target_armor, _armored_type, _super_armor_type) or false
 end
 
+local function _is_high_health_target(target_breed)
+	local tags = target_breed and target_breed.tags or nil
+
+	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	if tags and (tags.monster or tags.captain) then
+		return true
+	end
+
+	local breed_name = target_breed and target_breed.name or nil
+	return breed_name ~= nil and HIGH_HEALTH_BREEDS[breed_name] == true or false
+end
+
+local function _is_ogryn_latrine_shovel_target(target_breed, target_armor)
+	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
+end
+
+local function _is_ogryn_latrine_shovel_heavy_target(target_breed, target_armor)
+	if _super_armor_type ~= nil and target_armor == _super_armor_type then
+		return true
+	end
+
+	return _is_high_health_target(target_breed) and _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
+end
+
 local function _is_priority_special_target(special_action_meta, scratchpad, target_breed, target_armor)
 	if not special_action_meta then
 		return false
@@ -356,7 +403,20 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 		return _is_chain_special_target(target_breed, target_armor)
 	end
 
+	if special_action_meta.family == "ogryn_latrine_shovel" then
+		return _is_ogryn_latrine_shovel_target(target_breed, target_armor)
+	end
+
 	return false
+end
+
+local function _attack_meta_for_input(weapon_meta_data, attack_input)
+	if type(weapon_meta_data) ~= "table" then
+		return nil
+	end
+
+	local attack_meta_data = weapon_meta_data[attack_input]
+	return normalize_attack_meta_data(attack_meta_data)
 end
 
 local function _can_activate_special(scratchpad)
@@ -501,6 +561,16 @@ function M.install_melee_hooks(BtBotMeleeAction)
 			_armored_type,
 			_super_armor_type
 		)
+
+		local special_action_meta = scratchpad.special_action_meta or nil
+		if
+			special_action_meta
+			and special_action_meta.family == "ogryn_latrine_shovel"
+			and _is_ogryn_latrine_shovel_heavy_target(target_breed, target_armor)
+		then
+			chosen = _attack_meta_for_input(weapon_template.attack_meta_data, "heavy_attack") or chosen
+		end
+
 		local chosen_attack = _chosen_attack_input(weapon_template.attack_meta_data, chosen)
 		local wrapped_special
 

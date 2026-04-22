@@ -109,9 +109,9 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.psyker.talents.psyker_combat_ability_stance)
 			assert.is_not_nil(profiles.psyker.talents.psyker_brain_burst_improved)
 
-			assert.equals("content/items/weapons/player/melee/ogryn_club_p2_m3", profiles.ogryn.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m3", profiles.ogryn.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
+				"content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
 				profiles.ogryn.loadout.slot_secondary
 			)
 			assert.is_not_nil(profiles.ogryn.talents.ogryn_special_ammo)
@@ -737,10 +737,10 @@ describe("bot_profiles", function()
 					secondary_template = "forcestaff_p3_m1",
 				},
 				ogryn = {
-					primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
-					secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m2",
-					primary_template = "ogryn_club_p2_m3",
-					secondary_template = "ogryn_rippergun_p1_m2",
+					primary = "content/items/weapons/player/melee/ogryn_club_p1_m3",
+					secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
+					primary_template = "ogryn_club_p1_m3",
+					secondary_template = "ogryn_thumper_p1_m1",
 				},
 			}
 

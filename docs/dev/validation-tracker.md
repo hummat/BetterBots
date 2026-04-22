@@ -70,7 +70,7 @@ Date (local): 2026-04-22
 Date (UTC): 2026-04-22
 Git commit: local (post corruption-stim pickup follow-up)
 Log file: console-2026-04-22-10.46.31-a0fff67f-573b-4d89-9e32-eb3b9675ed14.log
-Bot lineup / abilities: current validation-first defaults — Veteran (Voice of Command + Focus Target + precision lasgun + chainsword), Zealot (Fury + Martyrdom + chainaxe + stub revolver), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
+Bot lineup / abilities: current validation-first defaults — Veteran (Voice of Command + Focus Target + precision lasgun + chainsword), Zealot (Fury + Martyrdom + chainaxe + stub revolver), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + Kickback + latrine shovel)
 Map + difficulty: live mission test run (exact map/difficulty not recorded in log)
 
 Regression checks:
@@ -1253,7 +1253,7 @@ Profile loading:
 
 Later default-profile swap (2026-04-20):
 - The shipped built-in defaults were later retuned for validation coverage and no longer match the April 7 lineup above.
-- Current defaults: Veteran = VoC + Focus Target + precision lasgun + chainsword; Zealot = Fury + Martyrdom + chainaxe + stub revolver; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + armor-pen rippergun + Bully Club.
+- Current defaults: Veteran = VoC + Focus Target + precision lasgun + chainsword; Zealot = Fury + Martyrdom + chainaxe + stub revolver; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + Kickback + latrine shovel.
 - That later swap has static coverage and profile-loading coverage, but it does not yet have a dedicated live mission entry in this tracker.
     Tertium/SoloPlay external profiles (validated in earlier run 0)
 
