@@ -287,39 +287,48 @@ local function has_keyword(weapon_template, keyword)
 	return false
 end
 
-local CLOSE_RANGE_RANGED_DISTANCE_SQ = 10 * 10
+local function meters_sq(meters)
+	return meters * meters
+end
+
+-- These windows are conservative "keep using the ranged plan" thresholds, not
+-- literal weapon max-range models. They are split by family/template so the
+-- bot's close-pressure carve-outs at least line up with broad weapon identity:
+-- autopistols sit around 10 m near-range starts, shotguns/ripperguns start
+-- stronger closer in, flamer/Purgatus are explicit close-pressure tools, and
+-- the p3 electro staff is narrower than Purgatus' crowd-control profile.
 local CLOSE_RANGE_RANGED_POLICIES = {
 	flamer = {
 		family = "flamer",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
-		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(12),
+		hipfire_distance_sq = meters_sq(12),
 	},
 	shotgun = {
 		family = "shotgun",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
-		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(8),
+		hipfire_distance_sq = meters_sq(8),
 	},
 	heavystubber = {
 		family = "heavystubber",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
-		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(11),
+		hipfire_distance_sq = meters_sq(11),
 	},
 	autopistol = {
 		family = "autopistol",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
-		hipfire_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(10),
+		hipfire_distance_sq = meters_sq(10),
 	},
 	rippergun = {
 		family = "rippergun",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(9),
 	},
 	forcestaff_p2_m1 = {
 		family = "forcestaff_p2_m1",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(12),
 	},
 	forcestaff_p3_m1 = {
 		family = "forcestaff_p3_m1",
-		hold_ranged_target_distance_sq = CLOSE_RANGE_RANGED_DISTANCE_SQ,
+		hold_ranged_target_distance_sq = meters_sq(8),
 	},
 }
 

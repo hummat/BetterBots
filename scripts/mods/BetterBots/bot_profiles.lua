@@ -33,7 +33,7 @@ local SLOT_SETTING_IDS = {
 --
 -- Current shipped lineup:
 --   veteran: Voice of Command + Focus Target + chainsword + precision lasgun
---   zealot:  Fury + Martyrdom + chainaxe + autopistol
+--   zealot:  Fury + Martyrdom + chainaxe + stub revolver
 --   psyker:  Scrier's Gaze + Brain Rupture + force sword + electrokinetic staff
 --   ogryn:   Point-Blank Barrage + armor-pen + rippergun
 -- All talent keys verified against decompiled tree layouts.
@@ -124,8 +124,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Zealot pairs Fury + Martyrdom with a chain-family melee weapon and an
-		-- autopistol. The passive package avoids dodge-gated talents because bots
+		-- Zealot pairs Fury + Martyrdom with a chain-family melee weapon and a
+		-- stub revolver. The passive package avoids dodge-gated talents because bots
 		-- never dodge, and it keeps Benediction because coherency DR is more
 		-- valuable to bot squads than corruption healing.
 		talents = {

@@ -1,5 +1,6 @@
 local test_helper = require("tests.test_helper")
 local Hysteresis = dofile("scripts/mods/BetterBots/target_type_hysteresis.lua")
+local RangedMetaData = dofile("scripts/mods/BetterBots/ranged_meta_data.lua")
 
 local function find_debug_log(logs, fragment)
 	for i = 1, #logs do
@@ -483,32 +484,92 @@ describe("target_type_hysteresis", function()
 		assert.is_truthy(find_debug_log(result.debug_logs, "type hold melee over raw ranged"))
 	end)
 
-	it("preserves ranged targeting for close-range flamer families under melee pressure", function()
-		local result = run_hooked_selection({
-			t = 1,
-			previous_target_type = "ranged",
-			target_distance_sq = 25,
-			bot_secondary_weapon_template = {
-				name = "flamer_p1_m1",
-				keywords = { "ranged", "flamer", "p1" },
+	it("preserves ranged targeting for the explicit close-range family set under melee pressure", function()
+		local cases = {
+			{
+				family = "flamer",
+				template = {
+					name = "flamer_p1_m1",
+					keywords = { "ranged", "flamer", "p1" },
+				},
 			},
-			bot_selection = {
-				slot_weight = function()
-					return 10
-				end,
-				melee_distance_weight = function()
-					return 8
-				end,
-				ranged_distance_weight = function()
-					return 0
-				end,
-				line_of_sight_weight = function()
-					return 0
-				end,
+			{
+				family = "shotgun",
+				template = {
+					name = "shotgun_p1_m1",
+					keywords = { "ranged", "shotgun", "p1" },
+				},
 			},
-		})
+			{
+				family = "heavystubber",
+				template = {
+					name = "ogryn_heavystubber_p1_m1",
+					keywords = { "ranged", "heavystubber", "p1" },
+				},
+			},
+			{
+				family = "autopistol",
+				template = {
+					name = "autopistol_p1_m1",
+					keywords = { "ranged", "autopistol", "p1" },
+				},
+			},
+			{
+				family = "rippergun",
+				template = {
+					name = "ogryn_rippergun_p1_m1",
+					keywords = { "ranged", "rippergun", "p1" },
+				},
+			},
+			{
+				family = "forcestaff_p2_m1",
+				template = {
+					name = "forcestaff_p2_m1",
+					keywords = { "ranged", "staff", "p2" },
+				},
+			},
+			{
+				family = "forcestaff_p3_m1",
+				template = {
+					name = "forcestaff_p3_m1",
+					keywords = { "ranged", "staff", "p3" },
+				},
+			},
+		}
 
-		assert.equals("ranged", result.perception_component.target_enemy_type)
+		for i = 1, #cases do
+			local case = cases[i]
+			local result = run_hooked_selection({
+				t = 1,
+				debug_enabled = true,
+				previous_target_type = "ranged",
+				target_distance_sq = 25,
+				bot_secondary_weapon_template = case.template,
+				close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+				bot_selection = {
+					slot_weight = function()
+						return 10
+					end,
+					melee_distance_weight = function()
+						return 8
+					end,
+					ranged_distance_weight = function()
+						return 0
+					end,
+					line_of_sight_weight = function()
+						return 0
+					end,
+				},
+			})
+
+			assert.equals("ranged", result.perception_component.target_enemy_type)
+			assert.is_truthy(
+				find_debug_log(
+					result.debug_logs,
+					"close-range ranged family kept ranged target type (family=" .. case.family
+				)
+			)
+		end
 	end)
 
 	it("eagerly patches an already-loaded BotPerceptionExtension", function()

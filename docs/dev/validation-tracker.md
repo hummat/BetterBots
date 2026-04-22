@@ -70,7 +70,7 @@ Date (local): 2026-04-19
 Date (UTC): 2026-04-19
 Git commit: local (post weapon_action / weakspot_aim hook conflict fix)
 Log file: console-2026-04-19-13.47.30-9f74e98d-a19e-4398-b3bf-93c243233c93.log
-Bot lineup / abilities: validation-first shipped lineup — Veteran (Voice of Command + Focus Target + boltgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electro staff + force sword), Ogryn (Point-Blank Barrage + armor-pen + rippergun + Bully Club)
+Bot lineup / abilities: validation-first lineup used in this run — Veteran (Voice of Command + Focus Target + boltgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electro staff + force sword), Ogryn (Point-Blank Barrage + armor-pen + rippergun + Bully Club)
 Map + difficulty: live mission smoke run
 
 Regression checks:
@@ -130,7 +130,7 @@ Date (local): 2026-04-20
 Date (UTC): 2026-04-20
 Git commit: 0cecb61 (dev/v1.0.0, local dirty)
 Log file: console-2026-04-20-18.30.47-c687b3e8-22d8-4beb-b875-379986fd2fd4.log
-Bot lineup / abilities: current defaults at run time — Veteran (Voice of Command + Focus Target + precision lasgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
+Bot lineup / abilities: then-current defaults at run time — Veteran (Voice of Command + Focus Target + precision lasgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
 Map + difficulty: live mission follow-up run
 
 Regression checks:

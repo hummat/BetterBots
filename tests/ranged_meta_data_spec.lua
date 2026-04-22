@@ -118,6 +118,17 @@ describe("ranged_meta_data", function()
 	end)
 
 	describe("close_range_ranged_policy", function()
+		it("treats flamer as the widest close-range hipfire family", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "flamer_p1_m1",
+				keywords = { "ranged", "flamer", "p1" },
+			})
+
+			assert.equals("flamer", policy.family)
+			assert.equals(144, policy.hold_ranged_target_distance_sq)
+			assert.equals(144, policy.hipfire_distance_sq)
+		end)
+
 		it("treats autopistol-family weapons as close-range hipfire ranged weapons", function()
 			local policy = RangedMetaData.close_range_ranged_policy(make_ranged_template({
 				keywords = { "ranged", "autopistol", "p1" },
@@ -146,7 +157,18 @@ describe("ranged_meta_data", function()
 			})
 
 			assert.equals("rippergun", policy.family)
-			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(81, policy.hold_ranged_target_distance_sq)
+			assert.is_nil(policy.hipfire_distance_sq)
+		end)
+
+		it("keeps Purgatus ranged at a wider close-range window than the electrokinetic staff", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "forcestaff_p2_m1",
+				keywords = { "ranged", "staff", "p2" },
+			})
+
+			assert.equals("forcestaff_p2_m1", policy.family)
+			assert.equals(144, policy.hold_ranged_target_distance_sq)
 			assert.is_nil(policy.hipfire_distance_sq)
 		end)
 
@@ -157,7 +179,7 @@ describe("ranged_meta_data", function()
 			})
 
 			assert.equals("forcestaff_p3_m1", policy.family)
-			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
 			assert.is_nil(policy.hipfire_distance_sq)
 		end)
 
@@ -168,8 +190,19 @@ describe("ranged_meta_data", function()
 			})
 
 			assert.equals("shotgun", policy.family)
-			assert.equals(100, policy.hold_ranged_target_distance_sq)
-			assert.equals(100, policy.hipfire_distance_sq)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
+			assert.equals(64, policy.hipfire_distance_sq)
+		end)
+
+		it("keeps heavy stubbers between shotgun and flamer in the hipfire window", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_heavystubber_p1_m1",
+				keywords = { "ranged", "heavystubber", "p1" },
+			})
+
+			assert.equals("heavystubber", policy.family)
+			assert.equals(121, policy.hold_ranged_target_distance_sq)
+			assert.equals(121, policy.hipfire_distance_sq)
 		end)
 
 		it("returns nil for weapons outside the explicit close-range family set", function()
