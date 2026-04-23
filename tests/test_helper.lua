@@ -49,13 +49,18 @@ function M.make_context(overrides)
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
+		target_is_elite = false,
+		target_is_special = false,
 		target_is_elite_special = false,
+		target_is_unarmored_elite = false,
 		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
 		target_daemonhost_stage = nil,
 		target_is_super_armor = false,
+		grenade_charges_remaining = nil,
+		seconds_since_last_grenade_charge = nil,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
@@ -139,6 +144,9 @@ function M.make_split_heuristics_deps(overrides)
 		grenade_module = dofile("scripts/mods/BetterBots/heuristics_grenade.lua"),
 		is_daemonhost_avoidance_enabled = function()
 			return true
+		end,
+		warp_weapon_peril_threshold = function()
+			return 0.99
 		end,
 	}
 

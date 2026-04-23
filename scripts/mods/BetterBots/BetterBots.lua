@@ -465,6 +465,7 @@ Heuristics.init({
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")
 	end,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 	context_module = HeuristicsContext,
 	veteran_module = HeuristicsVeteran,
 	zealot_module = HeuristicsZealot,
@@ -761,6 +762,7 @@ GrenadeFallback.init({
 	grenade_state_by_unit = _grenade_state_by_unit,
 	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
 	perf = Perf,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 })
 
 PingSystem.init({

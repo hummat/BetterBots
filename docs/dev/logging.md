@@ -78,13 +78,22 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
-- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
+- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason; `rule=*block_recent_use` is the confirmation signal for the non-explosive reuse pacing gate on fire/smoke-type grenades)
 - `unsupported grenade template <grenade> (rule=<rule>)` (heuristic approved a grenade/blitz template that BetterBots has no throw profile for)
-- `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
+- `grenade queued <input> for <grenade>` (grenade fallback advanced through the named throw/blitz input; use this to distinguish Assail `zoom`/`zoom_shoot` from the crowd-burst `shoot` path)
+- `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade> (<reason>)` / `grenade aim unavailable for <grenade> (<reason>)` (aim solver confirmation for ballistic vs flat vs failed aim acquisition)
+- `grenade aim lost dead target for <grenade>` (the sequence had a target during approval or handoff, but that unit died before release so BetterBots aborted instead of throwing at a stale position)
+- `grenade charge query failed for <grenade> (<error>)` (BetterBots could not read grenade/blitz charges from the live ability extension; Assail crowd bursts will then fail closed as `charges unknown`)
+- `grenade retained live precision target for <grenade>` (precision blitz temporarily lost the perception slot after approval, but BetterBots kept the already-resolved still-alive target through the handoff instead of aborting immediately)
+- `grenade burst unavailable for <grenade> (charges unknown)` (a depletion-style Assail crowd burst was refused because BetterBots could not confirm the remaining shard count; fail-closed guard against fake one-shot "bursts")
 - `grenade releasing toward <unit> via <input> (dist_bucket=<close|mid|far|unknown>)` (throw release with resolved aim target; primary validation signal for aimed grenade/blitz releases)
 - `grenade wield confirmed, waiting for aim` (item grenade actually swapped to `slot_grenade_ability`; this is the visible success signal the docs previously referred to as `grenade_wield_ok`)
-- `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
+- `grenade followup stopped at peril for <grenade> (<peril>)` (multi-shot blitz followup chain stopped because the configured shared warp peril line was reached; direct confirmation for Assail burst stop logic)
+- `grenade followup stopped at peril guard for <grenade> (peril unavailable)` (multi-shot blitz followup chain stopped defensively because the shared peril guard was armed but the live peril reading disappeared)
+- `voidblast aim fallback (reason=<reason>, bot=<unit>, target=<unit>)` (`forcestaff_p1_m1` had a live charge anchor but BetterBots could not build the override rotation or anchor state, so `_wanted_aim_rotation` fell back to vanilla aim)
+- `restored Voidblast locked target after vanilla _update_aim error (bot=<unit>, target=<unit>)` (`forcestaff_p1_m1` temporarily forced `perception_component.target_enemy`, vanilla `_update_aim` threw, and BetterBots restored the shared target state before rethrowing)
+- `voidblast charged fire override (fire=shoot_pressed -> charged_fire=trigger_explosion)` (`forcestaff_p1_m1` charged-fire dispatch corrected a live non-ADS path before `_fire()` queued the actual release input)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
 - `grenade throw complete, slot returned to <slot>` (grenade fallback reached cleanup success: the bot left `slot_grenade_ability` and BetterBots reset the sequence with `reason = "slot_returned"`; this does **not** prove the projectile hit anything, and it is weaker than `grenade charge consumed` for confirming a spent throw)
 - `grenade forced unwield_to_previous on timeout` (cleanup fallback; indicates normal post-throw unwind did not complete)
@@ -205,10 +214,10 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
-- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input>`, `grenade releasing toward ...`, or `grenade charge consumed`:
+- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input> for <grenade>`, `grenade releasing toward ...`, or `grenade charge consumed`:
   - the grenade weapon-action blocker is swallowing the **initial** item-grenade `grenade_ability` input during `state.stage == "wield"`.
   - this is an allowlist/sequence bug in `grenade_fallback._expected_weapon_action_input()`, not a ballistic/gravity-aim failure.
-  - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic` / `grenade aim flat fallback`.
+  - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>`.
 
 ## Writing debug logging for new features
 

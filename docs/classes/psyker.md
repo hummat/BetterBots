@@ -245,11 +245,11 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 **Bot usage notes**: Assail is moderately bot-friendly.
 - Item-based (wielded), same Tier 3 challenge as Brain Burst
 - Homing behavior makes aiming less critical
-- BetterBots now splits between the fast `shoot` path at close pressure and the aimed `zoom -> zoom_shoot` homing chain for longer-range priority/ranged threats
+- BetterBots now splits between a rapid `shoot` burst that dumps the current shard reserve into crowd softening once the bot commits, a single fast `shoot` fallback when neither the burst nor aimed path is justified, and the aimed `zoom -> zoom_shoot` homing chain for special / precision-target picks
 - Finite charges (10) require charge management
-- Use against specials and ranged threats
+- Use against specials first; crowd-softening is now a secondary path, not the default Assail behavior
 - Good for softening groups before melee engagement
-- Still generates Peril despite using charges rather than grenade pickups
+- Still generates Peril despite using charges rather than grenade pickups, and the crowd-burst stop line now follows the shared configurable warp peril threshold
 
 ### 3. Chain Lightning
 

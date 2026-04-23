@@ -240,7 +240,7 @@ Three mutually exclusive grenade types.
 
 **What it does**: Throws a fire grenade that creates a burning area (liquid_area_fire_burning damage profile). Deals damage over time to enemies in the area.
 
-**Bot usage notes**: Best thrown at chokepoints or dense groups. Creates area denial. Bots should avoid throwing at their own feet.
+**Bot usage notes**: Best thrown at chokepoints or dense groups. Creates area denial. Bots should avoid throwing at their own feet and should not rapidly stack a second control grenade into the same short window.
 
 ### 3. Blades of Faith (internal: `zealot_throwing_knives`; formerly: Throwing Knives)
 

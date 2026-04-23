@@ -369,10 +369,10 @@ return {
 		en = "If any player is below this grenade reserve, bots leave grenade refills for players.",
 	},
 	warp_weapon_peril_threshold = {
-		en = "Warp weapon max peril (%%)",
+		en = "Warp peril stop line (%%)",
 	},
 	warp_weapon_peril_threshold_description = {
-		en = "Bots stop non-vent warp weapon attacks once peril reaches this percent.",
+		en = "Bots stop non-vent warp attacks and Assail crowd bursts once peril reaches this percent.",
 	},
 	-- Healing deferral
 	healing_deferral_mode = {

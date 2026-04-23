@@ -56,6 +56,17 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item queued` | Tier 3 item-ability input sent |
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `unsupported grenade template` | Grenade/blitz heuristic approved a template with no mapped throw profile |
+| `grenade queued <input> for <grenade>` | Grenade/blitz stage machine advanced a named input for a specific grenade; use this to distinguish Assail aimed `zoom`/`zoom_shoot` from crowd-burst `shoot` |
+| `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>` / `grenade aim unavailable for <grenade>` | Aim solver path chosen for the current grenade/blitz; strongest runtime signal for new Assail/area-grenade aiming logic |
+| `grenade aim lost dead target for <grenade>` | The grenade/blitz had a target earlier in the sequence, but that unit died before release so BetterBots aborted instead of using a stale aim point |
+| `grenade charge query failed for <grenade>` | The live ability extension threw while BetterBots queried grenade/blitz charges; Assail crowd bursts then fail closed as `charges unknown` |
+| `grenade retained live precision target for <grenade>` | Precision blitz lost the live perception slot during the handoff but kept the already-resolved still-alive target instead of aborting immediately |
+| `grenade burst unavailable for <grenade>` | A depletion-style Assail crowd burst was refused because the live shard count could not be resolved, so BetterBots failed closed instead of guessing |
+| `grenade followup stopped at peril for <grenade>` | Assail or another multi-shot blitz stopped its followup chain because the configured shared warp peril line was reached |
+| `grenade followup stopped at peril guard for <grenade>` | A multi-shot blitz stopped defensively because the peril stop line was armed but the live peril reading disappeared |
+| `voidblast aim fallback` | `forcestaff_p1_m1` had a locked charge anchor but BetterBots had to fall back to vanilla aim because anchor resolution or direct-look rotation setup failed |
+| `restored Voidblast locked target after vanilla _update_aim error` | BetterBots restored `perception_component.target_enemy` after a forced-target `forcestaff_p1_m1` `_update_aim` call threw |
+| `voidblast charged fire override` | `forcestaff_p1_m1` forced the charged release input (`trigger_explosion`) even though vanilla was still on the non-ADS `shoot_pressed` path |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
 | `suppressed poxburster target_enemy (` | Bot cleared `target_enemy` when a poxburster was unsafe to shoot (#34) |
 | `suppressed poxburster opportunity_target_enemy (` / `suppressed poxburster urgent_target_enemy (` / `suppressed poxburster priority_target_enemy (` | Bot cleared unsafe poxbursters from the secondary perception slots (#34) |
@@ -93,6 +104,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `grenade blocked during <stage> by <ability> <reason>` | Grenade fallback hit the shared BetterBots slot-lock fast retry instead of idling into a wield timeout |
+| `grenade held <grenade> (rule=*_block_recent_use` | Non-explosive reuse pacing suppressed a second fire/smoke-style grenade too soon after the last confirmed spend |
 | `fallback item blocked <ability> (slot locked by <ability> <reason>)` | Item fallback hit the same shared slot-lock fast retry path |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `battle cry request noted` / `need ammo request noted` / `need health request noted` | Communication-wheel bridge cached a short-lived aggressive override or human-priority resource request |
@@ -237,7 +249,7 @@ For item-based grenade regressions, check the grenade state-machine phases befor
    - sequence started, but nothing is proven yet.
 2. `grenade wield confirmed, waiting for aim` appears:
    - grenade slot swap succeeded; only **after this** is it reasonable to suspect aim/ballistic logic.
-3. `grenade queued <aim_input>` / `grenade releasing toward ...` appears:
+3. `grenade queued <aim_input> for <grenade>` / `grenade releasing toward ...` appears:
    - aim/release phase actually ran.
 4. `grenade charge consumed for <grenade>` appears:
    - authoritative success for item-based grenades.

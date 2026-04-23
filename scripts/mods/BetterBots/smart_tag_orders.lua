@@ -145,12 +145,15 @@ local function _bot_is_alive(unit, player)
 		end
 	end
 
-	if player and player.unit_is_alive then
-		return player:unit_is_alive()
+	if Unit and Unit.alive then
+		local alive = Unit.alive(unit)
+		if alive ~= nil then
+			return alive == true
+		end
 	end
 
-	if Unit and Unit.alive then
-		return Unit.alive(unit)
+	if player and player.unit_is_alive then
+		return player:unit_is_alive()
 	end
 
 	return unit ~= nil

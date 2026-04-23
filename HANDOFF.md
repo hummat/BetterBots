@@ -3,6 +3,46 @@
 **From:** Codex (GPT-5, OpenAI API)  
 **Date:** 2026-04-20
 
+## Session Update — 2026-04-23 grenade/staff/smart-tag follow-up
+
+- Assail / grenade fallback was tightened and revalidated:
+  - Assail crowd bursts now fail closed when shard count cannot be read
+  - precision throws reject stale/dead targets and now distinguish `grenade aim lost dead target ...` from generic no-target failure
+  - non-explosive grenade pacing is covered across aggressive / balanced / conservative presets and the previously uncovered shock / flash / mine wrappers
+  - grenade charge reads are now wrapped in `pcall` with one-shot `grenade charge query failed ...` logging
+- Voidblast (`forcestaff_p1_m1`) is still **not** revalidated live, but the branch now follows the actual live charge path:
+  - the old `scratchpad.charging_shot`-only assumption was wrong for p1
+  - current code keys the fix stack off `weapon_action.current_action_name == "action_charge"` as well
+  - `_update_aim` anchor lock and `_fire` `trigger_explosion` override both have regression coverage for the live path
+  - `#43` was reopened because the old “PASS” evidence only proved `_may_fire` validation, not the real charged release
+- Smart-tag pickup bridge:
+  - April 22 logs showed the bridge firing but falsely rejecting all bots as `bot_dead`
+  - current branch fixes the bot-liveness check to trust `ALIVE[unit]`, then `Unit.alive(unit)`, before `player:unit_is_alive()`
+  - `#96` now has a follow-up comment documenting that fix
+
+## Verification — 2026-04-23
+
+- Passed:
+  - `make check`
+    - `1379 successes / 0 failures / 0 errors / 0 pending`
+    - `luacheck: 0 warnings / 0 errors`
+    - `lua-language-server: Diagnosis completed, no problems found`
+    - `doc-check: all checks passed`
+
+## Current priority gaps
+
+- `#43`
+  - reopened
+  - still needs fresh in-game proof for p1 Voidblast:
+    - `voidblast anchor locked`
+    - `voidblast charged fire override` or a real `trigger_explosion` action for `forcestaff_p1_m1`
+- `#96`
+  - code-side false-`bot_dead` rejection is fixed
+  - still needs a new positive `smart-tag pickup routed ...` live line
+- Assail
+  - current logs prove aimed/special use again
+  - still missing a fresh live confirmation of the crowd-burst path after the recent reserve/depletion/peril changes
+
 ## Session Update — 2026-04-22 default roster refresh
 
 - Shipped BetterBots default profiles were retuned to the requested curated lineup sourced from hadrons-blessing canonical builds:
@@ -124,6 +164,18 @@
   - objective: force Mauler / Bulwark / Crusher ranged windows
   - grep after run:
     - `./bb-log raw 'weakspot aim selected|weakspot override applied|smart-tag pickup routed|dormant_daemonhost'`
+
+## Next Log Watchlist
+- Psyker Assail misuse:
+  - shards thrown with no enemies around
+  - shards launched without actually targeting enemies
+- Grenade misuse in general:
+  - grenades thrown with no clear trigger / no visible tactical reason
+- Psyker vs double Crusher:
+  - does not commit to heavy melee into two Crushers
+  - observed failure mode to confirm/refute: blocks / dashes instead of attacking at all
+- Zealot fire grenade pacing:
+  - two incendiary grenades thrown in quick succession
 
 ## Session Update — 2026-04-22 profile naming audit follow-up
 

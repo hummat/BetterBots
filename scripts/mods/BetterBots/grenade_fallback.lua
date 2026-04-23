@@ -14,6 +14,7 @@ local _event_log
 local _bot_slot_for_unit
 local _is_suppressed
 local _perf
+local _warp_weapon_peril_threshold
 
 -- Late-bound cross-module refs (set via wire)
 local _build_context
@@ -33,6 +34,7 @@ local _grenade_state_by_unit
 local _last_grenade_charge_event_by_unit
 local _weapon_template_by_inventory_item_name
 local _projectile_template_by_inventory_item_name
+local _grenade_charge_query_failure_logged
 
 -- Timing constants
 local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
@@ -131,6 +133,19 @@ local ASSAIL_FAST_PROFILE = {
 	require_charge_confirmation = true,
 }
 
+local ASSAIL_BURST_PROFILE = {
+	aim_input = "shoot",
+	followup_input = "shoot",
+	followup_delay = { 0.5, 0.9 },
+	auto_unwield = true,
+	allow_external_wield_cleanup = true,
+	continue_followup_until_depleted = true,
+	require_charge_confirmation = true,
+	stop_followup_peril_pct = function()
+		return _warp_weapon_peril_threshold and _warp_weapon_peril_threshold() or nil
+	end,
+}
+
 local ASSAIL_AIMED_PROFILE = {
 	aim_input = "zoom",
 	followup_input = "zoom_shoot",
@@ -143,6 +158,7 @@ local ASSAIL_AIMED_PROFILE = {
 
 local PRECISION_TARGET_GRENADE_NAMES = {
 	psyker_smite = true,
+	psyker_throwing_knives = true,
 }
 
 local EXCLUDED_FLAT_GRENADE_NAMES = {
@@ -333,18 +349,94 @@ local function _default_solve_ballistic_rotation(unit, aim_unit, projectile_data
 	return Quaternion.multiply(look_rotation, Quaternion(Vector3.right(), angle))
 end
 
+local function _copy_context(context)
+	local copy = {}
+	for key, value in pairs(context) do
+		copy[key] = value
+	end
+	return copy
+end
+
+local function _target_breed(unit)
+	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system") or nil
+	return unit_data_extension and unit_data_extension:breed() or nil
+end
+
+local function _augment_grenade_context(unit, context, grenade_name)
+	if not context then
+		return nil
+	end
+
+	local prepared = _copy_context(context)
+	local target_breed = _target_breed(prepared.target_enemy)
+	local target_tags = target_breed and target_breed.tags or nil
+
+	prepared.target_is_elite = prepared.target_is_elite or (target_tags and target_tags.elite == true) or false
+	prepared.target_is_special = prepared.target_is_special or (target_tags and target_tags.special == true) or false
+	prepared.target_is_elite_special = prepared.target_is_elite_special
+		or prepared.target_is_elite
+		or prepared.target_is_special
+
+	if _equipped_grenade_ability then
+		local ability_extension = select(1, _equipped_grenade_ability(unit))
+		if ability_extension and ability_extension.remaining_ability_charges then
+			local ok, charges = pcall(ability_extension.remaining_ability_charges, ability_extension, "grenade_ability")
+			if ok then
+				prepared.grenade_charges_remaining = charges
+			elseif _debug_enabled() then
+				local combo_key = tostring(unit) .. ":" .. tostring(grenade_name)
+				if not _grenade_charge_query_failure_logged[combo_key] then
+					_grenade_charge_query_failure_logged[combo_key] = true
+					_debug_log(
+						"grenade_charge_query_failed:" .. tostring(unit),
+						_fixed_time(),
+						"grenade charge query failed for " .. tostring(grenade_name) .. " (" .. tostring(charges) .. ")"
+					)
+				end
+			end
+		end
+	end
+
+	local charge_event = _last_grenade_charge_event_by_unit and _last_grenade_charge_event_by_unit[unit]
+	if charge_event and charge_event.grenade_name == grenade_name and charge_event.fixed_t ~= nil then
+		prepared.seconds_since_last_grenade_charge = math.max(0, _fixed_time() - charge_event.fixed_t)
+	end
+
+	return prepared
+end
+
+local function _should_use_assail_aimed_profile(context, rule_text)
+	if not context then
+		return false
+	end
+
+	if context.target_is_special then
+		return true
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	if
+		target_distance >= 8
+		and (string.find(rule_text, "priority", 1, true) or string.find(rule_text, "ranged_pressure", 1, true))
+	then
+		return true
+	end
+
+	return false
+end
+
 local function _resolve_template_entry(grenade_name, context, rule)
 	if grenade_name ~= "psyker_throwing_knives" then
 		return SUPPORTED_THROW_TEMPLATES[grenade_name]
 	end
 
-	local target_distance = context and context.target_enemy_distance or 0
 	local rule_text = tostring(rule or "")
 
-	if
-		target_distance >= 8
-		and (string.find(rule_text, "priority", 1, true) or string.find(rule_text, "ranged_pressure", 1, true))
-	then
+	if string.find(rule_text, "crowd_soften", 1, true) then
+		return ASSAIL_BURST_PROFILE
+	end
+
+	if _should_use_assail_aimed_profile(context, rule_text) then
 		return ASSAIL_AIMED_PROFILE
 	end
 
@@ -370,6 +462,36 @@ local function _resolve_aim_unit(context, grenade_name)
 		or context.urgent_target_enemy
 end
 
+local function _unit_alive_state(unit)
+	-- HEALTH_ALIVE is the authoritative liveness table for minions. ALIVE can lag or
+	-- be absent on enemy units, so check HEALTH_ALIVE first whenever it exists.
+	if HEALTH_ALIVE ~= nil then
+		local alive = HEALTH_ALIVE[unit]
+		if alive ~= nil then
+			return alive == true, "health_alive"
+		end
+	end
+
+	if ALIVE ~= nil then
+		local alive = ALIVE[unit]
+		if alive ~= nil then
+			return alive == true, "alive"
+		end
+	end
+
+	if Unit and Unit.alive then
+		return Unit.alive(unit), "unit_alive"
+	end
+
+	return false, "unknown"
+end
+
+local function _unit_is_alive(unit)
+	local alive = _unit_alive_state(unit)
+
+	return alive
+end
+
 local function _prepare_grenade_context(unit, context, grenade_name)
 	if not context then
 		return nil
@@ -380,7 +502,7 @@ local function _prepare_grenade_context(unit, context, grenade_name)
 		context = _normalize_grenade_context(unit, context, aim_unit)
 	end
 
-	return context
+	return _augment_grenade_context(unit, context, grenade_name)
 end
 
 local function _finish_child_perf(tag, start_clock)
@@ -395,6 +517,10 @@ end
 local function _set_bot_aim(unit, aim_unit, grenade_name)
 	if not aim_unit then
 		return false, nil, "no_target_unit"
+	end
+
+	if not _unit_is_alive(aim_unit) then
+		return false, nil, "target_dead"
 	end
 
 	if not POSITION_LOOKUP then
@@ -454,19 +580,60 @@ local function _clear_bot_aim(unit)
 end
 
 local function _refresh_bot_aim(unit, state, context, fixed_t)
-	local resolved_aim_unit = _resolve_aim_unit(context)
+	local resolved_aim_unit = _resolve_aim_unit(context, state.grenade_name)
+	local is_precision_target_grenade = PRECISION_TARGET_GRENADE_NAMES[state.grenade_name] == true
+	local lost_dead_target = false
+	local resolved_aim_alive, resolved_aim_state = nil, nil
+	if resolved_aim_unit then
+		resolved_aim_alive, resolved_aim_state = _unit_alive_state(resolved_aim_unit)
+	end
+	if resolved_aim_unit and not resolved_aim_alive then
+		resolved_aim_unit = nil
+		lost_dead_target = resolved_aim_state ~= "unknown"
+	end
+
+	local retained_aim_alive, retained_aim_state = nil, nil
+	if state.aim_unit then
+		retained_aim_alive, retained_aim_state = _unit_alive_state(state.aim_unit)
+	end
+	if state.aim_unit and not retained_aim_alive then
+		state.aim_unit = nil
+		lost_dead_target = lost_dead_target or retained_aim_state ~= "unknown"
+	end
+
 	if resolved_aim_unit then
 		state.aim_unit = resolved_aim_unit
+		state.precision_target_retained_logged = nil
+	elseif is_precision_target_grenade and state.aim_unit and _unit_is_alive(state.aim_unit) then
+		if _debug_enabled() and not state.precision_target_retained_logged then
+			state.precision_target_retained_logged = true
+			_debug_log(
+				"grenade_precision_target_retained:" .. tostring(unit),
+				fixed_t,
+				"grenade retained live precision target for " .. tostring(state.grenade_name)
+			)
+		end
+	elseif is_precision_target_grenade then
+		state.aim_unit = nil
+		state.precision_target_retained_logged = nil
 	end
 	state.aim_distance = context and context.target_enemy_distance or nil
 
 	if not state.aim_unit then
 		if _debug_enabled() then
-			_debug_log(
-				"grenade_aim_no_target:" .. tostring(unit),
-				fixed_t,
-				"grenade aim unavailable (no target unit resolved)"
-			)
+			if lost_dead_target then
+				_debug_log(
+					"grenade_aim_lost_dead:" .. tostring(unit),
+					fixed_t,
+					"grenade aim lost dead target for " .. tostring(state.grenade_name)
+				)
+			else
+				_debug_log(
+					"grenade_aim_no_target:" .. tostring(unit),
+					fixed_t,
+					"grenade aim unavailable for " .. tostring(state.grenade_name) .. " (no target unit resolved)"
+				)
+			end
 		end
 		return false
 	end
@@ -475,12 +642,20 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 	if aim_ok then
 		if _debug_enabled() then
 			if aim_mode == "ballistic" then
-				_debug_log("grenade_aim_ballistic:" .. tostring(unit), fixed_t, "grenade aim ballistic")
+				_debug_log(
+					"grenade_aim_ballistic:" .. tostring(unit),
+					fixed_t,
+					"grenade aim ballistic for " .. tostring(state.grenade_name)
+				)
 			else
 				_debug_log(
 					"grenade_aim_flat_fallback:" .. tostring(unit),
 					fixed_t,
-					"grenade aim flat fallback (" .. tostring(aim_reason) .. ")"
+					"grenade aim flat fallback for "
+						.. tostring(state.grenade_name)
+						.. " ("
+						.. tostring(aim_reason)
+						.. ")"
 				)
 			end
 		end
@@ -491,7 +666,7 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 		_debug_log(
 			"grenade_aim_unavailable:" .. tostring(unit),
 			fixed_t,
-			"grenade aim unavailable (" .. tostring(aim_reason) .. ")"
+			"grenade aim unavailable for " .. tostring(state.grenade_name) .. " (" .. tostring(aim_reason) .. ")"
 		)
 	end
 
@@ -517,16 +692,21 @@ local function _reset_state(unit, state, next_try_t)
 	state.aim_input = nil
 	state.followup_input = nil
 	state.followup_delay = nil
+	state.followup_delay_index = nil
+	state.followup_shots_remaining = nil
 	state.release_input = nil
 	state.auto_unwield = nil
 	state.component = nil
 	state.allow_external_wield_cleanup = nil
+	state.continue_followup_until_depleted = nil
 	state.confirmation_action = nil
 	state.confirmation_logged = nil
 	state.require_charge_confirmation = nil
+	state.stop_followup_peril_pct = nil
 	state.last_blocked_foreign_input = nil
 	state.aim_unit = nil
 	state.aim_distance = nil
+	state.precision_target_retained_logged = nil
 	state.attempt_id = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
@@ -558,7 +738,32 @@ local function _has_confirmed_charge(state, unit)
 	return charge_t ~= nil and release_t ~= nil and charge_t >= release_t
 end
 
--- Block BT weapon switches for the full grenade sequence, including wait_unwield.
+local function _next_followup_delay(state)
+	local delay = state.followup_delay
+	if type(delay) == "table" then
+		local idx = state.followup_delay_index or 1
+		local resolved = delay[idx] or delay[#delay] or DEFAULT_THROW_DELAY_S
+		local len = #delay
+		if len > 0 then
+			state.followup_delay_index = idx % len + 1
+		end
+		return resolved
+	end
+
+	return delay or DEFAULT_THROW_DELAY_S
+end
+
+local function _resolve_stop_followup_peril_pct(state)
+	local threshold = state.stop_followup_peril_pct
+	if type(threshold) == "function" then
+		return threshold()
+	end
+
+	return threshold
+end
+
+-- Block BT weapon switches through the protected throw stages. `wait_unwield`
+-- may optionally allow external cleanup once the throw has already completed.
 -- The post-throw unwield chain must stay free to run, but the BT still must not
 -- switch to another weapon and cut the throw sequence short.
 local function should_block_wield_input(unit)
@@ -990,7 +1195,7 @@ local function try_queue(unit, blackboard)
 			end
 			if state.followup_input then
 				state.stage = "wait_followup"
-				state.wait_t = fixed_t + (state.followup_delay or DEFAULT_THROW_DELAY_S)
+				state.wait_t = fixed_t + _next_followup_delay(state)
 			elseif state.release_input then
 				state.stage = "wait_throw"
 				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
@@ -1003,7 +1208,11 @@ local function try_queue(unit, blackboard)
 			end
 			_emit_grenade_event("grenade_stage", unit, state.grenade_name, state, fixed_t, { input = aim })
 			if _debug_enabled() then
-				_debug_log("grenade_aim:" .. tostring(unit), fixed_t, "grenade queued " .. aim)
+				_debug_log(
+					"grenade_aim:" .. tostring(unit),
+					fixed_t,
+					"grenade queued " .. tostring(aim) .. " for " .. tostring(state.grenade_name)
+				)
 			end
 		end
 
@@ -1026,13 +1235,65 @@ local function try_queue(unit, blackboard)
 			return
 		end
 
+		local stop_followup_peril_pct = _resolve_stop_followup_peril_pct(state)
+		local active_peril_pct = active_context and active_context.peril_pct or nil
+		if stop_followup_peril_pct and active_peril_pct == nil then
+			state.stage = "wait_unwield"
+			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+			state.release_t = fixed_t
+			state.unwield_requested_t = nil
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_followup_stop_peril:" .. tostring(unit),
+					fixed_t,
+					"grenade followup stopped at peril guard for "
+						.. tostring(state.grenade_name)
+						.. " (peril unavailable)"
+				)
+			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
+			return
+		end
+
+		if stop_followup_peril_pct and active_peril_pct >= stop_followup_peril_pct then
+			state.stage = "wait_unwield"
+			state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+			state.release_t = fixed_t
+			state.unwield_requested_t = nil
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_followup_stop_peril:" .. tostring(unit),
+					fixed_t,
+					"grenade followup stopped at peril for "
+						.. tostring(state.grenade_name)
+						.. " ("
+						.. tostring(active_peril_pct)
+						.. ")"
+				)
+			end
+			_finish_child_perf("grenade_fallback.stage_machine", stage_t0)
+			return
+		end
+
 		if fixed_t >= (state.wait_t or 0) then
 			local followup = state.followup_input
 			if not _queue_weapon_input(unit, followup, state.component) then
 				_abort_missing_action_input(unit, state, fixed_t, followup, stage_t0)
 				return
 			end
-			if state.release_input then
+			if state.continue_followup_until_depleted then
+				local remaining = math.max((state.followup_shots_remaining or 0) - 1, 0)
+				state.followup_shots_remaining = remaining
+				if remaining > 0 then
+					state.stage = "wait_followup"
+					state.wait_t = fixed_t + _next_followup_delay(state)
+				else
+					state.stage = "wait_unwield"
+					state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
+					state.release_t = fixed_t
+					state.unwield_requested_t = nil
+				end
+			elseif state.release_input then
 				state.stage = "wait_throw"
 				state.wait_t = fixed_t + (state.throw_delay or DEFAULT_THROW_DELAY_S)
 			else
@@ -1050,7 +1311,11 @@ local function try_queue(unit, blackboard)
 				{ input = tostring(followup) }
 			)
 			if _debug_enabled() then
-				_debug_log("grenade_followup:" .. tostring(unit), fixed_t, "grenade queued " .. tostring(followup))
+				_debug_log(
+					"grenade_followup:" .. tostring(unit),
+					fixed_t,
+					"grenade queued " .. tostring(followup) .. " for " .. tostring(state.grenade_name)
+				)
 			end
 		end
 
@@ -1459,6 +1724,7 @@ local function try_queue(unit, blackboard)
 
 	local aim_input, followup_input, followup_delay, release_input, throw_delay
 	local auto_unwield, component, confirmation_action
+	local continue_followup_until_depleted = false
 	if type(template_entry) == "number" then
 		aim_input = "aim_hold"
 		release_input = "aim_released"
@@ -1473,17 +1739,38 @@ local function try_queue(unit, blackboard)
 		auto_unwield = template_entry.auto_unwield ~= false -- default true
 		component = template_entry.component
 		confirmation_action = template_entry.confirmation_action
+		continue_followup_until_depleted = template_entry.continue_followup_until_depleted == true
+	end
+
+	local depletion_burst_charges_remaining = continue_followup_until_depleted
+			and context
+			and context.grenade_charges_remaining
+		or nil
+	if continue_followup_until_depleted and depletion_burst_charges_remaining == nil then
+		_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
+		if _debug_enabled() then
+			_debug_log(
+				"grenade_burst_unknown_charges:" .. tostring(unit),
+				fixed_t,
+				"grenade burst unavailable for " .. tostring(grenade_name) .. " (charges unknown)"
+			)
+		end
+		_emit_grenade_event("blocked", unit, grenade_name, state, fixed_t, { reason = "charges_unknown" })
+		return
 	end
 
 	-- Pre-flight: don't enter the state machine without a target for aimed throws.
 	-- Wielding auto-fire templates (zealot knives) triggers the throw immediately,
 	-- so aborting after wield is too late — the charge is already consumed.
 	if aim_input then
-		local aim_unit = _resolve_aim_unit(context)
+		local aim_unit = _resolve_aim_unit(context, grenade_name)
 		if not aim_unit then
 			_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
 			return
 		end
+
+		state.aim_unit = aim_unit
+		state.aim_distance = context and context.target_enemy_distance or nil
 	end
 
 	local action_input_extension = ScriptUnit.has_extension(unit, "action_input_system")
@@ -1499,16 +1786,22 @@ local function try_queue(unit, blackboard)
 	state.aim_input = aim_input
 	state.followup_input = followup_input
 	state.followup_delay = followup_delay
+	state.followup_delay_index = nil
+	state.followup_shots_remaining = continue_followup_until_depleted
+			and math.max((depletion_burst_charges_remaining or 0) - 1, 0)
+		or nil
 	state.release_input = release_input
 	state.release_t = nil
 	state.auto_unwield = auto_unwield
 	state.component = component
 	state.allow_external_wield_cleanup = type(template_entry) == "table"
 		and template_entry.allow_external_wield_cleanup == true
+	state.continue_followup_until_depleted = continue_followup_until_depleted
 	state.confirmation_action = confirmation_action
 	state.confirmation_logged = nil
 	state.require_charge_confirmation = type(template_entry) == "table"
 		and template_entry.require_charge_confirmation == true
+	state.stop_followup_peril_pct = type(template_entry) == "table" and template_entry.stop_followup_peril_pct or nil
 
 	if _event_log and _event_log.is_enabled() then
 		state.attempt_id = _event_log.next_attempt_id()
@@ -1632,8 +1925,10 @@ return {
 		_grenade_state_by_unit = deps.grenade_state_by_unit
 		_last_grenade_charge_event_by_unit = deps.last_grenade_charge_event_by_unit
 		_perf = deps.perf
+		_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
 		_weapon_template_by_inventory_item_name = nil
 		_projectile_template_by_inventory_item_name = nil
+		_grenade_charge_query_failure_logged = {}
 	end,
 	wire = function(refs)
 		_build_context = refs.build_context

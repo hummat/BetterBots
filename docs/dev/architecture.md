@@ -72,6 +72,7 @@ This mod targets bot ability activation in three paths:
 15. Warp weapon peril block (#27, via `weapon_action.lua`):
     - blocks `weapon_action` inputs (except `wield`) for warp weapons at the configurable `warp_weapon_peril_threshold` slider (default ≥99% peril)
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
+    - the same shared threshold is also used by Assail crowd-burst followups in `grenade_fallback.lua`
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
 16. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
@@ -182,6 +183,10 @@ This mod targets bot ability activation in three paths:
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
     - the same `weapon_action.lua` hook stack also suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
+    - the shared stack now also carries the Voidblast (`forcestaff_p1_m1`) charged-shot fixes without stealing weakspot-owned hook slots:
+      - `_update_aim` provides scratchpad context plus temporary retarget freezing once a charge anchor exists and restores the forced target even if vanilla `_update_aim` throws
+      - `_wanted_aim_rotation` replaces the live `action_charge` torso tracking with a locked target-root anchor plus a short flat-velocity lead while keeping vanilla's straight-look vertical aim
+      - `_fire` forces the charged release through `trigger_explosion` when the p1 charge path would otherwise fall back to plain `shoot_pressed`
     - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`), to `j_head` for Bulwark only when the shield is open or the bot is outside the Bulwark's 70° blocking cone, and provisionally to `j_head` for Crusher only when the bot is in the rear arc
     - an `_aim_position` wrapper re-evaluates the two stateful cases (Bulwark shield exposure, Crusher rear arc) while the target stays locked, so turning or shield-state changes update live instead of going stale for the rest of the burst; when the exposure disappears or the bot retargets away, BetterBots restores the cached baseline so overrides do not leak across targets
     - baseline capture is lazy: the first `apply_override` call snapshots the current `scratchpad.aim_at_node` / `aim_at_node_charged` **before** mutation. An `enter`-level post-hook would be too late because vanilla `enter` calls `_set_new_aim_target` (and therefore our post-hook) before it returns, which on a Mauler-first acquisition would stamp the baseline with the already-overridden `j_spine`

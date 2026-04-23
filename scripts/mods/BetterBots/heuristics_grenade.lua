@@ -1,6 +1,8 @@
 local _is_monster_signal_allowed
 local _is_daemonhost_avoidance_enabled
+local _warp_weapon_peril_threshold
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
+local DEFAULT_ASSAIL_PERIL_THRESHOLD = 0.85
 
 local GRENADE_HORDE_PRESETS = {
 	aggressive = { nearby_offset = -1, challenge_offset = -0.5 },
@@ -26,6 +28,22 @@ local GRENADE_MINE_PRESETS = {
 	conservative = { elite_offset = 1, density_offset = 1 },
 }
 
+-- Bot policy, not a game-authored rule: reserve enough Assail shards for priority
+-- use before spending them on horde softening. See docs/classes/psyker-tactics.md.
+local ASSAIL_CROWD_MIN_CHARGES = {
+	aggressive = 4,
+	balanced = 5,
+	conservative = 6,
+}
+
+-- Shared pacing window for non-explosive grenades so bots do not double-throw
+-- defensive/disruption tools back-to-back. See docs/classes/psyker-tactics.md.
+local NONEXPLOSIVE_GRENADE_REUSE_DELAY_S = {
+	aggressive = 6,
+	balanced = 8,
+	conservative = 10,
+}
+
 local CHAIN_LIGHTNING_THRESHOLDS = {
 	aggressive = { crowd = 3, mixed_nearby = 2 },
 	balanced = { crowd = 4, mixed_nearby = 3 },
@@ -42,6 +60,10 @@ local function _has_talent(context, talent_name)
 	local talents = context and context.talents or nil
 
 	return type(talents) == "table" and talents[talent_name] ~= nil
+end
+
+local function _assail_peril_threshold()
+	return _warp_weapon_peril_threshold and _warp_weapon_peril_threshold() or DEFAULT_ASSAIL_PERIL_THRESHOLD
 end
 
 local function _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
@@ -419,7 +441,7 @@ local function _grenade_assail(context)
 		return false, "grenade_assail_block_dormant_daemonhost"
 	end
 
-	if context.peril_pct and context.peril_pct >= 0.85 then
+	if context.peril_pct and context.peril_pct >= _assail_peril_threshold() then
 		return false, "grenade_assail_block_peril"
 	end
 
@@ -451,10 +473,85 @@ local function _grenade_assail(context)
 	end
 
 	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		local min_crowd_charges = ASSAIL_CROWD_MIN_CHARGES[context.preset] or ASSAIL_CROWD_MIN_CHARGES.balanced
+		local charges_remaining = context.grenade_charges_remaining
+		if charges_remaining == nil then
+			return false, "grenade_assail_block_unknown_charges"
+		end
+		if charges_remaining < min_crowd_charges then
+			return false, "grenade_assail_block_low_charges"
+		end
+
 		return true, "grenade_assail_crowd_soften"
 	end
 
 	return false, "grenade_assail_hold"
+end
+
+local function _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	local min_reuse_delay = NONEXPLOSIVE_GRENADE_REUSE_DELAY_S[preset] or NONEXPLOSIVE_GRENADE_REUSE_DELAY_S.balanced
+	local since_last_charge = context.seconds_since_last_grenade_charge
+	if since_last_charge ~= nil and since_last_charge < min_reuse_delay then
+		return false, rule_prefix .. "_block_recent_use"
+	end
+
+	return true, nil
+end
+
+local function _grenade_fire(context, preset)
+	local should_throw, rule = _grenade_horde(context, 5, 2.5, "grenade_fire", preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, "grenade_fire", preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_defensive_nonexplosive(context, rule_prefix, preset)
+	local should_throw, rule = _grenade_defensive(context, rule_prefix, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_disruption_nonexplosive(context, rule_prefix, opts, preset)
+	local should_throw, rule = _grenade_disruption(context, rule_prefix, opts, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_mine_nonexplosive(context, rule_prefix, preset)
+	local should_throw, rule = _grenade_mine(context, rule_prefix, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
 end
 
 local function _grenade_chain_lightning(context)
@@ -494,13 +591,13 @@ local GRENADE_HEURISTICS = {
 		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 }, context.preset)
 	end,
 	veteran_smoke_grenade = function(context)
-		return _grenade_defensive(context, "grenade_smoke", context.preset)
+		return _grenade_defensive_nonexplosive(context, "grenade_smoke", context.preset)
 	end,
 	zealot_fire_grenade = function(context)
-		return _grenade_horde(context, 5, 2.5, "grenade_fire", context.preset)
+		return _grenade_fire(context, context.preset)
 	end,
 	zealot_shock_grenade = function(context)
-		return _grenade_disruption(context, "grenade_shock", {
+		return _grenade_disruption_nonexplosive(context, "grenade_shock", {
 			pack_nearby = 4,
 			pack_challenge = 3.5,
 			crowd_nearby = 5,
@@ -532,14 +629,14 @@ local GRENADE_HEURISTICS = {
 		return _grenade_horde(context, 4, 2.0, "grenade_adamant", context.preset)
 	end,
 	adamant_shock_mine = function(context)
-		return _grenade_mine(context, "grenade_shock_mine", context.preset)
+		return _grenade_mine_nonexplosive(context, "grenade_shock_mine", context.preset)
 	end,
 	adamant_whistle = _grenade_whistle,
 	broker_flash_grenade = function(context)
-		return _grenade_disruption(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
+		return _grenade_disruption_nonexplosive(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_flash_grenade_improved = function(context)
-		return _grenade_disruption(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
+		return _grenade_disruption_nonexplosive(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_tox_grenade = function(context)
 		return _grenade_denial(context, "grenade_tox", 6, 3.0, {
@@ -565,6 +662,7 @@ return {
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
 			return true
 		end
+		_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
 	end,
 	grenade_heuristics = GRENADE_HEURISTICS,
 }

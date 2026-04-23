@@ -13,6 +13,7 @@ describe("smart_tag_orders", function()
 	local pickup_defs
 	local ammo_full_by_unit
 	local grenade_refill_by_unit
+	local unit_alive_by_unit
 	local players_by_unit
 	local inventories_by_unit
 	local side_units
@@ -29,6 +30,7 @@ describe("smart_tag_orders", function()
 		pickup_defs = {}
 		ammo_full_by_unit = {}
 		grenade_refill_by_unit = {}
+		unit_alive_by_unit = {}
 		players_by_unit = {}
 		inventories_by_unit = {}
 		side_units = {}
@@ -81,6 +83,9 @@ describe("smart_tag_orders", function()
 				end
 
 				return nil
+			end,
+			alive = function(unit)
+				return unit_alive_by_unit[unit]
 			end,
 		}
 
@@ -393,6 +398,38 @@ describe("smart_tag_orders", function()
 		}
 		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
 		side_units = { human_unit, bot_one }
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("prefers direct unit liveness over stale player liveness when ALIVE is missing", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+			unit_is_alive = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		rawset(_G, "ALIVE", nil)
+		unit_alive_by_unit[bot_one] = true
 		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
 		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
 

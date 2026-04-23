@@ -92,7 +92,7 @@ BLOCK IF allies_in_coherency == 0
 | Grenade | USE WHEN | DON'T USE WHEN | Confidence |
 |---------|----------|----------------|------------|
 | Stun | Clustered elite/special pressure, or dense crowds that need an interrupt window | Scattered enemies, or point-blank panic throws | HIGH |
-| Flame | Chokepoint / horde incoming at >5m | At bot's feet or melee range | MEDIUM |
+| Flame | Chokepoint / horde incoming at >5m | At bot's feet, melee range, or immediately after another control grenade | MEDIUM |
 | Throwing Knives | Special/elite at 5-20m — use aggressively (12 charges, refill on melee kills) | Hordes, point-blank | HIGH |
 
 ---

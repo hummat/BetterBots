@@ -2046,6 +2046,12 @@ describe("heuristics", function()
 	end)
 
 	describe("evaluate_grenade_heuristic", function()
+		before_each(function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+		end)
+
 		it("uses anti-horde rules for frag grenades", function()
 			local local_ctx = helper.make_context({ num_nearby = 6, challenge_rating_sum = 3.0 })
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
@@ -2645,6 +2651,95 @@ describe("heuristics", function()
 			assert.matches("ranged", rule)
 		end)
 
+		it("holds Assail crowd soften when the balanced shard reserve is not met", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 4,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("low_charges", rule)
+		end)
+
+		it("uses Assail crowd soften when the balanced shard reserve is met", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 5,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("lets aggressive Assail crowd soften start one shard earlier than balanced", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 7,
+				num_nearby = 5,
+				challenge_rating_sum = 2.5,
+				grenade_charges_remaining = 4,
+			})
+
+			local ok_agg, rule_agg = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "aggressive",
+			})
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "balanced",
+			})
+
+			assert.is_true(ok_agg)
+			assert.matches("crowd", rule_agg)
+			assert.is_false(ok_bal)
+			assert.matches("low_charges", rule_bal)
+		end)
+
+		it("makes conservative Assail crowd soften require one more shard than balanced", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 7,
+				num_nearby = 5,
+				challenge_rating_sum = 2.5,
+				grenade_charges_remaining = 5,
+			})
+
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "balanced",
+			})
+			local ok_con, rule_con = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "conservative",
+			})
+
+			assert.is_true(ok_bal)
+			assert.matches("crowd", rule_bal)
+			assert.is_false(ok_con)
+			assert.matches("low_charges", rule_con)
+		end)
+
+		it("holds Assail crowd soften when the remaining shard count is unavailable", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = nil,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("unknown_charges", rule)
+		end)
+
 		it("holds Assail on super armor", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
@@ -2659,7 +2754,35 @@ describe("heuristics", function()
 			assert.matches("super_armor", rule)
 		end)
 
-		it("holds Assail at high peril", function()
+		it("uses Assail below the configured warp peril threshold", function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+				warp_weapon_peril_threshold = function()
+					return 0.95
+				end,
+			})
+
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+					peril_pct = 0.90,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds Assail at or above the configured warp peril threshold", function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+				warp_weapon_peril_threshold = function()
+					return 0.95
+				end,
+			})
+
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
 				helper.make_context({
@@ -2671,6 +2794,165 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("peril", rule)
+		end)
+
+		it("paces fire grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_fire_grenade",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 10,
+					num_nearby = 6,
+					challenge_rating_sum = 3.0,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces smoke grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_smoke_grenade",
+				helper.make_context({
+					target_enemy = "gunner",
+					target_enemy_distance = 10,
+					ranged_count = 3,
+					toughness_pct = 0.35,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("lets aggressive non-explosive pacing reopen at six seconds while balanced still blocks", function()
+			local context = helper.make_context({
+				target_enemy = "gunner",
+				target_enemy_distance = 10,
+				ranged_count = 3,
+				toughness_pct = 0.35,
+				seconds_since_last_grenade_charge = 6.0,
+			})
+
+			local ok_agg, rule_agg = Heuristics.evaluate_grenade_heuristic("veteran_smoke_grenade", context, {
+				preset = "aggressive",
+			})
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("veteran_smoke_grenade", context, {
+				preset = "balanced",
+			})
+
+			assert.is_true(ok_agg)
+			assert.matches("pressure", rule_agg)
+			assert.is_false(ok_bal)
+			assert.matches("recent", rule_bal)
+		end)
+
+		it("allows fire grenades again once the pacing window expires", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_fire_grenade",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 10,
+					num_nearby = 6,
+					challenge_rating_sum = 3.0,
+					seconds_since_last_grenade_charge = 9.0,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("horde", rule)
+		end)
+
+		it("keeps conservative non-explosive pacing closed at nine seconds while balanced already allows", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 10,
+				num_nearby = 6,
+				challenge_rating_sum = 3.0,
+				seconds_since_last_grenade_charge = 9.0,
+			})
+
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("zealot_fire_grenade", context, {
+				preset = "balanced",
+			})
+			local ok_con, rule_con = Heuristics.evaluate_grenade_heuristic("zealot_fire_grenade", context, {
+				preset = "conservative",
+			})
+
+			assert.is_true(ok_bal)
+			assert.matches("horde", rule_bal)
+			assert.is_false(ok_con)
+			assert.matches("recent", rule_con)
+		end)
+
+		it("paces zealot shock grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "rager",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.90,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces broker flash grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces improved broker flash grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade_improved",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces shock mines after a recent confirmed deploy", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 8,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
 		end)
 
 		it("keeps zealot throwing knives opted out of the melee gate", function()

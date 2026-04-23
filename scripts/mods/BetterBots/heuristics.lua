@@ -387,6 +387,7 @@ return {
 		deps.grenade_module.init({
 			is_monster_signal_allowed = _context_module.is_monster_signal_allowed,
 			is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
+			warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold,
 		})
 
 		_template_heuristics = {}

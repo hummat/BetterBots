@@ -873,6 +873,8 @@ Staff charged fire (#43):
   - bot=2, weapon_template=forcestaff_p1_m1
 - All 4 staves now confirmed PASS (p2 Purgatus in earlier session, p3/p4 in earlier session, p1 this session)
 
+Later note (2026-04-23): that p1 signal turned out to be insufficient. A later live log still showed `forcestaff_p1_m1` entering `action_charge` and then falling back to plain `shoot_pressed` / `vent` with no `voidblast ...` confirmation, so the current branch treats p1 as re-validation pending after the live-`action_charge` fix.
+
 Grenade/blitz (#4):
 - Adamant whistle: PASS — 3/3 charge confirmed
 - Ogryn cluster grenades: PASS — 3 charges consumed
