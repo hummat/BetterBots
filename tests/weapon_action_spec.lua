@@ -100,6 +100,9 @@ local function reset(opts)
 
 			return nil
 		end,
+		warp_weapon_peril_threshold = opts.warp_weapon_peril_threshold or function()
+			return 0.99
+		end,
 		is_weakspot_aim_enabled = opts.is_weakspot_aim_enabled or function()
 			return true
 		end,
@@ -1321,6 +1324,101 @@ describe("weapon_action", function()
 			unit_data_system = test_helper.make_player_unit_data_extension({
 				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
 				warp_charge = { current_percentage = 0.99 },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		local result = PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", nil)
+
+		assert.is_nil(result)
+		assert.equals(0, forwarded_calls)
+		assert.is_truthy(find_debug_log("blocked shoot_pressed"))
+	end)
+
+	it("allows non-vent warp actions below the 99 percent peril guard", function()
+		local forwarded_calls = 0
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function()
+				forwarded_calls = forwarded_calls + 1
+				return 1
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+				warp_charge = { current_percentage = 0.98 },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		local result = PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", nil)
+
+		assert.equals(1, result)
+		assert.equals(1, forwarded_calls)
+		assert.is_falsy(find_debug_log("blocked shoot_pressed"))
+	end)
+
+	it("respects the configured warp peril threshold", function()
+		local forwarded_calls = 0
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function()
+				forwarded_calls = forwarded_calls + 1
+				return 1
+			end,
+		}
+		local bot_unit = "bot_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+			warp_weapon_peril_threshold = function()
+				return 0.98
+			end,
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_tweak_templates = { warp_charge_template_name = "forcestaff_p2_m1_charge" },
+				warp_charge = { current_percentage = 0.98 },
 			}),
 		}
 

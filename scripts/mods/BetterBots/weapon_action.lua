@@ -1,6 +1,6 @@
 -- Weapon action hooks: overheat bridge, vent translation, peril guard,
 -- _may_fire() validation, ADS logging, and diagnostic weapon logging.
-local PERIL_CRITICAL_THRESHOLD = 0.97
+local DEFAULT_WARP_WEAPON_PERIL_THRESHOLD = 0.99
 
 local _mod
 local _debug_log
@@ -12,6 +12,7 @@ local _ammo
 local _is_enabled
 local _is_weakspot_aim_enabled
 local _close_range_ranged_policy
+local _warp_weapon_peril_threshold
 local _missing_shoot_extension_warned = {}
 
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
@@ -401,6 +402,10 @@ function M.init(deps)
 		return true
 	end
 	_close_range_ranged_policy = deps.close_range_ranged_policy
+	_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
+		or function()
+			return DEFAULT_WARP_WEAPON_PERIL_THRESHOLD
+		end
 	_missing_shoot_extension_warned = {}
 	_missing_bt_bot_shoot_action_warned = false
 	_stream_action_logged_combos = {}
@@ -909,7 +914,9 @@ function M.register_hooks(deps)
 						local ude = ScriptUnit.has_extension(unit, "unit_data_system")
 						if ude then
 							local warp = ude:read_component("warp_charge")
-							if warp and warp.current_percentage >= PERIL_CRITICAL_THRESHOLD then
+							local peril_threshold = _warp_weapon_peril_threshold and _warp_weapon_peril_threshold()
+								or DEFAULT_WARP_WEAPON_PERIL_THRESHOLD
+							if warp and warp.current_percentage >= peril_threshold then
 								local tweaks = ude:read_component("weapon_tweak_templates")
 								if tweaks and tweaks.warp_charge_template_name ~= "none" then
 									if _debug_enabled() then

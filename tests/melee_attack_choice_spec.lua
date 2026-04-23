@@ -629,6 +629,230 @@ describe("melee_attack_choice", function()
 		assert.equals(light_attack, chosen)
 	end)
 
+	it("requires middle charge before arming 2h force sword specials", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return 1
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 5,
+			peril_pct = 0.3,
+			weapon_template = {
+				name = "forcesword_2h_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.7,
+				family = "forcesword_2h",
+			},
+			inventory_slot_component = {
+				special_active = false,
+				num_special_charges = 9,
+			},
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", {}, scratchpad)
+
+		assert.equals(light_attack, chosen)
+	end)
+
+	it("prepends 2h force sword specials for middle-charge unarmored hordes", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return 1
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 5,
+			peril_pct = 0.3,
+			weapon_template = {
+				name = "forcesword_2h_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.7,
+				family = "forcesword_2h",
+			},
+			inventory_slot_component = {
+				special_active = false,
+				num_special_charges = 10,
+			},
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", {}, scratchpad)
+
+		assert.equals("special_action", chosen.action_inputs[1].action_input)
+		assert.equals("start_attack", chosen.action_inputs[2].action_input)
+		assert.equals("light_attack", chosen.action_inputs[3].action_input)
+	end)
+
+	it("does not prepend 2h force sword specials into armored or high-value targets", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 5,
+			peril_pct = 0.3,
+			weapon_template = {
+				name = "forcesword_2h_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.7,
+				family = "forcesword_2h",
+			},
+			inventory_slot_component = {
+				special_active = false,
+				num_special_charges = 10,
+			},
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+		assert.equals(heavy_attack, chosen)
+	end)
+
 	it("widens thunder hammer special use to armored elites", function()
 		local MeleeAttackChoice = load_module()
 		local choose_attack_handler

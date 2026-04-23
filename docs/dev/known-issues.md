@@ -55,7 +55,7 @@
    - Meta builds research (`docs/classes/meta-builds-research.md`) shows Combat Ability Regeneration is a universal curio perk across all classes — players optimize for maximum ability uptime, suggesting current thresholds may be too conservative even for the "Balanced" preset.
    - Use `/bb_decide` to inspect live decisions during play.
 
-6. ~~Psyker Scrier's Gaze causes warp overcharge explosions.~~ **Fixed** (#27): Warp weapon attacks blocked at ≥97% peril via `bot_queue_action_input` hook. Vent/reload inputs pass through. Root cause: stance itself doesn't explode — explosions only happen when additional peril is generated (warp weapon attacks) while at 100%.
+6. ~~Psyker Scrier's Gaze causes warp overcharge explosions.~~ **Fixed** (#27): Warp weapon attacks are blocked at the configurable `warp_weapon_peril_threshold` (default `≥99%`) via `bot_queue_action_input`. Vent/reload inputs pass through. Root cause: stance itself doesn't explode — explosions only happen when additional peril is generated (warp weapon attacks) while at 100%.
 
 7. Structured event log (JSONL) working directory.
    - Darktide's CWD is `binaries/`, so `./dump/` resolves to `<game-root>/binaries/dump/`.

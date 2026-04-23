@@ -670,6 +670,7 @@ WeaponAction.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 	is_weakspot_aim_enabled = function()
 		return Settings.is_feature_enabled("weakspot_aim")
 	end,

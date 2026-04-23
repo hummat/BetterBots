@@ -28,7 +28,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, Ogryn latrine shovels, and supported shotgun special shells
 - Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
-- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
+- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, and warp-weapon max peril
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
 - Comprehensive busted test suite
 
@@ -93,6 +93,9 @@ Bots use 18 per-ability heuristic functions split across class-specific modules 
 - Special chase penalty range (slider, 0 = disable)
 - Player tag response strength (slider, 0 = ignore pings)
 - Melee horde light bias (slider, 0 = vanilla attack selection)
+- Warp weapon max peril before attack blocking
+- Melee improvements toggle (also covers supported melee weapon specials)
+- Ranged improvements toggle (also covers supported shotgun special shells)
 - Smart blitz targeting toggle
 - Daemonhost avoidance toggle
 - Poxburster safe targeting toggle

@@ -115,13 +115,15 @@ return {
 		en = "Melee improvements",
 	},
 	enable_melee_improvements_description = {
-		en = "Bots use heavier swings on armor and quicker swings into crowds. Turn this off for vanilla melee behavior.",
+		en = "Bots use heavier swings on armor, quicker swings into crowds, and supported melee weapon specials. "
+			.. "Turn this off for vanilla melee behavior.",
 	},
 	enable_ranged_improvements = {
 		en = "Ranged improvements",
 	},
 	enable_ranged_improvements_description = {
-		en = "Bots aim before firing, use charged shots, and vent heat or peril when needed. "
+		en = "Bots aim before firing, use charged shots, arm supported shotgun special shells, "
+			.. "and vent heat or peril when needed. "
 			.. "Turn this off for vanilla ranged behavior.",
 	},
 	enable_team_cooldown = {
@@ -365,6 +367,12 @@ return {
 	},
 	bot_human_grenade_reserve_threshold_description = {
 		en = "If any player is below this grenade reserve, bots leave grenade refills for players.",
+	},
+	warp_weapon_peril_threshold = {
+		en = "Warp weapon max peril (%%)",
+	},
+	warp_weapon_peril_threshold_description = {
+		en = "Bots stop non-vent warp weapon attacks once peril reaches this percent.",
 	},
 	-- Healing deferral
 	healing_deferral_mode = {

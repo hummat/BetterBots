@@ -15,6 +15,8 @@ local _melee_horde_light_bias
 local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
+local FORCE_SWORD_2H_MIN_CHARGES = 10
+local FORCE_SWORD_2H_MIN_ENEMIES = 4
 local HIGH_HEALTH_BREEDS = {
 	-- Approximate "worth folding the latrine shovel for" table, sourced from
 	-- docs/knowledge/enemy-stats.md (Damnation/Auric HP). Keep this intentionally
@@ -305,7 +307,22 @@ local function _is_power_sword_target(scratchpad, target_breed, target_armor)
 	return num_nearby >= 2
 end
 
-local function _is_force_sword_target(target_breed, target_armor)
+local function _is_high_health_target(target_breed)
+	local tags = target_breed and target_breed.tags or nil
+
+	if target_breed and target_breed.is_boss then
+		return true
+	end
+
+	if tags and (tags.monster or tags.captain) then
+		return true
+	end
+
+	local breed_name = target_breed and target_breed.name or nil
+	return breed_name ~= nil and HIGH_HEALTH_BREEDS[breed_name] == true or false
+end
+
+local function _is_force_sword_1h_target(_scratchpad, target_breed, target_armor)
 	local tags = target_breed and target_breed.tags or nil
 
 	if target_breed and target_breed.is_boss then
@@ -317,6 +334,30 @@ local function _is_force_sword_target(target_breed, target_armor)
 	end
 
 	return _super_armor_type ~= nil and target_armor == _super_armor_type
+end
+
+local function _is_force_sword_2h_target(scratchpad, target_breed, target_armor)
+	local inventory_slot_component = scratchpad and scratchpad.inventory_slot_component or nil
+	local num_special_charges = inventory_slot_component and inventory_slot_component.num_special_charges or 0
+	if num_special_charges < FORCE_SWORD_2H_MIN_CHARGES then
+		return false
+	end
+
+	if (scratchpad and scratchpad.num_enemies_in_proximity or 0) < FORCE_SWORD_2H_MIN_ENEMIES then
+		return false
+	end
+
+	if _is_armored_bucket(target_armor, _armored_type, _super_armor_type) then
+		return false
+	end
+
+	if _is_high_health_target(target_breed) then
+		return false
+	end
+
+	local tags = target_breed and target_breed.tags or nil
+
+	return not (tags and (tags.elite or tags.special or tags.monster or tags.captain))
 end
 
 local function _is_thunder_hammer_target(target_breed, target_armor)
@@ -355,21 +396,6 @@ local function _is_chain_special_target(target_breed, target_armor)
 	return tags and tags.elite and _is_armored_bucket(target_armor, _armored_type, _super_armor_type) or false
 end
 
-local function _is_high_health_target(target_breed)
-	local tags = target_breed and target_breed.tags or nil
-
-	if target_breed and target_breed.is_boss then
-		return true
-	end
-
-	if tags and (tags.monster or tags.captain) then
-		return true
-	end
-
-	local breed_name = target_breed and target_breed.name or nil
-	return breed_name ~= nil and HIGH_HEALTH_BREEDS[breed_name] == true or false
-end
-
 local function _is_ogryn_latrine_shovel_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
@@ -391,8 +417,12 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 		return _is_power_sword_target(scratchpad, target_breed, target_armor)
 	end
 
-	if special_action_meta.family == "forcesword_1h" or special_action_meta.family == "forcesword_2h" then
-		return _is_force_sword_target(target_breed, target_armor)
+	if special_action_meta.family == "forcesword_1h" then
+		return _is_force_sword_1h_target(scratchpad, target_breed, target_armor)
+	end
+
+	if special_action_meta.family == "forcesword_2h" then
+		return _is_force_sword_2h_target(scratchpad, target_breed, target_armor)
 	end
 
 	if special_action_meta.family == "thunderhammer" then

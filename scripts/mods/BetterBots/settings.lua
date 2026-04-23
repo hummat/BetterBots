@@ -93,6 +93,8 @@ local BOT_RANGED_AMMO_THRESHOLD_SETTING_ID = "bot_ranged_ammo_threshold"
 local HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID = "bot_human_ammo_reserve_threshold"
 local DEFAULT_HUMAN_GRENADE_RESERVE_THRESHOLD = 1.00
 local HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID = "bot_human_grenade_reserve_threshold"
+local DEFAULT_WARP_WEAPON_PERIL_THRESHOLD = 0.99
+local WARP_WEAPON_PERIL_THRESHOLD_SETTING_ID = "warp_weapon_peril_threshold"
 M.DEFAULTS = {
 	enable_stances = true,
 	enable_charges = true,
@@ -137,6 +139,7 @@ M.DEFAULTS = {
 	bot_ranged_ammo_threshold = 20,
 	bot_human_ammo_reserve_threshold = 80,
 	bot_human_grenade_reserve_threshold = 100,
+	warp_weapon_peril_threshold = 99,
 	healing_deferral_mode = "stations_and_deployables",
 	healing_deferral_human_threshold = 90,
 	healing_deferral_emergency_threshold = 25,
@@ -422,6 +425,10 @@ function M.human_grenade_reserve_threshold()
 		0,
 		100
 	)
+end
+
+function M.warp_weapon_peril_threshold()
+	return _read_percent_setting(WARP_WEAPON_PERIL_THRESHOLD_SETTING_ID, DEFAULT_WARP_WEAPON_PERIL_THRESHOLD, 0, 100)
 end
 
 -- Slider-with-zero migration helper: read the slider setting, but if it's nil

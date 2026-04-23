@@ -165,7 +165,7 @@ Community claims bots "hip-fire only" — **this is incorrect for vanilla bots**
 
 **Source:** `scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua`, `bot_actions.lua`
 
-**With mods:** BetterBots adds warp weapon peril block (≥97% → block weapon attacks). Issue #30 tracks proper vent support.
+**With mods:** BetterBots adds a configurable warp weapon peril block (default ≥99% → block weapon attacks). Issue #30 tracks proper vent support.
 
 #### Player weapon `attack_meta_data` gap
 
@@ -604,7 +604,7 @@ For context, here is what BetterBots modifies relative to vanilla:
 | Item abilities | Not possible | Tier 3 wield/use/unwield state machine |
 | Revive protection | Abilities can interrupt revives | Blocked during interactions (#20) |
 | Ability suppression | N/A | Blocked during dodge/fall/lunge/jump (#11) |
-| Warp weapon safety | Bots can explode at 100% peril | Blocked at ≥97% peril (#27) |
+| Warp weapon safety | Bots can explode at 100% peril | Blocked at configurable threshold (default ≥99% peril) (#27) |
 | Event logging | None | JSONL event stream for telemetry |
 
 **Unchanged:** melee combat, ranged combat, navigation, weapon switching, perception, revive mechanics, item pickup, group coordination.

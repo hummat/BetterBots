@@ -1708,12 +1708,23 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.sync_live_bot_groups%(", 1))
 	end)
 
-	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
+	it("exposes the full 0-100 bot ranged ammo slider and warp peril slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))
 		handle:close()
 
 		assert.is_truthy(source:find('make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5)', 1, true))
+		assert.is_truthy(source:find('make_numeric("warp_weapon_peril_threshold", { 0, 100 }, 1)', 1, true))
+	end)
+
+	it("surfaces weapon-special behavior in the melee and ranged settings copy", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("supported melee weapon specials", 1, true))
+		assert.is_truthy(source:find("supported shotgun special shells", 1, true))
+		assert.is_truthy(source:find("warp_weapon_peril_threshold = {", 1, true))
 	end)
 
 	it("keeps settings UI organized through widget factories and a flat bot team setup group", function()

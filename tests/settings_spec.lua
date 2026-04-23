@@ -208,6 +208,30 @@ describe("settings", function()
 		end)
 	end)
 
+	describe("warp weapon peril threshold setting", function()
+		it("returns the default threshold when mod returns nil", function()
+			Settings.init(mock_mod({}))
+
+			assert.are.equal(0.99, Settings.warp_weapon_peril_threshold())
+		end)
+
+		it("normalizes slider values into percentages", function()
+			Settings.init(mock_mod({
+				warp_weapon_peril_threshold = "98",
+			}))
+
+			assert.are.equal(0.98, Settings.warp_weapon_peril_threshold())
+		end)
+
+		it("falls back to the default threshold for invalid slider values", function()
+			Settings.init(mock_mod({
+				warp_weapon_peril_threshold = 101,
+			}))
+
+			assert.are.equal(0.99, Settings.warp_weapon_peril_threshold())
+		end)
+	end)
+
 	describe("mule pickup settings", function()
 		it("disables bot grimoire pickup by default", function()
 			Settings.init(mock_mod({}))
