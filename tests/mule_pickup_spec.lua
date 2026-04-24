@@ -11,6 +11,18 @@ local function make_pickups()
 				name = "grimoire",
 				inventory_slot_name = "slot_pocketable",
 			},
+			medical_crate_pocketable = {
+				name = "medical_crate_pocketable",
+				inventory_slot_name = "slot_pocketable",
+				slot_name = "slot_pocketable",
+				bots_mule_pickup = true,
+			},
+			syringe_corruption_pocketable = {
+				name = "syringe_corruption_pocketable",
+				inventory_slot_name = "slot_pocketable_small",
+				slot_name = "slot_pocketable_small",
+				bots_mule_pickup = true,
+			},
 		},
 	}
 end
@@ -28,6 +40,8 @@ describe("mule_pickup", function()
 	local tome_enabled
 	local saved_vector3
 	local saved_position_lookup
+	local policy_allow_pickup
+	local policy_block_order
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -65,6 +79,8 @@ describe("mule_pickup", function()
 		debug_logs = {}
 		warnings = {}
 		live_bot_groups = nil
+		policy_allow_pickup = nil
+		policy_block_order = nil
 		fake_mod = {
 			hook_require = function(_, _, callback)
 				callback({
@@ -115,6 +131,20 @@ describe("mule_pickup", function()
 			end,
 			is_tome_pickup_enabled = function()
 				return tome_enabled
+			end,
+			should_allow_mule_pickup = function(...)
+				if policy_allow_pickup then
+					return policy_allow_pickup(...)
+				end
+
+				return true, nil
+			end,
+			should_block_pickup_order = function(...)
+				if policy_block_order then
+					return policy_block_order(...)
+				end
+
+				return false, nil
 			end,
 			get_live_bot_groups = function()
 				return live_bot_groups
@@ -361,6 +391,47 @@ describe("mule_pickup", function()
 		assert.is_table(instance._available_mule_pickups.slot_pocketable)
 	end)
 
+	it("installs BotGroup hooks only once per shared class table", function()
+		local hook_safe_calls = {}
+		local BotGroup = {
+			init = function() end,
+			_update_mule_pickups = function() end,
+		}
+
+		MulePickup.init({
+			mod = {
+				hook_safe = function(_, target, method_name)
+					hook_safe_calls[#hook_safe_calls + 1] = {
+						target = target,
+						method = method_name,
+					}
+				end,
+			},
+			debug_enabled = function()
+				return false
+			end,
+			debug_log = function() end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		MulePickup.install_bot_group_hooks(BotGroup)
+
+		assert.equals(2, #hook_safe_calls)
+	end)
+
 	it("assigns an available tome mule pickup even when vanilla leaves it unclaimed", function()
 		local tome_unit = { pickup_type = "tome" }
 		local bot_unit = "bot_1"
@@ -414,6 +485,123 @@ describe("mule_pickup", function()
 		assert.equals(tome_unit, pickup_component.mule_pickup)
 		assert.equals(1, pickup_component.mule_pickup_distance)
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+	end)
+
+	it("does not assign proactive pocketables when policy rejects the pickup", function()
+		pickups.by_name.medical_crate_pocketable = {
+			name = "medical_crate_pocketable",
+			inventory_slot_name = "slot_pocketable",
+			slot_name = "slot_pocketable",
+			bots_mule_pickup = true,
+		}
+		policy_allow_pickup = function()
+			return false, "human_slot_open"
+		end
+
+		local medical_unit = { pickup_type = "medical_crate_pocketable" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[medical_unit] = { x = 2, y = 0, z = 0 },
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[medical_unit] = 20,
+					},
+					slot_pocketable_small = {},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_false(changed)
+		assert.is_nil(pickup_component.mule_pickup)
+		assert.equals(math.huge, pickup_component.mule_pickup_distance)
+	end)
+
+	it("clears live pocketable mule pickups when policy rejects them", function()
+		pickups.by_name.medical_crate_pocketable = {
+			name = "medical_crate_pocketable",
+			inventory_slot_name = "slot_pocketable",
+			slot_name = "slot_pocketable",
+			bots_mule_pickup = true,
+		}
+		policy_allow_pickup = function()
+			return false, "human_slot_open"
+		end
+
+		local medical_unit = { pickup_type = "medical_crate_pocketable" }
+		local pickup_component = {
+			mule_pickup = medical_unit,
+			mule_pickup_distance = 4,
+		}
+		local bot_data = {
+			bot_1 = {
+				pickup_component = pickup_component,
+				pickup_orders = {},
+				behavior_component = {},
+			},
+		}
+
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[medical_unit] = 20,
+					},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.is_nil(pickup_component.mule_pickup)
+		assert.equals(math.huge, pickup_component.mule_pickup_distance)
+	end)
+
+	it("blocks pickup orders when policy rejects the requested pocketable", function()
+		policy_block_order = function()
+			return true, "unsupported_pocketable"
+		end
+
+		local blocked, reason = MulePickup.should_block_pickup_order({
+			pickup_type = "medical_crate_pocketable",
+		})
+
+		assert.is_true(blocked)
+		assert.equals("unsupported_pocketable", reason)
 	end)
 
 	it("logs actual tome pickup success after a successful pocketable interaction", function()
@@ -475,6 +663,106 @@ describe("mule_pickup", function()
 		)
 
 		assert.is_truthy(find_debug_log("mule pickup success: tome (bot=3)"))
+	end)
+
+	it("logs supported pocketable pickup success after a successful pocketable interaction", function()
+		local PocketableInteraction = {
+			stop = function(_, world, interactor_unit, interaction_context, t, result, interactor_is_server)
+				return {
+					world = world,
+					interactor_unit = interactor_unit,
+					target_unit = interaction_context and interaction_context.target_unit or nil,
+					t = t,
+					result = result,
+					interactor_is_server = interactor_is_server,
+				}
+			end,
+		}
+
+		MulePickup.init({
+			mod = fake_mod,
+			debug_enabled = function()
+				return true
+			end,
+			debug_log = function(key, _t, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					message = message,
+				}
+			end,
+			bot_slot_for_unit = function(unit)
+				return unit == "bot_2" and 2 or nil
+			end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			get_live_bot_groups = function()
+				return live_bot_groups
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+
+		local target_unit = { pickup_type = "syringe_corruption_pocketable" }
+		PocketableInteraction.stop(
+			PocketableInteraction,
+			"world",
+			"bot_2",
+			{ target_unit = target_unit },
+			10,
+			"success",
+			true
+		)
+
+		assert.is_truthy(find_debug_log("mule pickup success: syringe_corruption_pocketable (bot=2)"))
+	end)
+
+	it("installs PocketableInteraction hooks only once per shared class table", function()
+		local hook_calls = 0
+		local PocketableInteraction = {
+			stop = function() end,
+		}
+
+		MulePickup.init({
+			mod = {
+				hook = function(_, target, method_name)
+					if target == PocketableInteraction and method_name == "stop" then
+						hook_calls = hook_calls + 1
+					end
+				end,
+			},
+			debug_enabled = function()
+				return false
+			end,
+			debug_log = function() end,
+			is_grimoire_pickup_enabled = function()
+				return enabled
+			end,
+			is_tome_pickup_enabled = function()
+				return tome_enabled
+			end,
+			pickups = pickups,
+			unit_get_data = function(unit, key)
+				return unit and unit[key]
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		})
+
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+		MulePickup.install_interaction_hooks(PocketableInteraction)
+
+		assert.equals(1, hook_calls)
 	end)
 
 	it("warns when the group system cannot be resolved", function()

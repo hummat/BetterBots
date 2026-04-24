@@ -114,6 +114,31 @@ return {
 						default_value = DEFAULTS.enable_target_type_hysteresis,
 					},
 					{
+						setting_id = "enable_pocketable_support",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_pocketable_support,
+					},
+					{
+						setting_id = "enable_smart_tag_orders",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_smart_tag_orders,
+					},
+					{
+						setting_id = "enable_com_wheel_responses",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_com_wheel_responses,
+					},
+					{
+						setting_id = "enable_weakspot_aim",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_weakspot_aim,
+					},
+					{
+						setting_id = "enable_charge_nav_validation",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_charge_nav_validation,
+					},
+					{
 						setting_id = "human_timing_profile",
 						type = "dropdown",
 						default_value = DEFAULTS.human_timing_profile,
@@ -183,6 +208,8 @@ return {
 					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
 					make_numeric("player_tag_bonus", { 0, 10 }, 1),
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
+					make_numeric("rippergun_bayonet_distance", { 0, 6 }, 0.5),
+					make_numeric("ranged_bash_distance", { 0, 6 }, 0.5),
 					{
 						setting_id = "enable_ammo_policy",
 						type = "checkbox",
@@ -191,6 +218,7 @@ return {
 					make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
 					make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
 					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
+					make_numeric("warp_weapon_peril_threshold", { 0, 100 }, 1),
 				},
 			},
 			{

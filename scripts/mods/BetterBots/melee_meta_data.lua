@@ -4,6 +4,7 @@ local _debug_log
 local _debug_enabled
 local _armored_type
 local _is_enabled
+local _fixed_time
 
 local ABSENT = {}
 local DEFAULT_MELEE_RANGE = 2.5
@@ -137,7 +138,11 @@ local function inject(WeaponTemplates)
 					if template.attack_meta_data == change.injected_table then
 						template.attack_meta_data = nil
 					end
-				elseif change.mode == "fields" and template.attack_meta_data then
+				elseif change.mode == "replace_invalid" then
+					if template.attack_meta_data == change.injected_table then
+						template.attack_meta_data = change.original_value
+					end
+				elseif change.mode == "fields" and type(template.attack_meta_data) == "table" then
 					for attack_input, original_fields in pairs(change.original_fields or {}) do
 						local entry = template.attack_meta_data[attack_input]
 						if type(entry) == "table" then
@@ -168,7 +173,11 @@ local function inject(WeaponTemplates)
 			change = { mode = mode }
 			state.changes[template] = change
 		end
-		if mode == "fields" and change.mode ~= "replace" then
+		if mode == "replace_invalid" then
+			change.mode = "replace_invalid"
+			return change
+		end
+		if mode == "fields" and change.mode ~= "replace" and change.mode ~= "replace_invalid" then
 			change.mode = "fields"
 			change.original_fields = change.original_fields or {}
 		end
@@ -201,7 +210,9 @@ local function inject(WeaponTemplates)
 					template.attack_meta_data = change.injected_table
 				end
 				skipped = skipped + 1
-			elseif template.attack_meta_data then
+			elseif change and change.mode == "replace_invalid" then
+				skipped = skipped + 1
+			elseif type(template.attack_meta_data) == "table" then
 				local meta = build_meta_data(template, _armored_type)
 				local merged = 0
 				if meta then
@@ -227,8 +238,15 @@ local function inject(WeaponTemplates)
 			else
 				local meta = build_meta_data(template, _armored_type)
 				if meta then
+					local replace_change
+					if template.attack_meta_data == nil then
+						replace_change = ensure_change(template, "replace")
+					else
+						replace_change = ensure_change(template, "replace_invalid")
+						replace_change.original_value = template.attack_meta_data
+					end
 					template.attack_meta_data = meta
-					ensure_change(template, "replace").injected_table = meta
+					replace_change.injected_table = meta
 					injected = injected + 1
 				end
 			end
@@ -239,7 +257,7 @@ local function inject(WeaponTemplates)
 	if _debug_enabled() then
 		_debug_log(
 			"melee_meta_injection:" .. tostring(WeaponTemplates),
-			0,
+			_fixed_time and _fixed_time() or 0,
 			"melee attack_meta_data patch installed (injected="
 				.. injected
 				.. ", patched="
@@ -261,6 +279,7 @@ return {
 		_debug_enabled = deps.debug_enabled
 		_armored_type = deps.ARMOR_TYPE_ARMORED
 		_is_enabled = deps.is_enabled
+		_fixed_time = deps.fixed_time
 	end,
 	inject = inject,
 	sync_all = function()

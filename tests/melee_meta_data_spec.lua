@@ -341,6 +341,23 @@ describe("melee_meta_data", function()
 			assert.is_true(templates.sword.attack_meta_data.light_attack.penetrating)
 		end)
 
+		it("replaces malformed attack_meta_data and restores it on disable", function()
+			local template = make_weapon_template({ "melee" }, make_damage_profile(6, 0.8), nil)
+			template.attack_meta_data = "broken"
+			local templates = { sword = template }
+
+			MeleeMetaData.inject(templates)
+
+			assert.is_table(templates.sword.attack_meta_data)
+			assert.is_table(templates.sword.attack_meta_data.light_attack)
+			assert.equals(2.5, templates.sword.attack_meta_data.light_attack.max_range)
+
+			enabled = false
+			MeleeMetaData.sync_all()
+
+			assert.equals("broken", templates.sword.attack_meta_data)
+		end)
+
 		it("is idempotent for the same table", function()
 			local templates = {
 				sword = make_weapon_template({ "melee" }, make_damage_profile(6, 0.3), nil),

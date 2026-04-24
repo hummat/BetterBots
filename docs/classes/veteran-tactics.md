@@ -57,6 +57,8 @@ BLOCK IF toughness_pct > 0.80 AND num_nearby <= 2
 ```
 **Confidence:** HIGH — community consensus: "spam it, 30s CD."
 
+**Current BetterBots note:** the shipped Voice of Command + Focus Target path also cares about tag ownership, not just whether an enemy is already tagged. BetterBots now allows one narrow override on an already-tagged elite/special so the Veteran can still claim `enemy_over_here_veteran` and apply the Focus Target debuff instead of silently yielding the tag forever.
+
 ---
 
 ## Infiltrate (`veteran_invisibility`)
@@ -86,13 +88,13 @@ DEFAULT: do not activate
 
 ---
 
-## Grenades (Tier 3 — not yet implemented)
+## Grenades (Tier 3 — implemented)
 
 | Grenade | USE WHEN | DON'T USE WHEN | Confidence |
 |---------|----------|----------------|------------|
-| Frag | `num_nearby >= 6` (horde) | Few scattered enemies | MEDIUM |
-| Krak | Elite/monster visible | Only chaff | MEDIUM |
-| Smoke | **Do not implement** — placement AI too hard, bad smoke is harmful | — | LOW |
+| Frag | Dense horde, or clustered elite/special pressure at safe throw range. Bleed lowers the commit threshold but is not the main reason to throw it. | Few scattered enemies, or target already inside close melee range | MEDIUM |
+| Krak | Elite/monster visible at safe throw range | Only chaff, or target already inside close melee range | HIGH |
+| Smoke | Ranged pressure or ally-aid window | Pure melee blobs, or bad sightline denial | MEDIUM |
 
 ---
 

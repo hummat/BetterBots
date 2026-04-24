@@ -36,6 +36,21 @@ local _dh_units_cache_enemy_sides = nil
 local _dh_units_cache = {}
 local _side_system_warned = false
 
+local function _unit_is_alive(unit)
+	if ALIVE ~= nil then
+		local alive = ALIVE[unit]
+		if alive ~= nil then
+			return alive == true
+		end
+	end
+
+	if Unit and Unit.alive then
+		return Unit.alive(unit)
+	end
+
+	return false
+end
+
 local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixed_t)
 	if
 		_dh_units_cache_t == fixed_t
@@ -55,7 +70,7 @@ local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixe
 		if ai_units then
 			for i = 1, #ai_units do
 				local enemy_unit = ai_units[i]
-				if enemy_unit and ALIVE[enemy_unit] then
+				if enemy_unit and _unit_is_alive(enemy_unit) then
 					local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
 					if unit_data_ext then
 						local breed = unit_data_ext:breed()
@@ -192,7 +207,7 @@ local function _should_sprint(self, unit, _input)
 		if group_extension then
 			local bot_group_data = group_extension:bot_group_data()
 			local follow_unit = bot_group_data and bot_group_data.follow_unit
-			if follow_unit and ALIVE[follow_unit] then
+			if follow_unit and _unit_is_alive(follow_unit) then
 				local unit_position = POSITION_LOOKUP[unit]
 				local follow_position = POSITION_LOOKUP[follow_unit]
 				if unit_position and follow_position then

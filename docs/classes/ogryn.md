@@ -186,6 +186,7 @@ Has `ability_meta_data.activation.action_input = "stance_pressed"`.
 - Auto-switches to ranged weapon and reloads -- bot should be prepared to shoot immediately after.
 - 80s cooldown is the longest of all three -- use strategically against dense groups or armored targets.
 - Requires ranged weapon equipped to use (`required_weapon_type = "ranged"`).
+- BetterBots now has a first build-aware pass here: Fire Shots variants spend stance on medium-range crowd pressure, Armor Pen variants spend it on hard ranged targets, movement variants allow closer-range commitment before blocking, and toughness-regen variants use it as a low-toughness ranged sustain button.
 
 ---
 
@@ -236,7 +237,8 @@ All Ogryn blitz abilities use `ability_type = "grenade_ability"`. They are **ite
 - `template_name` resolves to `"none"` -- **unreachable via current BT ability path** (Tier 3 problem).
 - Bots would need a different activation mechanism: equip grenade item, aim, throw.
 - B.F. Rock has self-regenerating charges -- safer for bots to spam.
-- Frag grenade has only 1 charge -- bots should reserve for high-value targets.
+- Standard box is also worth throwing into clustered elite/special pressure at safe range; it is not just a pure horde-clearing consumable.
+- Frag grenade has only 1 charge -- bots should reserve it for monsters or genuinely high-challenge mixed packs, not ordinary horde clear.
 
 ---
 
@@ -414,6 +416,8 @@ Stacks are consumed when taking damage.
 - The auto-reload on activation means timing doesn't need to account for reload state
 - Fire Shots variant is best for hordes, Armor Pierce for elites
 - 80s cooldown means this is roughly once-per-encounter
+- Movement variant can justify slightly closer activation windows because the stance reduces the usual braced movement penalty
+- Toughness Regen variant can be used as a ranged sustain tool instead of waiting only for a pure damage spike
 
 ### Grenade usage priorities
 - **B.F. Rock**: Spam freely on specials and elites -- 45s regen means it's always available

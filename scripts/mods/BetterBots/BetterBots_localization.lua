@@ -115,13 +115,15 @@ return {
 		en = "Melee improvements",
 	},
 	enable_melee_improvements_description = {
-		en = "Bots use heavier swings on armor and quicker swings into crowds. Turn this off for vanilla melee behavior.",
+		en = "Bots use heavier swings on armor, quicker swings into crowds, and supported melee weapon specials. "
+			.. "Turn this off for vanilla melee behavior.",
 	},
 	enable_ranged_improvements = {
 		en = "Ranged improvements",
 	},
 	enable_ranged_improvements_description = {
-		en = "Bots aim before firing, use charged shots, and vent heat or peril when needed. "
+		en = "Bots aim before firing, use charged shots, arm supported shotgun special shells, "
+			.. "and vent heat or peril when needed. "
 			.. "Turn this off for vanilla ranged behavior.",
 	},
 	enable_team_cooldown = {
@@ -153,6 +155,20 @@ return {
 	},
 	enable_target_type_hysteresis_description = {
 		en = "Bots are less likely to keep flipping between melee and ranged when both choices are close.",
+	},
+	enable_weakspot_aim = {
+		en = "Aim for real weakspots on armored elites",
+	},
+	enable_weakspot_aim_description = {
+		en = "Bots aim for the torso on Scab Maulers so shots do not glance off the helmet. "
+			.. "Other armored elites keep vanilla aim until their weakspot nodes are verified.",
+	},
+	enable_charge_nav_validation = {
+		en = "Validate charge and dash launch paths",
+	},
+	enable_charge_nav_validation_description = {
+		en = "Bots check the navmesh path before Zealot dash and Ogryn/Arbites charges "
+			.. "so they do not launch into blocked geometry.",
 	},
 	human_timing_profile = {
 		en = "Timing profile",
@@ -284,6 +300,26 @@ return {
 	enable_ammo_policy_description = {
 		en = "Bots defer ammo and grenades while humans are below their reserve thresholds. Off restores vanilla pickup.",
 	},
+	enable_pocketable_support = {
+		en = "Bot pocketable support",
+	},
+	enable_pocketable_support_description = {
+		en = "Lets bots carry supported stims and crates, then self-use or deploy them conservatively. "
+			.. "Bots still leave matching empty pocket slots to humans.",
+	},
+	enable_smart_tag_orders = {
+		en = "Respond to smart-tag pickup orders",
+	},
+	enable_smart_tag_orders_description = {
+		en = "Routes explicit smart-tag interactions on ammo, books, and supported pocketables "
+			.. "into the existing bot pickup-order path.",
+	},
+	enable_com_wheel_responses = {
+		en = "Respond to com-wheel requests",
+	},
+	enable_com_wheel_responses_description = {
+		en = "Battle-cry and need-ammo/health calls temporarily bias bot behavior toward the player's request.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},
@@ -312,6 +348,20 @@ return {
 		en = "Higher values make bots use more quick swings against unarmored hordes. "
 			.. "Set to 0 for vanilla melee choices.",
 	},
+	rippergun_bayonet_distance = {
+		en = "Rippergun bayonet range (m)",
+	},
+	rippergun_bayonet_distance_description = {
+		en = "Bots use the rippergun bayonet instead of firing only inside this distance, "
+			.. "and only against valuable targets. Set to 0 to disable bayonet rewrites.",
+	},
+	ranged_bash_distance = {
+		en = "Ranged bash/whip range (m)",
+	},
+	ranged_bash_distance_description = {
+		en = "Bots use supported ranged weapon bashes and pistol whips instead of firing only inside this distance, "
+			.. "and only against valuable targets. Set to 0 to disable ranged bash/whip rewrites.",
+	},
 	bot_ranged_ammo_threshold = {
 		en = "Bot ammo reserve (%%)",
 	},
@@ -331,6 +381,12 @@ return {
 	},
 	bot_human_grenade_reserve_threshold_description = {
 		en = "If any player is below this grenade reserve, bots leave grenade refills for players.",
+	},
+	warp_weapon_peril_threshold = {
+		en = "Warp peril stop line (%%)",
+	},
+	warp_weapon_peril_threshold_description = {
+		en = "Bots stop non-vent warp attacks and Assail crowd bursts once peril reaches this percent.",
 	},
 	-- Healing deferral
 	healing_deferral_mode = {
@@ -401,16 +457,16 @@ return {
 		en = "None (vanilla veteran)",
 	},
 	bot_profile_veteran = {
-		en = "Veteran - Plasma Gun + Devil's Claw Sword",
+		en = "Veteran - Plasma Gun + Power Sword",
 	},
 	bot_profile_zealot = {
-		en = "Zealot - Purgation Flamer + Relic Blade",
+		en = "Zealot - Boltgun + Heavy Eviscerator",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Surge Staff + Force Greatsword",
+		en = "Psyker - Voidblast Staff + Duelling Sword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Heavy Stubber + Power Maul",
+		en = "Ogryn - Ripper Gun + Latrine Shovel",
 	},
 	bot_weapon_quality = {
 		en = "Bot weapon quality",

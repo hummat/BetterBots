@@ -88,12 +88,12 @@ BLOCK IF team_actively_retreating
 
 ---
 
-## Blitz (Tier 3 — not yet implemented)
+## Blitz (Tier 3 — implemented)
 
 | Blitz | USE WHEN | DON'T USE WHEN | Confidence |
 |-------|----------|----------------|------------|
-| Flash Grenade | 5+ enemies clustered, disabler targeting ally, toughness < 20% surrounded | Single target, enemies already staggered | MEDIUM |
-| Tox Grenade | Chokepoint hordes, 8+ enemies clustered, elite packs | Open areas (walk around), single targets | MEDIUM |
+| Flash Grenade | Clustered specials/elites that need an interrupt, dense clusters, or emergency breathing room | Single isolated target in a calm fight | MEDIUM |
+| Tox Grenade | Chokepoint hordes, monsters, or high-challenge mixed packs that will stay inside the cloud | Open areas the pack will instantly walk around, or single small targets | MEDIUM |
 | Missile Launcher | Monster/boss at >8m, 3+ armored elites clustered at >8m | Allies in blast radius, close range (<8m, self-damage), scattered trash | MEDIUM |
 
 **Missile Launcher:** Always hold 1 charge if monster alive on map. Never fire at <8m (self-damage).

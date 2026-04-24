@@ -180,6 +180,16 @@ describe("healing_deferral", function()
 			assert.is_false(HealingDeferral.any_human_needs_healing(humans, 0.9, health_pct))
 		end)
 
+		it("treats a recent health request as human need even when everyone is healthy", function()
+			local humans = {
+				{ health_pct = 0.95 },
+			}
+
+			assert.is_true(HealingDeferral.any_human_needs_healing(humans, 0.9, health_pct, function()
+				return true
+			end))
+		end)
+
 		it("returns false with no humans", function()
 			assert.is_false(HealingDeferral.any_human_needs_healing({}, 0.9, health_pct))
 		end)
@@ -239,6 +249,169 @@ describe("healing_deferral", function()
 
 			assert.is_true(HealingDeferral.should_defer_resource("health_deployable", 0.8, true, settings))
 		end)
+
+		it("keeps Martyrdom bots off health stations even when no human needs healing", function()
+			local settings = {
+				mode = "stations_and_deployables",
+				emergency_threshold = 0.25,
+			}
+
+			assert.is_true(HealingDeferral.should_defer_resource("health_station", 0.05, false, settings, true))
+		end)
+
+		it("keeps Martyrdom bots off deployables even when critically low", function()
+			local settings = {
+				mode = "stations_and_deployables",
+				emergency_threshold = 0.25,
+			}
+
+			assert.is_true(HealingDeferral.should_defer_resource("health_deployable", 0.05, true, settings, true))
+		end)
+	end)
+
+	describe("should_skip_health_station_use", function()
+		it("does not skip medicae for corruption-only damage", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.7, 0.3, 0.3, 4, true))
+		end)
+
+		it("does not skip medicae for slight missing health", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.85, 0.15, 0, 4, true))
+		end)
+
+		it("does not reserve the last charge once human reserve is satisfied", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 1, true))
+		end)
+
+		it("allows medicae when health is missing and spare charges remain", function()
+			assert.is_false(HealingDeferral.should_skip_health_station_use(0.5, 0.5, 0.1, 2, true))
+		end)
+
+		it("skips medicae only when the bot is already full", function()
+			assert.is_true(HealingDeferral.should_skip_health_station_use(1.0, 0, 0, 4, true))
+		end)
+	end)
+
+	describe("install_behavior_ext_hooks", function()
+		local update_health_stations_hook
+		local saved_script_unit
+
+		local function install_hook_fixture(opts)
+			local station_unit = {}
+
+			saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == station_unit and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return opts.charge_amount
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_human_threshold" then
+							return opts.human_threshold or 90
+						end
+						if setting_id == "healing_deferral_emergency_threshold" then
+							return 25
+						end
+					end,
+					hook_safe = function(_, _, method_name, fn)
+						if method_name == "_update_health_stations" then
+							update_health_stations_hook = fn
+						end
+					end,
+				},
+				health_module = {
+					current_health_percent = function(unit)
+						if unit == "bot1" then
+							return opts.bot_health_pct
+						end
+
+						return opts.human_health_pct
+					end,
+					permanent_damage_taken_percent = function(unit)
+						if unit == "bot1" then
+							return opts.bot_permanent_damage_pct or 0
+						end
+
+						return 0
+					end,
+				},
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			HealingDeferral.install_behavior_ext_hooks({})
+
+			return station_unit
+		end
+
+		after_each(function()
+			_G.ScriptUnit = saved_script_unit
+		end)
+
+		it("promotes slight bot damage into health-station demand when humans are above reserve", function()
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.95,
+				human_health_pct = 0.95,
+				charge_amount = 1,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("promotes corruption-only damage into health-station demand when humans are above reserve", function()
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.70,
+				bot_permanent_damage_pct = 0.30,
+				human_health_pct = 0.95,
+				charge_amount = 4,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
 	end)
 
 	describe("apply deferral", function()
@@ -266,6 +439,38 @@ describe("healing_deferral", function()
 			assert.is_nil(pickup_component.health_deployable)
 			assert.are.equal(math.huge, pickup_component.health_deployable_distance)
 			assert.are.equal(-math.huge, pickup_component.health_deployable_valid_until)
+		end)
+	end)
+
+	describe("install_bot_group_hooks", function()
+		it("installs BotGroup deployable hooks only once per shared class table", function()
+			local hook_safe_calls = 0
+			local BotGroup = {
+				_update_pickups_and_deployables_near_player = function() end,
+			}
+
+			HealingDeferral.init({
+				mod = {
+					hook_safe = function(_, target, method_name)
+						if target == BotGroup and method_name == "_update_pickups_and_deployables_near_player" then
+							hook_safe_calls = hook_safe_calls + 1
+						end
+					end,
+				},
+				health_module = {
+					current_health_percent = function()
+						return 1
+					end,
+				},
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			HealingDeferral.install_bot_group_hooks(BotGroup)
+			HealingDeferral.install_bot_group_hooks(BotGroup)
+
+			assert.equals(1, hook_safe_calls)
 		end)
 	end)
 end)

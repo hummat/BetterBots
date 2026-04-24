@@ -1,6 +1,8 @@
 local _is_monster_signal_allowed
 local _is_daemonhost_avoidance_enabled
+local _warp_weapon_peril_threshold
 local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
+local DEFAULT_ASSAIL_PERIL_THRESHOLD = 0.85
 
 local GRENADE_HORDE_PRESETS = {
 	aggressive = { nearby_offset = -1, challenge_offset = -0.5 },
@@ -26,11 +28,56 @@ local GRENADE_MINE_PRESETS = {
 	conservative = { elite_offset = 1, density_offset = 1 },
 }
 
+-- Bot policy, not a game-authored rule: reserve enough Assail shards for priority
+-- use before spending them on horde softening. See docs/classes/psyker-tactics.md.
+local ASSAIL_CROWD_MIN_CHARGES = {
+	aggressive = 4,
+	balanced = 5,
+	conservative = 6,
+}
+
+-- Shared pacing window for non-explosive grenades so bots do not double-throw
+-- defensive/disruption tools back-to-back. See docs/classes/psyker-tactics.md.
+local NONEXPLOSIVE_GRENADE_REUSE_DELAY_S = {
+	aggressive = 6,
+	balanced = 8,
+	conservative = 10,
+}
+
+local KRAK_HIGH_ARMOR_BREEDS = {
+	chaos_ogryn_bulwark = true,
+	chaos_ogryn_executor = true,
+	renegade_executor = true,
+}
+
+local STAFF_CHARGED_PACK_TEMPLATES = {
+	forcestaff_p1_m1 = true,
+	forcestaff_p2_m1 = true,
+	forcestaff_p3_m1 = true,
+	forcestaff_p4_m1 = true,
+}
+
 local CHAIN_LIGHTNING_THRESHOLDS = {
 	aggressive = { crowd = 3, mixed_nearby = 2 },
 	balanced = { crowd = 4, mixed_nearby = 3 },
 	conservative = { crowd = 5, mixed_nearby = 4 },
 }
+
+local SMITE_THRESHOLDS = {
+	aggressive = { hard_min_distance = 4, priority_min_distance = 7, melee_pressure = 4 },
+	balanced = { hard_min_distance = 5, priority_min_distance = 8, melee_pressure = 3 },
+	conservative = { hard_min_distance = 6, priority_min_distance = 9, melee_pressure = 2 },
+}
+
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents or nil
+
+	return type(talents) == "table" and talents[talent_name] ~= nil
+end
+
+local function _assail_peril_threshold()
+	return _warp_weapon_peril_threshold and _warp_weapon_peril_threshold() or DEFAULT_ASSAIL_PERIL_THRESHOLD
+end
 
 local function _grenade_blocked_by_melee_engagement(context, rule_prefix, opts)
 	opts = opts or {}
@@ -62,6 +109,56 @@ local function _grenade_horde(context, min_nearby, min_challenge, rule_prefix, p
 	end
 
 	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_frag(context, preset)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_frag")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, 6, 2.5, "grenade_frag", preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	local elite_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	local pressure_challenge = _has_talent(context, "veteran_grenade_apply_bleed") and 4.0 or 4.5
+
+	if
+		elite_pressure >= 2
+		and context.num_nearby >= 3
+		and context.challenge_rating_sum >= pressure_challenge
+		and (context.target_enemy_distance or 0) >= 6
+	then
+		return true, "grenade_frag_pressure"
+	end
+
+	return false, horde_rule
+end
+
+local function _grenade_ogryn_frag(context)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_ogryn_frag")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	if _is_monster_signal_allowed(context) and target_distance >= 6 then
+		return true, "grenade_ogryn_frag_monster"
+	end
+
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0) + (context.monster_count or 0)
+	if
+		priority_pressure >= 3
+		and context.num_nearby >= 4
+		and context.challenge_rating_sum >= 5.0
+		and target_distance >= 6
+	then
+		return true, "grenade_ogryn_frag_priority_pack"
+	end
+
+	return false, "grenade_ogryn_frag_hold"
 end
 
 local function _grenade_priority_target(context, rule_prefix, opts, preset)
@@ -115,6 +212,44 @@ local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	return false, rule_prefix .. "_hold"
 end
 
+local function _grenade_krak(context, preset)
+	local hard_target_context = {}
+	for k, v in pairs(context) do
+		hard_target_context[k] = v
+	end
+
+	local breed_name = context.target_breed_name
+	local high_armor_breed = breed_name ~= nil and KRAK_HIGH_ARMOR_BREEDS[breed_name] == true
+	hard_target_context.target_is_elite_special = context.target_is_super_armor == true or high_armor_breed
+	hard_target_context.priority_target_enemy = nil
+	hard_target_context.opportunity_target_enemy = nil
+	hard_target_context.urgent_target_enemy = nil
+
+	if context.target_is_monster then
+		hard_target_context.target_is_elite_special = true
+	end
+
+	return _grenade_priority_target(hard_target_context, "grenade_krak", { min_distance = 4 }, preset)
+end
+
+local function _charged_staff_should_own_pack(context)
+	local weapon_name = context.current_weapon_template_name
+	if not (weapon_name and STAFF_CHARGED_PACK_TEMPLATES[weapon_name]) then
+		return false
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	if target_distance < 6 then
+		return false
+	end
+
+	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		return true
+	end
+
+	return (context.elite_count + context.special_count + context.monster_count) >= 2 and context.num_nearby >= 2
+end
+
 local function _grenade_defensive(context, rule_prefix, preset)
 	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix)
 	if blocked then
@@ -138,6 +273,102 @@ local function _grenade_defensive(context, rule_prefix, preset)
 	end
 
 	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_disruption(context, rule_prefix, opts, preset)
+	opts = opts or {}
+
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix)
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local target_distance = context.target_enemy_distance or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	local pack_nearby = math.max(2, (opts.pack_nearby or 4) - interaction_offset)
+	local pack_challenge = opts.pack_challenge or 3.5
+	local min_distance = opts.min_distance or 6
+
+	if
+		priority_pressure >= (opts.pack_targets or 2)
+		and context.num_nearby >= pack_nearby
+		and context.challenge_rating_sum >= pack_challenge
+		and target_distance >= min_distance
+	then
+		return true, rule_prefix .. "_interrupt_pack"
+	end
+
+	local target_nearby = math.max(2, (opts.target_nearby or 3) - interaction_offset)
+	if context.target_is_elite_special and context.num_nearby >= target_nearby and target_distance >= min_distance then
+		return true, rule_prefix .. "_interrupt_target"
+	end
+
+	local crowd_nearby = math.max(3, (opts.crowd_nearby or 6) - interaction_offset)
+	if context.num_nearby >= crowd_nearby and context.challenge_rating_sum >= (opts.crowd_challenge or 2.5) then
+		return true, rule_prefix .. "_crowd"
+	end
+
+	return _grenade_defensive(context, rule_prefix, preset)
+end
+
+local function _grenade_denial(context, rule_prefix, min_nearby, min_challenge, opts, preset)
+	opts = opts or {}
+
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, rule_prefix)
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local min_distance = opts.min_distance or 6
+	if opts.use_monster and _is_monster_signal_allowed(context) and target_distance >= min_distance then
+		return true, rule_prefix .. "_monster"
+	end
+
+	local interaction_offset = context.ally_interacting and 1 or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0) + (context.monster_count or 0)
+	local pack_nearby = math.max(3, (opts.pack_nearby or 4) - interaction_offset)
+	if
+		priority_pressure >= (opts.pack_targets or 2)
+		and context.num_nearby >= pack_nearby
+		and context.challenge_rating_sum >= (opts.pack_challenge or 4.0)
+		and target_distance >= min_distance
+	then
+		return true, rule_prefix .. "_priority_pack"
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, min_nearby, min_challenge, rule_prefix, preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	return false, horde_rule
+end
+
+local function _grenade_ogryn_box(context, preset)
+	local blocked, blocked_rule = _grenade_blocked_by_melee_engagement(context, "grenade_box")
+	if blocked then
+		return false, blocked_rule
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	local priority_pressure = (context.elite_count or 0) + (context.special_count or 0)
+	if
+		priority_pressure >= 2
+		and context.num_nearby >= 4
+		and context.challenge_rating_sum >= 4.5
+		and target_distance >= 8
+	then
+		return true, "grenade_box_priority_pack"
+	end
+
+	local horde_ok, horde_rule = _grenade_horde(context, 5, 3.0, "grenade_box", preset)
+	if horde_ok then
+		return true, horde_rule
+	end
+
+	return false, horde_rule
 end
 
 local function _grenade_mine(context, rule_prefix, preset)
@@ -187,12 +418,67 @@ local function _grenade_whistle(context)
 end
 
 local function _grenade_smite(context)
-	return _grenade_priority_target(context, "grenade_smite", {
-		max_peril = 0.85,
-		min_distance = 5,
-		skip_melee_engagement_block = true,
-		skip_priority_melee_pressure_block = true,
-	}, context.preset)
+	-- Brain Burst is a long stationary charge. Treat it as a selective
+	-- hard-target delete, not a generic "some priority target exists" blitz.
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "grenade_smite_block_dormant_daemonhost"
+	end
+
+	if context.peril_pct and context.peril_pct >= 0.85 then
+		return false, "grenade_smite_block_peril"
+	end
+
+	if not context.target_enemy then
+		return false, "grenade_smite_hold"
+	end
+
+	local t = SMITE_THRESHOLDS[context.preset] or SMITE_THRESHOLDS.balanced
+	local target_distance = context.target_enemy_distance or 0
+	local is_hard_target = context.target_is_super_armor or _is_monster_signal_allowed(context)
+	local is_explicit_priority_target = context.target_enemy == context.priority_target_enemy
+		or context.target_enemy == context.opportunity_target_enemy
+		or context.target_enemy == context.urgent_target_enemy
+	local has_smite_on_hit = _has_talent(context, "psyker_smite_on_hit")
+
+	if target_distance < t.hard_min_distance then
+		return false, "grenade_smite_block_melee_range"
+	end
+
+	if context.num_nearby >= t.melee_pressure and not is_hard_target then
+		return false, "grenade_smite_block_melee_pressure"
+	end
+
+	if context.target_is_super_armor and target_distance >= t.hard_min_distance then
+		return true, "grenade_smite_super_armor"
+	end
+
+	if _is_monster_signal_allowed(context) and target_distance >= t.priority_min_distance then
+		return true, "grenade_smite_monster"
+	end
+
+	if
+		has_smite_on_hit
+		and context.target_is_elite_special
+		and not context.target_is_bomber
+		and not context.target_is_super_armor
+		and not _is_monster_signal_allowed(context)
+		and not is_explicit_priority_target
+	then
+		return false, "grenade_smite_block_proc_cover"
+	end
+
+	if
+		(context.target_is_elite_special or is_explicit_priority_target)
+		and target_distance >= t.priority_min_distance
+	then
+		return true, "grenade_smite_priority_target"
+	end
+
+	return false, "grenade_smite_hold"
 end
 
 local function _grenade_assail(context)
@@ -206,7 +492,7 @@ local function _grenade_assail(context)
 		return false, "grenade_assail_block_dormant_daemonhost"
 	end
 
-	if context.peril_pct and context.peril_pct >= 0.85 then
+	if context.peril_pct and context.peril_pct >= _assail_peril_threshold() then
 		return false, "grenade_assail_block_peril"
 	end
 
@@ -215,33 +501,137 @@ local function _grenade_assail(context)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
+	local has_resolved_target = context.target_enemy ~= nil
+		or context.priority_target_enemy ~= nil
+		or context.opportunity_target_enemy ~= nil
+		or context.urgent_target_enemy ~= nil
+	if not has_resolved_target then
+		return false, "grenade_assail_hold"
+	end
+
 	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
 		or context.urgent_target_enemy ~= nil
 
+	if
+		_charged_staff_should_own_pack(context)
+		and context.target_is_elite
+		and not context.target_is_special
+		and not context.target_is_monster
+	then
+		return false, "grenade_assail_block_staff_pack"
+	end
+
 	if has_priority_target then
 		return true, "grenade_assail_priority_target"
 	end
 
 	if context.target_enemy_type == "ranged" or context.ranged_count >= 2 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_ranged_pressure"
 	end
 
 	if context.ranged_count >= 1 and target_distance >= 8 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_ranged_pressure"
 	end
 
 	if (context.elite_count + context.special_count + context.monster_count) >= 1 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_priority_pack"
 	end
 
 	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		local min_crowd_charges = ASSAIL_CROWD_MIN_CHARGES[context.preset] or ASSAIL_CROWD_MIN_CHARGES.balanced
+		local charges_remaining = context.grenade_charges_remaining
+		if charges_remaining == nil then
+			return false, "grenade_assail_block_unknown_charges"
+		end
+		if charges_remaining < min_crowd_charges then
+			return false, "grenade_assail_block_low_charges"
+		end
+
 		return true, "grenade_assail_crowd_soften"
 	end
 
 	return false, "grenade_assail_hold"
+end
+
+local function _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	local min_reuse_delay = NONEXPLOSIVE_GRENADE_REUSE_DELAY_S[preset] or NONEXPLOSIVE_GRENADE_REUSE_DELAY_S.balanced
+	local since_last_charge = context.seconds_since_last_grenade_charge
+	if since_last_charge ~= nil and since_last_charge < min_reuse_delay then
+		return false, rule_prefix .. "_block_recent_use"
+	end
+
+	return true, nil
+end
+
+local function _grenade_fire(context, preset)
+	local should_throw, rule = _grenade_horde(context, 5, 2.5, "grenade_fire", preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, "grenade_fire", preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_defensive_nonexplosive(context, rule_prefix, preset)
+	local should_throw, rule = _grenade_defensive(context, rule_prefix, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_disruption_nonexplosive(context, rule_prefix, opts, preset)
+	local should_throw, rule = _grenade_disruption(context, rule_prefix, opts, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
+end
+
+local function _grenade_mine_nonexplosive(context, rule_prefix, preset)
+	local should_throw, rule = _grenade_mine(context, rule_prefix, preset)
+	if not should_throw then
+		return false, rule
+	end
+
+	local allowed, blocked_rule = _block_recent_nonexplosive_grenade_use(context, rule_prefix, preset)
+	if not allowed then
+		return false, blocked_rule
+	end
+
+	return true, rule
 end
 
 local function _grenade_chain_lightning(context)
@@ -265,21 +655,35 @@ local function _grenade_chain_lightning(context)
 	return false, "grenade_chain_lightning_hold"
 end
 
+local BROKER_FLASH_DISRUPTION_OPTS = {
+	pack_nearby = 4,
+	pack_challenge = 3.5,
+	crowd_nearby = 5,
+	crowd_challenge = 2.5,
+	min_distance = 6,
+}
+
 local GRENADE_HEURISTICS = {
 	veteran_frag_grenade = function(context)
-		return _grenade_horde(context, 6, 2.5, "grenade_frag", context.preset)
+		return _grenade_frag(context, context.preset)
 	end,
 	veteran_krak_grenade = function(context)
-		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 }, context.preset)
+		return _grenade_krak(context, context.preset)
 	end,
 	veteran_smoke_grenade = function(context)
-		return _grenade_defensive(context, "grenade_smoke", context.preset)
+		return _grenade_defensive_nonexplosive(context, "grenade_smoke", context.preset)
 	end,
 	zealot_fire_grenade = function(context)
-		return _grenade_horde(context, 5, 2.5, "grenade_fire", context.preset)
+		return _grenade_fire(context, context.preset)
 	end,
 	zealot_shock_grenade = function(context)
-		return _grenade_defensive(context, "grenade_shock", context.preset)
+		return _grenade_disruption_nonexplosive(context, "grenade_shock", {
+			pack_nearby = 4,
+			pack_challenge = 3.5,
+			crowd_nearby = 5,
+			crowd_challenge = 2.5,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	zealot_throwing_knives = function(context)
 		return _grenade_priority_target(context, "grenade_knives", {
@@ -289,14 +693,12 @@ local GRENADE_HEURISTICS = {
 		}, context.preset)
 	end,
 	ogryn_grenade_box = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_box", context.preset)
+		return _grenade_ogryn_box(context, context.preset)
 	end,
 	ogryn_grenade_box_cluster = function(context)
 		return _grenade_horde(context, 5, 3.0, "grenade_box_cluster", context.preset)
 	end,
-	ogryn_grenade_frag = function(context)
-		return _grenade_horde(context, 5, 3.0, "grenade_ogryn_frag", context.preset)
-	end,
+	ogryn_grenade_frag = _grenade_ogryn_frag,
 	ogryn_grenade_friend_rock = function(context)
 		return _grenade_priority_target(context, "grenade_rock", { min_distance = 6 }, context.preset)
 	end,
@@ -307,17 +709,23 @@ local GRENADE_HEURISTICS = {
 		return _grenade_horde(context, 4, 2.0, "grenade_adamant", context.preset)
 	end,
 	adamant_shock_mine = function(context)
-		return _grenade_mine(context, "grenade_shock_mine", context.preset)
+		return _grenade_mine_nonexplosive(context, "grenade_shock_mine", context.preset)
 	end,
 	adamant_whistle = _grenade_whistle,
 	broker_flash_grenade = function(context)
-		return _grenade_defensive(context, "grenade_flash", context.preset)
+		return _grenade_disruption_nonexplosive(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_flash_grenade_improved = function(context)
-		return _grenade_defensive(context, "grenade_flash", context.preset)
+		return _grenade_disruption_nonexplosive(context, "grenade_flash", BROKER_FLASH_DISRUPTION_OPTS, context.preset)
 	end,
 	broker_tox_grenade = function(context)
-		return _grenade_horde(context, 6, 3.0, "grenade_tox", context.preset)
+		return _grenade_denial(context, "grenade_tox", 6, 3.0, {
+			use_monster = true,
+			pack_targets = 2,
+			pack_nearby = 4,
+			pack_challenge = 4.0,
+			min_distance = 6,
+		}, context.preset)
 	end,
 	broker_missile_launcher = function(context)
 		return _grenade_priority_target(context, "grenade_missile", { min_distance = 8 }, context.preset)
@@ -334,6 +742,7 @@ return {
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
 			return true
 		end
+		_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
 	end,
 	grenade_heuristics = GRENADE_HEURISTICS,
 }

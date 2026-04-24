@@ -58,6 +58,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 
 - `BetterBots loaded`
 - `BetterBots DEBUG: logging enabled (level=<debug|trace>)` (`startup:logging`; only appears when debug logs are set to `Debug` or `Trace`)
+- `BetterBots DEBUG: fixed_time unavailable during bootstrap; using 0 until extension manager is ready` (one-shot bootstrap breadcrumb from `_fixed_time()`; expected only before `Managers.state.extension.latest_fixed_t` is live)
 - `BetterBots DEBUG: settings: preset=..., sprint_dist=..., chase_range=..., tag_bonus=..., horde_bias=..., smart_targeting=..., dh_avoidance=...` (`startup:settings`; concise startup summary, intentionally not a full config dump)
 - `patched <bt_bot_conditions|bt_conditions>.can_activate_ability (version=<N>)` (startup patch confirmation for the condition hooks)
 - `ability template metadata patch installed (version=<N>, injected=<N>, overridden=<N>)` (startup debug/info confirmation that the ability template metadata patch ran)
@@ -77,13 +78,22 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
-- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason)
+- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason; `rule=*block_recent_use` is the confirmation signal for the non-explosive reuse pacing gate on fire/smoke-type grenades)
 - `unsupported grenade template <grenade> (rule=<rule>)` (heuristic approved a grenade/blitz template that BetterBots has no throw profile for)
-- `grenade queued aim_hold` / `grenade queued aim_released` (grenade fallback advanced through the throw inputs)
-- `grenade releasing toward <unit> via <input> (dist_bucket=<close|mid|far|unknown>)` (throw release with resolved aim target; primary validation signal for aimed grenade/blitz releases)
+- `grenade queued <input> for <grenade>` (grenade fallback advanced through the named throw/blitz input; use this to distinguish Assail `zoom`/`zoom_shoot` from the crowd-burst `shoot` path)
+- `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade> (<reason>)` / `grenade aim unavailable for <grenade> (<reason>)` (aim solver confirmation for ballistic vs flat vs failed aim acquisition; debug lines include `bot=`, `target=`, `target_alive=`, `target_alive_source=`, and `target_breed=`)
+- `grenade aim lost dead target for <grenade>` (the sequence had a target during approval or handoff, but that unit died before release so BetterBots aborted instead of throwing at a stale position)
+- `grenade charge query failed for <grenade> (<error>)` (BetterBots could not read grenade/blitz charges from the live ability extension; Assail crowd bursts will then fail closed as `charges unknown`)
+- `grenade retained live precision target for <grenade>` (precision blitz temporarily lost the perception slot after approval, but BetterBots kept the already-resolved still-alive target through the handoff instead of aborting immediately)
+- `grenade burst unavailable for <grenade> (charges unknown)` (a depletion-style Assail crowd burst was refused because BetterBots could not confirm the remaining shard count; fail-closed guard against fake one-shot "bursts")
+- `grenade releasing toward <unit> via <input> (dist_bucket=<close|mid|far|unknown>)` (throw release with resolved aim target; primary validation signal for aimed grenade/blitz releases; includes the same target identity suffix as aim logs)
 - `grenade wield confirmed, waiting for aim` (item grenade actually swapped to `slot_grenade_ability`; this is the visible success signal the docs previously referred to as `grenade_wield_ok`)
-- `grenade queued <input>` for staged custom blitz chains such as `charge_heavy`, `shoot_heavy_hold`, `shoot_heavy_hold_release`
 - `grenade charge consumed for <grenade> (charges=<N>)` (grenade actually spent a charge; strongest throw confirmation)
+- `grenade followup stopped at peril for <grenade> (<peril>)` (multi-shot blitz followup chain stopped because the configured shared warp peril line was reached; direct confirmation for Assail burst stop logic)
+- `grenade followup stopped at peril guard for <grenade> (peril unavailable)` (multi-shot blitz followup chain stopped defensively because the shared peril guard was armed but the live peril reading disappeared)
+- `voidblast aim fallback (reason=<reason>, bot=<unit>, target=<unit>)` (`forcestaff_p1_m1` had a live charge anchor but BetterBots could not build the override rotation or anchor state, or the anchor target's velocity lookup became unsafe, so `_wanted_aim_rotation` fell back to vanilla aim)
+- `restored Voidblast locked target after vanilla _update_aim error (bot=<unit>, target=<unit>)` (`forcestaff_p1_m1` temporarily forced `perception_component.target_enemy`, vanilla `_update_aim` threw, and BetterBots restored the shared target state before rethrowing)
+- `voidblast charged fire override (fire=shoot_pressed -> charged_fire=trigger_explosion)` (`forcestaff_p1_m1` charged-fire dispatch corrected a live non-ADS path before `_fire()` queued the actual release input)
 - `grenade queued unwield_to_previous after charge confirmation` (BetterBots started explicit post-throw cleanup for bots)
 - `grenade throw complete, slot returned to <slot>` (grenade fallback reached cleanup success: the bot left `slot_grenade_ability` and BetterBots reset the sequence with `reason = "slot_returned"`; this does **not** prove the projectile hit anything, and it is weaker than `grenade charge consumed` for confirming a spent throw)
 - `grenade forced unwield_to_previous on timeout` (cleanup fallback; indicates normal post-throw unwind did not complete)
@@ -94,6 +104,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `ability blitz activated <grenade> on <component> (rule=<rule>) ...` (ability-based blitz path fired directly on the action component instead of through grenade-slot wield)
 - `ability blitz complete (charge confirmed|timeout) ...` (ability-based blitz path reached its terminal confirmation or timeout)
 - `grenade deferred while unarmed (slot=<slot>, template=<template>)` (grenade fallback refused to start because the bot was currently unarmed)
+- `grenade deferred during active weapon charge (weapon=<template>, action=action_charge)` (grenade fallback refused to interrupt a non-grenade charged weapon action such as Voidblast staff charging)
+- `grenade blocked during <stage> by <ability> <reason> (held_slot=<slot>)` (grenade fallback hit the shared BetterBots slot-lock fast retry instead of waiting out a full wield timeout)
 - `smart targeting using bot perception target <unit> (already_seeded=<true|false>)` (bot smart-target hook ran and fed the precision-target module a concrete target; direct validation signal for `#61`)
 - `post-charge grace started (4s)` (engagement leash recorded a movement-ability charge and started the temporary 20m grace window for that bot)
 - `restored engagement leash overrides after vanilla error` (the `_allow_engage` hook restored shared singleton state before rethrowing; direct failure-path validation signal for `#73`)
@@ -116,23 +128,34 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `grenade pickup skipped: no ability extension` (grenade refill logic could not resolve the bot's `ability_system`, so reserve evaluation did not run. One-shot per bot until the missing-extension state changes.)
 - `grenade pickup success: <pickup> (bot=<slot>, charges=<before>-><after>/<max>)` (actual pickup interaction succeeded and grenade charges increased; strongest confirmation for grenade refill pickups)
 - `melee choice <attack> vs <armored|unarmored> target (crowd=<N>, bucket=<solo|pack|horde>, weapon=<template>)` (interesting `_choose_attack` decision; use to validate `#52` without per-swing spam)
+- `melee defend suppressed for attack commit (target=<breed>, attackers=<N>, nearby=<N>, weapon=<template>)` (BetterBots suppressed vanilla's broad `num_melee_attackers() > 0` block gate so a bot can commit attacks into high-value armored melee targets under low-count pressure)
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
-- `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw>` (`#43` validation; template-tagged queued weapon input — one-shot per unique combo)
+- `normalized shoot scratchpad inputs (fire=<input>, aim_fire=<input>, aim=<input>, unaim=<input>)` (`#43` validation; `BtBotShootAction.enter` repaired stale/default shoot inputs against the live wielded template before `_may_fire` validates them. For plasma, expect `fire=shoot_charge, aim_fire=shoot_charge`.)
+- `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw> target_slot=<slot> target=<unit|none> target_alive=<alive|dead|unknown|none> target_breed=<breed|unknown>` (`#43` validation; template-tagged queued weapon input, keyed by target so suspected ghost-target shots can be separated from normal target changes)
+- `combat utility selected ...` (debug-only `BtRandomUtilityNode.evaluate` diagnostic for the bot `in_combat` selector; includes the selected branch/leaf, utility scores, current perception target/type/distance, ally distance, and current weapon. The selector is weighted-random, so the highest utility score does not always win. No-target follow selections are suppressed, and identical selection/target/weapon tuples are logged once per bot.)
 - `stream action queued for <template> via <input> (phase=<phase>, bot=<slot>)` (`#87` validation; direct confirmation that a flamer/Purgatus stream-specific queue input actually reached `bot_queue_action_input` successfully)
 - `patched opportunity reaction times (min=<N>, max=<N>)` (`#44` validation; startup/runtime confirmation that `BotSettings.opportunity_target_reaction_times.normal` was patched from the selected human-likeness timing profile)
 - `HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal; reaction-time patch skipped` (one-shot warning that the engine bot-settings API shape changed and the human-likeness timing patch could not bind)
 - `leash scaled <base> -> <effective> (pressure=<N>)` (`#44` validation; direct confirmation that pressure-based engagement leash scaling fired in combat)
 - `type flip <old> -> <new>` (`#90` math-layer validation; perception hysteresis allowed a real melee/ranged type transition after the opposite mode cleared the margin)
+- `close-range ranged family kept ranged target type (family=<family>, distance=<d>, ranged_score=<r>, melee_score=<m>)` (`#41` narrow Sprint 3 override; a supported close-range ranged family kept the bot in ranged mode under point-blank pressure instead of flipping to melee)
+- `close-range hipfire suppressed ADS (family=<family>, distance=<d>)` (`#41` narrow Sprint 3 ADS suppression; a supported close-range ranged family stayed in hipfire inside the family policy window)
+- `melee special prelude queued before <attack> (family=<family>)` (`#33`/`#103` melee-special identity; BetterBots prepended `special_action` before the chosen melee attack, with the family marker distinguishing powered weapons, chain weapons, direct combat axe/sword/knife specials, power mauls, Ogryn latrine shovels, clubs, pickaxes, and combat blades)
+- `supported special family missing action metadata (weapon=<template>, family=<family>)` (one-shot debug diagnostic that a supported melee-special template matched BetterBots' family policy but did not expose a resolvable `special_action` action for that family; catches future Fatshark action-kind renames and partial policy additions without silently dropping the feature)
+- `queued rippergun bayonet for <template> target=<breed> (bot=<slot>, fire_input=<input>)` (`#33` ranged-special identity; BetterBots rewrote close-range rippergun fire into the bayonet `stab` input for a valuable target)
+- `queued ranged bash for <template> target=<breed> (bot=<slot>, fire_input=<input>)` (`#33` ranged-special identity; BetterBots rewrote close-range supported heavy-stubber/thumper, direct ranged bash, or pistol-whip fire into a weapon-special input for a valuable target)
 - `type hold <current> over raw <candidate> (melee=<N>, ranged=<N>)` (`#90` math-layer validation; perception hysteresis actively suppressed a raw flip and kept the current type)
 - `bot <slot> suppressed opposite-type switch <old> -> <new> (elapsed=<N>s)` (`#90` symptom-layer validation; `wrong_slot_for_target_type` wanted an immediate opposite-type reswitch, but the BT-side debounce suppressed it for a non-priority target)
 - `bot <slot> wrong slot for <target_type> target (wielded=<slot>, wanted=<slot>)` (`#90` symptom-layer condition signal; `wrong_slot_for_target_type` fired for the current target type, so the BT wanted a weapon swap)
 - `bot <slot> switch_melee entered (wielded=<slot>, wanted=slot_primary, target_type=melee)` / `bot <slot> switch_ranged entered (wielded=<slot>, wanted=slot_secondary, target_type=ranged)` (`#90` action-layer signal; the inventory-switch node actually executed instead of just evaluating the target-type math)
-- `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active and selected an actual runtime node)
+- `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active while the `Weakspot aim` feature was enabled and selected an actual runtime node)
+- `suppressed stale shoot aim input <input> for <template>` / `suppressed stale shoot unaim input <input> for <template>` (`BtBotShootAction` tried to carry an old ADS input onto a live non-aim template after a weapon/context change; BetterBots suppressed the queue before it reached `ActionInputParser`)
 - `shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system` (one-shot diagnostic from the `BtBotShootAction.enter` hook; BetterBots could not normalize ADS/brace inputs for that bot)
 - `BetterBots: shoot scratchpad normalization skipped for <unit> because unit_data_system or visual_loadout_system is missing` (one-shot warning counterpart to the debug line above; emitted even when debug logging is off so operators can see why `#43` diagnostics were incomplete for a bot)
+- `BetterBots: bt_bot_shoot_action hook_require resolved nil` (one-shot warning that the engine handed BetterBots a nil `BtBotShootAction` target during delayed hook installation; this is abnormal and should be investigated before trusting any shoot-action diagnostics)
 - `BetterBots: ammo utility unavailable; dead-zone ranged fire detection disabled` (one-shot warning that `scripts/utilities/ammo` failed to load, so the dead-zone fire confirmation log for `#51` is unavailable in this session)
 - `penalizing melee score for distant special <breed> dist_sq=<N> ammo=<N>` (target selection penalty applied — bot will prefer ranged over chasing)
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
@@ -163,12 +186,18 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `[Bot <slot>] revive ability skipped (...)` with reasons such as `no enemies nearby`, `suppressed: <reason>`, `no unit_data_system extension`, `no ability_system extension`, `missing ability_meta_data.activation`, `activation has no action_input`, `no action_input_system extension`, or `<template> action_input <input> not bot-queueable` (the throttle key encodes the reason, but the emitted text is always the human-readable skip message)
 - `combat_ability_identity: unknown template_name '<template>' — returning passthrough identity ...` (`combat_ability_identity.resolve` encountered a template not present in any of the category/cooldown/revive tables; one-shot per unique template per load, gated on debug — fires on Fatshark renames or unclassified abilities)
 - `BetterBots: veteran combat ability could not be resolved to shout/stance (class_tag=<tag>, ability_name=<name>). Defaulting to stance gating.` (one-shot `mod:warning` when the Veteran shared template can't disambiguate via class_tag or ability name — operator-visible signal of a new Veteran variant the mod hasn't classified)
+- `psyker heuristic context missing talents table; build-aware checks falling back to untuned defaults` / `ogryn heuristic context missing talents table; build-aware checks falling back to untuned defaults` (one-shot debug diagnostics that a build-aware heuristic received a malformed context without `talents`; BetterBots still falls back safely, but the build-specific branches are disabled until the caller/context seed is fixed)
 - `cleared stale mule pickup ref (source=<path>)` (`#32`/stale-unit validation; deleted pickup refs were sanitized without touching invalid engine units)
-- `mule pickup success: tome|grimoire (bot=<slot>)` (authoritative side-mission book pickup confirmation from `PocketableInteraction.stop(result == "success")`; use this to close `#32`, not the earlier assignment line)
+- `mule pickup success: <pickup> (bot=<slot>)` (authoritative `PocketableInteraction.stop(result == "success")` confirmation for side-mission books and supported mule-pocketables such as stims/crates; use this to prove the item was actually inserted, not merely assigned)
 - `BetterBots: group_system unavailable; mule pickup live-sync skipped` (one-shot warning that the live mule-sync path could not resolve `group_system`; pickup metadata patching still ran, but live reservation cleanup did not)
 - `BetterBots: blackboard utility unavailable; mule pickup destination refresh skipped` (one-shot warning that the blackboard write helper could not be loaded, so mule destination refresh fell back to a no-op for that session)
 - `ammo policy skipped: no pickup_component` (debug-only diagnostic that `_update_ammo` ran on a bot without a pickup component, so reserve logic was skipped for that tick)
 - `deferred health station to human player` / `deferred medical crate to human player` (healing deferral yielded a medicae station or med-crate because a human player was below the configured reserve)
+- `battle cry request noted: aggressive preset override for <N>s` / `need ammo request noted for <N>s` / `need health request noted for <N>s` (`com_wheel_response.lua` observed the relevant communication-wheel trigger and cached its short-lived override state)
+- `smart-tag pickup routed <pickup> to bot <slot> (family=<family>)` / `smart-tag pickup ignored for <pickup> (reason=<reason>[, detail=bot=<slot>:<reason>, ...])` (`smart_tag_orders.lua` accepted or rejected an explicit item tag after reusing the normal BetterBots pickup policy gates; `detail=` is only present when `reason=no_eligible_bot`)
+- `queued pocketable wield <input> for <pickup>` / `queued pocketable input <input> for <pickup>` (`pocketable_pickup.lua` advanced the carried-item state machine into wield/use)
+- `pocketable use completed for <pickup>` / `pocketable ended without confirmation for <pickup>` / `pocketable timed out waiting for consume` / `pocketable timed out waiting for wield` (carried pocketable follow-through succeeded, ended ambiguously, or stalled)
+- `fallback item blocked <ability> (slot locked by <ability> <reason>)` (item fallback hit the shared BetterBots slot-lock fast retry instead of waiting out the normal wield timeout)
 
 ## Intentionally suppressed (noise reduction)
 
@@ -191,10 +220,10 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
-- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input>`, `grenade releasing toward ...`, or `grenade charge consumed`:
+- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input> for <grenade>`, `grenade releasing toward ...`, or `grenade charge consumed`:
   - the grenade weapon-action blocker is swallowing the **initial** item-grenade `grenade_ability` input during `state.stage == "wield"`.
   - this is an allowlist/sequence bug in `grenade_fallback._expected_weapon_action_input()`, not a ballistic/gravity-aim failure.
-  - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic` / `grenade aim flat fallback`.
+  - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>`.
 
 ## Writing debug logging for new features
 

@@ -38,6 +38,8 @@ function M.make_context(overrides)
 		toughness_pct = 1,
 		peril_pct = nil,
 		target_enemy = nil,
+		current_weapon_template_name = nil,
+		target_breed_name = nil,
 		target_enemy_position = nil,
 		target_enemy_distance = nil,
 		target_enemy_type = nil,
@@ -49,12 +51,18 @@ function M.make_context(overrides)
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
+		target_is_elite = false,
+		target_is_special = false,
 		target_is_elite_special = false,
+		target_is_unarmored_elite = false,
+		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
 		target_daemonhost_stage = nil,
 		target_is_super_armor = false,
+		grenade_charges_remaining = nil,
+		seconds_since_last_grenade_charge = nil,
 		allies_in_coherency = 0,
 		avg_ally_toughness_pct = 1,
 		max_ally_corruption_pct = 0,
@@ -138,6 +146,9 @@ function M.make_split_heuristics_deps(overrides)
 		grenade_module = dofile("scripts/mods/BetterBots/heuristics_grenade.lua"),
 		is_daemonhost_avoidance_enabled = function()
 			return true
+		end,
+		warp_weapon_peril_threshold = function()
+			return 0.99
 		end,
 	}
 
@@ -437,6 +448,7 @@ end
 function M.make_player_talent_extension(opts)
 	opts = opts or {}
 	local special_rules = opts.special_rules or {}
+	local talents = opts.talents
 	local ext = {
 		has_special_rule = opts.has_special_rule or function(_, rule_name)
 			if special_rules[rule_name] ~= nil then
@@ -444,10 +456,30 @@ function M.make_player_talent_extension(opts)
 			end
 			return false
 		end,
+		talents = function()
+			return talents
+		end,
 	}
 
 	_apply_audited_overrides("make_player_talent_extension", ext, opts.overrides, {
 		has_special_rule = true,
+		talents = true,
+	})
+
+	return ext
+end
+
+function M.make_player_buff_extension(opts)
+	opts = opts or {}
+	local stacks = opts.stacks or {}
+	local ext = {
+		current_stacks = function(_, buff_name)
+			return stacks[buff_name] or 0
+		end,
+	}
+
+	_apply_audited_overrides("make_player_buff_extension", ext, opts.overrides, {
+		current_stacks = true,
 	})
 
 	return ext

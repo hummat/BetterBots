@@ -137,6 +137,20 @@ local function _target_name(target_unit)
 	return breed and breed.name or tostring(target_unit)
 end
 
+local function _has_focus_target_talent(unit)
+	if not (unit and ScriptUnit and ScriptUnit.has_extension) then
+		return false
+	end
+
+	local talent_extension = ScriptUnit.has_extension(unit, "talent_system")
+	if not (talent_extension and talent_extension.talents) then
+		return false
+	end
+
+	local talents = talent_extension:talents()
+	return talents and talents.veteran_improved_tag ~= nil or false
+end
+
 local function _log_skip_once(unit, fixed_t, reason, target_unit)
 	if not _debug_enabled() then
 		return
@@ -239,10 +253,11 @@ function M.update(unit, blackboard)
 			-- Candidate found, check if valid for pinging
 			local target_extension = ScriptUnit.has_extension(candidate, "smart_tag_system")
 			local already_tagged = target_extension and target_extension:tag_id()
+			local focus_target_override = already_tagged and _has_focus_target_talent(unit)
 
-			if target_extension and already_tagged then
+			if target_extension and already_tagged and not focus_target_override then
 				_log_skip_once(unit, fixed_t, "already_tagged", candidate)
-			elseif target_extension and not already_tagged then
+			elseif target_extension and (not already_tagged or focus_target_override) then
 				-- Check LOS via enemy's perception (BotPerceptionExtension has no has_line_of_sight).
 				-- This asks "can the enemy see the bot?" — asymmetric (ignores bot facing), but
 				-- wall occlusion is symmetric and perception slots already filter awareness.
@@ -261,7 +276,7 @@ function M.update(unit, blackboard)
 
 				if has_los then
 					target_unit = candidate
-					reason = slot_name
+					reason = focus_target_override and (slot_name .. "_focus_target_override") or slot_name
 					target_distance_sq = _distance_sq_between_units(unit, candidate)
 					break
 				else

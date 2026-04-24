@@ -1,3 +1,4 @@
+local test_helper = require("tests.test_helper")
 local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
 local unpack_results = unpack
 if table and table.unpack then -- luacheck: ignore 143
@@ -72,6 +73,18 @@ local function find_echo(echoes, pattern)
 	return nil
 end
 
+local function count_echoes(echoes, pattern)
+	local count = 0
+
+	for i = 1, #echoes do
+		if string.find(echoes[i], pattern, 1, true) then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 local function sorted_keys(map)
 	local keys = {}
 
@@ -94,6 +107,87 @@ local function count_hooks(hook_registrations, target, method_name, hook_type)
 	end
 
 	return count
+end
+
+local function trim(str)
+	return (str:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function line_for_position(source, position)
+	local line = 1
+	for _ in source:sub(1, position):gmatch("\n") do
+		line = line + 1
+	end
+
+	return line
+end
+
+local function read_call_argument(source, position)
+	local depth = 0
+	local quote
+	local escaped = false
+
+	for i = position, #source do
+		local char = source:sub(i, i)
+		if quote then
+			if escaped then
+				escaped = false
+			elseif char == "\\" then
+				escaped = true
+			elseif char == quote then
+				quote = nil
+			end
+		else
+			if char == '"' or char == "'" then
+				quote = char
+			elseif char == "(" or char == "{" or char == "[" then
+				depth = depth + 1
+			elseif char == ")" or char == "}" or char == "]" then
+				if depth > 0 then
+					depth = depth - 1
+				end
+			elseif char == "," and depth == 0 then
+				return trim(source:sub(position, i - 1)), i + 1
+			end
+		end
+	end
+
+	return nil, position
+end
+
+local function collect_method_hooks(path, source)
+	local hooks = {}
+	local patterns = {
+		{ hook_type = "hook_safe", pattern = "([_%w]*mod):hook_safe%s*%(" },
+		{ hook_type = "hook", pattern = "([_%w]*mod):hook%s*%(" },
+	}
+
+	for _, spec in ipairs(patterns) do
+		local position = 1
+		while true do
+			local start_pos, open_pos = source:find(spec.pattern, position)
+			if not start_pos then
+				break
+			end
+
+			local target, method_pos = read_call_argument(source, open_pos + 1)
+			local method_arg = target and read_call_argument(source, method_pos)
+			local method_name = method_arg and method_arg:match([[^%s*["']([^"']+)["']%s*$]])
+			if method_name then
+				hooks[#hooks + 1] = {
+					path = path,
+					line = line_for_position(source, start_pos),
+					target = target,
+					method_name = method_name,
+					hook_type = spec.hook_type,
+				}
+			end
+
+			position = open_pos + 1
+		end
+	end
+
+	return hooks
 end
 
 local function make_runtime_module(module_name, install_calls, extra)
@@ -134,6 +228,7 @@ local function make_bootstrap_harness(module_overrides)
 	local saved_require = require
 	local saved_script_unit = rawget(_G, "ScriptUnit")
 	local saved_blackboards = rawget(_G, "BLACKBOARDS")
+	local saved_managers = rawget(_G, "Managers")
 	local hook_require_callbacks = {}
 	local install_calls = {
 		init_calls = {},
@@ -151,6 +246,18 @@ local function make_bootstrap_harness(module_overrides)
 		enable_perf_timing = false,
 	}
 	module_overrides = module_overrides or {}
+	if module_overrides.__settings then
+		for key, value in pairs(module_overrides.__settings) do
+			settings[key] = value
+		end
+	end
+	local fixed_frame_module = module_overrides.__fixed_frame
+		or {
+			get_latest_fixed_time = function()
+				return 0
+			end,
+		}
+	local managers = module_overrides.__managers
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -173,6 +280,11 @@ local function make_bootstrap_harness(module_overrides)
 			return "off"
 		end,
 	})
+	if module_overrides.LogLevels then
+		for key, value in pairs(module_overrides.LogLevels) do
+			modules.LogLevels[key] = value
+		end
+	end
 
 	modules.SharedRules = {}
 	modules.BotTargeting = {}
@@ -293,6 +405,9 @@ local function make_bootstrap_harness(module_overrides)
 			return 1
 		end,
 		register_commands = function() end,
+		install_combat_utility_diagnostics = function(...)
+			record_install("Debug", "install_combat_utility_diagnostics", ...)
+		end,
 		collect_alive_bots = function()
 			return {}
 		end,
@@ -368,6 +483,7 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 	})
 	modules.WeaponAction = make_runtime_module("WeaponAction", install_calls)
+	modules.RangedSpecialAction = make_runtime_module("RangedSpecialAction", install_calls)
 	modules.SustainedFire = make_runtime_module("SustainedFire", install_calls, {
 		install_bot_unit_input_hooks = function(target)
 			record_install("SustainedFire", "install_bot_unit_input_hooks", target)
@@ -416,6 +532,11 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("AmmoPolicy", "install_behavior_ext_hooks", target)
 		end,
 	})
+	modules.ComWheelResponse = make_runtime_module("ComWheelResponse", install_calls, {
+		override_behavior_profile = function()
+			return nil
+		end,
+	})
 	modules.MulePickup = make_runtime_module("MulePickup", install_calls, {
 		install_bot_group_hooks = function(target)
 			record_install("MulePickup", "install_bot_group_hooks", target)
@@ -425,7 +546,14 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 		patch_pickups = function() end,
 		sync_live_bot_groups = function() end,
+		should_block_pickup_order = function()
+			return false
+		end,
 	})
+	modules.PocketablePickup = make_runtime_module("PocketablePickup", install_calls, {
+		patch_pickups = function() end,
+	})
+	modules.SmartTagOrders = make_runtime_module("SmartTagOrders", install_calls)
 	modules.BotProfiles = make_runtime_module("BotProfiles", install_calls, {
 		reset = function() end,
 		register_hooks = function()
@@ -445,6 +573,15 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("TargetTypeHysteresis", "install_bot_perception_hooks", target)
 		end,
 	})
+	modules.WeakspotAim = make_runtime_module("WeakspotAim", install_calls, {})
+	modules.ChargeNavValidation = make_runtime_module("ChargeNavValidation", install_calls, {
+		should_validate = function()
+			return false
+		end,
+		validate = function()
+			return true
+		end,
+	})
 	modules.EngagementLeash = make_runtime_module("EngagementLeash", install_calls, {
 		install_melee_hooks = function(target)
 			record_install("EngagementLeash", "install_melee_hooks", target)
@@ -461,7 +598,10 @@ local function make_bootstrap_harness(module_overrides)
 	})
 
 	for module_name, override in pairs(module_overrides) do
-		if override.__strict then
+		if module_name == "__fixed_frame" or module_name == "__managers" or module_name == "__settings" then
+			-- test-only harness knobs, not runtime modules
+			local _ = override
+		elseif override.__strict then
 			modules[module_name] = override
 		else
 			local module = assert(modules[module_name], "unknown fake module override: " .. tostring(module_name))
@@ -506,6 +646,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/airlock_guard"] = modules.AirlockGuard,
 		["BetterBots/scripts/mods/BetterBots/vfx_suppression"] = modules.VfxSuppression,
 		["BetterBots/scripts/mods/BetterBots/weapon_action"] = modules.WeaponAction,
+		["BetterBots/scripts/mods/BetterBots/ranged_special_action"] = modules.RangedSpecialAction,
 		["BetterBots/scripts/mods/BetterBots/sustained_fire"] = modules.SustainedFire,
 		["BetterBots/scripts/mods/BetterBots/condition_patch"] = modules.ConditionPatch,
 		["BetterBots/scripts/mods/BetterBots/ability_queue"] = modules.AbilityQueue,
@@ -514,10 +655,15 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/companion_tag"] = modules.CompanionTag,
 		["BetterBots/scripts/mods/BetterBots/healing_deferral"] = modules.HealingDeferral,
 		["BetterBots/scripts/mods/BetterBots/ammo_policy"] = modules.AmmoPolicy,
+		["BetterBots/scripts/mods/BetterBots/com_wheel_response"] = modules.ComWheelResponse,
 		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
+		["BetterBots/scripts/mods/BetterBots/pocketable_pickup"] = modules.PocketablePickup,
+		["BetterBots/scripts/mods/BetterBots/smart_tag_orders"] = modules.SmartTagOrders,
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
+		["BetterBots/scripts/mods/BetterBots/weakspot_aim"] = modules.WeakspotAim,
+		["BetterBots/scripts/mods/BetterBots/charge_nav_validation"] = modules.ChargeNavValidation,
 		["BetterBots/scripts/mods/BetterBots/engagement_leash"] = modules.EngagementLeash,
 		["BetterBots/scripts/mods/BetterBots/revive_ability"] = modules.ReviveAbility,
 	}
@@ -591,13 +737,10 @@ local function make_bootstrap_harness(module_overrides)
 				end,
 			})
 			rawset(_G, "BLACKBOARDS", {})
+			rawset(_G, "Managers", managers)
 			rawset(_G, "require", function(path)
 				if path == "scripts/utilities/fixed_frame" then
-					return {
-						get_latest_fixed_time = function()
-							return 0
-						end,
-					}
+					return fixed_frame_module
 				end
 				if path == "scripts/settings/damage/armor_settings" then
 					return {
@@ -618,6 +761,7 @@ local function make_bootstrap_harness(module_overrides)
 			rawset(_G, "get_mod", saved_get_mod)
 			rawset(_G, "ScriptUnit", saved_script_unit)
 			rawset(_G, "BLACKBOARDS", saved_blackboards)
+			rawset(_G, "Managers", saved_managers)
 
 			assert.is_true(ok, tostring(loaded))
 			return fake_mod
@@ -651,6 +795,115 @@ describe("startup regressions", function()
 		handle:close()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/log_levels"%)', 1))
+	end)
+
+	it("keeps fixed_time bootstrap-safe before extension managers exist", function()
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					error("fixed_frame unavailable during bootstrap")
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(0, fixed_time_seen)
+	end)
+
+	it("keeps fixed_time bootstrap-safe when the extension manager lacks latest_fixed_t", function()
+		local fixed_frame_calls = 0
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__managers = {
+				state = {
+					extension = {},
+				},
+			},
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					fixed_frame_calls = fixed_frame_calls + 1
+					error("FixedFrame should not be touched without latest_fixed_t")
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(0, fixed_time_seen)
+		assert.equals(0, fixed_frame_calls)
+	end)
+
+	it("calls FixedFrame when the extension manager exposes latest_fixed_t", function()
+		local fixed_frame_calls = 0
+		local fixed_time_seen
+		local harness = make_bootstrap_harness({
+			__managers = {
+				state = {
+					extension = {
+						latest_fixed_t = 123.45,
+					},
+				},
+			},
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					fixed_frame_calls = fixed_frame_calls + 1
+					return 123.45
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					fixed_time_seen = deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(123.45, fixed_time_seen)
+		assert.equals(1, fixed_frame_calls)
+	end)
+
+	it("emits a one-shot debug breadcrumb when fixed_time is unavailable during bootstrap", function()
+		local harness = make_bootstrap_harness({
+			__settings = {
+				enable_debug_logs = 2,
+			},
+			LogLevels = {
+				resolve_setting = function(value)
+					return value
+				end,
+				should_log = function(_current, _level)
+					return true
+				end,
+				level_name = function()
+					return "debug"
+				end,
+			},
+			PocketablePickup = {
+				init = function(deps)
+					deps.fixed_time()
+					deps.fixed_time()
+				end,
+			},
+		})
+
+		harness:load()
+
+		local breadcrumb = find_echo(harness.echoes, "fixed_time unavailable during bootstrap")
+		assert.is_not_nil(breadcrumb)
+		assert.equals(1, count_echoes(harness.echoes, "fixed_time unavailable during bootstrap"))
 	end)
 
 	it("loads shared helper modules through mod io", function()
@@ -731,12 +984,36 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/mule_pickup"%)', 1))
 	end)
 
+	it("loads pocketable_pickup through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/pocketable_pickup"%)', 1))
+	end)
+
+	it("loads com_wheel_response through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/com_wheel_response"%)', 1))
+	end)
+
 	it("loads companion_tag through mod io", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))
 		handle:close()
 
 		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/companion_tag"%)', 1))
+	end)
+
+	it("loads charge_nav_validation through mod io", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/charge_nav_validation"%)', 1))
 	end)
 
 	it("initializes and registers extracted runtime modules", function()
@@ -761,6 +1038,10 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
 		assert.is_truthy(source:find("MulePickup%.register_hooks%(", 1))
+		assert.is_truthy(source:find("ComWheelResponse%.init%(", 1))
+		assert.is_truthy(source:find("ComWheelResponse%.register_hooks%(", 1))
+		assert.is_truthy(source:find("SmartTagOrders%.init%(", 1))
+		assert.is_truthy(source:find("SmartTagOrders%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.init%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.handle%(", 1))
 		assert.is_truthy(source:find("GestaltInjector%.init%(", 1))
@@ -800,8 +1081,28 @@ describe("startup regressions", function()
 		local ability_wire = find_named_call(harness.wire_calls, "AbilityQueue")
 		assert.equals(harness.modules.ItemFallback, ability_wire.refs.ItemFallback)
 		assert.equals(harness.modules.EngagementLeash, ability_wire.refs.EngagementLeash)
+		assert.equals(harness.modules.ChargeNavValidation, ability_wire.refs.ChargeNavValidation)
 		assert.equals(harness.modules.CombatAbilityIdentity, ability_wire.refs.CombatAbilityIdentity)
 		assert.equals(harness.modules.HumanLikeness, ability_wire.refs.HumanLikeness)
+
+		local smart_tag_init = find_named_call(harness.init_calls, "SmartTagOrders")
+		assert.is_truthy(smart_tag_init)
+		assert.equals(harness.modules.Debug.bot_slot_for_unit, smart_tag_init.deps.bot_slot_for_unit)
+
+		local com_wheel_init = find_named_call(harness.init_calls, "ComWheelResponse")
+		assert.is_truthy(com_wheel_init)
+		assert.is_function(com_wheel_init.deps.is_enabled)
+
+		local settings_wire = find_named_call(harness.wire_calls, "Settings")
+		assert.is_truthy(settings_wire)
+		assert.equals(
+			harness.modules.ComWheelResponse.override_behavior_profile,
+			settings_wire.refs.behavior_profile_override
+		)
+
+		local smart_tag_wire = find_named_call(harness.wire_calls, "SmartTagOrders")
+		assert.is_truthy(smart_tag_wire)
+		assert.is_function(smart_tag_wire.refs.should_block_pickup_order)
 
 		local revive_wire = find_named_call(harness.wire_calls, "ReviveAbility")
 		assert.equals(harness.modules.MetaData, revive_wire.refs.MetaData)
@@ -848,6 +1149,10 @@ describe("startup regressions", function()
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
 		assert.is_function(weapon_register.args[1].should_block_wield_input)
 		assert.is_function(weapon_register.args[1].should_block_weapon_action_input)
+		assert.is_function(weapon_register.args[1].rewrite_weapon_action_input)
+
+		local ranged_special_init = find_named_call(harness.init_calls, "RangedSpecialAction")
+		assert.equals(harness.modules.Debug.bot_slot_for_unit, ranged_special_init.deps.bot_slot_for_unit)
 
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
 			attack = function() end,
@@ -855,6 +1160,7 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", {
 			_update_target_enemy = function() end,
 		})
+		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", {})
 		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
 		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
 		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
@@ -867,6 +1173,7 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
+		assert.is_truthy(find_install_call(harness.install_calls, "Debug", "install_combat_utility_diagnostics"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
 
@@ -880,6 +1187,7 @@ describe("startup regressions", function()
 			"scripts/extension_systems/behavior/bot_behavior_extension",
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
+			"scripts/extension_systems/behavior/nodes/bt_random_utility_node",
 			"scripts/extension_systems/group/bot_group",
 			"scripts/extension_systems/input/bot_unit_input",
 			"scripts/extension_systems/perception/bot_perception_extension",
@@ -953,6 +1261,131 @@ describe("startup regressions", function()
 		assert.equals("interrupted", forwarded[1].reason)
 		assert.equals(12, forwarded[1].t)
 		assert.equals(0.1, forwarded[1].time_in_action)
+	end)
+
+	it("blocks BtBotActivateAbilityAction.enter when charge nav validation fails", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local validated = {}
+		harness.modules.ChargeNavValidation.should_validate = function(template_name)
+			return template_name == "zealot_dash"
+		end
+		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source)
+			validated[#validated + 1] = {
+				unit = unit,
+				template_name = template_name,
+				source = source,
+			}
+			return false, "ray_blocked"
+		end
+
+		local called = 0
+		local action = {
+			enter = function()
+				called = called + 1
+			end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "zealot_dash" },
+		})
+		local input_extension = test_helper.make_player_input_extension()
+
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+				input_system = input_extension,
+			},
+		})
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		assert.equals(0, called)
+		assert.same({
+			{
+				unit = "bot_unit",
+				template_name = "zealot_dash",
+				source = "bt_enter",
+			},
+		}, validated)
+	end)
+
+	it("does not mutate rescue aim before bt_enter charge validation blocks the action", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local ally_pos = { x = 12, y = -3, z = 0 }
+		local call_order = {}
+		local validated = {}
+		local condition_init = find_named_call(harness.init_calls, "ConditionPatch")
+		local rescue_intent = condition_init and condition_init.deps and condition_init.deps.rescue_intent
+
+		assert.is_not_nil(rescue_intent, "ConditionPatch rescue_intent dep was not wired")
+
+		harness.modules.ChargeNavValidation.should_validate = function(template_name)
+			return template_name == "ogryn_charge"
+		end
+		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source, opts)
+			call_order[#call_order + 1] = "validate"
+			validated[#validated + 1] = {
+				unit = unit,
+				template_name = template_name,
+				source = source,
+				target_position = opts and opts.target_position or nil,
+			}
+			return false, "ray_blocked"
+		end
+
+		local action = {
+			enter = function()
+				call_order[#call_order + 1] = "enter"
+			end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "ogryn_charge" },
+		})
+		local bot_unit_input = test_helper.make_bot_unit_input({
+			set_aiming = function()
+				call_order[#call_order + 1] = "set_aiming"
+			end,
+			set_aim_position = function()
+				call_order[#call_order + 1] = "set_aim_position"
+			end,
+		})
+		local input_extension = test_helper.make_player_input_extension({
+			bot_unit_input = bot_unit_input,
+		})
+
+		_G.POSITION_LOOKUP = {
+			ally_unit = ally_pos,
+		}
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+				input_system = input_extension,
+			},
+		})
+		rescue_intent["bot_unit"] = "ally_unit"
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, { perception = {} }, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		assert.same({ "validate" }, call_order)
+		assert.same({
+			{
+				unit = "bot_unit",
+				template_name = "ogryn_charge",
+				source = "bt_enter",
+				target_position = ally_pos,
+			},
+		}, validated)
 	end)
 
 	it("installs behavior hooks once and dispatches update/init through extracted modules", function()
@@ -1062,6 +1495,34 @@ describe("startup regressions", function()
 		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
 	end)
 
+	it("is idempotent on BotGroup hook installation across hot-reload (file re-execution)", function()
+		local bot_group = {
+			init = function() end,
+			_update_mule_pickups = function() end,
+			_update_pickups_and_deployables_near_player = function() end,
+		}
+
+		local harness1 = make_bootstrap_harness()
+		harness1:load()
+		harness1:invoke_hook_require("scripts/extension_systems/group/bot_group", bot_group)
+
+		local harness2 = make_bootstrap_harness()
+		harness2:load()
+		harness2:invoke_hook_require("scripts/extension_systems/group/bot_group", bot_group)
+
+		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "init", "hook_safe"))
+		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "_update_mule_pickups", "hook_safe"))
+		assert.equals(
+			0,
+			count_hooks(
+				harness2.hook_registrations,
+				bot_group,
+				"_update_pickups_and_deployables_near_player",
+				"hook_safe"
+			)
+		)
+	end)
+
 	it("fails bootstrap when a required module API is missing", function()
 		local harness = make_bootstrap_harness({
 			WeaponAction = {
@@ -1118,26 +1579,43 @@ describe("startup regressions", function()
 		local owners_by_target = {}
 		local duplicates = {}
 
+		local function record_owner(target, path)
+			local owners = owners_by_target[target]
+			if not owners then
+				owners = {}
+				owners_by_target[target] = owners
+			end
+
+			for i = 1, #owners do
+				if owners[i] == path then
+					return
+				end
+			end
+
+			owners[#owners + 1] = path
+		end
+
 		each_mod_source_file(function(path)
 			local source = read_file(path)
 
+			-- Collect `local IDENT = "LITERAL"` assignments so that
+			-- `hook_require(IDENT, cb)` resolves to the underlying path.
+			-- Without this step, wrapping the path in a module-local constant
+			-- silently bypasses the duplicate check (as happened with #92 in
+			-- weakspot_aim.lua before Codex caught the P0 at runtime).
+			local local_string_consts = {}
+			for ident, literal in source:gmatch('local%s+([%w_]+)%s*=%s*"([^"]+)"') do
+				local_string_consts[ident] = literal
+			end
+
 			for target in source:gmatch('hook_require%(%s*"([^"]+)"') do
-				local owners = owners_by_target[target]
-				if not owners then
-					owners = {}
-					owners_by_target[target] = owners
-				end
+				record_owner(target, path)
+			end
 
-				local already_listed = false
-				for i = 1, #owners do
-					if owners[i] == path then
-						already_listed = true
-						break
-					end
-				end
-
-				if not already_listed then
-					owners[#owners + 1] = path
+			for ident in source:gmatch("hook_require%(%s*([%w_]+)[,%)]") do
+				local resolved = local_string_consts[ident]
+				if resolved then
+					record_owner(resolved, path)
 				end
 			end
 		end)
@@ -1162,6 +1640,40 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("local _original_hook_require = mod%._raw_hook_require", 1))
 		assert.is_truthy(source:find("local _hook_require_callsite_by_path = {}", 1, true))
 		assert.is_truthy(source:find("BetterBots duplicate hook_require for %%s", 1))
+	end)
+
+	it("rejects duplicate DMF method hook ownership across BetterBots source files", function()
+		local allowed_duplicates = {
+			-- Test-only legacy helpers kept beside the production consolidated
+			-- BotPerceptionExtension dispatcher; BetterBots.lua owns runtime install.
+			["BotPerceptionExtension::_update_target_enemy"] = true,
+		}
+		local owners_by_target_method = {}
+		local duplicates = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+			for _, hook in ipairs(collect_method_hooks(path, source)) do
+				local key = hook.target .. "::" .. hook.method_name
+				local owners = owners_by_target_method[key]
+				if not owners then
+					owners = {}
+					owners_by_target_method[key] = owners
+				end
+
+				owners[#owners + 1] = string.format("%s:%d:%s", hook.path, hook.line, hook.hook_type)
+			end
+		end)
+
+		for key, owners in pairs(owners_by_target_method) do
+			if #owners > 1 and not allowed_duplicates[key] then
+				table.sort(owners)
+				duplicates[#duplicates + 1] = key .. " => " .. table.concat(owners, ", ")
+			end
+		end
+
+		table.sort(duplicates)
+		assert.same({}, duplicates)
 	end)
 
 	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()
@@ -1317,12 +1829,23 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("MulePickup%.sync_live_bot_groups%(", 1))
 	end)
 
-	it("exposes the full 0-100 bot ranged ammo slider in DMF settings", function()
+	it("exposes the full 0-100 bot ranged ammo slider and warp peril slider in DMF settings", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_data.lua", "r"))
 		local source = assert(handle:read("*a"))
 		handle:close()
 
 		assert.is_truthy(source:find('make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5)', 1, true))
+		assert.is_truthy(source:find('make_numeric("warp_weapon_peril_threshold", { 0, 100 }, 1)', 1, true))
+	end)
+
+	it("surfaces weapon-special behavior in the melee and ranged settings copy", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots_localization.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("supported melee weapon specials", 1, true))
+		assert.is_truthy(source:find("supported shotgun special shells", 1, true))
+		assert.is_truthy(source:find("warp_weapon_peril_threshold = {", 1, true))
 	end)
 
 	it("keeps settings UI organized through widget factories and a flat bot team setup group", function()

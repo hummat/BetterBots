@@ -1,3 +1,7 @@
+local _debug_log
+local _debug_enabled
+local _missing_talents_context_logged = false
+
 local PSYKER_SHOUT_THRESHOLDS = {
 	aggressive = {
 		high_peril = 0.60,
@@ -22,11 +26,55 @@ local PSYKER_SHOUT_THRESHOLDS = {
 	},
 }
 
+local function _has_talent(context, talent_name)
+	local talents = context and context.talents
+
+	if talents == nil then
+		if _debug_log and _debug_enabled and _debug_enabled() and not _missing_talents_context_logged then
+			_missing_talents_context_logged = true
+			_debug_log(
+				"missing_talents_context:psyker",
+				0,
+				"psyker heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				nil,
+				"debug"
+			)
+		end
+
+		return false
+	end
+
+	return talents[talent_name] ~= nil
+end
+
+local function _resolve_shout_high_peril_threshold(context, thresholds)
+	local high_peril = thresholds.high_peril
+	local preserve_peril = false
+
+	if
+		_has_talent(context, "psyker_damage_based_on_warp_charge") or _has_talent(context, "psyker_warp_glass_cannon")
+	then
+		high_peril = high_peril + 0.10
+		preserve_peril = true
+	end
+
+	if _has_talent(context, "psyker_shout_vent_warp_charge") then
+		high_peril = high_peril + 0.05
+		preserve_peril = true
+	end
+
+	return math.min(high_peril, 0.95), preserve_peril
+end
+
 local function _can_activate_psyker_shout(context, thresholds)
 	if context.num_nearby == 0 then
 		return false, "psyker_shout_block_no_enemies"
 	end
-	if context.peril_pct and context.peril_pct >= thresholds.high_peril then
+	local high_peril_threshold, preserve_peril = _resolve_shout_high_peril_threshold(context, thresholds)
+	if context.peril_pct and context.peril_pct >= high_peril_threshold then
+		if preserve_peril then
+			return true, "psyker_shout_high_peril_talent_aware"
+		end
 		return true, "psyker_shout_high_peril"
 	end
 	if context.num_nearby >= thresholds.surrounded then
@@ -41,6 +89,9 @@ local function _can_activate_psyker_shout(context, thresholds)
 		and context.target_enemy_distance <= thresholds.priority_dist
 	then
 		return true, "psyker_shout_priority_target"
+	end
+	if preserve_peril and context.peril_pct and context.peril_pct >= thresholds.high_peril then
+		return false, "psyker_shout_hold_preserve_peril"
 	end
 	if
 		context.peril_pct
@@ -60,6 +111,40 @@ local PSYKER_STANCE_THRESHOLDS = {
 	conservative = { threat_cr = 5.0, combat_density = 4 },
 }
 
+local function _resolve_psyker_stance_tuning(context, thresholds)
+	local tuning = {
+		threat_cr = thresholds.threat_cr,
+		combat_density = thresholds.combat_density,
+		bot_no_peril_combat_density = math.max(2, thresholds.combat_density),
+		target_peril_floor = 0.35,
+		target_peril_ceiling = 0.85,
+		block_peril_floor = 0.20,
+		block_peril_ceiling = 0.90,
+		build_aggressive = false,
+	}
+
+	if
+		_has_talent(context, "psyker_new_mark_passive")
+		or _has_talent(context, "psyker_overcharge_weakspot_kill_bonuses")
+	then
+		tuning.threat_cr = math.max(2.0, tuning.threat_cr - 1.0)
+		tuning.combat_density = math.max(1, tuning.combat_density - 1)
+		tuning.build_aggressive = true
+	end
+
+	if _has_talent(context, "psyker_overcharge_reduced_warp_charge") then
+		tuning.target_peril_ceiling = 0.90
+		tuning.block_peril_ceiling = 0.95
+	end
+
+	if _has_talent(context, "psyker_overcharge_stance_infinite_casting") then
+		tuning.target_peril_ceiling = 0.95
+		tuning.block_peril_ceiling = 0.97
+	end
+
+	return tuning
+end
+
 local function _can_activate_psyker_stance(context, thresholds)
 	if context.peril_pct == nil then
 		return nil, "psyker_stance_missing_peril"
@@ -74,23 +159,42 @@ local function _can_activate_psyker_stance(context, thresholds)
 	-- Some bot loadouts still report 0 peril in live combat, so keep a
 	-- threat-only fallback instead of hard-blocking on the human peril window.
 	local bot_no_peril = context.peril_pct == 0
+	local tuning = _resolve_psyker_stance_tuning(context, thresholds)
 
-	if not bot_no_peril and (context.peril_pct < 0.20 or context.peril_pct > 0.90) then
+	if
+		not bot_no_peril
+		and (context.peril_pct < tuning.block_peril_floor or context.peril_pct > tuning.block_peril_ceiling)
+	then
 		return false, "psyker_stance_block_peril_window"
 	end
 	if
 		(context.opportunity_target_enemy or context.urgent_target_enemy)
-		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+		and (
+			bot_no_peril
+			or (context.peril_pct >= tuning.target_peril_floor and context.peril_pct <= tuning.target_peril_ceiling)
+		)
 	then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_target_window_build"
+		end
 		return true, "psyker_stance_target_window"
 	end
 	if
-		context.challenge_rating_sum >= thresholds.threat_cr
-		and (bot_no_peril or (context.peril_pct >= 0.35 and context.peril_pct <= 0.85))
+		context.challenge_rating_sum >= tuning.threat_cr
+		and (
+			bot_no_peril
+			or (context.peril_pct >= tuning.target_peril_floor and context.peril_pct <= tuning.target_peril_ceiling)
+		)
 	then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_threat_window_build"
+		end
 		return true, "psyker_stance_threat_window"
 	end
-	if bot_no_peril and context.num_nearby >= thresholds.combat_density then
+	if bot_no_peril and context.num_nearby >= tuning.bot_no_peril_combat_density then
+		if tuning.build_aggressive then
+			return true, "psyker_stance_combat_density_build"
+		end
 		return true, "psyker_stance_combat_density"
 	end
 
@@ -141,6 +245,11 @@ local function _can_activate_force_field(context, thresholds)
 end
 
 return {
+	init = function(deps)
+		_debug_log = deps and deps.debug_log or nil
+		_debug_enabled = deps and deps.debug_enabled or nil
+		_missing_talents_context_logged = false
+	end,
 	template_heuristics = {
 		psyker_shout = _can_activate_psyker_shout,
 		psyker_overcharge_stance = _can_activate_psyker_stance,

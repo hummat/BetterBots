@@ -1,7 +1,8 @@
 -- bot_profiles.lua — hardcoded default class profiles for bots (#45)
 -- Replaces vanilla all-veteran profiles with class-diverse loadouts so players
 -- without leveled characters can still benefit from BetterBots' ability support.
--- Weapon and talent choices sourced from hadrons-blessing bot-optimized builds (2026-04-07).
+-- Weapon and talent choices are curated from selected live/community builds,
+-- then resolved into engine item objects at spawn time.
 --
 -- Profile resolution: vanilla bot profiles are pre-baked by bot_character_profiles.lua
 -- (items resolved, parse_profile called) BEFORE reaching add_bot. We must resolve our
@@ -27,14 +28,103 @@ local SLOT_SETTING_IDS = {
 	"bot_slot_5_profile",
 }
 
+local ATTACHMENT_SLOT_NAMES = {
+	"slot_attachment_1",
+	"slot_attachment_2",
+	"slot_attachment_3",
+}
+
+-- Verified via 2026-04-22 live /curio_dump in Mourningstar: the current
+-- attachment-slot Blessed Bullet base item is the Reliquary gadget variant.
+local BLESSED_BULLET_GADGET_ID = "content/items/gadgets/defensive_gadget_11"
+local BLESSED_BULLET_DISPLAY_NAME = "Blessed Bullet (Reliquary)"
+
+local function _trait_id(family, effect_name)
+	return "content/items/traits/bespoke_" .. family .. "/" .. effect_name
+end
+
+local function _perk_id(category, perk_name)
+	return "content/items/perks/" .. category .. "/" .. perk_name
+end
+
+local function _trait_override(id)
+	return {
+		id = id,
+		rarity = 4,
+		value = 1,
+	}
+end
+
+local function _perk_override(id)
+	return {
+		id = id,
+		rarity = 4,
+		value = 1,
+	}
+end
+
+local function _copy_item_overrides(entries)
+	local copy = {}
+
+	if type(entries) ~= "table" then
+		return copy
+	end
+
+	for index, entry in ipairs(entries) do
+		copy[index] = {
+			id = entry.id,
+			rarity = entry.rarity,
+			value = entry.value ~= nil and entry.value or 1,
+		}
+	end
+
+	return copy
+end
+
+local function _ensure_loadout_metadata(profile)
+	profile.loadout_item_ids = profile.loadout_item_ids or {}
+	profile.loadout_item_data = profile.loadout_item_data or {}
+
+	for slot_name, item in pairs(profile.loadout or {}) do
+		local item_name = item and item.name
+
+		if item_name and not profile.loadout_item_ids[slot_name] then
+			profile.loadout_item_ids[slot_name] = item_name .. slot_name
+		end
+
+		if item_name and not profile.loadout_item_data[slot_name] then
+			profile.loadout_item_data[slot_name] = {
+				id = item_name,
+			}
+		end
+	end
+end
+
+local function _default_curio_entry()
+	return {
+		name = BLESSED_BULLET_DISPLAY_NAME,
+		master_item_id = BLESSED_BULLET_GADGET_ID,
+		traits = {
+			{ id = "gadget_innate_toughness_increase", rarity = 4 },
+			{ id = "gadget_cooldown_reduction", rarity = 4 },
+			{ id = "gadget_damage_reduction_vs_gunners", rarity = 4 },
+			{ id = "gadget_stamina_regeneration", rarity = 4 },
+		},
+	}
+end
+
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
--- Bot-optimized builds sourced from hadrons-blessing (2026-04-07):
---   veteran: bot-veteran (VoC + Focus Target, no dodge/weakspot talents)
---   zealot:  bot-zealot  (Chorus + Martyrdom, no dodge talents)
---   psyker:  bot-psyker  (Venting Shriek + Warp Siphon + Voidblast staff)
---   ogryn:   bot-ogryn   (Indomitable + Heavy Hitter + Rumbler)
+-- Current shipped lineup:
+--   veteran: Voice of Command + Focus Target + power sword + plasma gun
+--   zealot:  Chorus + Blazing Piety + heavy eviscerator + boltgun
+--   psyker:  Venting Shriek + Warp Siphon + duelling sword + voidblast staff
+--   ogryn:   Indomitable + Heavy Hitter + latrine shovel + ripper gun
+-- Experimental backlog picks once the profile UI/export surface widens past the
+-- core 4 classes:
+--   adamant: [Havoc 40 Meta] Hyper Carry Dog Build
+--   broker:  Lihoe's Havoc 40 Scumlinger build.
 -- All talent keys verified against decompiled tree layouts.
 -- Stat node names verified against class-specific tree files.
 -- Mapping: see docs/knowledge/talent-system.md for entity ID → engine key rules.
@@ -45,94 +135,78 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "veteran_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/combatsword_p2_m1",
+			slot_primary = "content/items/weapons/player/melee/powersword_p1_m2",
 			slot_secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
-		},
-		-- Weapon overrides: blessings (traits) and perks from bot-veteran build.
-		-- Rampage (increased_melee_damage_on_multiple_hits) + cleave stacking on sword.
-		-- Rising Heat + Gets Hot! on plasma: damage scales with heat, overheat management.
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_combatsword_p2/increased_melee_damage_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_combatsword_p2/increased_attack_cleave_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_berserker_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_plasmagun_p1/power_bonus_scaled_on_heat",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_plasmagun_p1/reduced_overheat_on_critical_strike",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_berserker_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
-				},
-			},
 		},
 		bot_gestalts = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-veteran (Voice of Command + Focus Target)
-		-- Removed: veteran_dodging_grants_crit (bots can't dodge),
-		-- veteran_replenish_toughness_on_weakspot_kill (bots aim at spine),
-		-- veteran_increased_weakspot_damage (near-zero value for bots).
-		-- Replaced with: flanking damage, ranged cleave, deployable bonus, bleed-on-hit.
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("powersword_p1", "extended_activation_duration_on_chained_attacks")),
+					_trait_override(_trait_id("powersword_p1", "increase_power_on_kill")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_resistant_damage")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("plasmagun_p1", "crit_chance_scaled_on_heat")),
+					_trait_override(_trait_id("plasmagun_p1", "reduced_overheat_on_critical_strike")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_resistant_damage")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
+		-- Veteran now mirrors the requested Voice of Command + Focus Target plasma
+		-- build instead of the earlier validation-first lasgun fallback.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			veteran_combat_ability_stagger_nearby_enemies = 1,
-			veteran_grenade_apply_bleed = 1,
+			veteran_krak_grenade = 1,
 			veteran_aura_gain_ammo_on_elite_kill_improved = 1,
 			veteran_improved_tag = 1,
-			-- Class talents (all passive/kill/hit-triggered — zero dodge/weakspot dependency)
+			-- Class talents
 			veteran_all_kills_replenish_toughness = 1,
-			veteran_elite_kills_replenish_toughness = 1,
-			veteran_reduce_swap_time = 1,
-			veteran_replenish_toughness_and_boost_allies = 1,
+			veteran_aura_elite_kills_restore_grenade = 1,
+			veteran_crits_apply_rending = 1,
+			veteran_increase_damage_after_sprinting = 1,
+			veteran_increased_melee_crit_chance_and_melee_finesse = 1,
+			veteran_extra_grenade = 1,
+			veteran_dodging_grants_crit = 1,
+			veteran_kill_grants_damage_to_other_slot = 1,
+			veteran_attack_speed = 1,
 			veteran_reduced_toughness_damage_in_coherency = 1,
 			veteran_tdr_on_high_toughness = 1,
-			veteran_attack_speed = 1,
 			veteran_increase_damage_vs_elites = 1,
 			veteran_better_deployables = 1,
-			veteran_hits_cause_bleed = 1,
-			veteran_increased_ranged_cleave = 1,
-			veteran_increased_damage_when_flanking = 1,
 			veteran_replenish_toughness_outside_melee = 1,
 			veteran_improved_grenades = 1,
 			veteran_replenish_grenades = 1,
-			veteran_allies_in_coherency_share_toughness_gain = 1,
 			veteran_elite_kills_reduce_cooldown = 1,
-			veteran_rending_bonus = 1,
 			veteran_big_game_hunter = 1,
+			veteran_reduce_swap_time = 1,
 			-- Keystone/ability modifiers
 			veteran_combat_ability_increase_and_restore_toughness_to_coherency = 1,
+			veteran_improved_tag_more_damage = 1,
 			veteran_improved_tag_dead_coherency_bonus = 1,
 			-- Stat nodes (names verified against veteran_tree.lua)
 			base_toughness_node_buff_low_5 = 1,
 			base_stamina_node_buff_low_2 = 1,
 			base_toughness_node_buff_medium_1 = 1,
 			base_toughness_node_buff_medium_2 = 1,
-			base_ranged_damage_node_buff_medium_1 = 1,
+			base_melee_damage_node_buff_high_1 = 1,
 		},
 	},
 	-- Cosmetics sourced from Darktide Seven (misc_bot_profiles.lua) and tutorial bots.
@@ -143,46 +217,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "female",
 		selected_voice = "zealot_female_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/powersword_2h_p1_m2",
-			slot_secondary = "content/items/weapons/player/ranged/flamer_p1_m1",
-		},
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_powersword_2h_p1/reduce_fixed_overheat_amount",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_powersword_2h_p1/chained_weakspot_hits_increase_finesse_and_reduce_overheat",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_elite_enemy_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_flamer_p1/power_bonus_on_continuous_fire",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_flamer_p1/armor_rending_from_dot_burning",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
+			slot_primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/bolter_p1_m2",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",
@@ -204,44 +240,63 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-zealot (Chorus + Martyrdom)
-		-- Switched from Blazing Piety to Martyrdom: bots take constant damage and
-		-- naturally maintain the low-health state that Martyrdom rewards with stacking
-		-- damage, attack speed, and toughness bonuses.
-		-- Removed: zealot_toughness_on_dodge, zealot_increased_crit_and_weakspot_damage_after_dodge,
-		-- zealot_reduced_damage_after_dodge (all require dodge input — bots never dodge).
-		-- Aura: Benediction (TDR in coherency) over Beacon of Purity — bots take constant
-		-- toughness damage, making DR more valuable than corruption healing.
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("chainsword_2h_p1", "toughness_recovery_on_multiple_hits")),
+					_trait_override(_trait_id("chainsword_2h_p1", "chained_hits_increases_crit_chance")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("bolter_p1", "targets_receive_rending_debuff")),
+					_trait_override(_trait_id("bolter_p1", "bleed_on_ranged")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_resistant_damage")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
+		-- Zealot now mirrors the requested Sister of Battle loadout: Chorus,
+		-- heavy eviscerator, boltgun, and Blazing Piety.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			zealot_bolstering_prayer = 1,
-			zealot_throwing_knives = 1,
+			zealot_flame_grenade = 1,
 			zealot_toughness_damage_reduction_coherency_improved = 1,
-			zealot_martyrdom = 1,
-			-- Class talents (all passive/kill/hit/crit-triggered — zero dodge dependency)
-			zealot_multi_hits_increase_damage = 1,
-			zealot_more_toughness_on_melee = 1,
-			zealot_increased_damage_vs_resilient = 1,
-			zealot_resist_death = 1,
-			zealot_resist_death_healing = 1,
-			zealot_hits_grant_stacking_damage = 1,
-			zealot_attack_speed = 1,
-			zealot_offensive_vs_many = 1,
-			zealot_revive_speed = 1,
+			zealot_fanatic_rage = 1,
+			-- Class talents
 			zealot_crits_apply_bleed = 1,
+			zealot_multi_hits_increase_damage = 1,
+			zealot_increased_damage_vs_resilient = 1,
+			zealot_increase_ranged_close_damage = 1,
 			zealot_crits_reduce_toughness_damage = 1,
-			zealot_reduced_damage_on_wound = 1,
-			zealot_bled_enemies_take_more_damage = 1,
-			zealot_elite_kills_empowers = 1,
-			zealot_additional_wounds = 1,
-			zealot_damage_vs_elites = 1,
-			-- Keystone/ability modifiers
+			zealot_toughness_on_dodge = 1,
+			zealot_increased_crit_and_weakspot_damage_after_dodge = 1,
+			zealot_ally_damage_taken_reduced = 1,
+			zealot_resist_death = 1,
 			zealot_channel_grants_damage = 1,
+			zealot_resist_death_healing = 1,
+			zealot_reduced_damage_after_dodge = 1,
+			zealot_toughness_in_melee = 1,
+			zealot_attack_speed = 1,
 			zealot_crits_grant_cd = 1,
-			zealot_martyrdom_grants_toughness = 1,
-			zealot_martyrdom_grants_attack_speed = 1,
-			zealot_martyrdom_toughness_modifier = 1,
-			zealot_corruption_resistance_stacking = 1,
+			zealot_fanatic_rage_toughness_on_max = 1,
+			zealot_fanatic_rage_improved = 1,
+			zealot_bled_enemies_take_more_damage = 1,
+			zealot_revive_speed = 1,
+			zealot_elite_kills_empowers = 1,
+			zealot_damage_vs_elites = 1,
 			-- Stat nodes (names verified against zealot_tree.lua)
 			base_melee_damage_node_buff_medium_4 = 1,
 			base_toughness_node_buff_medium_2 = 1,
@@ -255,50 +310,8 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p4_m1",
-		},
-		-- Weapon overrides: Voidblast staff (p4) replaces Surge (p3) — AoE blast is more
-		-- bot-friendly than chain lightning (no single-target tracking needed).
-		-- Force Greatsword m1 per hadrons-blessing export recommendation.
-		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
-		weapon_overrides = {
-			slot_primary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_forcesword_2h_p1/warp_charge_power_bonus",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_forcesword_2h_p1/chained_hits_increases_melee_cleave",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
-			slot_secondary = {
-				traits = {
-					{
-						id = "content/items/traits/bespoke_forcestaff_p4/warp_charge_critical_strike_chance_bonus",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_forcestaff_p4/faster_charge_on_chained_secondary_attacks",
-						rarity = 4,
-						value = 1,
-					},
-				},
-				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_armored_damage", rarity = 4 },
-				},
-			},
+			slot_primary = "content/items/weapons/player/melee/combatsword_p3_m2",
+			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p1_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
@@ -320,36 +333,61 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-psyker (Venting Shriek + Warp Siphon + Voidblast)
-		-- Zero bot-unfriendly talents. Warpfire chain + soul stacking are passive.
-		-- Stat node names corrected (previous had 4 wrong suffixes that silently did nothing).
+		weapon_overrides = {
+			slot_primary = {
+				traits = {
+					_trait_override(_trait_id("combatsword_p3", "windup_increases_power")),
+					_trait_override(_trait_id("combatsword_p3", "stacking_rending_on_weakspot")),
+				},
+				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
+				},
+			},
+			slot_secondary = {
+				traits = {
+					_trait_override(_trait_id("forcestaff_p1", "warp_charge_critical_strike_chance_bonus")),
+					_trait_override(_trait_id("forcestaff_p1", "double_shot_on_crit")),
+				},
+				perks = {
+					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("ranged", "increase_crit_chance")),
+				},
+			},
+		},
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
+		-- Psyker now mirrors the requested Karen Mode loadout: Venting Shriek,
+		-- Assail, duelling sword, and Voidblast staff.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			psyker_shout_vent_warp_charge = 1,
-			psyker_brain_burst_improved = 1,
+			psyker_grenade_throwing_knives = 1,
 			psyker_cooldown_aura_improved = 1,
 			psyker_passive_souls_from_elite_kills = 1,
-			-- Class talents (all passive/kill/crit-triggered)
-			psyker_toughness_on_vent = 1,
+			-- Class talents
 			psyker_toughness_on_warp_kill = 1,
-			psyker_elite_kills_add_warpfire = 1,
 			psyker_crits_regen_toughness_movement_speed = 1,
+			psyker_elite_kills_add_warpfire = 1,
 			psyker_crits_empower_next_attack = 1,
-			psyker_killing_enemy_with_warpfire_boosts = 1,
+			psyker_throwing_knives_piercing = 1,
+			psyker_shout_reduces_warp_charge_generation = 1,
+			psyker_warpfire_on_shout = 1,
+			psyker_throwing_knives_cast_speed = 1,
 			psyker_spread_warpfire_on_kill = 1,
 			psyker_2_tier_3_name_2 = 1,
 			psyker_warp_charge_reduces_toughness_damage_taken = 1,
-			psyker_damage_based_on_warp_charge = 1,
 			psyker_increased_vent_speed = 1,
+			psyker_damage_based_on_warp_charge = 1,
+			psyker_warpfire_generate_souls = 1,
+			psyker_increased_max_souls = 1,
+			psyker_killing_enemy_with_warpfire_boosts = 1,
 			psyker_warp_glass_cannon = 1,
 			psyker_warp_attacks_rending = 1,
 			psyker_damage_vs_ogryns_and_monsters = 1,
-			-- Keystone/ability modifiers
-			psyker_smite_on_hit = 1,
-			psyker_shout_reduces_warp_charge_generation = 1,
-			psyker_warpfire_on_shout = 1,
-			psyker_toughness_on_soul = 1,
-			psyker_increased_max_souls = 1,
 			-- Stat nodes (names verified against psyker_tree.lua)
 			base_toughness_node_buff_medium_5 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
@@ -366,48 +404,31 @@ local DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "ogryn_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/ogryn_club_p2_m3",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m2",
+			slot_primary = "content/items/weapons/player/melee/ogryn_club_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
 		},
-		-- Weapon overrides: Bully Club + Rumbler replace Power Maul + Heavy Stubber.
-		-- Bully Club: massive stagger, synergizes with Heavy Hitter keystone heavy-attack rewards.
-		-- Rumbler (grenade launcher): AoE area denial, no aim or sustained-fire ramp-up needed.
+		-- Ogryn now mirrors the requested shovel/ripper build instead of the older
+		-- Point-Blank Barrage Kickback validation profile.
 		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					{
-						id = "content/items/traits/bespoke_ogryn_club_p2/staggered_targets_receive_increased_damage_debuff",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_ogryn_club_p2/toughness_recovery_on_multiple_hits",
-						rarity = 4,
-						value = 1,
-					},
+					_trait_override(_trait_id("ogryn_club_p1", "staggered_targets_receive_increased_damage_debuff")),
+					_trait_override(_trait_id("ogryn_club_p1", "windup_increases_power")),
 				},
 				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_super_armor_damage", rarity = 4 },
+					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
 					{ id = "content/items/perks/melee_common/wield_increase_resistant_damage", rarity = 4 },
 				},
 			},
 			slot_secondary = {
 				traits = {
-					{
-						id = "content/items/traits/bespoke_ogryn_thumper_p1/power_bonus_on_continuous_fire",
-						rarity = 4,
-						value = 1,
-					},
-					{
-						id = "content/items/traits/bespoke_ogryn_thumper_p1/suppression_on_close_kill",
-						rarity = 4,
-						value = 1,
-					},
+					_trait_override(_trait_id("ogryn_rippergun_p1", "toughness_on_continuous_fire")),
+					_trait_override(_trait_id("ogryn_rippergun_p1", "power_bonus_on_continuous_fire")),
 				},
 				perks = {
-					{ id = "content/items/perks/ranged_common/wield_increase_super_armor_damage", rarity = 4 },
-					{ id = "content/items/perks/ranged_common/wield_increase_resistant_damage", rarity = 4 },
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_berserker_damage")),
 				},
 			},
 		},
@@ -431,38 +452,39 @@ local DEFAULT_PROFILE_TEMPLATES = {
 			melee = "linesman",
 			ranged = "killshot",
 		},
-		-- Source: bot-ogryn (Indomitable + Heavy Hitter + Bully Club + Rumbler)
-		-- Indomitable charge synergizes with BetterBots charge heuristics.
-		-- Heavy Hitter rewards heavy melee attacks (BetterBots biases heavies for armored).
-		-- Bleed chain: Batter + Delight in Destruction = passive DR from bleed stacking.
-		-- Stat node names corrected (previous had 2 wrong names that did nothing).
+		curios = {
+			_default_curio_entry(),
+			_default_curio_entry(),
+			_default_curio_entry(),
+		},
+		-- Ogryn now mirrors the requested shovel/ripper Heavy Hitter build.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
 			ogryn_longer_charge = 1,
-			ogryn_grenade_frag = 1,
+			ogryn_grenade_friend_rock = 1,
 			ogryn_melee_damage_coherency_improved = 1,
 			ogryn_passive_heavy_hitter = 1,
-			-- Class talents (all passive/hit/kill-triggered)
-			ogryn_ogryn_killer = 1,
-			ogryn_toughness_while_bracing = 1,
+			-- Class talents
 			ogryn_multi_heavy_toughness = 1,
 			ogryn_single_heavy_toughness = 1,
+			ogryn_ogryn_killer = 1,
+			ogryn_melee_stagger = 1,
 			ogryn_targets_recieve_damage_taken_increase_debuff = 1,
-			ogryn_revenge_damage = 1,
-			ogryn_damage_reduction_on_high_stamina = 1,
-			ogryn_weakspot_damage = 1,
 			ogryn_heavy_bleeds = 1,
 			ogryn_nearby_bleeds_reduce_damage_taken = 1,
-			ogryn_toughness_on_low_health = 1,
-			ogryn_windup_reduces_damage_taken = 1,
-			ogryn_rending_on_elite_kills = 1,
-			ogryn_stacking_attack_speed = 1,
-			ogryn_damage_reduction_after_elite_kill = 1,
-			-- Keystone/ability modifiers
+			ogryn_ally_elite_kills_grant_cooldown = 1,
 			ogryn_charge_toughness = 1,
-			ogryn_charge_trample = 1,
+			ogryn_blocking_reduces_push_cost = 1,
+			ogryn_damage_taken_by_all_increases_strength_tdr = 1,
+			ogryn_replenish_rock_on_miss = 1,
+			ogryn_protect_allies = 1,
+			ogryn_damage_reduction_on_high_stamina = 1,
+			ogryn_stacking_attack_speed = 1,
+			ogryn_melee_damage_after_heavy = 1,
+			ogryn_wield_speed_increase = 1,
+			ogryn_weakspot_damage = 1,
+			-- Keystone/ability modifiers
 			ogryn_heavy_hitter_max_stacks_improves_attack_speed = 1,
-			ogryn_heavy_hitter_tdr = 1,
 			ogryn_heavy_hitter_stagger = 1,
 			-- Stat nodes (names verified against ogryn_tree.lua)
 			base_toughness_node_buff_medium_2 = 1,
@@ -478,6 +500,20 @@ local DEFAULT_PROFILE_TEMPLATES = {
 -- Resolved profiles cache: built on first use by resolving item strings to objects.
 -- Keyed by class name. Reset on GameplayStateRun enter (item catalog may change).
 local _resolved_profiles = {}
+
+-- Per-class throttle for profile-resolution failure warnings: once a class trips
+-- a given failure reason, the warning fires the first time unconditionally and
+-- the detailed payload still gates on debug flag.
+local _warned_resolution = {}
+local function _warn_resolution(key, message)
+	if _warned_resolution[key] then
+		return
+	end
+	_warned_resolution[key] = true
+	if _mod and _mod.warning then
+		_mod:warning("BetterBots: " .. message)
+	end
+end
 
 local function _get_slot_profile_choice(slot_index)
 	if not _mod then
@@ -545,6 +581,14 @@ local function _resolve_profile_template(class_name)
 	-- so it must be the resolved table, not the raw string.
 	local archetype_table = Archetypes[template.archetype]
 	if not archetype_table then
+		_warn_resolution(
+			"bad_archetype:" .. class_name,
+			"profile resolution failed for "
+				.. class_name
+				.. " (unknown archetype '"
+				.. tostring(template.archetype)
+				.. "')"
+		)
 		if _debug_enabled() then
 			_debug_log(
 				"bot_profiles:bad_archetype",
@@ -560,6 +604,56 @@ local function _resolve_profile_template(class_name)
 	if template.cosmetic_overrides then
 		for slot_name, item_id in pairs(template.cosmetic_overrides) do
 			profile.loadout[slot_name] = item_id
+		end
+	end
+
+	local item_overrides = {}
+	local weapon_overrides = template.weapon_overrides or {}
+
+	for slot_name, overrides in pairs(weapon_overrides) do
+		item_overrides[slot_name] = {
+			traits = _copy_item_overrides(overrides.traits),
+			perks = _copy_item_overrides(overrides.perks),
+		}
+	end
+
+	if template.curios then
+		for index, curio in ipairs(template.curios) do
+			local slot_name = ATTACHMENT_SLOT_NAMES[index]
+
+			if not slot_name then
+				break
+			end
+
+			if curio.master_item_id then
+				profile.loadout[slot_name] = curio.master_item_id
+				item_overrides[slot_name] = {
+					traits = _copy_item_overrides(curio.traits),
+					perks = _copy_item_overrides(curio.perks),
+				}
+			else
+				_warn_resolution(
+					"gadget_missing:" .. class_name .. ":" .. slot_name,
+					"skipping runtime curio for "
+						.. slot_name
+						.. " on "
+						.. class_name
+						.. " (missing master_item_id for "
+						.. tostring(curio.name)
+						.. ")"
+				)
+				if _debug_enabled() then
+					_debug_log(
+						"bot_profiles:gadget_missing:" .. class_name .. ":" .. slot_name,
+						0,
+						"skipping runtime curio for "
+							.. slot_name
+							.. " (missing master_item_id for "
+							.. tostring(curio.name)
+							.. ")"
+					)
+				end
+			end
 		end
 	end
 
@@ -602,49 +696,70 @@ local function _resolve_profile_template(class_name)
 		target_power = AUTO_POWER_BY_CHALLENGE[challenge] or 380
 	end
 
-	local weapon_overrides = template.weapon_overrides
 	for slot_name, item_id in pairs(profile.loadout) do
-		local overrides = weapon_overrides and weapon_overrides[slot_name]
+		local overrides = item_overrides[slot_name]
 		if overrides then
-			-- Read the master item definition to discover its stat names,
-			-- then construct a base_stats array with uniform quality value.
-			-- Discover stat names from the weapon template (NOT the MasterItems catalog —
-			-- the catalog doesn't carry base_stats). Extract template name from the content
-			-- path and look it up in WeaponTemplates.
-			local WeaponTemplates = require("scripts/settings/equipment/weapon_templates/weapon_templates")
-			local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
-			local weapon_template = template_name and WeaponTemplates[template_name]
-			local base_stats_override = {}
-			if weapon_template and weapon_template.base_stats then
-				for stat_name, _ in pairs(weapon_template.base_stats) do
-					base_stats_override[#base_stats_override + 1] = { name = stat_name }
-				end
-			end
-			local num_stats = math.max(1, #base_stats_override)
-			local total_stat_points = target_power / 10 * 6 + 80
-			local stat_value = math.min(1.0, total_stat_points / num_stats / 100)
-			for _, stat in ipairs(base_stats_override) do
-				stat.value = stat_value
-			end
+			local master_overrides = {
+				traits = _copy_item_overrides(overrides.traits),
+				perks = _copy_item_overrides(overrides.perks),
+			}
+			local is_weapon_slot = slot_name == "slot_primary" or slot_name == "slot_secondary"
 
-			-- baseItemLevel for display: use total_stat_points (matches total_stats_value)
-			local base_item_level = math.floor(total_stat_points + 0.5)
+			if is_weapon_slot then
+				-- Read the master item definition to discover its stat names,
+				-- then construct a base_stats array with uniform quality value.
+				-- Discover stat names from the weapon template (NOT the MasterItems catalog —
+				-- the catalog doesn't carry base_stats). Extract template name from the content
+				-- path and look it up in WeaponTemplates.
+				-- pcall-wrap the require: if Fatshark renames the weapon-templates path in a
+				-- patch the mod must still fall back gracefully (warn once, skip the
+				-- base_stats override) instead of throwing through the add_bot hook.
+				local ok_wt, WeaponTemplates =
+					pcall(require, "scripts/settings/equipment/weapon_templates/weapon_templates")
+				local template_name = item_id:match("([^/]+)$") -- e.g. "combatsword_p2_m1"
+				local weapon_template = ok_wt
+						and type(WeaponTemplates) == "table"
+						and template_name
+						and WeaponTemplates[template_name]
+					or nil
+				if not ok_wt or type(WeaponTemplates) ~= "table" then
+					_warn_resolution(
+						"weapon_templates_unavailable",
+						"weapon_templates engine module unavailable; bot weapons ship without base_stats override"
+					)
+				end
+				local base_stats_override = {}
+				if weapon_template and weapon_template.base_stats then
+					for stat_name, _ in pairs(weapon_template.base_stats) do
+						base_stats_override[#base_stats_override + 1] = { name = stat_name }
+					end
+				end
+				local num_stats = math.max(1, #base_stats_override)
+				local total_stat_points = target_power / 10 * 6 + 80
+				local stat_value = math.min(1.0, total_stat_points / num_stats / 100)
+				for _, stat in ipairs(base_stats_override) do
+					stat.value = stat_value
+				end
+
+				-- baseItemLevel for display: use total_stat_points (matches total_stats_value)
+				master_overrides.baseItemLevel = math.floor(total_stat_points + 0.5)
+				master_overrides.base_stats = base_stats_override
+			end
 
 			local gear_id = "betterbots_" .. class_name .. "_" .. slot_name
 			local gear = {
 				masterDataInstance = {
 					id = item_id,
-					overrides = {
-						baseItemLevel = base_item_level,
-						base_stats = base_stats_override,
-						traits = overrides.traits or {},
-						perks = overrides.perks or {},
-					},
+					overrides = master_overrides,
 				},
 				slots = { slot_name },
 			}
 			local item = MasterItems.get_item_instance(gear, gear_id)
 			if not item then
+				_warn_resolution(
+					"item_fail:" .. class_name .. ":" .. slot_name,
+					"failed to resolve weapon " .. tostring(item_id) .. " for " .. slot_name .. " on " .. class_name
+				)
 				if _debug_enabled() then
 					_debug_log(
 						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
@@ -657,36 +772,58 @@ local function _resolve_profile_template(class_name)
 			profile.loadout[slot_name] = item
 
 			if _debug_enabled() then
-				local stat_names = {}
-				for _, s in ipairs(base_stats_override) do
-					stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
+				if is_weapon_slot then
+					local stat_names = {}
+					local base_stats_override = master_overrides.base_stats or {}
+					local stat_value = base_stats_override[1] and base_stats_override[1].value or 0
+
+					for _, s in ipairs(base_stats_override) do
+						stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
+					end
+
+					_debug_log(
+						"bot_profiles:weapon:" .. class_name .. ":" .. slot_name,
+						0,
+						slot_name
+							.. " quality="
+							.. tostring(quality_setting)
+							.. " power="
+							.. tostring(target_power)
+							.. " stat_value="
+							.. string.format("%.2f", stat_value)
+							.. " baseItemLevel="
+							.. tostring(master_overrides.baseItemLevel)
+							.. " stats="
+							.. tostring(#base_stats_override)
+							.. " ("
+							.. table.concat(stat_names, ",")
+							.. ")"
+							.. " traits="
+							.. tostring(#(master_overrides.traits or {}))
+							.. " perks="
+							.. tostring(#(master_overrides.perks or {}))
+					)
+				else
+					_debug_log(
+						"bot_profiles:gadget:" .. class_name .. ":" .. slot_name,
+						0,
+						slot_name
+							.. " item="
+							.. tostring(item_id)
+							.. " traits="
+							.. tostring(#(master_overrides.traits or {}))
+							.. " perks="
+							.. tostring(#(master_overrides.perks or {}))
+					)
 				end
-				_debug_log(
-					"bot_profiles:weapon:" .. class_name .. ":" .. slot_name,
-					0,
-					slot_name
-						.. " quality="
-						.. tostring(quality_setting)
-						.. " power="
-						.. tostring(target_power)
-						.. " stat_value="
-						.. string.format("%.2f", stat_value)
-						.. " baseItemLevel="
-						.. tostring(base_item_level)
-						.. " stats="
-						.. tostring(#base_stats_override)
-						.. " ("
-						.. table.concat(stat_names, ",")
-						.. ")"
-						.. " traits="
-						.. tostring(#(overrides.traits or {}))
-						.. " perks="
-						.. tostring(#(overrides.perks or {}))
-				)
 			end
 		else
 			local item = MasterItems.get_item_or_fallback(item_id, slot_name, item_definitions)
 			if not item then
+				_warn_resolution(
+					"item_fail:" .. class_name .. ":" .. slot_name,
+					"failed to resolve item " .. tostring(item_id) .. " for " .. slot_name .. " on " .. class_name
+				)
 				if _debug_enabled() then
 					_debug_log(
 						"bot_profiles:item_fail:" .. class_name .. ":" .. slot_name,
@@ -713,6 +850,8 @@ local function _resolve_profile_template(class_name)
 		end
 		return nil
 	end
+
+	_ensure_loadout_metadata(profile)
 
 	-- The package synchronizer client iterates visual_loadout to resolve item packages.
 	-- Bot profiles don't have visual_loadout natively — vanilla bots get it set elsewhere.
@@ -794,6 +933,18 @@ local function resolve_profile(profile)
 		return profile, false
 	end
 
+	-- Guard against partial-mutation: committing archetype/talents without resolved
+	-- primary+secondary weapons would leave the bot flagged as e.g. a zealot but
+	-- holding vanilla veteran weapons. Reject before touching `profile`.
+	local resolved_loadout = resolved.loadout
+	if not (resolved_loadout and resolved_loadout.slot_primary and resolved_loadout.slot_secondary) then
+		_warn_resolution(
+			"missing_weapon_slots:" .. tostring(choice),
+			"resolved profile for " .. tostring(choice) .. " is missing slot_primary or slot_secondary"
+		)
+		return profile, false
+	end
+
 	-- Mutate the vanilla profile in-place rather than replacing it entirely.
 	-- The vanilla profile has cosmetic slots, body data, and visual_loadout already
 	-- set up correctly. We swap class identity fields (archetype, level, gender, voice,
@@ -812,45 +963,30 @@ local function resolve_profile(profile)
 	for k, v in pairs(resolved.bot_gestalts or {}) do
 		profile.bot_gestalts[k] = v
 	end
-	profile.loadout.slot_primary = resolved.loadout.slot_primary
-	profile.loadout.slot_secondary = resolved.loadout.slot_secondary
-	if resolved.loadout_item_ids then
-		profile.loadout_item_ids = profile.loadout_item_ids or {}
-		profile.loadout_item_ids.slot_primary = resolved.loadout_item_ids.slot_primary
-		profile.loadout_item_ids.slot_secondary = resolved.loadout_item_ids.slot_secondary
-	end
-	if resolved.loadout_item_data then
-		profile.loadout_item_data = profile.loadout_item_data or {}
-		profile.loadout_item_data.slot_primary = resolved.loadout_item_data.slot_primary
-		profile.loadout_item_data.slot_secondary = resolved.loadout_item_data.slot_secondary
-	end
-	-- Apply cosmetic slot overrides (e.g. ogryn body meshes)
-	local template = DEFAULT_PROFILE_TEMPLATES[choice]
-	if template and template.cosmetic_overrides then
-		for slot_name in pairs(template.cosmetic_overrides) do
-			if resolved.loadout[slot_name] then
-				profile.loadout[slot_name] = resolved.loadout[slot_name]
-				if resolved.loadout_item_ids and resolved.loadout_item_ids[slot_name] then
-					profile.loadout_item_ids[slot_name] = resolved.loadout_item_ids[slot_name]
-				end
-				if resolved.loadout_item_data and resolved.loadout_item_data[slot_name] then
-					profile.loadout_item_data[slot_name] = resolved.loadout_item_data[slot_name]
-				end
-			end
-		end
-	end
+	profile.loadout_item_ids = profile.loadout_item_ids or {}
+	profile.loadout_item_data = profile.loadout_item_data or {}
+	profile.visual_loadout = profile.visual_loadout or {}
 
-	-- visual_loadout mirrors loadout for package resolution
-	if profile.visual_loadout then
-		profile.visual_loadout.slot_primary = resolved.loadout.slot_primary
-		profile.visual_loadout.slot_secondary = resolved.loadout.slot_secondary
-		if template and template.cosmetic_overrides then
-			for slot_name in pairs(template.cosmetic_overrides) do
-				if resolved.loadout[slot_name] then
-					profile.visual_loadout[slot_name] = resolved.loadout[slot_name]
-				end
-			end
+	for slot_name, item in pairs(resolved.loadout or {}) do
+		profile.loadout[slot_name] = item
+
+		local item_name = item and item.name
+		local item_id = resolved.loadout_item_ids and resolved.loadout_item_ids[slot_name] or nil
+		local item_data = resolved.loadout_item_data and resolved.loadout_item_data[slot_name] or nil
+
+		profile.loadout_item_ids[slot_name] = item_id
+			or (item_name and item_name .. slot_name)
+			or profile.loadout_item_ids[slot_name]
+
+		if item_data then
+			profile.loadout_item_data[slot_name] = item_data
+		elseif item_name and not profile.loadout_item_data[slot_name] then
+			profile.loadout_item_data[slot_name] = {
+				id = item_name,
+			}
 		end
+
+		profile.visual_loadout[slot_name] = item
 	end
 
 	-- Guard against 1.11+ profile overwrite (#65): the network-sync pipeline
@@ -920,6 +1056,11 @@ local function reset()
 	-- Clear resolved cache — item catalog may have changed between missions
 	for k in pairs(_resolved_profiles) do
 		_resolved_profiles[k] = nil
+	end
+	-- Let resolution warnings fire again after a reset so a fresh mission surfaces
+	-- regressions that appeared between mission loads.
+	for k in pairs(_warned_resolution) do
+		_warned_resolution[k] = nil
 	end
 end
 

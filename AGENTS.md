@@ -35,7 +35,30 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
+**Pre-release cold-boot test (mandatory before `make release` → Nexus push).** Static checks pass for code that still crashes on real bootstrap (v0.11.0 shipped clean tests but CTD'd on cold launch). Hot-reload skips the Lua state reset that exposes `hook_require` sentinel bugs. Before pushing a release:
+1. Fully quit Darktide, relaunch, load into a mission — no hot-reload, state must reset.
+2. Run `bb-log summary` AND `bb-log warnings` — expect zero rehook / install-failure lines.
+3. Grep the raw console log: `grep -cE "rehook active|\[ERROR\]|lua error|CRASH" <newest-console-log>` — expect 0.
+4. Repeat the launch with BetterBots loaded **first** and **last** in the mod order. Some crashes only reproduce under one ordering (v0.11.0 regression was BetterBots-first-only).
+
 **Mock fidelity rule:** Test mocks for `ScriptUnit.has_extension` / `ScriptUnit.extension` must only expose methods verified to exist on the real engine extension class — via decompiled source (`../Darktide-Source-Code/`) or in-game dump. Darktide has extension subtype splits where the same `system_name` returns different classes for players vs minions (e.g. `unit_data_system` → `PlayerUnitDataExtension` with `read_component` for players, `MinionUnitDataExtension` with only `breed()` for enemies). Mocks that give minion units player-only methods create false test confidence — tests pass, production crashes. When code can receive both player and minion units, test both paths. See #95. Current audited surface + source-line evidence: `docs/dev/mock-api-audit.md`.
+
+**Bug-catch audit (mandatory for every bug fix).** Every time a bug surfaces — Codex/Claude review finding, runtime crash, Nexus report, in-game regression, DMF warning — the fix is not complete until you have asked *"should the harness have caught this?"* and acted on the answer.
+
+Required steps before closing the task:
+
+1. **Reproduce the miss.** Temporarily restore the buggy code on a scratch branch or via `git stash`, run the relevant subset of `make check` (or the spec in question), and confirm it still passes. Silence proves the gap is real.
+2. **Classify the gap.** Is it (a) a test that never existed, (b) a test that exists but has a blind spot (regex only matches literals, fake bypasses real runtime guard, mock exposes methods the real class lacks, patch-check missing an anchor), or (c) a test that runs but asserts nothing meaningful? All three count.
+3. **Close it for the class, not the instance.** A stronger regex that handles the specific variable name is not the fix; a resolver that handles any indirection is. Ask whether the next bug of the same shape would be caught.
+4. **Drive the change with TDD.** New/strengthened test goes red against the original bug, green with the fix. This is non-negotiable — a harness improvement that was not seen to fail has the same credibility as untested production code.
+5. **Ship harness + code together.** Same commit, same PR. Never merge the fix and defer the harness. The next commit will always be "more urgent."
+
+Historical worked examples (keep for pattern-matching):
+
+- *Duplicate `hook_require` path (#92 Sprint 1, 2026-04-18):* the bootstrap `rejects duplicate hook_require targets` check missed a case where one of the two registrations used a module-local constant instead of a string literal — regex only matched `hook_require("…"`. Strengthened by resolving `local IDENT = "…"` declarations per-file and mapping `hook_require(IDENT, …)` calls through that table. `tests/startup_regressions_spec.lua` ~line 1119.
+- *Mock fidelity (#95):* see the rule above. The fix was an audit doc (`docs/dev/mock-api-audit.md`) + per-spec discipline, not just a per-crash mock patch.
+
+If the bug cannot be caught by a static check or spec — for example, an engine-side rename that a unit test could never see — escalate it to `scripts/patch-check.sh` as an anchor instead. That is still "strengthening the harness," just at the contract layer.
 
 ## Debugging
 
@@ -94,7 +117,11 @@ Use project-local tooling configs before handing off changes:
 - `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → patch-check-refresh + check + package + tag + push + upload ZIP (CI also attaches ZIP)
-  - **Post-release:** prepare a Nexus changelog entry (version + summary of user-facing changes) and add it via the Nexus "Add new changelog" form
+  - **Post-release (all 4 Nexus fields required):**
+    1. Update `docs/nexus-description.bbcode` — remove fixed bugs from "Known issues", update "New in vX.Y.Z", move shipped features to ✓ in roadmap. Commit + push.
+    2. Brief overview (≤350 chars, plain text) for the Nexus "Summary" field.
+    3. File description (≤255 chars, plain text) for the upload's "File description" field.
+    4. Changelog row (version + summary of user-facing changes) via the Nexus "Add new changelog" form.
 
 Notes:
 
@@ -285,7 +312,7 @@ Do not jump to web search first for Darktide mechanics or patch-impact questions
 | Changed debug commands or log patterns | `docs/dev/debugging.md` |
 | Fixed a user-reported bug or known issue | `docs/nexus-description.bbcode` ("Known issues") + relevant GitHub issue |
 | Added/changed user-visible behavior | README.md highlights + `docs/nexus-description.bbcode` (roadmap, "What works", version notes) |
-| Released a new version (`make release`) | Add changelog entry on Nexus (version + summary of user-facing changes) |
+| Released a new version (`make release`) | Update `docs/nexus-description.bbcode` + post all 4 Nexus fields (brief overview, file description, changelog row, mod page description) |
 
 ### Doc index by activity
 
@@ -372,6 +399,6 @@ Per-class ability references and tactical heuristics live under `docs/classes/` 
 
 For per-module descriptions see the repo layout block in `README.md`; for architecture and hook wiring see `docs/dev/architecture.md`. The inventories below are what `make doc-check` cross-checks against the filesystem — keep them in lockstep with `scripts/mods/BetterBots/` and `tests/`.
 
-**Modules** (`scripts/mods/BetterBots/`): `BetterBots.lua`, `BetterBots_data.lua`, `BetterBots_localization.lua`, `ability_queue.lua`, `airlock_guard.lua`, `ammo_policy.lua`, `animation_guard.lua`, `bot_profiles.lua`, `bot_targeting.lua`, `charge_tracker.lua`, `combat_ability_identity.lua`, `companion_tag.lua`, `condition_patch.lua`, `debug.lua`, `engagement_leash.lua`, `event_log.lua`, `gestalt_injector.lua`, `grenade_fallback.lua`, `healing_deferral.lua`, `heuristics.lua`, `heuristics_arbites.lua`, `heuristics_context.lua`, `heuristics_grenade.lua`, `heuristics_hive_scum.lua`, `heuristics_ogryn.lua`, `heuristics_psyker.lua`, `heuristics_veteran.lua`, `heuristics_zealot.lua`, `human_likeness.lua`, `item_fallback.lua`, `log_levels.lua`, `melee_attack_choice.lua`, `melee_meta_data.lua`, `meta_data.lua`, `mule_pickup.lua`, `perf.lua`, `ping_system.lua`, `poxburster.lua`, `ranged_meta_data.lua`, `revive_ability.lua`, `settings.lua`, `shared_rules.lua`, `smart_targeting.lua`, `sprint.lua`, `sustained_fire.lua`, `target_selection.lua`, `target_type_hysteresis.lua`, `team_cooldown.lua`, `update_dispatcher.lua`, `vfx_suppression.lua`, `weapon_action.lua`.
+**Modules** (`scripts/mods/BetterBots/`): `BetterBots.lua`, `BetterBots_data.lua`, `BetterBots_localization.lua`, `ability_queue.lua`, `airlock_guard.lua`, `ammo_policy.lua`, `animation_guard.lua`, `bot_profiles.lua`, `bot_targeting.lua`, `charge_nav_validation.lua`, `charge_tracker.lua`, `combat_ability_identity.lua`, `com_wheel_response.lua`, `companion_tag.lua`, `condition_patch.lua`, `debug.lua`, `engagement_leash.lua`, `event_log.lua`, `gestalt_injector.lua`, `grenade_fallback.lua`, `healing_deferral.lua`, `heuristics.lua`, `heuristics_arbites.lua`, `heuristics_context.lua`, `heuristics_grenade.lua`, `heuristics_hive_scum.lua`, `heuristics_ogryn.lua`, `heuristics_psyker.lua`, `heuristics_veteran.lua`, `heuristics_zealot.lua`, `human_likeness.lua`, `item_fallback.lua`, `log_levels.lua`, `melee_attack_choice.lua`, `melee_meta_data.lua`, `meta_data.lua`, `mule_pickup.lua`, `perf.lua`, `ping_system.lua`, `pocketable_pickup.lua`, `poxburster.lua`, `ranged_meta_data.lua`, `ranged_special_action.lua`, `revive_ability.lua`, `settings.lua`, `shared_rules.lua`, `smart_tag_orders.lua`, `smart_targeting.lua`, `sprint.lua`, `sustained_fire.lua`, `target_selection.lua`, `target_type_hysteresis.lua`, `team_cooldown.lua`, `update_dispatcher.lua`, `vfx_suppression.lua`, `weakspot_aim.lua`, `weapon_action.lua`.
 
-**Test specs** (`tests/`): `ability_queue_spec.lua`, `airlock_guard_spec.lua`, `ammo_policy_spec.lua`, `animation_guard_spec.lua`, `boss_engagement_spec.lua`, `bot_profiles_spec.lua`, `bot_targeting_spec.lua`, `charge_tracker_spec.lua`, `combat_ability_identity_spec.lua`, `companion_tag_spec.lua`, `condition_patch_spec.lua`, `debug_spec.lua`, `engagement_leash_spec.lua`, `event_log_spec.lua`, `gestalt_injector_spec.lua`, `grenade_fallback_spec.lua`, `healing_deferral_spec.lua`, `heuristics_spec.lua`, `human_likeness_spec.lua`, `item_fallback_spec.lua`, `log_levels_spec.lua`, `melee_attack_choice_spec.lua`, `melee_meta_data_spec.lua`, `meta_data_spec.lua`, `mule_pickup_spec.lua`, `perf_spec.lua`, `ping_system_spec.lua`, `poxburster_spec.lua`, `ranged_meta_data_spec.lua`, `resolve_decision_spec.lua`, `revive_ability_spec.lua`, `runtime_contracts_spec.lua`, `settings_spec.lua`, `shared_rules_spec.lua`, `smart_targeting_spec.lua`, `sprint_spec.lua`, `startup_regressions_spec.lua`, `sustained_fire_spec.lua`, `target_selection_spec.lua`, `target_type_hysteresis_spec.lua`, `team_cooldown_spec.lua`, `test_helper_spec.lua`, `update_dispatcher_spec.lua`, `vfx_suppression_spec.lua`, `weapon_action_spec.lua`.
+**Test specs** (`tests/`): `ability_queue_spec.lua`, `airlock_guard_spec.lua`, `ammo_policy_spec.lua`, `animation_guard_spec.lua`, `boss_engagement_spec.lua`, `bot_profiles_spec.lua`, `bot_targeting_spec.lua`, `charge_nav_validation_spec.lua`, `charge_tracker_spec.lua`, `com_wheel_response_spec.lua`, `combat_ability_identity_spec.lua`, `companion_tag_spec.lua`, `condition_patch_spec.lua`, `debug_spec.lua`, `engagement_leash_spec.lua`, `event_log_spec.lua`, `gestalt_injector_spec.lua`, `grenade_fallback_spec.lua`, `healing_deferral_spec.lua`, `heuristics_spec.lua`, `human_likeness_spec.lua`, `item_fallback_spec.lua`, `log_levels_spec.lua`, `melee_attack_choice_spec.lua`, `melee_meta_data_spec.lua`, `meta_data_spec.lua`, `mule_pickup_spec.lua`, `perf_spec.lua`, `ping_system_spec.lua`, `pocketable_pickup_spec.lua`, `poxburster_spec.lua`, `ranged_meta_data_spec.lua`, `ranged_special_action_spec.lua`, `resolve_decision_spec.lua`, `revive_ability_spec.lua`, `runtime_contracts_spec.lua`, `settings_spec.lua`, `shared_rules_spec.lua`, `smart_tag_orders_spec.lua`, `smart_targeting_spec.lua`, `sprint_spec.lua`, `startup_regressions_spec.lua`, `sustained_fire_spec.lua`, `target_selection_spec.lua`, `target_type_hysteresis_spec.lua`, `team_cooldown_spec.lua`, `test_helper_spec.lua`, `update_dispatcher_spec.lua`, `vfx_suppression_spec.lua`, `weakspot_aim_spec.lua`, `weapon_action_spec.lua`.

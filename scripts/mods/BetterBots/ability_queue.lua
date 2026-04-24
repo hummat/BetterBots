@@ -17,6 +17,7 @@ local _ItemFallback
 local _Debug
 local _EventLog
 local _EngagementLeash
+local _ChargeNavValidation
 local _TeamCooldown
 local _CombatAbilityIdentity
 local _HumanLikeness
@@ -358,25 +359,53 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 
 	-- Rescue aim (#10): for fallback-queued charges, apply aim correction
 	-- here since the BtBotActivateAbilityAction.enter hook won't fire.
+	local rescue_ally_position
 	if rule and RESCUE_CHARGE_RULES[rule] then
 		local perception = blackboard and blackboard.perception
 		local ally_unit = perception and perception.target_ally
 		if ally_unit then
 			local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 			if ally_pos then
-				local input_ext = ScriptUnit.has_extension(unit, "input_system")
-				local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
-				if bot_input then
-					bot_input:set_aiming(true)
-					bot_input:set_aim_position(ally_pos)
-					if _debug_enabled() then
-						_debug_log(
-							"rescue_aim:" .. tostring(unit),
-							fixed_t,
-							"rescue aim (fallback): directed charge toward disabled ally"
-						)
-					end
-				end
+				rescue_ally_position = ally_pos
+			end
+		end
+	end
+
+	if _ChargeNavValidation and _ChargeNavValidation.should_validate(ability_template_name) then
+		local nav_ok, nav_reason = _ChargeNavValidation.validate(unit, ability_template_name, "fallback", {
+			blackboard = blackboard,
+			target_position = rescue_ally_position,
+		})
+		if not nav_ok then
+			if _EventLog.is_enabled() then
+				_EventLog.emit({
+					t = fixed_t,
+					event = "blocked",
+					bot = _Debug.bot_slot_for_unit(unit),
+					ability = _equipped_combat_ability_name(unit),
+					template = ability_template_name,
+					source = "fallback",
+					rule = rule,
+					reason = nav_reason,
+				})
+			end
+			_finish_child_perf("ability_queue.queue", queue_t0)
+			return
+		end
+	end
+
+	if rescue_ally_position then
+		local input_ext = ScriptUnit.has_extension(unit, "input_system")
+		local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+		if bot_input then
+			bot_input:set_aiming(true)
+			bot_input:set_aim_position(rescue_ally_position)
+			if _debug_enabled() then
+				_debug_log(
+					"rescue_aim:" .. tostring(unit),
+					fixed_t,
+					"rescue aim (fallback): directed charge toward disabled ally"
+				)
 			end
 		end
 	end
@@ -477,6 +506,7 @@ function M.wire(deps)
 	_Debug = deps.Debug
 	_EventLog = deps.EventLog
 	_EngagementLeash = deps.EngagementLeash
+	_ChargeNavValidation = deps.ChargeNavValidation
 	_TeamCooldown = deps.TeamCooldown
 	_CombatAbilityIdentity = deps.CombatAbilityIdentity
 	_HumanLikeness = deps.HumanLikeness

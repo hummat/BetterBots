@@ -24,19 +24,17 @@ describe("smart_targeting", function()
 
 	it("registers a fixed_update hook that preserves the original logic for bots", function()
 		local SmartTargeting = load_smart_targeting()
-		local hook_handler
+		local hook_handlers = {}
 		local debug_logs = {}
+		local seen_paths = {}
 		local stub_mod = {
 			hook_require = function(_, path, callback)
-				assert.equals(
-					"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
-					path
-				)
+				seen_paths[#seen_paths + 1] = path
 				callback({})
 			end,
 			hook = function(_, _, method_name, handler)
 				assert.equals("fixed_update", method_name)
-				hook_handler = handler
+				hook_handlers[#hook_handlers + 1] = handler
 			end,
 		}
 
@@ -57,6 +55,11 @@ describe("smart_targeting", function()
 			end,
 		})
 		SmartTargeting.register_hooks()
+		assert.same({
+			"scripts/extension_systems/weapon/actions/modules/smart_target_targeting_action_module",
+			"scripts/extension_systems/weapon/actions/modules/psyker_smite_targeting_action_module",
+		}, seen_paths)
+		assert.equals(2, #hook_handlers)
 
 		local targeting_data = { unit = "vanilla_target" }
 		local component = {}
@@ -64,6 +67,7 @@ describe("smart_targeting", function()
 		local original_calls = 0
 		local self = {
 			_unit = "bot_unit",
+			_player_unit = "bot_player_unit",
 			_component = component,
 			_unit_data_extension = test_helper.make_player_unit_data_extension({
 				perception = {
@@ -84,7 +88,7 @@ describe("smart_targeting", function()
 			},
 		}
 
-		hook_handler(function(_self)
+		hook_handlers[1](function(_self)
 			original_calls = original_calls + 1
 			seen_target_during_original = targeting_data.unit
 			_self._component.target_unit_1 = seen_target_during_original
@@ -95,6 +99,64 @@ describe("smart_targeting", function()
 		assert.equals("bot_target", component.target_unit_1)
 		assert.equals("vanilla_target", targeting_data.unit)
 		assert.equals(1, #debug_logs)
+		assert.equals("smart_targeting:bot_player_unit:bot_target", debug_logs[1].key)
+	end)
+
+	it("seeds psyker smite targeting from precision-priority perception slots", function()
+		local SmartTargeting = load_smart_targeting()
+		local hook_handlers = {}
+		local stub_mod = {
+			hook_require = function(_, _, callback)
+				callback({})
+			end,
+			hook = function(_, _, _, handler)
+				hook_handlers[#hook_handlers + 1] = handler
+			end,
+		}
+
+		SmartTargeting.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			bot_targeting = dofile("scripts/mods/BetterBots/bot_targeting.lua"),
+		})
+		SmartTargeting.register_hooks()
+
+		local targeting_data = { unit = "vanilla_target" }
+		local seen_target_during_original
+		local self = {
+			_component = {},
+			_unit_data_extension = test_helper.make_player_unit_data_extension({
+				perception = {
+					target_enemy = "fodder_target",
+					priority_target_enemy = "priority_target",
+				},
+			}, {
+				is_resimulating = false,
+			}),
+			_smart_targeting_extension = {
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+				targeting_data = function()
+					return targeting_data
+				end,
+			},
+		}
+
+		hook_handlers[2](function()
+			seen_target_during_original = targeting_data.unit
+		end, self, 0.1, 99)
+
+		assert.equals("priority_target", seen_target_during_original)
+		assert.equals("vanilla_target", targeting_data.unit)
 	end)
 
 	it("passes through unchanged for human-controlled units", function()

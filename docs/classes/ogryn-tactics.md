@@ -68,6 +68,9 @@ BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 - Monster visible with no melee pressure (`urgent_target AND num_nearby <= 1 AND target_dist > 5`)
 - 2+ elites/specials at range (`target_dist > 5 AND count_elites_or_specials >= 2`)
 - `challenge_rating_sum >= 6.0 AND target_dist > 5 AND num_nearby <= 2`
+- Fire Shots variant can also justify activation on medium-range crowd pressure, not just elite packs
+- Armor Pen variant is worth spending on hard ranged targets (super armor / monster / priority ranged pressure) even when the generic CR gate is not met yet
+- Toughness Regen variant can justify activation at low toughness when the bot has a ranged target and room to stand off
 
 ### DON'T USE WHEN
 - In melee (`num_nearby >= 3` or `target_dist < 4`) — locked into ranged weapon
@@ -82,17 +85,46 @@ BLOCK IF num_nearby >= 3
 BLOCK IF target_dist < 4
 BLOCK IF challenge_rating_sum < 2.0
 ```
-**Confidence:** MEDIUM — 80s CD demands very conservative use.
+Build-aware follow-up now shipped in BetterBots:
+```
+IF has(ogryn_special_ammo_fire_shots) AND target_dist > 5
+   AND num_nearby >= 2 AND challenge_rating_sum >= 2.0 THEN activate
+IF has(ogryn_special_ammo_armor_pen) AND target_dist > 5
+   AND (target_is_super_armor OR target_is_monster OR priority_target_enemy) THEN activate
+IF has(ogryn_ranged_stance_toughness_regen) AND target_dist > 5
+   AND toughness_pct < 0.60 AND target_enemy_type == "ranged" THEN activate
+IF has(ogryn_special_ammo_movement) THEN allow slightly closer commits
+   (block melee pressure threshold +1, minimum target distance 3m, commit distance 3m)
+```
+**Confidence:** MEDIUM — first build-aware batch shipped; longer-horizon weapon/loadout coupling is still open.
 
 ---
 
-## Grenades (Tier 3 — not yet implemented)
+## Grenades (Tier 3 — implemented)
 
 | Grenade | USE WHEN | Key constraint | Confidence |
 |---------|----------|----------------|------------|
 | B.F. Rock | Special at >6m — spam freely (4 charges, 45s regen) | Most bot-friendly blitz | MEDIUM |
-| Big Box of Hurt | `num_nearby >= 5 AND challenge_rating_sum >= 3.0` | Keep 1 charge reserve | MEDIUM |
-| Demolition Frag | Monster OR `challenge_rating_sum >= 8.0` — panic button | Single charge, no regen | MEDIUM |
+| Big Box of Hurt | Dense horde, or mixed elite/special pressure at safe range | Impact profile is stronger than a generic horde grenade, but still worse than Rock for lone picks | MEDIUM |
+| Demolition Frag | Monster, or clustered elite/special pressure at safe range | Single charge, no regen — not a generic horde grenade | MEDIUM |
+
+---
+
+## Weapon Specials
+
+BetterBots now covers the shipped Ogryn default special actions that matter most for validation:
+
+- `ogryn_club_p1_m1`: queues the uppercut special before a melee attack only against high-health or armored targets.
+- `ogryn_club_p1_m2/m3`: folds the latrine shovel before high-health or armored targets, with heavy follow-up bias for the hardest targets.
+- `ogryn_club_p2_m1/m2/m3`: queues the fist/slap special before high-health or armored targets.
+- `ogryn_pickaxe_2h_p1_m1/m2/m3`: queues the pickaxe special before high-health or armored targets.
+- `ogryn_combatblade_p1_m1/m2/m3`: queues the uppercut special before high-health or armored targets.
+- `ogryn_powermaul_p1_m1/m2/m3`: activates the power maul special before high-health or armored targets.
+- `ogryn_rippergun_p1_m1/m2/m3`: rewrites close-range fire into the bayonet `stab` input when the current target is inside the configured bayonet distance and worth a melee special.
+- `ogryn_heavystubber_p1_m1/m2/m3` and `ogryn_thumper_p1_m1`: rewrite close-range fire into the melee bash input when the current target is inside the configured ranged-bash distance and worth a melee special.
+- `ogryn_heavystubber_p2_m1/m2/m3`: deliberately ignored; the special is a flashlight toggle, not a combat action.
+
+These are all gated by the existing `melee_improvements` or `ranged_improvements` settings, not by new Ogryn-only toggles.
 
 ---
 

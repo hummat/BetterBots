@@ -12,7 +12,7 @@ All values are the raw multipliers (0.1 = 10%). Tiers: T1/T2/T3/T4.
 | combatsword_p1 | Maccabian Mk IV Duelling Sword | Veteran/Zealot |
 | flamer_p1 | Artemia Mk III Purgation Flamer | Zealot |
 | forcesword_p1 | Deimos Mk IV Blaze Force Sword | Psyker |
-| forcestaff_p1 | Voidstrike Staff | Psyker |
+| forcestaff_p1 | Voidblast Staff | Psyker |
 | forcestaff_p2 | Inferno/Purgatus Staff | Psyker |
 | forcestaff_p3 | Surge Staff (chain lightning) | Psyker |
 | forcestaff_p4 | Equinox Mk III Voidblast Staff | Psyker |

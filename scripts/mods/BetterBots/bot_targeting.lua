@@ -24,6 +24,21 @@ function M.resolve_bot_target_unit(target_source)
 		or target_source.urgent_target_enemy
 end
 
+function M.resolve_precision_target_unit(target_source)
+	if not target_source then
+		return nil
+	end
+
+	for i = 1, #M.PERCEPTION_SLOTS do
+		local target_unit = target_source[M.PERCEPTION_SLOTS[i]]
+		if target_unit then
+			return target_unit
+		end
+	end
+
+	return nil
+end
+
 function M.is_elite_special_monster(unit)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	local breed = unit_data_extension and unit_data_extension:breed()

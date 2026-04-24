@@ -240,6 +240,120 @@ describe("poxburster", function()
 			assert.equals("bot_unit_A", scratchpad._bb_bot_unit)
 		end)
 
+		it("installs melee hooks only once per shared BtBotMeleeAction table", function()
+			local hook_calls = {}
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, target, method_name)
+						hook_calls[#hook_calls + 1] = {
+							target = target,
+							method_name = method_name,
+						}
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+			})
+
+			local BtBotMeleeAction = {}
+			Poxburster.install_melee_hooks(BtBotMeleeAction)
+			Poxburster.install_melee_hooks(BtBotMeleeAction)
+
+			assert.equals(2, #hook_calls)
+			assert.equals("_should_defend", hook_calls[1].method_name)
+			assert.equals("_should_push", hook_calls[2].method_name)
+		end)
+
+		it("_should_defend composes BetterBots defend suppression without installing a second hook", function()
+			local captured_defend_hook
+			local suppress_args
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+				should_suppress_defend = function(self, unit, target_unit, scratchpad)
+					suppress_args = {
+						self = self,
+						unit = unit,
+						target_unit = target_unit,
+						scratchpad = scratchpad,
+					}
+
+					return true
+				end,
+			})
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local self_node = {}
+			local scratchpad = {}
+			local result = captured_defend_hook(function()
+				return true
+			end, self_node, "bot_unit_A", "crusher", scratchpad)
+
+			assert.is_false(result)
+			assert.equals("bot_unit_A", scratchpad._bb_bot_unit)
+			assert.equals(self_node, suppress_args.self)
+			assert.equals("bot_unit_A", suppress_args.unit)
+			assert.equals("crusher", suppress_args.target_unit)
+			assert.equals(scratchpad, suppress_args.scratchpad)
+		end)
+
+		it("_should_defend keeps melee defend suppression active when poxburster handling is disabled", function()
+			local captured_defend_hook
+			Poxburster.init({
+				mod = {
+					hook_safe = function() end,
+					hook = function(_self, _target, method_name, handler)
+						if method_name == "_should_defend" then
+							captured_defend_hook = handler
+						end
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 42
+				end,
+				is_enabled = function()
+					return false
+				end,
+				should_suppress_defend = function()
+					return true
+				end,
+			})
+
+			Poxburster.install_melee_hooks({})
+			assert.is_not_nil(captured_defend_hook)
+
+			local result = captured_defend_hook(function()
+				return true
+			end, nil, "bot_unit_A", "crusher", {})
+
+			assert.is_false(result)
+		end)
+
 		it("_should_defend bypasses the defend gate for poxburster targets", function()
 			local captured_defend_hook
 			Poxburster.init({

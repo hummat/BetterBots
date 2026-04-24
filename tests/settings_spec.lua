@@ -42,6 +42,16 @@ describe("settings", function()
 		restore_managers()
 	end)
 
+	describe("feature defaults", function()
+		it("enables com_wheel_responses by default", function()
+			assert.is_true(Settings.DEFAULTS.enable_com_wheel_responses)
+		end)
+
+		it("enables charge_nav_validation by default", function()
+			assert.is_true(Settings.DEFAULTS.enable_charge_nav_validation)
+		end)
+	end)
+
 	describe("resolve_preset", function()
 		it("defaults to balanced when mod returns nil", function()
 			Settings.init(mock_mod({}))
@@ -76,6 +86,17 @@ describe("settings", function()
 		it("falls back to balanced for unknown values", function()
 			Settings.init(mock_mod({ behavior_profile = "broken" }))
 			assert.equals("balanced", Settings.resolve_preset())
+		end)
+
+		it("applies a wired behavior-profile override when present", function()
+			Settings.init(mock_mod({ behavior_profile = "balanced" }))
+			Settings.wire({
+				behavior_profile_override = function()
+					return "aggressive"
+				end,
+			})
+
+			assert.equals("aggressive", Settings.resolve_preset())
 		end)
 	end)
 
@@ -184,6 +205,30 @@ describe("settings", function()
 			}))
 
 			assert.are.equal(1.00, Settings.human_grenade_reserve_threshold())
+		end)
+	end)
+
+	describe("warp weapon peril threshold setting", function()
+		it("returns the default threshold when mod returns nil", function()
+			Settings.init(mock_mod({}))
+
+			assert.are.equal(0.99, Settings.warp_weapon_peril_threshold())
+		end)
+
+		it("normalizes slider values into percentages", function()
+			Settings.init(mock_mod({
+				warp_weapon_peril_threshold = "98",
+			}))
+
+			assert.are.equal(0.98, Settings.warp_weapon_peril_threshold())
+		end)
+
+		it("falls back to the default threshold for invalid slider values", function()
+			Settings.init(mock_mod({
+				warp_weapon_peril_threshold = 101,
+			}))
+
+			assert.are.equal(0.99, Settings.warp_weapon_peril_threshold())
 		end)
 	end)
 
@@ -714,6 +759,8 @@ describe("settings", function()
 			assert.is_true(Settings.is_feature_enabled("smart_targeting"))
 			assert.is_true(Settings.is_feature_enabled("daemonhost_avoidance"))
 			assert.is_true(Settings.is_feature_enabled("target_type_hysteresis"))
+			assert.is_true(Settings.is_feature_enabled("com_wheel_responses"))
+			assert.is_true(Settings.is_feature_enabled("charge_nav_validation"))
 		end)
 
 		it("returns true for unknown feature names", function()
@@ -761,6 +808,16 @@ describe("settings", function()
 		it("gates team_cooldown feature correctly", function()
 			Settings.init(mock_mod({ enable_team_cooldown = false }))
 			assert.is_false(Settings.is_feature_enabled("team_cooldown"))
+		end)
+
+		it("gates com_wheel_responses feature correctly", function()
+			Settings.init(mock_mod({ enable_com_wheel_responses = false }))
+			assert.is_false(Settings.is_feature_enabled("com_wheel_responses"))
+		end)
+
+		it("gates charge_nav_validation feature correctly", function()
+			Settings.init(mock_mod({ enable_charge_nav_validation = false }))
+			assert.is_false(Settings.is_feature_enabled("charge_nav_validation"))
 		end)
 	end)
 
@@ -868,6 +925,40 @@ describe("settings", function()
 					special_chase_penalty_range = 24,
 				}))
 				assert.equals(24, Settings.special_chase_penalty_range())
+			end)
+		end)
+
+		describe("rippergun_bayonet_distance", function()
+			it("returns default 3 when mod returns nil", function()
+				Settings.init(mock_mod({}))
+				assert.equals(3, Settings.rippergun_bayonet_distance())
+			end)
+
+			it("returns configured value", function()
+				Settings.init(mock_mod({ rippergun_bayonet_distance = 4 }))
+				assert.equals(4, Settings.rippergun_bayonet_distance())
+			end)
+
+			it("returns 0 when set to 0", function()
+				Settings.init(mock_mod({ rippergun_bayonet_distance = 0 }))
+				assert.equals(0, Settings.rippergun_bayonet_distance())
+			end)
+		end)
+
+		describe("ranged_bash_distance", function()
+			it("returns default 3 when mod returns nil", function()
+				Settings.init(mock_mod({}))
+				assert.equals(3, Settings.ranged_bash_distance())
+			end)
+
+			it("returns configured value", function()
+				Settings.init(mock_mod({ ranged_bash_distance = 4 }))
+				assert.equals(4, Settings.ranged_bash_distance())
+			end)
+
+			it("returns 0 when set to 0", function()
+				Settings.init(mock_mod({ ranged_bash_distance = 0 }))
+				assert.equals(0, Settings.ranged_bash_distance())
 			end)
 		end)
 	end)

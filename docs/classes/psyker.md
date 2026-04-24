@@ -133,12 +133,12 @@ The Psyker's base combat ability is **Venting Shriek**. Two alternatives can be 
 - `psyker_overcharge_increased_movement_speed`: Increased movement speed during stance
 - `psyker_overcharge_weakspot_kill_bonuses`: Weakspot kills grant stacking finesse damage per kill
 
-**Bot usage notes**: Scrier's Gaze is harder for bots to use optimally. Recommended behavior:
-- Activate before engaging elites/bosses for the damage/crit buff
-- Simple activation pattern (single press, stance type)
-- Bot must monitor Peril during stance and be ready to vent or let stance expire
-- Best for ranged-focused bot builds where Peril generation is lower
-- 25s cooldown is the shortest of the three combat abilities
+**Bot usage notes**: Scrier's Gaze is harder for bots to use optimally, but BetterBots now has a first build-aware pass on top of the simple stance activation:
+- Base stance rule is still threat-window driven: fire on clear elite/monster pressure or real combat density, not on cooldown into empty space
+- `psyker_new_mark_passive` / `psyker_overcharge_weakspot_kill_bonuses` builds lower the threat/density gates so aggressive Disrupt Destiny / weakspot-kill variants spend stance earlier
+- `psyker_overcharge_reduced_warp_charge` widens the acceptable upper Peril window, and `psyker_overcharge_stance_infinite_casting` widens it further
+- Bot still needs to monitor Peril during stance and let the existing overcharge guard stop warp-weapon attacks near critical Peril
+- 25s cooldown is the shortest of the three combat abilities, so liberal use on valid combat windows is correct
 
 ### 3. Telekine Shield / Dome
 
@@ -205,12 +205,14 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 - `psyker_ability_increase_brain_burst_speed`: After combat ability, Brain Burst charges 75% faster and costs 50% less Peril for 10s
 - `psyker_empowered_ability` (keystone): Empowered Brain Burst costs 0% Peril, has increased attack speed and damage
 
-**Bot usage notes**: Brain Burst is the most straightforward blitz for bots.
+**Bot usage notes**: Brain Burst is the most straightforward blitz for bots, but it still needs selective use because the charge is long and stationary.
 - Item-based ability (wielded like weapon), so it requires wield/aim/fire sequence
 - Use against elites, specials, and bosses (high single-target damage)
 - Bot must track Peril -- each use adds significant Peril
 - Do not use when Peril is above ~80%
-- Prioritize: Snipers > Specials > Elites > Monsters
+- BetterBots now seeds Brain Burst precision targeting from the bot perception priority slots instead of inheriting the generic current target
+- BetterBots now blocks Brain Burst under close melee pressure on non-hard targets and keeps it biased toward super-armor / monsters / explicit priority enemies at range
+- When `psyker_smite_on_hit` is equipped, BetterBots de-prioritizes manual Brain Burst on ordinary elites/specials that the proc already covers, but still keeps manual casts live for bombers, super-armor, monsters, and explicit long-range priority targets
 - **Tier 3 for bot implementation** (item-based, no `ability_template`)
 
 ### 2. Assail (Throwing Knives)
@@ -243,11 +245,11 @@ The Psyker's base blitz is **Brain Burst**. Two alternatives: **Assail (Throwing
 **Bot usage notes**: Assail is moderately bot-friendly.
 - Item-based (wielded), same Tier 3 challenge as Brain Burst
 - Homing behavior makes aiming less critical
-- BetterBots now splits between the fast `shoot` path at close pressure and the aimed `zoom -> zoom_shoot` homing chain for longer-range priority/ranged threats
+- BetterBots now splits between a rapid `shoot` burst that dumps the current shard reserve into crowd softening once the bot commits, a single fast `shoot` fallback when neither the burst nor aimed path is justified, and the aimed `zoom -> zoom_shoot` homing chain for special / precision-target picks
 - Finite charges (10) require charge management
-- Use against specials and ranged threats
+- Use against specials first; crowd-softening is now a secondary path, not the default Assail behavior
 - Good for softening groups before melee engagement
-- Still generates Peril despite using charges rather than grenade pickups
+- Still generates Peril despite using charges rather than grenade pickups, and the crowd-burst stop line now follows the shared configurable warp peril threshold
 
 ### 3. Chain Lightning
 

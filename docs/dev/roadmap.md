@@ -133,16 +133,16 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 
 **Release framing.** `v1.0.0` is scoped as the terminal release. Post-1.0 work may never ship — the milestone therefore includes everything feasible without architectural rewrites, not just the cheapest wins. Broad-scope follow-ups under individual issues are formally documented as scope-exit (see Post-1.0 section).
 
-**Execution order.** Sprints are a logical dependency ordering, not calendar weeks. Foundation primitives (F1 talent context, F2 pocketable pickup) are load-bearing — F2 unlocks three downstream features on its own.
+**Execution order.** Sprints are a logical dependency ordering, not calendar weeks. Foundation primitives (F1 talent context, F2 pocketable carry bootstrap) are load-bearing — F2 unlocks the carried-consumable MVP on its own.
 
 #### Sprint 1 — Foundations + cheap independent wins
 
 | # | Item | Notes |
 |---|------|-------|
 | F1 | Talent/buff context extension | Additive fields in `build_context()` — `has_talent()`, `current_stacks()`. Prerequisite for `#38`. Pure additive. |
-| 13 | Navmesh charge/dash validation | GwNav raycast before committing charge direction. Darktide uses navigation destination vector, not `aim_position` (per March 8 audit correction on issue). Applies to `ogryn_charge`, `adamant_charge`, `zealot_targeted_dash`. Existing rescue-aim path at `ability_queue.lua:359` is a complementary layer, not a substitute. |
-| 92 | Per-breed weakspot aim map | Hook `BtBotShootAction._set_new_aim_target` + breed→node override table. Ships atop `#91` MVP allowlist in `ranged_meta_data.lua:224`. Independent of `#41`. Per-breed node names need verification from `breeds/*` source. |
-| 86 | Tier 3 revive cover — timing investigation | Answer the blocker in the issue body: does `BtBotInteractAction.enter` leave ≥1.5–2s window before revive commits? Ship or scope-exit based on result. Cheap to investigate. |
+| 13 | Navmesh charge/dash validation | **Implemented 2026-04-18.** Shared `charge_nav_validation.lua` validates the actual launch endpoint with `NavQueries.ray_can_go(...)` before committing `ogryn_charge`, `adamant_charge`, and zealot dash variants. Zealot dash resolves its targeted enemy from bot perception/smart-targeting, rescue charges validate the explicit ally aim point, and directional charges fall back to `navigation_extension:destination()` when no better endpoint exists. Wired into both `BtBotActivateAbilityAction.enter` and `ability_queue.lua`, with rescue aim applied only after validation passes so a blocked charge cannot leave `BotUnitInput` stuck on the ally position. Same-endpoint failures cache for 0.5s so GwNav queries do not repeat every tick, and the behavior is exposed behind `enable_charge_nav_validation` as a user kill switch. |
+| 92 | Per-breed weakspot aim override | Hook `BtBotShootAction._set_new_aim_target` atop the `#91` MVP allowlist in `ranged_meta_data.lua:224`, with live `_aim_position` re-evaluation for the two stateful cases. Implemented in code for Scab Mauler (`j_spine`), Bulwark exposed-head routing (`j_head` only when the shield is open or the bot is outside the 70° blocking cone, using the engine's flat block-angle math), and a **provisional** Crusher rear-arc proxy (`j_head` only when the bot is behind the target). The Crusher path is documented assumption, not rig-verified fact: the original back-of-head claim still lacks a confirmed node name in decompiled source. Independent of `#41`. |
+| 86 | Tier 3 revive cover — timing investigation | **Done 2026-04-17.** Scope-exit at the `enter` hook confirmed by two independent investigations. `PlayerCharacterStateInteracting.on_enter` interrupts any in-flight ability/weapon action and force-wields `slot_unarmed`, killing Tier 3 sequences on revive entry. Viable-but-substantial architecture (approach-phase hook via `on_refresh_destination` + gated `can_revive`) documented on the issue and moved to Post-1.0. |
 
 #### Sprint 2 — Keystone-aware layer (shipped-roster coverage)
 
@@ -150,69 +150,63 @@ Not a Zealot-Martyrdom one-liner. BB ships three tuned builds in `bot_profiles.l
 
 | Build | Talent marker | Touchpoint |
 |---|---|---|
-| Zealot Martyrdom | `zealot_martyrdom` | Healing suppression + `zealot_invisibility` low-HP panic disable; wound-cure exception |
+| Zealot Martyrdom | `zealot_martyrdom` | Live healing suppression on stations/med-crates + `zealot_invisibility` low-HP panic disable; pocketable wound-cure path stays deferred with F2 |
 | Psyker Warp Siphon / glass cannon | `psyker_damage_based_on_warp_charge` + `psyker_warp_glass_cannon` | Raise peril vent threshold to preserve warp-charge-scaled damage |
 | Psyker Venting Shriek cadence | `psyker_shout_vent_warp_charge` | Shout as vent-trigger; cooldown shape differs from burst-damage shout |
-| Veteran VoC + Focus Target | existing stance path | Targeting weight pass — verify focus-target passive flows through |
+| Veteran VoC + Focus Target | existing stance path | Verify tag ownership, then narrow ping override so Focus Target can still claim already-tagged priority targets |
+| Psyker Scrier's Gaze follow-up (`#104`) | `psyker_new_mark_passive`, `psyker_overcharge_weakspot_kill_bonuses`, `psyker_overcharge_reduced_warp_charge`, `psyker_overcharge_stance_infinite_casting` | Lower stance threat/density gates for aggressive mark/weakspot builds; widen upper peril ceilings for reduced-peril / Warp Unbound variants |
+| Ogryn Point-Blank Barrage follow-up (`#104`) | `ogryn_special_ammo_fire_shots`, `ogryn_special_ammo_armor_pen`, `ogryn_special_ammo_movement`, `ogryn_ranged_stance_toughness_regen` | Build-specific activation reasons for horde pressure, hard ranged targets, closer-range commitment, and low-toughness ranged sustain |
 
-Keystone extensions beyond shipped roster (Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor) remain post-1.0.
+Further keystone/build extensions beyond the current shipped batch (Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor, wider Veteran specialization coverage, deeper Scrier vent logic) remain post-1.0.
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 38 | Talent-aware behavior | Full shipped-roster coverage per table above. Detection via `talent_extension:talents()` + `buff_extension:current_stacks()`. Graceful degrade when talent missing (non-BB profiles). Validation surface = load BB + Solo Play + each class slot. |
+| 38 | Talent-aware behavior | **Code-complete 2026-04-18; first broader follow-up `#104` landed 2026-04-19 and closed 2026-04-22 after live validation.** The base MVP still covers Martyrdom live-healing suppression + low-HP Shroudfield panic disable, Psyker shout peril preservation keyed off warp-charge damage talents plus `psyker_shout_vent_warp_charge`, and Veteran Focus Target's one-shot tag reclaim for `enemy_over_here_veteran`. The first broader build-aware follow-up now also tunes Scrier's Gaze for aggressive mark/weakspot builds and reduced-peril / Warp Unbound variants, and tunes Point-Blank Barrage for Fire Shots, Armor Pen, movement, and toughness-regen branches. Detection still degrades cleanly when talents are absent (non-BB profiles). |
 
 #### Sprint 3 — Close-range ranged gap + melee identity
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 41 (narrow) | Weapon-family close-range classifier | Purgatus/flamer/shotgun/stubber — hip-fire gestalt + skip melee transition under close-range pressure. Closes Nexus Auric Psyker-dies-most field report. Broad enemy-aware fire cadence stays post-1.0. Touches `target_type_hysteresis.lua`, `ranged_meta_data.lua`, `weapon_action.lua`, vanilla `_should_aim` — med-high blast radius even when narrowed. |
-| 33 (narrow) | Activate_special melee | Power sword, thunder hammer, force sword — pre-engagement `special_action` input when facing elite/specialist + charges available. `damage_profile_special_active` is 2–3× damage + rending + AP per Mar 15 comment on issue. Biggest unshipped lethality lift. Ranged specials + `toggle_special` chainaxe energy mgmt stay post-1.0. |
+| 41 (narrow) | Weapon-family close-range classifier | **Code-complete 2026-04-18; first explicit family-expansion follow-up `#105` landed 2026-04-19 and closed 2026-04-22 after live validation.** Narrow family policy landed in `ranged_meta_data.lua`, then wired into both `target_type_hysteresis.lua` and the vanilla `BtBotShootAction._should_aim` hook. Supported close-range families are now flamer, Purgatus (`forcestaff_p2_m1`), shotgun, heavy stubber, autopistol/dual autopistols, and rippergun. Under close pressure those families keep ranged target type instead of falling back to melee; ADS suppression applies to the true hipfire families (including autopistols), while Purgatus and ripperguns preserve their non-hipfire fire paths. Broad enemy-aware fire cadence and any autogun subgroup expansion stay post-1.0. |
+| 33 (narrow) | Activate_special melee | **Code-complete 2026-04-18; follow-ups landed 2026-04-19, 2026-04-20, and 2026-04-22; chain-family follow-up `#103` closed 2026-04-22 after live validation.** `melee_attack_choice.lua` now caches supported weapon-special metadata during `BtBotMeleeAction.enter` and prepends `special_action` before the chosen attack when the current family-specific rule says the target is worth it. The first post-1.0 pass added chain-family `toggle_special` weapons (`chainaxe_`, `chainsword_`, `chainsword_2h_`) for elite/captain/monster/boss or super-armor targets. The next pass split the old powered bucket into real families: 1H power swords now arm in live combat windows instead of only elite/special cases, Zealot 2H power swords resolve their `toggle_special` path correctly, force swords stay targeted, thunder hammers now widen to armored/heavy elites plus captain/monster/boss, and Ogryn latrine shovels (`ogryn_club_p1_m2/m3`) now fold for high-health or armored targets, forcing heavy follow-ups on super-armor and armored high-health targets. First-pass ranged specials also landed for supported shotgun special-shell loaders; mauls, other Ogryn melee specials, and bash/bayonet ranged specials remain post-1.0. |
 
 #### Sprint 4 — Pocketable pickup primitive + consumable features
 
-F2 is the real infrastructure bet. One primitive unlocks three downstream features. Per `#24` Mar 8 audit + `#88` body, the shared blocker is a missing BT primitive for pocketable item pickup.
+Sprint 4 stopped being "invent a missing primitive" once the decompiled source was checked closely on 2026-04-18. Vanilla already has the carry side (`pickup_component.mule_pickup`, `BotBehaviorExtension._refresh_destination`, `PocketableInteraction.stop`); BetterBots needed to patch supported pocketables into that path, then layer conservative bot policy and use/deploy sequencing on top.
 
 | # | Item | Notes |
 |---|------|-------|
-| F2 | Pocketable pickup primitive | New module `pocketable_pickup.lua`: BT walk-to-unit + interact + pocket-slot insert. No existing path in bot BT. Load-bearing. |
-| 24 (a) | Medicae discipline | Extend `healing_deferral.lua:182` plumbing: corruption-only gate + charge reserve + 80%+ skip. Existing hooks. |
-| 24 (b) | Stim usage | Rides F2; trigger = high-threat combat entry. |
-| 24 (c) | Med-kit carry + distribute | Rides F2; give-to-ally on ping or <40% threshold. |
-| 88 | Deployable crate carry + deploy | Rides F2 for ammo + medical pocketable forms. Existing mule-pickup plumbing (`mule_pickup.lua:64`, `bot_group.lua:1064`, `bt_bot_conditions.lua:287`) carries the carry side. Deploy-location heuristic (coherency anchor + ≥2 allies + resource need + no 15m enemies) is the real design cost. |
+| F2 | Pocketable carry bootstrap | **Code-complete 2026-04-18; in-game validation pending.** New module `pocketable_pickup.lua` patches supported pocketables (`ammo_cache_pocketable`, `medical_crate_pocketable`, the three combat stims, and `syringe_corruption_pocketable`) into the existing vanilla mule path, blocks proactive grabs while a human still has the matching slot open, and hooks `update_dispatcher.lua` for conservative wield/use/place follow-through. |
+| 24 (a) | Medicae discipline | **Code-complete 2026-04-18; in-game validation pending.** `healing_deferral.lua` owns the human-first medicae policy, Martyrdom carve-out, and station/deployable deferral hooks. The original Sprint 4 MVP shipped conservative bot-side onset rules here; `#97` later narrowed that to "any missing amount once humans are above reserve" for non-Martyrdom bots without reviving the broad wound-cure / ally-handoff scope. A distinct corruption-only onset and a station-charge-aware reserve model are still not shipped. |
+| 24 (b) | Stim usage | **Code-complete 2026-04-18; in-game validation pending.** Supported combat stims self-use on high-threat combat entry after the carried stim is wielded into `slot_pocketable_small`; `syringe_corruption_pocketable` is also pickable now and self-uses conservatively when the bot itself needs healing/corruption relief while ally-give stays deferred. |
+| 24 (c) | Pocketable wound-cure / ally distribution | **Deferred post-1.0 on 2026-04-18.** The carry primitive exists, but reliable give-to-ally / wound-cure behavior is not load-bearing for v1.0.0 and the vanilla handoff path is too narrow/flaky for an MVP claim. |
+| 88 | Deployable crate carry + deploy | **Code-complete 2026-04-18; in-game validation pending.** Ammo + medical crates now ride the vanilla mule carry path and auto-deploy from `slot_pocketable` only when the bot is safe, at least two allies are in coherency, and the team actually needs the resource. |
 
 #### Sprint 5 — Team coordination + safety
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 86 | Tier 3 revive cover | Ship if Sprint 1 investigation cleared the timing window. Psyker Telekine Shield, Zealot Relic, Arbites Nuncio-Aquila drone (+30% revive speed with `adamant_drone_buff_talent`). Parallel resolution branch through `item_fallback.lua`. |
-| 56 | Communication wheel response | React to com wheel commands (battle cry → aggression, need help → converge). `Vo.on_demand_vo_event` hook. ForTheEmperor compat. |
-| 96 | Smart-tag item interaction bridge | Route explicit non-enemy smart-tag interactions into bot pickup/drop orders. Sits atop `#24` + `#88` pickup paths — queue after those ship. |
-| 97 | Non-book resource arbitration | Unify reserve logic across ammo, grenade refills, medicae, med-crates. Excludes books + still-dead pocketable health paths. Behavior-policy unification, not a hotfix. |
-| 101 | Weapon-slot wield timeout on BB-locked swap | Grenade/item fallbacks wait out full 2 s timeout + 2 s retry when `weapon_action.bot_queue_action_input` rejects the wield. Expose lock state; short-circuit with `reason = 'slot_locked'`. Fits coordination-polish neighborhood; not load-bearing. |
+| 56 | Communication wheel response | **Code-complete 2026-04-18; in-game validation pending.** Narrow Solo Play MVP in `com_wheel_response.lua`: hook `Vo.on_demand_vo_event` so vanilla + ForTheEmperor wheel events share one detection path, temporarily force `aggressive` after `com_cheer`, and treat `com_need_ammo` / `com_need_health` as short-lived human-priority overrides in `ammo_policy.lua` / `healing_deferral.lua`. `Need Help` convergence and location-directed movement stay out of scope because BetterBots still has no movement-order layer. |
+| 96 | Smart-tag item interaction bridge | **Code-complete 2026-04-18; in-game validation pending.** `smart_tag_orders.lua` hooks `SmartTagSystem.set_contextual_unit_tag` for first-time item pings and `SmartTagSystem.trigger_tag_interaction` for already-tagged items, then routes explicit item-tag interactions for ammo, world grenade refills, books, and supported pocketables back into `BotOrder.pickup(...)`, reusing existing `MulePickup`/`PocketablePickup` policy gates and choosing the nearest eligible bot. Health stations and location-style interactions stay out of scope for the MVP. |
+| 97 | Non-book resource arbitration | **Code-complete 2026-04-18; in-game validation pending.** Ammo, ammo-driven grenade refills, and world grenade pickups already used the intended "human reserve first, then any missing amount" onset on the current branch; the remaining gap was medicae. `healing_deferral.lua` now promotes health-station demand for any damaged non-Martyrdom bot once humans are above reserve, instead of inheriting vanilla's heavy-damage threshold or BetterBots' old corruption/>80%/last-charge vetoes. Med-crates keep the same human-first gate and vanilla's existing any-healable-damage onset. |
+| 101 | Weapon-slot wield timeout on BB-locked swap | **Code-complete 2026-04-18; in-game validation pending.** Grenade + item fallbacks now query shared BetterBots slot-lock state and fast-retry with `reason = "slot_locked"` instead of waiting out the full wield timeout when another BB sequence is holding a different slot. Fits coordination-polish neighborhood; not load-bearing. |
 
 #### Sprint 6 — Validation, hardening, release
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 98 | Sparse metadata hardening | Targeted boundary guards in engine-facing consumers — follow-up to three v0.11.x melee crash fixes (`299eaac`, `ebcb71c`, `15fdd65`). No blanket `pcall`, no broad refactor. |
-| 102 | ActionInputParser zoom/unzoom noise | Same family as `#98`: `ranged_meta_data.lua:15` falls back to `"zoom"` when the weapon uses `action_brace` (plasmagun) or has no aim action (flamer, melee). 0–195 engine INFO lines/run. Log hygiene only, not user-visible. |
-| 99 | Perf benchmark protocol | Reusable perf harness — acceptance target definition first, then medium-risk hotspot work (`ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, `ammo_policy.update_ammo`). Current-branch mission-end sample: `104.9 us/bot/frame`. |
-| 85 | Combat ability identity refactor | Tech debt, user-invisible — separate `template_name` from `ability_name` semantics. Ship if runway permits; drop first if tight. |
+| 98 | Sparse metadata hardening | **Code-complete 2026-04-18; in-game validation pending.** Targeted boundary guards landed in `melee_attack_choice.lua`, `melee_meta_data.lua`, and `ranged_meta_data.lua`: truthy non-table `attack_meta_data` is now treated as invalid at the boundary instead of being indexed as if it were sane, while the metadata injectors replace malformed values only for the enabled lifetime of the feature and restore the original value on disable. Regression coverage now includes non-table top-level melee selection plus malformed existing `attack_meta_data` on both melee and ranged injectors. No blanket `pcall`, no broad refactor. |
+| 102 | ActionInputParser zoom/unzoom noise | **Closed 2026-04-18.** `ranged_meta_data.resolve_vanilla_fallback()` no longer invents `"zoom"`/`"zoom_shoot"` on templates that do not actually expose aim inputs; it keeps explicit vanilla action start_inputs, derives brace/charge aim paths when they exist, and otherwise returns nil aim fields. `weapon_action.lua` now clears stale scratchpad zoom/unzoom fields when the current template has no aim chain and drops parser-proven unsupported queued `zoom` / `unzoom` inputs on the currently wielded template before they reach the engine parser. |
+| 99 | Perf benchmark protocol | **Closed 2026-04-18.** BetterBots already had the reusable recorder; the missing piece was a credible gate. `docs/dev/debugging.md` now defines the v1.0.0 benchmark protocol: use mission-end `bb-perf:auto:` totals from three combat-heavy Solo Play runs on the same build, with only `Performance timings` enabled, and evaluate the median rather than a single cherry-picked dump. Current validated reference band is `104.9`, `113.8`, and `124.5 µs/bot/frame total`, so the old `<80 µs/bot/frame` target is retired; v1.0.0 accepts **median <= `125`** with **no single run > `140`**. Reopen only on user-visible perf complaints or future runs outside that band, then investigate `ability_queue.decision`, `grenade_fallback`, `sprint.update_movement`, and `ammo_policy.update_ammo`. |
+| 85 | Combat ability identity refactor | **Closed 2026-04-18.** The shared `combat_ability_identity.lua` resolver already landed, duplicated Veteran-specific sniffers are gone from leaf modules, and regression guards now enforce both table drift and "no duplicate local resolver" invariants in `tests/startup_regressions_spec.lua`. Later live validation already exercised the important shared-template paths: `#7` proved the revive hook → identity → ability check chain on real revive candidates, and `#14` proved semantic cooldown routing for Veteran shout. No further v1.0.0 code work is justified here. |
 | — | Full cold-boot soak | Both mod load orders, grep DMF warnings in raw console, Auric mission runs. |
 | — | Nexus package + changelog + outreach | Release mechanics. |
 
 #### Tier-cut priority if runway tight
 
-Hard cut order (first to drop):
+Runway cuts are now mostly moot. The planned code/doc items for v1.0.0 are either landed or explicitly scope-exited; the remaining release work is validation and packaging, not feature triage.
 
-1. `#85` (refactor, user-invisible)
-2. `#56` (comm wheel — ForTheEmperor users only)
-3. `#86` (ship/skip based on Sprint 1 timing investigation)
-4. `#96` + `#97` (coordination polish)
-5. `#41-narrow` (document Purgatus gap as known issue in Nexus description)
-6. `#88` deploy-location heuristic (ship carry without deploy auto-trigger — player ping only)
-
-**Do not cut:** F2 primitive + its three downstream consumable features (`#24a/b/c`, `#88` carry), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
+**Do not cut:** Sprint 4's shipped MVP (`F2` bootstrap + `#24a/b` + `#88` carry/deploy), `#33-narrow` melee identity, `#38` keystone layer, `#13` + `#92` mechanical polish. These are load-bearing for "v1.0.0 was worth shipping."
 
 ### Post-1.0 — "Intelligence Architecture" (may never ship)
 
@@ -224,21 +218,22 @@ Hard cut order (first to drop):
 | 28 | Built-in bot profile management | Absorb Tertium4Or5 functionality. Profile selection + loadout preset support. Only pursue if upstream remains unpatched. |
 | 80 | Grenade/blitz tactical evaluator | Shared grenade/blitz decision object, family-specific targeting/placement, Arbites dog vs `Lone Wolf` split, and execution-time revalidation tied to original tactical intent. Planning docs: `docs/superpowers/specs/2026-04-08-grenade-blitz-tactical-evaluator-design.md`, `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`. References `#49` and is intentionally narrower than `#22`. |
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
+| 86 | Tier 3 revive cover | Moved 2026-04-17 after Sprint 1 timing investigation confirmed `BtBotInteractAction.enter` is unusable (engine interrupt on interacting state entry). Viable architecture: approach-phase hook in `revive_ability.on_refresh_destination` + gate `bt_bot_conditions.can_revive` while item sequence mid-flight. Ships instant-variant shield + drone; relic stays excluded (5.6s unwield + slot lock). Full plan on the issue. |
 
 **Broad-scope cuts (scope-exit, captured under parent issues):**
 
 - Broad `#24`: complex healing-item ping negotiation beyond F2 primitive + medicae + basic distribution
-- Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide), `toggle_special` chainaxe energy management
-- Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type
-- Broad `#92`: Bulwark angle-aware aim (shield direction tracking)
-- Keystone extensions beyond shipped roster: Scrier's Gaze vent suppression, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt
+- Broad `#33`: ranged weapon specials (bayonet, pistol-whip, racking slide) and richer per-family target policy beyond the current powered-vs-chain split
+- Broad `#41`: full enemy-aware fire cadence, dynamic gestalt per target type, plus any autogun subgroup audit beyond the current family set
+- Broad `#92`: replace the provisional Crusher rear-arc proxy with a rig-verified node or stronger live evidence
+- Keystone/build extensions beyond the current shipped batch: deeper Scrier's Gaze vent logic, Broker Chemical Dependency / Adrenaline Junkie, Ogryn Carapace Armor stack mgmt, broader Veteran specialization coverage, and any future Brain Burst proc-cooldown-aware follow-up beyond the shipped `psyker_smite_on_hit` de-prioritization carve-out
 
 ### Validation-gated — slot into any batch when testable
 
 | # | Issue | Blocker |
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
-| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Re-validation on next DH spawn. |
+| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Later 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no positive dormant-suppression evidence; the 2026-04-24 engagement is inconclusive until first-action `stage`/`aggro_state` is logged. |
 
 ## Design principles
 

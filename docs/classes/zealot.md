@@ -222,7 +222,7 @@ Three mutually exclusive grenade types.
 
 **What it does**: Throws a stun grenade that staggers and temporarily incapacitates enemies in an area.
 
-**Bot usage notes**: Standard grenade throw via `grenade_ability_pressed`. Use against dense packs, especially to interrupt dangerous enemy attacks or to stagger elites.
+**Bot usage notes**: Standard grenade throw via `grenade_ability_pressed`. Use against dense packs, especially to interrupt dangerous elite/special pressure or to create space when the fight starts collapsing.
 
 #### Talent Modifier
 - **Stunstorm Grenade** (internal: `zealot_improved_stun_grenade`; formerly: Improved Stun Grenade): +50% explosion radius
@@ -240,7 +240,7 @@ Three mutually exclusive grenade types.
 
 **What it does**: Throws a fire grenade that creates a burning area (liquid_area_fire_burning damage profile). Deals damage over time to enemies in the area.
 
-**Bot usage notes**: Best thrown at chokepoints or dense groups. Creates area denial. Bots should avoid throwing at their own feet.
+**Bot usage notes**: Best thrown at chokepoints or dense groups. Creates area denial. Bots should avoid throwing at their own feet and should not rapidly stack a second control grenade into the same short window.
 
 ### 3. Blades of Faith (internal: `zealot_throwing_knives`; formerly: Throwing Knives)
 

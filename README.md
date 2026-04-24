@@ -20,12 +20,15 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Ammo awareness: bots defer ammo pickups when humans are low
 - Engagement leash: bots stay in combat longer using coherency-based ranges
 - Healing deferral: bots let humans heal first at health stations and med-crates
+- Communication-wheel response: battle cry briefly pushes aggression; ammo/health requests defer bot pickups
+- Talent-aware Sprint 2 MVP: Martyrdom bots stay wounded, Psykers preserve peril for Venting Shriek, Focus Target veterans can claim their own threat tags
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
+- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
 - Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
-- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias
+- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, rippergun bayonet/direct ranged bash range, and warp-weapon max peril
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
 - Comprehensive busted test suite
 
@@ -90,12 +93,16 @@ Bots use 18 per-ability heuristic functions split across class-specific modules 
 - Special chase penalty range (slider, 0 = disable)
 - Player tag response strength (slider, 0 = ignore pings)
 - Melee horde light bias (slider, 0 = vanilla attack selection)
+- Warp weapon max peril before attack blocking
+- Melee improvements toggle (also covers supported melee weapon specials)
+- Ranged improvements toggle (also covers supported shotgun shells, bayonets, and direct ranged bashes/pistol whips)
 - Smart blitz targeting toggle
 - Daemonhost avoidance toggle
 - Poxburster safe targeting toggle
 - Bot ranged ammo threshold and human ammo reserve threshold
 - Human-likeness timing and pressure-leash profiles (auto / manual / custom)
 - Healing deferral mode + thresholds
+- Communication wheel response toggle
 - Bot grimoire pickup toggle
 - Bot profiles: class per slot, weapon quality
 - Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
@@ -149,17 +156,17 @@ See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
 - [x] Mule scripture/tome pickup (grimoires opt-in)
 
 **Planned for v1.0.0 (final release)**
-- [ ] Navmesh validation for charge/dash abilities
-- [ ] Per-breed weakspot aim map (Mauler, Crusher, Bulwark)
-- [ ] Talent-aware bot behavior (Zealot Martyrdom, Psyker Warp Siphon, Venting Shriek, Veteran VoC)
-- [ ] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
-- [ ] Melee activated specials (power sword, thunder hammer, force sword)
-- [ ] Pocketable pickup primitive + medicae/stim/med-kit discipline
-- [ ] Deployable crate carry and deploy (ammo + medical)
+- [x] Navmesh validation for charge/dash abilities
+- [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
+- [x] Talent-aware bot behavior (Sprint 2 MVP: Zealot Martyrdom, Psyker Warp Siphon/Venting Shriek, Veteran Focus Target tag ownership)
+- [x] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
+- [x] Melee activated specials (power sword, thunder hammer, force sword, chain weapons)
+- [x] Pocketable pickup primitive + medicae/stim/med-kit discipline
+- [x] Deployable crate carry and deploy (ammo + medical)
 - [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
-- [ ] Communication wheel response (ForTheEmperor compat)
-- [ ] Smart-tag item interaction bridge
-- [ ] Unified non-book resource arbitration
+- [x] Communication wheel response (ForTheEmperor compat)
+- [x] Smart-tag item interaction bridge
+- [x] Unified non-book resource arbitration
 
 **Post-1.0 (may never ship)**
 - Utility-based ability scoring (architectural)
@@ -313,13 +320,16 @@ scripts/mods/BetterBots/          # Mod source
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profiles.lua                #   Bot-optimized class profiles per slot
   bot_targeting.lua               #   Shared perception target resolver + helpers
+  charge_nav_validation.lua       #   Shared navmesh launch validation for charge/dash abilities (#13)
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
   target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
+  weakspot_aim.lua                #   Per-breed ranged aim-node override (#92)
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
   weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix
+  ranged_special_action.lua       #   Shotgun special-shell preload policy + arm/spend logging
   sustained_fire.lua              #   Held-input bridge for sustained-fire ranged weapons
   ping_system.lua                 #   Bot elite/special pinging
   companion_tag.lua               #   Arbites Cyber-Mastiff companion-command smart tag
@@ -329,7 +339,10 @@ scripts/mods/BetterBots/          # Mod source
   engagement_leash.lua            #   Coherency-anchored melee engagement range
   healing_deferral.lua            #   Defer health stations/med-crates to humans
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
+  com_wheel_response.lua          #   Communication-wheel aggression/resource overrides
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
+  pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
+  smart_tag_orders.lua            #   Explicit smart-tag pickup-order bridge
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression

@@ -106,6 +106,11 @@ describe("update_dispatcher", function()
 					call_log[#call_log + 1] = "grenade_fallback"
 				end,
 			},
+			pocketable_pickup = {
+				try_queue = function(_unit, _blackboard)
+					call_log[#call_log + 1] = "pocketable_pickup"
+				end,
+			},
 			ping_system = {
 				update = function(_unit, _blackboard)
 					call_log[#call_log + 1] = "ping_system"
@@ -175,6 +180,12 @@ describe("update_dispatcher", function()
 
 		assert.truthy(table.concat(call_log, ","):find("ability_queue", 1, true))
 		assert.truthy(table.concat(call_log, ","):find("grenade_fallback", 1, true))
+	end)
+
+	it("dispatches pocketable support every frame", function()
+		UpdateDispatcher.dispatch(make_self(false), "unit_stub")
+
+		assert.truthy(table.concat(call_log, ","):find("pocketable_pickup", 1, true))
 	end)
 
 	it("dispatches pinging collaborators when the feature is enabled", function()

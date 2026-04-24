@@ -155,7 +155,7 @@ Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`
 - Passively recharges via kill tracking (`broker_passive_blitz_charge_on_kill`)
 - Special rule: `quick_flash_grenade`
 
-**Bot usage notes:** Standard grenade ability. Bot should throw at: (a) dense enemy groups, (b) specials/elites to interrupt attacks, (c) to create breathing room when overwhelmed.
+**Bot usage notes:** Standard grenade ability. Bot should throw at: (a) dense enemy groups, (b) clustered specials/elites to interrupt attacks, (c) to create breathing room when overwhelmed.
 
 ### 2. Chem Grenade (internal: `broker_tox_grenade`; formerly: Tox Grenade)
 
@@ -171,7 +171,7 @@ Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`
 - Lasts 15s, applies up to 6 toxin stacks
 - Synergizes with Chemist talent path
 
-**Bot usage notes:** Area denial grenade. Bot should throw at: (a) chokepoints, (b) dense hordes, (c) priority targets when running Chemist build.
+**Bot usage notes:** Area denial grenade. Bot should throw at: (a) chokepoints, (b) dense hordes, (c) monsters or clustered priority packs where the cloud can keep ticking.
 
 ### 3. Boom Bringer (internal: `broker_missile_launcher`; formerly: Missile Launcher)
 

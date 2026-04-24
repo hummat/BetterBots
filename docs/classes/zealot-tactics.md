@@ -38,7 +38,8 @@ BLOCK IF target_breed IN {chaos_ogryn_bulwark, chaos_ogryn_executor, chaos_plagu
 **Bot note:** Offensive backstab value is limited since bots can't pathfind behind enemies. Primary bot value is **defensive** (shed aggro, toughness recovery on exit, repositioning).
 
 ### USE WHEN
-- Emergency survival: `toughness_pct < 0.20 AND num_nearby >= 3` OR `health_pct < 0.25`
+- Emergency survival: `toughness_pct < 0.20 AND num_nearby >= 3`
+- Low health alone only on non-Martyrdom builds: `health_pct < 0.25`
 - Overwhelmed: `num_nearby >= 5 AND toughness_pct < 0.50`
 - Elite/monster present and toughness OK (offensive use, lower priority)
 
@@ -49,13 +50,16 @@ BLOCK IF target_breed IN {chaos_ogryn_bulwark, chaos_ogryn_executor, chaos_plagu
 
 ### PROPOSED BOT RULES
 ```
-IF (toughness_pct < 0.20 AND num_nearby >= 3) OR health_pct < 0.25 THEN activate (CRITICAL)
+IF toughness_pct < 0.20 AND num_nearby >= 3 THEN activate (CRITICAL)
+IF health_pct < 0.25 AND NOT talent(zealot_martyrdom) THEN activate (CRITICAL)
 IF num_nearby >= 5 AND toughness_pct < 0.50 THEN activate (HIGH)
 IF (target has "elite" or "monster") AND num_nearby >= 1 AND toughness_pct > 0.20 THEN activate (MEDIUM)
 BLOCK IF num_nearby == 0
 BLOCK IF allies_in_coherency == 0 AND num_nearby > 2  -- don't dump aggro if team isn't nearby
 ```
 **Confidence:** HIGH
+
+**Current BetterBots note:** the shipped Martyrdom carve-out keeps Shroudfield pressure-based, not health-based. Low health alone is not a panic trigger when the bot has `zealot_martyrdom`, because the keystone pays for staying wounded.
 
 ---
 
@@ -83,12 +87,12 @@ BLOCK IF allies_in_coherency == 0
 
 ---
 
-## Grenades (Tier 3 — not yet implemented)
+## Grenades (Tier 3 — implemented)
 
 | Grenade | USE WHEN | DON'T USE WHEN | Confidence |
 |---------|----------|----------------|------------|
-| Stun | `num_nearby >= 4` or elite winding up | Scattered enemies | HIGH |
-| Flame | Chokepoint / horde incoming at >5m | At bot's feet or melee range | MEDIUM |
+| Stun | Clustered elite/special pressure, or dense crowds that need an interrupt window | Scattered enemies, or point-blank panic throws | HIGH |
+| Flame | Chokepoint / horde incoming at >5m | At bot's feet, melee range, or immediately after another control grenade | MEDIUM |
 | Throwing Knives | Special/elite at 5-20m — use aggressively (12 charges, refill on melee kills) | Hordes, point-blank | HIGH |
 
 ---

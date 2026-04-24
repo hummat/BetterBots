@@ -13,6 +13,8 @@ local _perf
 local _bot_slot_for_unit
 local _bot_target_selection
 local _breed
+local _player_unit_visual_loadout
+local _close_range_ranged_policy
 local _warned_errors = {}
 local BOT_PERCEPTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
 
@@ -26,6 +28,21 @@ local function _load_runtime_deps()
 	end
 
 	return _bot_target_selection, _breed
+end
+
+local function _visual_loadout_api()
+	if _player_unit_visual_loadout ~= nil then
+		return _player_unit_visual_loadout or nil
+	end
+
+	local ok, api = pcall(require, "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+	if ok then
+		_player_unit_visual_loadout = api
+	else
+		_player_unit_visual_loadout = false
+	end
+
+	return _player_unit_visual_loadout or nil
 end
 
 local function _abs(x)
@@ -101,7 +118,28 @@ local function _calculate_score(
 	local ranged_score = common_score
 		+ _calculate_ranged_score(unit, target_unit, ranged_gestalt, target_breed, target_distance_sq, threat_units)
 
-	return melee_score, ranged_score
+	local policy
+	if _close_range_ranged_policy and target_distance_sq ~= nil then
+		local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
+		local visual_loadout_api = visual_loadout_extension and _visual_loadout_api() or nil
+		local weapon_template = visual_loadout_api
+			and visual_loadout_api.weapon_template_from_slot
+			and visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, "slot_secondary")
+
+		policy = weapon_template and _close_range_ranged_policy(weapon_template) or nil
+
+		if
+			policy
+			and policy.hold_ranged_target_distance_sq
+			and target_distance_sq <= policy.hold_ranged_target_distance_sq
+			and ranged_score <= melee_score
+		then
+			local scale = _max3(_abs(melee_score), _abs(ranged_score), 1)
+			ranged_score = melee_score + scale * 0.25 + 1
+		end
+	end
+
+	return melee_score, ranged_score, policy
 end
 
 local function _is_valid_target(target_unit, target_breed, aggroed_minion_target_units)
@@ -135,6 +173,7 @@ local function _collect_stabilized_choice(
 
 	local best_melee_score, best_melee_target, best_melee_target_distance_sq = -math.huge, nil, math.huge
 	local best_ranged_score, best_ranged_target, best_ranged_target_distance_sq = -math.huge, nil, math.huge
+	local best_ranged_policy = nil
 
 	local should_fully_reevaluate = not current_target_enemy or t > perception_component.target_enemy_reevaluation_t
 
@@ -157,7 +196,7 @@ local function _collect_stabilized_choice(
 				end
 
 				local target_distance_sq = vector3_distance_squared(unit_position, target_position)
-				local melee_score, ranged_score = _calculate_score(
+				local melee_score, ranged_score, ranged_policy = _calculate_score(
 					unit,
 					target_unit,
 					target_breed,
@@ -179,6 +218,7 @@ local function _collect_stabilized_choice(
 				if best_ranged_score < ranged_score then
 					best_ranged_score, best_ranged_target, best_ranged_target_distance_sq =
 						ranged_score, target_unit, target_distance_sq
+					best_ranged_policy = ranged_policy
 				end
 			end
 
@@ -213,6 +253,7 @@ local function _collect_stabilized_choice(
 			suppressed_raw_flip = analysis.suppressed_raw_flip,
 			melee_score = best_melee_score,
 			ranged_score = best_ranged_score,
+			close_range_ranged_family = best_ranged_policy and best_ranged_policy.family or nil,
 		}
 	end
 
@@ -232,7 +273,7 @@ local function _collect_stabilized_choice(
 
 		local target_breed = target_unit_data_extension:breed()
 		local target_distance_sq = vector3_distance_squared(unit_position, target_position)
-		local melee_score, ranged_score = _calculate_score(
+		local melee_score, ranged_score, ranged_policy = _calculate_score(
 			unit,
 			target_unit,
 			target_breed,
@@ -256,6 +297,7 @@ local function _collect_stabilized_choice(
 			suppressed_raw_flip = analysis.suppressed_raw_flip,
 			melee_score = melee_score,
 			ranged_score = ranged_score,
+			close_range_ranged_family = ranged_policy and ranged_policy.family or nil,
 		}
 	end
 
@@ -270,6 +312,7 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 	_perf = deps.perf
 	_bot_slot_for_unit = deps.bot_slot_for_unit
+	_close_range_ranged_policy = deps.close_range_ranged_policy
 end
 
 function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
@@ -468,6 +511,25 @@ function M.post_update_target_enemy(
 					.. string.format("%.2f", stabilized.melee_score or 0)
 					.. ", ranged="
 					.. string.format("%.2f", stabilized.ranged_score or 0)
+					.. ")",
+				nil,
+				"debug"
+			)
+		end
+
+		if
+			stabilized.close_range_ranged_family
+			and stabilized.target_enemy_type == "ranged"
+			and _debug_enabled
+			and _debug_enabled()
+		then
+			_debug_log(
+				"close_range_ranged_family:" .. tostring(self_unit),
+				_fixed_time and _fixed_time() or t or 0,
+				"close-range ranged family kept ranged target type (family="
+					.. tostring(stabilized.close_range_ranged_family)
+					.. ", distance="
+					.. string.format("%.2f", stabilized.target_enemy_distance or 0)
 					.. ")",
 				nil,
 				"debug"

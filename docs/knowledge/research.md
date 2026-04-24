@@ -38,7 +38,7 @@ MEMORY.md has brief summaries — this file has the full details.
 - Stance cancellation (#12): Tier 1 stances have NO release input, `transition="stay"` is one-way. Need template injection or `stop_action()`.
 - Revive protection (#20): DONE — `blackboard.behavior.current_interaction_unit ~= nil` blocks ability during any interaction.
 - Ability suppression (#11): DONE — `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder, moving platform. Guards placed AFTER "keep running" fast path so in-progress abilities complete.
-- Scrier's Gaze fix (#27): DONE — blocks warp weapon attacks at ≥97% peril via `bot_queue_action_input` hook. Root cause: explosion only on additional peril generation at 100%, not from stance itself.
+- Scrier's Gaze fix (#27): DONE — blocks warp weapon attacks at the configurable `warp_weapon_peril_threshold` (default `≥99%`) via `bot_queue_action_input`. Root cause: explosion only on additional peril generation at 100%, not from stance itself.
 - Bot venting (#30): NEW — bots can't actively vent warp weapons. BT has vent node but sends wrong action_input ("reload" vs "vent"). Approach: piggyback on existing BT, translate reload→vent in hook.
 - 7 issues implementation-ready: #6, #8-T1, #10, #13, #15, #18, #21
 

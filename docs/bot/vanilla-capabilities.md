@@ -159,13 +159,13 @@ Community claims bots "hip-fire only" — **this is incorrect for vanilla bots**
 | Suppressive fire | No concept of suppression output | No suppression scoring |
 | Target leading (projectile) | Ballistic prediction exists but limited | `_ballistic_shoot_angle` only for gravity projectiles |
 | Ammo conservation | Bots pick up ammo they don't need (infinite effective ammo) | `can_loot` checks ammo %, but bot ammo rarely depletes |
-| Weakspot / headshot aim | Vanilla bots aim `j_spine` (chest) for every shot, so finesse stats and weakspot blessings/perks/talents are wasted. BetterBots `#91` partially overrides this for lasguns, autoguns, bolters, and stub revolvers by injecting `{ "j_head", "j_spine" }` into `attack_meta_data.aim_at_node` when unset. | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 (MVP shipped in mod), #92 (per-breed map, v1.0.0) |
+| Weakspot / headshot aim | Vanilla bots aim `j_spine` (chest) for every shot, so finesse stats and weakspot blessings/perks/talents are wasted. BetterBots `#91` partially overrides this for lasguns, autoguns, bolters, and stub revolvers by injecting `{ "j_head", "j_spine" }` into `attack_meta_data.aim_at_node` when unset. BetterBots `#92` then corrects the known edge cases: Scab Mauler is pinned to `j_spine`; Bulwark routes to `j_head` only when the shield is open or the bot is outside the 70° block cone; Crusher is **provisionally** routed to `j_head` only from the rear arc as a stand-in for the claimed back-of-head weakspot. The two stateful cases are refreshed while the target stays locked, and the angle check follows the engine's flat block-angle math so elevation does not falsely expose a frontal shield. The Crusher path is explicitly assumption, not rig-verified fact. | `bt_bot_shoot_action.lua:53,282-285`. Issues #91 and #92. |
 
 **Note on "infinite ammo":** Community claims bots have infinite ammo. **Verified false.** Bots consume ammo per shot through the identical `ActionShoot._spend_ammunition()` path as players (`action_shoot.lua:469-553`). No `is_human_controlled` exemption exists anywhere in the ammo deduction chain. The only infinite ammo flag (`infinite_ammo_reserve`) is exclusive to prologue missions (`prologue_mission_templates.lua:18`). Bots appear to have infinite ammo because: (a) conservative firing behavior with accuracy gating, (b) ammo pickup priority when below threshold, (c) high reserve on bot weapons.
 
 **Source:** `scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua`, `bot_actions.lua`
 
-**With mods:** BetterBots adds warp weapon peril block (≥97% → block weapon attacks). Issue #30 tracks proper vent support.
+**With mods:** BetterBots adds a configurable warp weapon peril block (default ≥99% → block weapon attacks). Issue #30 tracks proper vent support.
 
 #### Player weapon `attack_meta_data` gap
 
@@ -336,7 +336,7 @@ The one exception is `adamant_whistle` (Ogryn rock throw), which has an `ability
 
 **Source:** `scripts/extension_systems/behavior/bot_behavior_extension.lua`, `scripts/extension_systems/behavior/utilities/bot_navigation.lua`
 
-**With mods:** BetterBots charge/dash abilities move bots off navmesh temporarily; live path recalculates on next frame. No navigation changes otherwise.
+**With mods:** BetterBots now validates the actual charge/dash launch endpoint before commit (`charge_nav_validation.lua` calls `NavQueries.ray_can_go(...)` from both BT enter and fallback, using rescue-ally aim for rescue charges and targeted-enemy position for zealot dash when available). Once committed, charge/dash abilities still move bots off navmesh temporarily and the live path recalculates on the next frame. The guard is user-toggleable through `enable_charge_nav_validation`.
 
 ---
 
@@ -604,7 +604,7 @@ For context, here is what BetterBots modifies relative to vanilla:
 | Item abilities | Not possible | Tier 3 wield/use/unwield state machine |
 | Revive protection | Abilities can interrupt revives | Blocked during interactions (#20) |
 | Ability suppression | N/A | Blocked during dodge/fall/lunge/jump (#11) |
-| Warp weapon safety | Bots can explode at 100% peril | Blocked at ≥97% peril (#27) |
+| Warp weapon safety | Bots can explode at 100% peril | Blocked at configurable threshold (default ≥99% peril) (#27) |
 | Event logging | None | JSONL event stream for telemetry |
 
 **Unchanged:** melee combat, ranged combat, navigation, weapon switching, perception, revive mechanics, item pickup, group coordination.

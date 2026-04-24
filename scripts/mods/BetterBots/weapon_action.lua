@@ -1,7 +1,6 @@
--- Weapon action hooks: overheat bridge (#30), vent translation (#30),
--- peril guard, _may_fire() validation fix (#43), ADS logging (#35),
--- and diagnostic weapon logging (#43).
-local PERIL_CRITICAL_THRESHOLD = 0.97
+-- Weapon action hooks: overheat bridge, vent translation, peril guard,
+-- _may_fire() validation, ADS logging, and diagnostic weapon logging.
+local DEFAULT_WARP_WEAPON_PERIL_THRESHOLD = 0.99
 
 local _mod
 local _debug_log
@@ -11,18 +10,26 @@ local _bot_slot_for_unit
 local _perf
 local _ammo
 local _is_enabled
+local _is_weakspot_aim_enabled
+local _close_range_ranged_policy
+local _warp_weapon_peril_threshold
 local _missing_shoot_extension_warned = {}
 
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local BETTERBOTS_RANGED_AMMO_THRESHOLD = 0.2
 
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
+local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
+local _shoot_action_hooks_installed = false
+local _missing_bt_bot_shoot_action_warned = false
 
 -- One-shot set: each unique bot:template:action:raw_input combo logged once
 -- per load. Mirrors the ability_queue.lua context dump pattern.
 local _weapon_logged_combos = {}
 local _stream_action_logged_combos = {}
 local _weakspot_aim_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _stale_shoot_action_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _plasma_may_fire_logged_scratchpads = setmetatable({}, { __mode = "k" })
 
 local STREAM_CONFIRM_ACTIONS = {
 	flamer_p1_m1 = {
@@ -36,6 +43,20 @@ local STREAM_CONFIRM_ACTIONS = {
 		charge_release = "charge_release",
 	},
 }
+
+local VOIDBLAST_TEMPLATE_NAME = "forcestaff_p1_m1"
+local VOIDBLAST_CHARGE_ACTION_NAME = "action_charge"
+-- forcestaff_p1_m1 action_charge chains into action_trigger_explosion in the
+-- decompiled weapon template, so this is the charged release input we must force.
+local VOIDBLAST_CHARGED_FIRE_INPUT = "trigger_explosion"
+-- Keep the lead bounded to the charge window; longer prediction drifts too far
+-- before the shot can actually release.
+local VOIDBLAST_MIN_LEAD_TIME = 0.3
+local VOIDBLAST_MAX_LEAD_TIME = 0.6
+local _voidblast_anchor_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _voidblast_fallback_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _voidblast_retarget_logged_scratchpads = setmetatable({}, { __mode = "k" })
+local _bt_shoot_scratchpad_context = setmetatable({}, { __mode = "k" })
 
 local function _find_action_for_start_input(actions, input_name)
 	for action_name, action in pairs(actions or {}) do
@@ -95,6 +116,88 @@ local function _has_hold_start_input(weapon_template, input_name)
 	return first and first.input == "action_two_hold" and first.value == true
 end
 
+local function _weapon_template_supports_input(weapon_template, input_name)
+	if type(input_name) ~= "string" then
+		return false
+	end
+
+	local action_inputs = weapon_template and weapon_template.action_inputs or nil
+
+	return type(action_inputs) == "table" and action_inputs[input_name] ~= nil or false
+end
+
+local DIRECT_FIRE_INPUT_PREFERENCE = { "shoot_pressed", "shoot_charge", "shoot" }
+
+local function _find_direct_fire_input(weapon_template)
+	local action_inputs = weapon_template and weapon_template.action_inputs or {}
+	local actions = weapon_template and weapon_template.actions or {}
+	local candidates = {}
+
+	for input_name, input_def in pairs(action_inputs) do
+		local seq = input_def and input_def.input_sequence
+		local first = seq and seq[1]
+		if first and first.input == "action_one_pressed" and first.value == true and not first.hold_input then
+			local action_name = _find_action_for_start_input(actions, input_name)
+			if action_name then
+				candidates[#candidates + 1] = input_name
+			end
+		end
+	end
+
+	if #candidates == 0 then
+		return nil
+	end
+
+	for _, preferred in ipairs(DIRECT_FIRE_INPUT_PREFERENCE) do
+		for _, input_name in ipairs(candidates) do
+			if input_name == preferred then
+				return input_name
+			end
+		end
+	end
+
+	return candidates[1]
+end
+
+local function _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad)
+	if not scratchpad then
+		return false
+	end
+
+	local changed = false
+
+	if
+		scratchpad.aim_action_input
+		and not _weapon_template_supports_input(weapon_template, scratchpad.aim_action_input)
+	then
+		scratchpad.aim_action_input = nil
+		changed = true
+	end
+
+	if scratchpad.aim_action_input == nil and scratchpad.aim_action_name ~= nil then
+		scratchpad.aim_action_name = nil
+		changed = true
+	end
+
+	if
+		scratchpad.unaim_action_input
+		and (
+			scratchpad.aim_action_input == nil
+			or not _weapon_template_supports_input(weapon_template, scratchpad.unaim_action_input)
+		)
+	then
+		scratchpad.unaim_action_input = nil
+		changed = true
+	end
+
+	if scratchpad.unaim_action_input == nil and scratchpad.unaim_action_name ~= nil then
+		scratchpad.unaim_action_name = nil
+		changed = true
+	end
+
+	return changed
+end
+
 local function _find_bt_shoot_aim_chain(weapon_template, aim_fire_input)
 	for action_name, action in pairs(weapon_template and weapon_template.actions or {}) do
 		local start_input = action.start_input
@@ -128,6 +231,73 @@ local function _weapon_log_context(unit)
 	end
 
 	return bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name
+end
+
+local function _target_alive_label(target_unit)
+	if not target_unit then
+		return "none"
+	end
+
+	if HEALTH_ALIVE ~= nil then
+		local alive = HEALTH_ALIVE[target_unit]
+		if alive ~= nil then
+			return alive and "alive" or "dead"
+		end
+	end
+
+	if ALIVE ~= nil then
+		local alive = ALIVE[target_unit]
+		if alive ~= nil then
+			return alive and "alive" or "dead"
+		end
+	end
+
+	if Unit and Unit.alive then
+		return Unit.alive(target_unit) and "alive" or "dead"
+	end
+
+	return "unknown"
+end
+
+local function _target_breed_name(target_unit)
+	local unit_data_extension = target_unit and ScriptUnit.has_extension(target_unit, "unit_data_system")
+	local breed = unit_data_extension and unit_data_extension.breed and unit_data_extension:breed()
+
+	return breed and breed.name or "unknown"
+end
+
+local function _first_perception_target(perception_component)
+	if not perception_component then
+		return nil, "none"
+	end
+
+	if perception_component.target_enemy then
+		return perception_component.target_enemy, "target_enemy"
+	end
+
+	if perception_component.priority_target_enemy then
+		return perception_component.priority_target_enemy, "priority_target_enemy"
+	end
+
+	if perception_component.opportunity_target_enemy then
+		return perception_component.opportunity_target_enemy, "opportunity_target_enemy"
+	end
+
+	if perception_component.urgent_target_enemy then
+		return perception_component.urgent_target_enemy, "urgent_target_enemy"
+	end
+
+	return nil, "none"
+end
+
+local function _weapon_target_log_context(unit)
+	local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+	local perception_component = blackboard and blackboard.perception
+	local target_unit, target_slot = _first_perception_target(perception_component)
+	local target_alive = _target_alive_label(target_unit)
+	local target_breed_name = _target_breed_name(target_unit)
+
+	return target_slot, target_unit or "none", target_alive, target_breed_name
 end
 
 local M = {}
@@ -198,6 +368,9 @@ function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 	if not (_debug_enabled and _debug_enabled()) then
 		return false
 	end
+	if _is_weakspot_aim_enabled and not _is_weakspot_aim_enabled() then
+		return false
+	end
 
 	if _weakspot_aim_logged_scratchpads[scratchpad] then
 		return true
@@ -225,17 +398,40 @@ function M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 end
 
 function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
-	if not weapon_template or not scratchpad or not scratchpad.aim_fire_action_input then
+	if not weapon_template or not scratchpad then
 		return false
+	end
+
+	local changed = false
+	if
+		scratchpad.fire_action_input
+		and not _weapon_template_supports_input(weapon_template, scratchpad.fire_action_input)
+	then
+		local fire_input = _find_direct_fire_input(weapon_template)
+		if fire_input then
+			scratchpad.fire_action_input = fire_input
+			changed = true
+		end
+	end
+
+	if
+		scratchpad.aim_fire_action_input
+		and not _weapon_template_supports_input(weapon_template, scratchpad.aim_fire_action_input)
+		and _weapon_template_supports_input(weapon_template, scratchpad.fire_action_input)
+	then
+		scratchpad.aim_fire_action_input = scratchpad.fire_action_input
+		changed = true
+	end
+
+	if not scratchpad.aim_fire_action_input then
+		return _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad) or changed
 	end
 
 	local aim_input, aim_action_name, unaim_input, unaim_action_name =
 		_find_bt_shoot_aim_chain(weapon_template, scratchpad.aim_fire_action_input)
 	if not aim_input then
-		return false
+		return _clear_stale_bt_shoot_aim_inputs(weapon_template, scratchpad) or changed
 	end
-
-	local changed = false
 
 	if scratchpad.aim_action_input ~= aim_input then
 		scratchpad.aim_action_input = aim_input
@@ -260,6 +456,442 @@ function M._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
 	return changed
 end
 
+local function _current_weapon_action_template_name(unit)
+	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
+	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action") or nil
+
+	return weapon_action_component and weapon_action_component.template_name or nil
+end
+
+local function _current_weapon_action_name(unit)
+	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
+	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action") or nil
+
+	return weapon_action_component and weapon_action_component.current_action_name or nil
+end
+
+local function _scratchpad_player_unit(scratchpad)
+	local action_input_extension = scratchpad and scratchpad.action_input_extension or nil
+	local unit = action_input_extension and action_input_extension._betterbots_player_unit or nil
+
+	return unit or scratchpad and scratchpad.__bb_weakspot_self_unit or nil
+end
+
+local function _parser_accepts_weapon_action_input(action_input_extension, template_name, action_input)
+	local parser = action_input_extension
+		and action_input_extension._action_input_parsers
+		and action_input_extension._action_input_parsers.weapon_action
+	local sequence_configs = parser
+		and parser._ACTION_INPUT_SEQUENCE_CONFIGS
+		and parser._ACTION_INPUT_SEQUENCE_CONFIGS[template_name]
+
+	if sequence_configs == nil then
+		return true
+	end
+
+	return sequence_configs[action_input] ~= nil
+end
+
+local function _should_suppress_stale_shoot_action(scratchpad, action_input)
+	local action_input_extension = scratchpad and scratchpad.action_input_extension or nil
+	local unit = _scratchpad_player_unit(scratchpad)
+	local template_name = _current_weapon_action_template_name(unit)
+	if not action_input_extension or not template_name then
+		return false, template_name
+	end
+	if type(action_input) ~= "string" then
+		return true, template_name
+	end
+
+	return not _parser_accepts_weapon_action_input(action_input_extension, template_name, action_input), template_name
+end
+
+local function _should_suppress_stale_shoot_unaim(scratchpad)
+	local suppress, template_name =
+		_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.unaim_action_input)
+	if suppress then
+		return true, template_name
+	end
+
+	if scratchpad and scratchpad.aim_action_input == nil and scratchpad.aiming_shot then
+		local unit = _scratchpad_player_unit(scratchpad)
+		return true, _current_weapon_action_template_name(unit)
+	end
+
+	return false, template_name
+end
+
+local function _log_stale_shoot_action(scratchpad, phase, action_input, template_name)
+	if not (_debug_enabled and _debug_enabled()) or not scratchpad then
+		return
+	end
+
+	local logged_phases = _stale_shoot_action_logged_scratchpads[scratchpad]
+	if not logged_phases then
+		logged_phases = {}
+		_stale_shoot_action_logged_scratchpads[scratchpad] = logged_phases
+	end
+	if logged_phases[phase] then
+		return
+	end
+	logged_phases[phase] = true
+
+	_debug_log(
+		"stale_shoot_action:" .. tostring(phase) .. ":" .. tostring(template_name or "unknown"),
+		_fixed_time(),
+		"suppressed stale shoot "
+			.. tostring(phase)
+			.. " input "
+			.. tostring(action_input)
+			.. " for "
+			.. tostring(template_name or "unknown")
+	)
+end
+
+local function _is_voidblast_staff(scratchpad)
+	local unit = _scratchpad_player_unit(scratchpad)
+
+	return _current_weapon_action_template_name(unit) == VOIDBLAST_TEMPLATE_NAME
+end
+
+local function _is_voidblast_charge_active(scratchpad)
+	if not _is_voidblast_staff(scratchpad) then
+		return false
+	end
+
+	if scratchpad and scratchpad.charging_shot then
+		return true
+	end
+
+	local unit = _scratchpad_player_unit(scratchpad)
+	local current_action_name = _current_weapon_action_name(unit)
+	if current_action_name == VOIDBLAST_CHARGE_ACTION_NAME then
+		return true
+	end
+
+	return scratchpad and scratchpad.aiming_shot and scratchpad.aim_action_input == "charge" or false
+end
+
+local function _should_lock_voidblast_anchor(scratchpad)
+	return scratchpad and _is_voidblast_charge_active(scratchpad) or false
+end
+
+local function _voidblast_charged_fire_input(scratchpad)
+	if not _is_voidblast_staff(scratchpad) then
+		return nil
+	end
+
+	local aim_fire_action_input = scratchpad and scratchpad.aim_fire_action_input or nil
+	local fire_action_input = scratchpad and scratchpad.fire_action_input or nil
+
+	if aim_fire_action_input and aim_fire_action_input ~= fire_action_input then
+		return aim_fire_action_input
+	end
+
+	return VOIDBLAST_CHARGED_FIRE_INPUT
+end
+
+local function _forced_bt_shoot_fire_input(scratchpad)
+	if not scratchpad then
+		return nil
+	end
+
+	if _is_voidblast_charge_active(scratchpad) then
+		local fire_action_input = scratchpad.fire_action_input
+		local charged_fire_input = _voidblast_charged_fire_input(scratchpad)
+		if charged_fire_input and charged_fire_input ~= fire_action_input then
+			return charged_fire_input
+		end
+	end
+
+	local fire_action_input = scratchpad.fire_action_input
+	if scratchpad.aiming_shot then
+		local aim_fire_action_input = scratchpad.aim_fire_action_input
+		if aim_fire_action_input and aim_fire_action_input ~= fire_action_input then
+			return aim_fire_action_input
+		end
+
+		return nil
+	end
+
+	if scratchpad.charging_shot then
+		local charged_fire_input = _voidblast_charged_fire_input(scratchpad)
+		if charged_fire_input and charged_fire_input ~= fire_action_input then
+			return charged_fire_input
+		end
+	end
+
+	return nil
+end
+
+local function _should_force_voidblast_charged_fire(scratchpad)
+	return scratchpad and _is_voidblast_charge_active(scratchpad) and _forced_bt_shoot_fire_input(scratchpad) ~= nil
+		or false
+end
+
+local function _is_plasmagun_scratchpad(scratchpad)
+	local unit = _scratchpad_player_unit(scratchpad)
+
+	return _current_weapon_action_template_name(unit) == "plasmagun_p1_m1"
+end
+
+local function _may_fire_block_reason(scratchpad, range_squared, t)
+	if not scratchpad then
+		return "missing_scratchpad"
+	end
+
+	if scratchpad.fire_input_request_id then
+		return "pending_fire"
+	end
+
+	if scratchpad.obstructed then
+		return "obstructed"
+	end
+
+	if scratchpad.aiming_shot and t < (scratchpad.aim_done_t or 0) then
+		return "aiming"
+	end
+
+	local charging = scratchpad.charging_shot
+	local minimum_charge_time = scratchpad.minimum_charge_time
+	local sufficiently_charged = not minimum_charge_time
+		or not scratchpad.always_charge_before_firing and not charging
+		or charging and scratchpad.charge_start_time and minimum_charge_time <= t - scratchpad.charge_start_time
+	if not sufficiently_charged then
+		return "charge"
+	end
+
+	local max_range_sq = charging and scratchpad.max_range_sq_charged or scratchpad.max_range_sq
+	if max_range_sq and max_range_sq <= range_squared then
+		return "range"
+	end
+
+	local weapon_extension = scratchpad.weapon_extension
+	if weapon_extension and weapon_extension.action_input_is_currently_valid then
+		local fixed_frame = rawget(_G, "FixedFrame")
+		local fixed_t = fixed_frame and fixed_frame.get_latest_fixed_time and fixed_frame.get_latest_fixed_time() or t
+		local ok, valid = pcall(
+			weapon_extension.action_input_is_currently_valid,
+			weapon_extension,
+			"weapon_action",
+			scratchpad.fire_action_input,
+			nil,
+			fixed_t
+		)
+		if ok and not valid then
+			return "invalid_input"
+		elseif not ok then
+			return "input_check_failed"
+		end
+	end
+
+	return "vanilla_false"
+end
+
+local function _log_plasma_may_fire_block(scratchpad, range_squared, t)
+	if not (_debug_enabled and _debug_enabled()) or not _is_plasmagun_scratchpad(scratchpad) then
+		return
+	end
+
+	local reason = _may_fire_block_reason(scratchpad, range_squared, t)
+	local logged_reasons = _plasma_may_fire_logged_scratchpads[scratchpad]
+	if not logged_reasons then
+		logged_reasons = {}
+		_plasma_may_fire_logged_scratchpads[scratchpad] = logged_reasons
+	end
+	if logged_reasons[reason] then
+		return
+	end
+	logged_reasons[reason] = true
+
+	_debug_log(
+		"plasma_may_fire_block:" .. tostring(reason) .. ":" .. tostring(_scratchpad_player_unit(scratchpad)),
+		_fixed_time(),
+		"plasma _may_fire blocked (reason="
+			.. tostring(reason)
+			.. ", fire="
+			.. tostring(scratchpad and scratchpad.fire_action_input)
+			.. ", aim_fire="
+			.. tostring(scratchpad and scratchpad.aim_fire_action_input)
+			.. ", aiming="
+			.. tostring(scratchpad and scratchpad.aiming_shot)
+			.. ", charging="
+			.. tostring(scratchpad and scratchpad.charging_shot)
+			.. ", obstructed="
+			.. tostring(scratchpad and scratchpad.obstructed)
+			.. ")",
+		1
+	)
+end
+
+local function _clear_voidblast_anchor(scratchpad, suppress_reanchor)
+	if scratchpad then
+		scratchpad.__bb_voidblast_anchor = nil
+		scratchpad.__bb_voidblast_anchor_suppressed = suppress_reanchor and true or nil
+	end
+end
+
+local function _vector3_flat(v)
+	if Vector3 and Vector3.flat then
+		return Vector3.flat(v)
+	end
+
+	return nil
+end
+
+local function _vector3_normalize(v)
+	if Vector3 and Vector3.normalize then
+		return Vector3.normalize(v)
+	end
+
+	return nil
+end
+
+local function _vector3_up()
+	if Vector3 and Vector3.up then
+		return Vector3.up()
+	end
+
+	return nil
+end
+
+local function _vector3_length_squared(v)
+	if Vector3 and Vector3.length_squared then
+		return Vector3.length_squared(v)
+	end
+
+	return v and (v.x * v.x + v.y * v.y + v.z * v.z) or 0
+end
+
+local function _voidblast_lead_time(scratchpad)
+	local minimum_charge_time = scratchpad and scratchpad.minimum_charge_time or 0
+	local lead_time = math.max(VOIDBLAST_MIN_LEAD_TIME, minimum_charge_time or 0)
+
+	return math.min(VOIDBLAST_MAX_LEAD_TIME, lead_time)
+end
+
+local function _voidblast_aim_rotation(current_position, anchor_position)
+	if not current_position or not anchor_position then
+		return nil, "missing_anchor_position"
+	end
+
+	local delta = anchor_position - current_position
+	if _vector3_length_squared(delta) <= 1e-6 then
+		return nil, "degenerate_anchor_delta"
+	end
+
+	local direction = _vector3_normalize(delta)
+	local up = _vector3_up()
+	if not direction or not up or not Quaternion or not Quaternion.look then
+		return nil, "missing_rotation_math"
+	end
+
+	return Quaternion.look(direction, up), nil
+end
+
+local function _log_voidblast_fallback(scratchpad, self_unit, target_unit, reason)
+	if not (_debug_enabled and _debug_enabled()) or not scratchpad or not reason then
+		return nil
+	end
+
+	local logged_reasons = _voidblast_fallback_logged_scratchpads[scratchpad]
+	if not logged_reasons then
+		logged_reasons = {}
+		_voidblast_fallback_logged_scratchpads[scratchpad] = logged_reasons
+	end
+	if logged_reasons[reason] then
+		return nil
+	end
+	logged_reasons[reason] = true
+
+	_debug_log(
+		"voidblast_fallback:" .. tostring(self_unit) .. ":" .. tostring(reason),
+		_fixed_time(),
+		"voidblast aim fallback (reason="
+			.. tostring(reason)
+			.. ", bot="
+			.. tostring(self_unit)
+			.. ", target="
+			.. tostring(target_unit)
+			.. ")"
+	)
+end
+
+local function _voidblast_target_velocity(self, target_unit, target_breed)
+	if not (self and self._target_velocity) then
+		return nil, nil
+	end
+
+	local ok, velocity = pcall(self._target_velocity, self, target_unit, target_breed)
+	if not ok then
+		return nil, "target_velocity_unavailable"
+	end
+
+	return velocity, nil
+end
+
+local function _resolve_voidblast_anchor_state(self, self_unit, scratchpad, target_unit)
+	if not _should_lock_voidblast_anchor(scratchpad) then
+		_clear_voidblast_anchor(scratchpad)
+		return nil, nil
+	end
+	if scratchpad.__bb_voidblast_anchor_suppressed then
+		return nil, "anchor_suppressed"
+	end
+
+	local state = scratchpad.__bb_voidblast_anchor
+	if state and state.target_unit then
+		target_unit = state.target_unit
+	end
+
+	local target_position = POSITION_LOOKUP and target_unit and POSITION_LOOKUP[target_unit] or nil
+	if not target_position then
+		return nil, "missing_target_position"
+	end
+
+	local lead_time = _voidblast_lead_time(scratchpad)
+	local target_velocity, velocity_reason = _voidblast_target_velocity(self, target_unit, scratchpad.target_breed)
+	if velocity_reason then
+		_clear_voidblast_anchor(scratchpad, true)
+		return nil, velocity_reason
+	end
+
+	local anchor_position = target_position
+	local flat_velocity = target_velocity and _vector3_flat(target_velocity) or nil
+	if flat_velocity then
+		anchor_position = anchor_position + flat_velocity * lead_time
+	end
+
+	state = state or {}
+	state.target_unit = target_unit
+	state.position = anchor_position
+	state.lead_time = lead_time
+	scratchpad.__bb_voidblast_anchor = state
+
+	if _debug_enabled and _debug_enabled() and not _voidblast_anchor_logged_scratchpads[scratchpad] then
+		_voidblast_anchor_logged_scratchpads[scratchpad] = true
+		_debug_log(
+			"voidblast_anchor:" .. tostring(self_unit) .. ":" .. tostring(target_unit),
+			_fixed_time(),
+			"voidblast anchor locked (lead="
+				.. string.format("%.2f", lead_time)
+				.. ", bot="
+				.. tostring(self_unit)
+				.. ", target="
+				.. tostring(target_unit)
+				.. ", pos="
+				.. string.format("%.2f", anchor_position.x)
+				.. ","
+				.. string.format("%.2f", anchor_position.y)
+				.. ","
+				.. string.format("%.2f", anchor_position.z)
+				.. ")"
+		)
+	end
+
+	return state
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -269,8 +901,23 @@ function M.init(deps)
 	_perf = deps.perf
 	_ammo = deps.ammo
 	_is_enabled = deps.is_enabled
+	_is_weakspot_aim_enabled = deps.is_weakspot_aim_enabled or function()
+		return true
+	end
+	_close_range_ranged_policy = deps.close_range_ranged_policy
+	_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
+		or function()
+			return DEFAULT_WARP_WEAPON_PERIL_THRESHOLD
+		end
 	_missing_shoot_extension_warned = {}
+	_missing_bt_bot_shoot_action_warned = false
 	_stream_action_logged_combos = {}
+	_shoot_action_hooks_installed = false
+	_voidblast_anchor_logged_scratchpads = setmetatable({}, { __mode = "k" })
+	_voidblast_fallback_logged_scratchpads = setmetatable({}, { __mode = "k" })
+	_voidblast_retarget_logged_scratchpads = setmetatable({}, { __mode = "k" })
+	_plasma_may_fire_logged_scratchpads = setmetatable({}, { __mode = "k" })
+	_bt_shoot_scratchpad_context = setmetatable({}, { __mode = "k" })
 end
 
 local function _ammo_api()
@@ -365,7 +1012,9 @@ function M.register_hooks(deps)
 	local should_lock_weapon_switch = deps.should_lock_weapon_switch
 	local should_block_wield_input = deps.should_block_wield_input or should_lock_weapon_switch
 	local should_block_weapon_action_input = deps.should_block_weapon_action_input
+	local rewrite_weapon_action_input = deps.rewrite_weapon_action_input
 	local observe_queued_weapon_action = deps.observe_queued_weapon_action
+	local install_weakspot_aim = deps.install_weakspot_aim
 
 	-- Overheat bridge (#30): warp weapons have no overheat_configuration,
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
@@ -402,17 +1051,43 @@ function M.register_hooks(deps)
 		end
 	end)
 
-	-- ADS verification log (#35) + _may_fire() validation fix (#43)
+	-- Shoot-action hooks: weakspot handoff, scratchpad cleanup, close-range ADS
+	-- policy, and the _may_fire() validation fix.
 	local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
+			if not BtBotShootAction then
+				if not _missing_bt_bot_shoot_action_warned and _mod and _mod.warning then
+					_missing_bt_bot_shoot_action_warned = true
+					_mod:warning("BetterBots: bt_bot_shoot_action hook_require resolved nil")
+				end
+				return
+			end
+			if _shoot_action_hooks_installed or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) then
+				return
+			end
+			_shoot_action_hooks_installed = true
+			BtBotShootAction[SHOOT_ACTION_PATCH_SENTINEL] = true
+
 			local PlayerUnitVisualLoadout =
 				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
+			local _close_range_ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
+
+			if install_weakspot_aim then
+				install_weakspot_aim(BtBotShootAction)
+			end
 
 			_mod:hook_safe(BtBotShootAction, "enter", function(_self, unit, _breed, _blackboard, scratchpad)
 				if _is_enabled and not _is_enabled() then
 					return
+				end
+
+				if scratchpad then
+					-- This is a post-hook, so the first _set_new_aim_target call inside
+					-- vanilla enter cannot rely on __bb_weakspot_self_unit functionally.
+					-- Today the field is only used for weakspot logging context.
+					scratchpad.__bb_weakspot_self_unit = unit
 				end
 
 				local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
@@ -444,7 +1119,11 @@ function M.register_hooks(deps)
 					_debug_log(
 						"shoot_scratchpad_normalized:" .. tostring(unit),
 						_fixed_time(),
-						"normalized shoot scratchpad aim cleanup (aim="
+						"normalized shoot scratchpad inputs (fire="
+							.. tostring(scratchpad.fire_action_input)
+							.. ", aim_fire="
+							.. tostring(scratchpad.aim_fire_action_input)
+							.. ", aim="
 							.. tostring(scratchpad.aim_action_input)
 							.. ", unaim="
 							.. tostring(scratchpad.unaim_action_input)
@@ -452,10 +1131,228 @@ function M.register_hooks(deps)
 					)
 				end
 
+				scratchpad.close_range_ranged_policy = _close_range_ranged_policy
+						and _close_range_ranged_policy(weapon_template)
+					or nil
 				M.log_weakspot_aim_selection(unit, weapon_template, scratchpad)
 			end)
 
-			_mod:hook_safe(BtBotShootAction, "_start_aiming", function(_self, _t, scratchpad)
+			_mod:hook(BtBotShootAction, "_update_aim", function(func, self, unit, scratchpad, action_data, dt, t)
+				if _is_enabled and not _is_enabled() then
+					return func(self, unit, scratchpad, action_data, dt, t)
+				end
+
+				local perception_component = scratchpad and scratchpad.perception_component or nil
+				local locked_target = scratchpad
+						and scratchpad.__bb_voidblast_anchor
+						and scratchpad.__bb_voidblast_anchor.target_unit
+					or nil
+				local anchor_state, anchor_reason
+				if _should_lock_voidblast_anchor(scratchpad) and locked_target then
+					anchor_state, anchor_reason = _resolve_voidblast_anchor_state(self, unit, scratchpad, locked_target)
+					if anchor_reason then
+						_log_voidblast_fallback(scratchpad, unit, locked_target, anchor_reason)
+					end
+				end
+
+				if not anchor_state then
+					locked_target = nil
+				end
+
+				local should_lock = _should_lock_voidblast_anchor(scratchpad) and perception_component and locked_target
+				local locked_perception_component = should_lock and perception_component or nil
+				local original_target = locked_perception_component and locked_perception_component.target_enemy or nil
+
+				_bt_shoot_scratchpad_context[unit] = scratchpad
+				if locked_perception_component and original_target ~= locked_target then
+					if
+						_debug_enabled
+						and _debug_enabled()
+						and not _voidblast_retarget_logged_scratchpads[scratchpad]
+					then
+						_voidblast_retarget_logged_scratchpads[scratchpad] = true
+						_debug_log(
+							"voidblast_retarget:" .. tostring(_scratchpad_player_unit(scratchpad)),
+							_fixed_time(),
+							"voidblast anchor held through retarget (from="
+								.. tostring(original_target)
+								.. ", to="
+								.. tostring(locked_target)
+								.. ")"
+						)
+					end
+
+					locked_perception_component.target_enemy = locked_target
+				end
+
+				local ok, done, evaluate = pcall(func, self, unit, scratchpad, action_data, dt, t)
+				_bt_shoot_scratchpad_context[unit] = nil
+				if scratchpad then
+					scratchpad.__bb_voidblast_anchor_suppressed = nil
+				end
+
+				if locked_perception_component and original_target ~= locked_target then
+					locked_perception_component.target_enemy = original_target
+				end
+
+				if not ok then
+					if _debug_enabled and _debug_enabled() then
+						_debug_log(
+							"voidblast_retarget_restore_error:" .. tostring(_scratchpad_player_unit(scratchpad) or unit),
+							t,
+							"restored Voidblast locked target after vanilla _update_aim error"
+								.. " (bot="
+								.. tostring(_scratchpad_player_unit(scratchpad) or unit)
+								.. ", target="
+								.. tostring(original_target)
+								.. ")",
+							nil,
+							"info"
+						)
+					end
+					error(done, 0)
+				end
+
+				return done, evaluate
+			end)
+
+			_mod:hook(
+				BtBotShootAction,
+				"_wanted_aim_rotation",
+				function(
+					func,
+					self,
+					self_unit,
+					target_unit,
+					target_breed,
+					current_position,
+					projectile_template,
+					aim_at_node
+				)
+					if _is_enabled and not _is_enabled() then
+						return func(
+							self,
+							self_unit,
+							target_unit,
+							target_breed,
+							current_position,
+							projectile_template,
+							aim_at_node
+						)
+					end
+
+					local scratchpad = _bt_shoot_scratchpad_context[self_unit]
+					local state, state_reason =
+						_resolve_voidblast_anchor_state(self, self_unit, scratchpad, target_unit)
+					if not state then
+						if state_reason then
+							_log_voidblast_fallback(scratchpad, self_unit, target_unit, state_reason)
+						end
+						return func(
+							self,
+							self_unit,
+							target_unit,
+							target_breed,
+							current_position,
+							projectile_template,
+							aim_at_node
+						)
+					end
+
+					local wanted_rotation, rotation_reason = _voidblast_aim_rotation(current_position, state.position)
+					if not wanted_rotation then
+						if rotation_reason then
+							_log_voidblast_fallback(scratchpad, self_unit, target_unit, rotation_reason)
+						end
+						return func(
+							self,
+							self_unit,
+							target_unit,
+							target_breed,
+							current_position,
+							projectile_template,
+							aim_at_node
+						)
+					end
+
+					return wanted_rotation, state.position
+				end
+			)
+
+			_mod:hook(BtBotShootAction, "_should_aim", function(func, self, t, scratchpad, action_data)
+				if _is_enabled and not _is_enabled() then
+					return func(self, t, scratchpad, action_data)
+				end
+
+				local should_aim = func(self, t, scratchpad, action_data)
+				if not should_aim then
+					return false
+				end
+
+				local policy = scratchpad and scratchpad.close_range_ranged_policy
+				local perception_component = scratchpad and scratchpad.perception_component or nil
+				local target_enemy_distance = perception_component and perception_component.target_enemy_distance or nil
+				local target_enemy_distance_sq = target_enemy_distance and target_enemy_distance * target_enemy_distance
+					or nil
+
+				if
+					not policy
+					or not policy.hipfire_distance_sq
+					or not target_enemy_distance_sq
+					or target_enemy_distance_sq > policy.hipfire_distance_sq
+				then
+					local suppress, template_name =
+						_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.aim_action_input)
+					if suppress then
+						_log_stale_shoot_action(
+							scratchpad,
+							"aim",
+							scratchpad and scratchpad.aim_action_input,
+							template_name
+						)
+						return false
+					end
+					return should_aim
+				end
+
+				if not _close_range_ads_logged_scratchpads[scratchpad] and _debug_enabled() then
+					_close_range_ads_logged_scratchpads[scratchpad] = true
+					_debug_log(
+						"close_range_hipfire:" .. tostring(scratchpad),
+						_fixed_time(),
+						"close-range hipfire suppressed ADS (family="
+							.. tostring(policy.family or "?")
+							.. ", distance="
+							.. string.format("%.2f", target_enemy_distance)
+							.. ")"
+					)
+				end
+
+				return false
+			end)
+
+			_mod:hook(BtBotShootAction, "_start_aiming", function(func, self, t, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, t, scratchpad)
+				end
+
+				local suppress, template_name =
+					_should_suppress_stale_shoot_action(scratchpad, scratchpad and scratchpad.aim_action_input)
+				if suppress then
+					if scratchpad then
+						scratchpad.aiming_shot = false
+						scratchpad.aim_done_t = 0
+					end
+					_log_stale_shoot_action(
+						scratchpad,
+						"aim",
+						scratchpad and scratchpad.aim_action_input,
+						template_name
+					)
+					return nil
+				end
+
+				local result = func(self, t, scratchpad)
 				if scratchpad and not _ads_logged_scratchpads[scratchpad] then
 					_ads_logged_scratchpads[scratchpad] = true
 					if _debug_enabled() then
@@ -463,6 +1360,30 @@ function M.register_hooks(deps)
 						_mod:echo("BetterBots DEBUG: bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
 					end
 				end
+				return result
+			end)
+
+			_mod:hook(BtBotShootAction, "_stop_aiming", function(func, self, scratchpad)
+				if _is_enabled and not _is_enabled() then
+					return func(self, scratchpad)
+				end
+
+				local suppress, template_name = _should_suppress_stale_shoot_unaim(scratchpad)
+				if suppress then
+					if scratchpad and scratchpad.aiming_shot then
+						scratchpad.aiming_shot = false
+						scratchpad.aim_done_t = 0
+					end
+					_log_stale_shoot_action(
+						scratchpad,
+						"unaim",
+						scratchpad and scratchpad.unaim_action_input,
+						template_name
+					)
+					return nil
+				end
+
+				return func(self, scratchpad)
 			end)
 
 			-- #43: vanilla _may_fire() validates fire_action_input even though
@@ -475,12 +1396,12 @@ function M.register_hooks(deps)
 					return func(self, unit, scratchpad, range_squared, t)
 				end
 				local perf_t0 = _perf and _perf.begin()
-				if
-					not scratchpad
-					or not scratchpad.aiming_shot
-					or scratchpad.fire_action_input == scratchpad.aim_fire_action_input
-				then
+				local forced_fire_action_input = _forced_bt_shoot_fire_input(scratchpad)
+				if not scratchpad or not forced_fire_action_input then
 					local result = func(self, unit, scratchpad, range_squared, t)
+					if not result then
+						_log_plasma_may_fire_block(scratchpad, range_squared, t)
+					end
 					if perf_t0 then
 						_perf.finish("weapon_action.may_fire", perf_t0)
 					end
@@ -490,32 +1411,76 @@ function M.register_hooks(deps)
 				if not _may_fire_logged[scratchpad] and _debug_enabled() then
 					_may_fire_logged[scratchpad] = true
 					_debug_log(
-						"may_fire_swap:" .. tostring(scratchpad.aim_fire_action_input),
+						"may_fire_swap:" .. tostring(forced_fire_action_input),
 						_fixed_time(),
 						"_may_fire swap: fire="
 							.. tostring(scratchpad.fire_action_input)
 							.. " -> aim_fire="
-							.. tostring(scratchpad.aim_fire_action_input)
+							.. tostring(forced_fire_action_input)
 					)
 				end
 
 				local fire_action_input = scratchpad.fire_action_input
-				scratchpad.fire_action_input = scratchpad.aim_fire_action_input
+				scratchpad.fire_action_input = forced_fire_action_input
 
 				local may_fire = func(self, unit, scratchpad, range_squared, t)
 
 				scratchpad.fire_action_input = fire_action_input
+				if not may_fire then
+					_log_plasma_may_fire_block(scratchpad, range_squared, t)
+				end
 				if perf_t0 then
 					_perf.finish("weapon_action.may_fire", perf_t0)
 				end
 
 				return may_fire
 			end)
+
+			local _voidblast_fire_override_logged = setmetatable({}, { __mode = "k" })
+			_mod:hook(BtBotShootAction, "_fire", function(func, self, scratchpad, action_data, bot_unit_input, t)
+				if _is_enabled and not _is_enabled() then
+					return func(self, scratchpad, action_data, bot_unit_input, t)
+				end
+
+				if not _should_force_voidblast_charged_fire(scratchpad) then
+					return func(self, scratchpad, action_data, bot_unit_input, t)
+				end
+
+				local charged_fire_input = _forced_bt_shoot_fire_input(scratchpad)
+				local aiming_shot = scratchpad.aiming_shot
+				local aim_fire_action_input = scratchpad.aim_fire_action_input
+				scratchpad.aiming_shot = true
+				scratchpad.aim_fire_action_input = charged_fire_input
+
+				if not _voidblast_fire_override_logged[scratchpad] and _debug_enabled() then
+					_voidblast_fire_override_logged[scratchpad] = true
+					_debug_log(
+						"voidblast_fire_override:" .. tostring(_scratchpad_player_unit(scratchpad)),
+						_fixed_time(),
+						"voidblast charged fire override (fire="
+							.. tostring(scratchpad.fire_action_input)
+							.. " -> charged_fire="
+							.. tostring(charged_fire_input)
+							.. ")"
+					)
+				end
+
+				local ok, result_a, result_b, result_c, result_d =
+					pcall(func, self, scratchpad, action_data, bot_unit_input, t)
+				scratchpad.aim_fire_action_input = aim_fire_action_input
+				scratchpad.aiming_shot = aiming_shot
+
+				if not ok then
+					error(result_a, 0)
+				end
+
+				return result_a, result_b, result_c, result_d
+			end)
 		end
 	)
 
-	-- bot_queue_action_input: wield lock, vent translation (#30), peril guard,
-	-- and diagnostic weapon logging (#43).
+	-- bot_queue_action_input: wield lock, vent translation, peril guard,
+	-- and diagnostic weapon logging.
 	_mod:hook_require(
 		"scripts/extension_systems/action_input/player_unit_action_input_extension",
 		function(PlayerUnitActionInputExtension)
@@ -532,6 +1497,7 @@ function M.register_hooks(deps)
 					end
 					local perf_t0 = _perf and _perf.begin()
 					local unit = self._betterbots_player_unit
+					local original_action_input = action_input
 					if unit and id == "weapon_action" and action_input == "wield" then
 						local should_block, ability_name = should_block_wield_input(unit)
 						if should_block then
@@ -548,6 +1514,41 @@ function M.register_hooks(deps)
 										.. " (raw_input="
 										.. tostring(raw_input)
 										.. ")"
+								)
+							end
+							if perf_t0 then
+								_perf.finish("weapon_action.bot_queue_action_input", perf_t0)
+							end
+							return nil
+						end
+					end
+
+					if unit and id == "weapon_action" and rewrite_weapon_action_input then
+						local rewritten_action_input, rewritten_raw_input =
+							rewrite_weapon_action_input(unit, action_input, raw_input)
+						action_input = rewritten_action_input or action_input
+						if rewritten_raw_input ~= nil then
+							raw_input = rewritten_raw_input
+						end
+					end
+
+					if unit and id == "weapon_action" and (action_input == "zoom" or action_input == "unzoom") then
+						local template_name = _current_weapon_action_template_name(unit)
+						if
+							template_name
+							and not _parser_accepts_weapon_action_input(self, template_name, action_input)
+						then
+							if _debug_enabled() then
+								_debug_log(
+									"drop_unsupported_weapon_action:"
+										.. tostring(template_name)
+										.. ":"
+										.. tostring(action_input),
+									_fixed_time(),
+									"dropped unsupported queued weapon action "
+										.. tostring(action_input)
+										.. " for "
+										.. tostring(template_name)
 								)
 							end
 							if perf_t0 then
@@ -586,8 +1587,8 @@ function M.register_hooks(deps)
 						end
 					end
 
-					-- #30: BtBotReloadAction queues "reload" but warp weapons have
-					-- "vent" not "reload". Translate BEFORE the peril guard so
+					-- BtBotReloadAction queues "reload" but warp weapons have
+					-- "vent" not "reload". Translate before the peril guard so
 					-- venting is not blocked at critical peril.
 					if unit and id == "weapon_action" and action_input == "reload" then
 						local ude = ScriptUnit.has_extension(unit, "unit_data_system")
@@ -610,7 +1611,9 @@ function M.register_hooks(deps)
 						local ude = ScriptUnit.has_extension(unit, "unit_data_system")
 						if ude then
 							local warp = ude:read_component("warp_charge")
-							if warp and warp.current_percentage >= PERIL_CRITICAL_THRESHOLD then
+							local peril_threshold = _warp_weapon_peril_threshold and _warp_weapon_peril_threshold()
+								or DEFAULT_WARP_WEAPON_PERIL_THRESHOLD
+							if warp and warp.current_percentage >= peril_threshold then
 								local tweaks = ude:read_component("weapon_tweak_templates")
 								if tweaks and tweaks.warp_charge_template_name ~= "none" then
 									if _debug_enabled() then
@@ -633,12 +1636,14 @@ function M.register_hooks(deps)
 						end
 					end
 
-					-- #43: log bot weapon actions (except wield) with bot/template
-					-- tags so charged inputs can be attributed to the correct bot
-					-- and staff family. One-shot per unique combo.
+					-- Log bot weapon actions (except wield) with bot/template tags
+					-- so charged inputs can be attributed to the correct bot and
+					-- staff family. One-shot per unique combo.
 					if id == "weapon_action" and action_input ~= "wield" and _debug_enabled() then
 						local bot_slot, wielded_slot, weapon_template_name, warp_charge_template_name =
 							_weapon_log_context(unit)
+						local target_slot, target_unit, target_alive, target_breed_name =
+							_weapon_target_log_context(unit)
 						local combo_key = tostring(bot_slot)
 							.. ":"
 							.. tostring(weapon_template_name)
@@ -646,6 +1651,12 @@ function M.register_hooks(deps)
 							.. tostring(action_input)
 							.. ":"
 							.. tostring(raw_input)
+							.. ":"
+							.. tostring(target_slot)
+							.. ":"
+							.. tostring(target_unit)
+							.. ":"
+							.. tostring(target_alive)
 						if not _weapon_logged_combos[combo_key] then
 							_weapon_logged_combos[combo_key] = true
 							_debug_log(
@@ -663,6 +1674,14 @@ function M.register_hooks(deps)
 									.. tostring(action_input)
 									.. " raw_input="
 									.. tostring(raw_input)
+									.. " target_slot="
+									.. tostring(target_slot)
+									.. " target="
+									.. tostring(target_unit)
+									.. " target_alive="
+									.. tostring(target_alive)
+									.. " target_breed="
+									.. tostring(target_breed_name)
 							)
 						end
 
@@ -672,7 +1691,7 @@ function M.register_hooks(deps)
 					local result = func(self, id, action_input, raw_input)
 					if result ~= nil and id == "weapon_action" and unit then
 						if observe_queued_weapon_action then
-							observe_queued_weapon_action(unit, action_input)
+							observe_queued_weapon_action(unit, action_input, original_action_input)
 						end
 					end
 					if result ~= nil and id == "weapon_action" and unit and _debug_enabled() then

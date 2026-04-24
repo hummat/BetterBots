@@ -2,6 +2,7 @@ local M = {}
 
 local _mod
 local _combat_ability_identity
+local _behavior_profile_override
 
 -- Category → setting ID mapping
 -- These tables are the authoritative list of templates covered by each gate.
@@ -69,7 +70,12 @@ local FEATURE_GATES = {
 	daemonhost_avoidance = "enable_daemonhost_avoidance",
 	target_type_hysteresis = "enable_target_type_hysteresis",
 	ammo_policy = "enable_ammo_policy",
+	pocketable_support = "enable_pocketable_support",
+	smart_tag_orders = "enable_smart_tag_orders",
+	com_wheel_responses = "enable_com_wheel_responses",
 	bot_tome_pickup = "enable_bot_tome_pickup",
+	weakspot_aim = "enable_weakspot_aim",
+	charge_nav_validation = "enable_charge_nav_validation",
 }
 
 -- Preset system
@@ -87,6 +93,8 @@ local BOT_RANGED_AMMO_THRESHOLD_SETTING_ID = "bot_ranged_ammo_threshold"
 local HUMAN_AMMO_RESERVE_THRESHOLD_SETTING_ID = "bot_human_ammo_reserve_threshold"
 local DEFAULT_HUMAN_GRENADE_RESERVE_THRESHOLD = 1.00
 local HUMAN_GRENADE_RESERVE_THRESHOLD_SETTING_ID = "bot_human_grenade_reserve_threshold"
+local DEFAULT_WARP_WEAPON_PERIL_THRESHOLD = 0.99
+local WARP_WEAPON_PERIL_THRESHOLD_SETTING_ID = "warp_weapon_peril_threshold"
 M.DEFAULTS = {
 	enable_stances = true,
 	enable_charges = true,
@@ -105,7 +113,12 @@ M.DEFAULTS = {
 	enable_daemonhost_avoidance = true,
 	enable_target_type_hysteresis = true,
 	enable_ammo_policy = true,
+	enable_pocketable_support = true,
+	enable_smart_tag_orders = true,
+	enable_com_wheel_responses = true,
 	enable_bot_tome_pickup = true,
+	enable_weakspot_aim = true,
+	enable_charge_nav_validation = true,
 	human_timing_profile = "auto",
 	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,
@@ -123,9 +136,12 @@ M.DEFAULTS = {
 	special_chase_penalty_range = 18,
 	player_tag_bonus = 3,
 	melee_horde_light_bias = 4,
+	rippergun_bayonet_distance = 3,
+	ranged_bash_distance = 3,
 	bot_ranged_ammo_threshold = 20,
 	bot_human_ammo_reserve_threshold = 80,
 	bot_human_grenade_reserve_threshold = 100,
+	warp_weapon_peril_threshold = 99,
 	healing_deferral_mode = "stations_and_deployables",
 	healing_deferral_human_threshold = 90,
 	healing_deferral_emergency_threshold = 25,
@@ -175,6 +191,11 @@ function M.init(deps)
 	assert(deps.combat_ability_identity, "settings: combat_ability_identity dep required")
 	_mod = deps.mod
 	_combat_ability_identity = deps.combat_ability_identity
+	_behavior_profile_override = nil
+end
+
+function M.wire(refs)
+	_behavior_profile_override = refs and refs.behavior_profile_override or nil
 end
 
 function M.resolve_preset()
@@ -190,6 +211,11 @@ function M.resolve_preset()
 	end
 
 	if VALID_PRESETS[value] then
+		local override = _behavior_profile_override and _behavior_profile_override(value) or nil
+		if VALID_PRESETS[override] then
+			return override
+		end
+
 		return value
 	end
 
@@ -403,6 +429,10 @@ function M.human_grenade_reserve_threshold()
 	)
 end
 
+function M.warp_weapon_peril_threshold()
+	return _read_percent_setting(WARP_WEAPON_PERIL_THRESHOLD_SETTING_ID, DEFAULT_WARP_WEAPON_PERIL_THRESHOLD, 0, 100)
+end
+
 -- Slider-with-zero migration helper: read the slider setting, but if it's nil
 -- (user hasn't touched it) AND a legacy checkbox was explicitly false, return 0.
 local function _read_slider_with_legacy(slider_id, legacy_id, default_value, min_value, max_value)
@@ -430,6 +460,14 @@ end
 
 function M.melee_horde_light_bias()
 	return _read_numeric_setting("melee_horde_light_bias", 4, 0, 10)
+end
+
+function M.rippergun_bayonet_distance()
+	return _read_numeric_setting("rippergun_bayonet_distance", 3, 0, 6)
+end
+
+function M.ranged_bash_distance()
+	return _read_numeric_setting("ranged_bash_distance", 3, 0, 6)
 end
 
 function M.sprint_follow_distance()

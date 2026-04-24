@@ -30,6 +30,7 @@ local mock_mod = {
 }
 
 local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
 
 BotProfiles.init({
 	mod = mock_mod,
@@ -64,6 +65,9 @@ local VANILLA_PROFILE = {
 	talents = {},
 }
 
+local EXPECTED_CURIO_NAME = "Blessed Bullet (Reliquary)"
+local EXPECTED_CURIO_MASTER_ITEM_ID = "content/items/gadgets/defensive_gadget_11"
+
 describe("bot_profiles", function()
 	before_each(function()
 		_mock_settings = {}
@@ -80,6 +84,57 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.zealot)
 			assert.is_not_nil(profiles.psyker)
 			assert.is_not_nil(profiles.ogryn)
+		end)
+
+		it("ships the configured default lineup", function()
+			local profiles = BotProfiles._get_profiles()
+
+			assert.equals("content/items/weapons/player/melee/powersword_p1_m2", profiles.veteran.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/plasmagun_p1_m1",
+				profiles.veteran.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.veteran.talents.veteran_improved_tag)
+			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
+
+			assert.equals(
+				"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+				profiles.zealot.loadout.slot_primary
+			)
+			assert.equals("content/items/weapons/player/ranged/bolter_p1_m2", profiles.zealot.loadout.slot_secondary)
+			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_not_nil(profiles.zealot.talents.zealot_fanatic_rage)
+
+			assert.equals("content/items/weapons/player/melee/combatsword_p3_m2", profiles.psyker.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/forcestaff_p1_m1",
+				profiles.psyker.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.psyker.talents.psyker_shout_vent_warp_charge)
+			assert.is_not_nil(profiles.psyker.talents.psyker_grenade_throwing_knives)
+
+			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m1", profiles.ogryn.loadout.slot_primary)
+			assert.equals(
+				"content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
+				profiles.ogryn.loadout.slot_secondary
+			)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_longer_charge)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_grenade_friend_rock)
+		end)
+
+		it("locks in the requested meta pivots for the shipped lineup", function()
+			local profiles = BotProfiles._get_profiles()
+
+			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_not_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
+			assert.is_not_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
+		end)
+
+		it("keeps the shipped profile labels aligned with the authored lineup", function()
+			assert.equals("Veteran - Plasma Gun + Power Sword", Localization.bot_profile_veteran.en)
+			assert.equals("Zealot - Boltgun + Heavy Eviscerator", Localization.bot_profile_zealot.en)
+			assert.equals("Psyker - Voidblast Staff + Duelling Sword", Localization.bot_profile_psyker.en)
+			assert.equals("Ogryn - Ripper Gun + Latrine Shovel", Localization.bot_profile_ogryn.en)
 		end)
 
 		it("every template has required fields", function()
@@ -150,6 +205,55 @@ describe("bot_profiles", function()
 					string.find(profile.loadout.slot_secondary, "content/items/weapons/", 1, true),
 					class_name .. " ranged should be a full content path"
 				)
+			end
+		end)
+
+		it("defines synthesized quality gear payloads for both weapon slots on every profile", function()
+			local profiles = BotProfiles._get_profiles()
+
+			for class_name, profile in pairs(profiles) do
+				assert.is_table(profile.weapon_overrides, class_name .. " missing weapon_overrides")
+
+				for _, slot_name in ipairs({ "slot_primary", "slot_secondary" }) do
+					local override = profile.weapon_overrides[slot_name]
+
+					assert.is_table(override, class_name .. " missing override for " .. slot_name)
+					assert.is_table(override.traits, class_name .. " missing traits for " .. slot_name)
+					assert.is_true(#override.traits > 0, class_name .. " traits empty for " .. slot_name)
+					assert.is_table(override.perks, class_name .. " missing perks for " .. slot_name)
+					assert.is_true(#override.perks > 0, class_name .. " perks empty for " .. slot_name)
+				end
+			end
+		end)
+
+		it("declares explicit curio metadata with concrete runtime gadget IDs", function()
+			local profiles = BotProfiles._get_profiles()
+
+			for class_name, profile in pairs(profiles) do
+				assert.is_table(profile.curios, class_name .. " missing curios metadata")
+				assert.equals(3, #profile.curios, class_name .. " should declare exactly 3 curios")
+
+				for index, curio in ipairs(profile.curios) do
+					assert.equals(EXPECTED_CURIO_NAME, curio.name, class_name .. " curio " .. index .. " name")
+					assert.equals(
+						EXPECTED_CURIO_MASTER_ITEM_ID,
+						curio.master_item_id,
+						class_name .. " curio " .. index .. " master item id"
+					)
+					assert.is_table(curio.traits, class_name .. " curio " .. index .. " missing traits")
+					assert.equals(4, #curio.traits, class_name .. " curio " .. index .. " should declare 4 traits")
+					assert.equals("gadget_innate_toughness_increase", curio.traits[1].id)
+					assert.equals("gadget_cooldown_reduction", curio.traits[2].id)
+					assert.equals("gadget_damage_reduction_vs_gunners", curio.traits[3].id)
+					assert.equals("gadget_stamina_regeneration", curio.traits[4].id)
+					for trait_index, trait in ipairs(curio.traits) do
+						assert.equals(
+							4,
+							trait.rarity,
+							class_name .. " curio " .. index .. " trait " .. trait_index .. " rarity"
+						)
+					end
+				end
 			end
 		end)
 	end)
@@ -352,13 +456,13 @@ describe("bot_profiles", function()
 				}
 
 				local fake_weapon_templates = {
-					powersword_2h_p1_m2 = {
+					chainsword_2h_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							finesse_stat = {},
 						},
 					},
-					flamer_p1_m1 = {
+					bolter_p1_m2 = {
 						base_stats = {
 							damage_stat = {},
 							charge_stat = {},
@@ -451,6 +555,661 @@ describe("bot_profiles", function()
 				assert.is_not_nil(resolved.visual_loadout.slot_gear_head, "head visual slot must still exist")
 				assert.is_not_nil(resolved.loadout_item_ids.slot_body_face, "face loadout_item_ids must still exist")
 				assert.is_not_nil(resolved.loadout_item_data.slot_body_face, "face loadout_item_data must still exist")
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
+		it("synthesizes authored weapon and gadget overrides through MasterItems.get_item_instance", function()
+			local saved_require = require
+			local seen_gears = {}
+
+			local ok, err = pcall(function()
+				local fake_master_items = {
+					get_cached = function()
+						return {
+							zealot_primary = {
+								id = "zealot_primary",
+								name = "zealot_primary",
+								item_type = "WEAPON_MELEE",
+							},
+							zealot_secondary = {
+								id = "zealot_secondary",
+								name = "zealot_secondary",
+								item_type = "WEAPON_RANGED",
+							},
+							[EXPECTED_CURIO_MASTER_ITEM_ID] = {
+								id = EXPECTED_CURIO_MASTER_ITEM_ID,
+								name = EXPECTED_CURIO_MASTER_ITEM_ID,
+								item_type = "GADGET",
+							},
+						}
+					end,
+					get_item_or_fallback = function(item_id)
+						return {
+							name = item_id,
+							source = "fallback",
+						}
+					end,
+					get_item_instance = function(gear)
+						local slot_name = gear.slots and gear.slots[1]
+						seen_gears[slot_name] = gear
+
+						return {
+							name = gear.masterDataInstance.id,
+							gear_id = gear.masterDataInstance.id,
+							item_type = slot_name and string.find(slot_name, "slot_attachment_", 1, true) and "GADGET"
+								or nil,
+							source = "instance",
+							traits = gear.masterDataInstance.overrides and gear.masterDataInstance.overrides.traits
+								or nil,
+							perks = gear.masterDataInstance.overrides and gear.masterDataInstance.overrides.perks
+								or nil,
+						}
+					end,
+				}
+
+				local fake_archetypes = {
+					zealot = { name = "zealot", breed = "human" },
+				}
+
+				local fake_weapon_templates = {
+					chainsword_2h_p1_m1 = {
+						base_stats = {
+							damage_stat = {},
+							cleave_stat = {},
+							finesse_stat = {},
+						},
+					},
+					bolter_p1_m2 = {
+						base_stats = {
+							damage_stat = {},
+							finesse_stat = {},
+							ammo_stat = {},
+						},
+					},
+				}
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function(_profile, _id)
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return fake_weapon_templates
+					end
+
+					return saved_require(modname)
+				end)
+
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = mock_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.reset()
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_weapon_quality = "max"
+
+				local profile = {
+					archetype = "veteran",
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+					},
+					visual_loadout = {},
+					loadout_item_ids = {},
+					loadout_item_data = {},
+					talents = {},
+					bot_gestalts = {
+						melee = "linesman",
+						ranged = "killshot",
+					},
+				}
+
+				local resolved, swapped = Profiles.resolve_profile(profile)
+
+				assert.is_true(swapped)
+				assert.equals("instance", resolved.loadout.slot_primary.source)
+				assert.equals("instance", resolved.loadout.slot_secondary.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_1.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_2.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_3.source)
+				assert.equals(
+					"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+					seen_gears.slot_primary.masterDataInstance.id
+				)
+				assert.equals(
+					"content/items/weapons/player/ranged/bolter_p1_m2",
+					seen_gears.slot_secondary.masterDataInstance.id
+				)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.base_stats > 0)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.traits)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.traits > 0)
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.perks)
+				assert.is_true(#seen_gears.slot_primary.masterDataInstance.overrides.perks > 0)
+				assert.is_table(seen_gears.slot_secondary.masterDataInstance.overrides.base_stats)
+				assert.is_true(#seen_gears.slot_secondary.masterDataInstance.overrides.base_stats > 0)
+				assert.is_table(seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
+				assert.equals(4, #seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_1.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_2.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_3.masterDataInstance.id)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.visual_loadout.slot_attachment_1.name)
+				assert.equals(
+					EXPECTED_CURIO_MASTER_ITEM_ID .. "slot_attachment_1",
+					resolved.loadout_item_ids.slot_attachment_1
+				)
+				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.loadout_item_data.slot_attachment_1.id)
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
+		it("resolves authored weapon overrides for every shipped class", function()
+			-- Parametrized follow-up to the zealot end-to-end test above. Guards
+			-- against per-class trait/perk ID drift in the non-zealot archetypes
+			-- by driving a full resolve_profile() for each class and asserting
+			-- the synthesized gear carries the expected content path + non-empty
+			-- override lists back out through MasterItems.get_item_instance.
+			local class_expectations = {
+				veteran = {
+					primary = "content/items/weapons/player/melee/powersword_p1_m2",
+					secondary = "content/items/weapons/player/ranged/plasmagun_p1_m1",
+					primary_template = "powersword_p1_m2",
+					secondary_template = "plasmagun_p1_m1",
+				},
+				zealot = {
+					primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
+					secondary = "content/items/weapons/player/ranged/bolter_p1_m2",
+					primary_template = "chainsword_2h_p1_m1",
+					secondary_template = "bolter_p1_m2",
+				},
+				psyker = {
+					primary = "content/items/weapons/player/melee/combatsword_p3_m2",
+					secondary = "content/items/weapons/player/ranged/forcestaff_p1_m1",
+					primary_template = "combatsword_p3_m2",
+					secondary_template = "forcestaff_p1_m1",
+				},
+				ogryn = {
+					primary = "content/items/weapons/player/melee/ogryn_club_p1_m1",
+					secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
+					primary_template = "ogryn_club_p1_m1",
+					secondary_template = "ogryn_rippergun_p1_m3",
+				},
+			}
+
+			for class_name, expected in pairs(class_expectations) do
+				local saved_require = require
+				local seen_gears = {}
+
+				local ok, err = pcall(function()
+					local fake_master_items = {
+						get_cached = function()
+							return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+						end,
+						get_item_or_fallback = function(item_id)
+							return { name = item_id, source = "fallback" }
+						end,
+						get_item_instance = function(gear)
+							local slot_name = gear.slots and gear.slots[1]
+							seen_gears[slot_name] = gear
+							return {
+								name = gear.masterDataInstance.id,
+								source = "instance",
+							}
+						end,
+					}
+
+					local fake_archetypes = {
+						veteran = { name = "veteran", breed = "human" },
+						zealot = { name = "zealot", breed = "human" },
+						psyker = { name = "psyker", breed = "human" },
+						ogryn = { name = "ogryn", breed = "ogryn" },
+					}
+
+					local fake_weapon_templates = {
+						[expected.primary_template] = { base_stats = { damage_stat = {} } },
+						[expected.secondary_template] = { base_stats = { damage_stat = {} } },
+					}
+
+					rawset(_G, "require", function(modname)
+						if modname == "scripts/backend/master_items" then
+							return fake_master_items
+						end
+						if modname == "scripts/utilities/local_profile_backend_parser" then
+							return {
+								parse_profile = function()
+									return true
+								end,
+							}
+						end
+						if modname == "scripts/settings/archetype/archetypes" then
+							return fake_archetypes
+						end
+						if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+							return fake_weapon_templates
+						end
+						return saved_require(modname)
+					end)
+
+					local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+					Profiles.init({
+						mod = mock_mod,
+						debug_log = function() end,
+						debug_enabled = function()
+							return false
+						end,
+					})
+					Profiles.reset()
+
+					_mock_settings.bot_slot_1_profile = class_name
+					_mock_settings.bot_weapon_quality = "max"
+
+					local profile = {
+						archetype = "veteran",
+						loadout = {
+							slot_primary = "bot_combatsword_linesman_p1",
+							slot_secondary = "bot_lasgun_killshot",
+						},
+						visual_loadout = {},
+						loadout_item_ids = {},
+						loadout_item_data = {},
+						talents = {},
+						bot_gestalts = { melee = "linesman", ranged = "killshot" },
+					}
+
+					local resolved, swapped = Profiles.resolve_profile(profile)
+
+					assert.is_true(swapped, class_name .. " must swap")
+					assert.equals(
+						expected.primary,
+						seen_gears.slot_primary.masterDataInstance.id,
+						class_name .. " primary id mismatch"
+					)
+					assert.equals(
+						expected.secondary,
+						seen_gears.slot_secondary.masterDataInstance.id,
+						class_name .. " secondary id mismatch"
+					)
+					-- Deep-compare the synthesized overrides against the shipped template
+					-- so that a trait/perk ID typo in any class (or a drift away from
+					-- the rarity/value schema) fails this spec instead of sailing
+					-- through a bare #>0 check.
+					local template = BotProfiles._get_profiles()[class_name]
+					local function extract_ids(entries)
+						local ids = {}
+						for i = 1, #(entries or {}) do
+							ids[i] = entries[i].id
+						end
+						return ids
+					end
+					assert.same(
+						extract_ids(template.weapon_overrides.slot_primary.traits),
+						extract_ids(seen_gears.slot_primary.masterDataInstance.overrides.traits),
+						class_name .. " primary traits must match authored IDs"
+					)
+					assert.same(
+						extract_ids(template.weapon_overrides.slot_primary.perks),
+						extract_ids(seen_gears.slot_primary.masterDataInstance.overrides.perks),
+						class_name .. " primary perks must match authored IDs"
+					)
+					assert.same(
+						extract_ids(template.weapon_overrides.slot_secondary.traits),
+						extract_ids(seen_gears.slot_secondary.masterDataInstance.overrides.traits),
+						class_name .. " secondary traits must match authored IDs"
+					)
+					assert.same(
+						extract_ids(template.weapon_overrides.slot_secondary.perks),
+						extract_ids(seen_gears.slot_secondary.masterDataInstance.overrides.perks),
+						class_name .. " secondary perks must match authored IDs"
+					)
+					assert.equals("instance", resolved.loadout.slot_primary.source)
+					assert.equals("instance", resolved.loadout.slot_secondary.source)
+				end)
+
+				rawset(_G, "require", saved_require)
+				assert.is_true(ok, class_name .. ": " .. tostring(err))
+			end
+		end)
+
+		it("returns the vanilla profile when MasterItems.get_item_instance returns nil for any weapon slot", function()
+			local saved_require = require
+			local warnings = {}
+
+			local ok, err = pcall(function()
+				local fake_master_items = {
+					get_cached = function()
+						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+					end,
+					get_item_or_fallback = function(item_id)
+						return { name = item_id, source = "fallback" }
+					end,
+					get_item_instance = function(gear)
+						local slot_name = gear.slots and gear.slots[1]
+						-- Simulate engine returning nil for secondary (e.g. item definition shifted in a patch)
+						if slot_name == "slot_secondary" then
+							return nil
+						end
+						return { name = gear.masterDataInstance.id, source = "instance" }
+					end,
+				}
+
+				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function()
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return {
+							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
+						}
+					end
+					return saved_require(modname)
+				end)
+
+				local warn_mod = {
+					get = mock_mod.get,
+					hook = mock_mod.hook,
+					echo = mock_mod.echo,
+					warning = function(_self, msg)
+						warnings[#warnings + 1] = msg
+					end,
+				}
+
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = warn_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.reset()
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_weapon_quality = "max"
+
+				local vanilla = {
+					archetype = "veteran",
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+					},
+					visual_loadout = {},
+					loadout_item_ids = {},
+					loadout_item_data = {},
+					talents = {},
+					bot_gestalts = { melee = "linesman", ranged = "killshot" },
+				}
+				local returned, swapped = Profiles.resolve_profile(vanilla)
+
+				assert.is_false(swapped, "must not swap when a weapon slot fails to resolve")
+				assert.equals(vanilla, returned, "must return the caller's vanilla profile untouched")
+				assert.equals("veteran", returned.archetype, "vanilla archetype must be preserved")
+
+				local saw_warning = false
+				for i = 1, #warnings do
+					if
+						warnings[i]:find("failed to resolve", 1, true)
+						and warnings[i]:find("slot_secondary", 1, true)
+						and warnings[i]:find("zealot", 1, true)
+					then
+						saw_warning = true
+						break
+					end
+				end
+				assert.is_true(
+					saw_warning,
+					"must warn unconditionally when weapon resolution fails; got: ["
+						.. table.concat(warnings, " | ")
+						.. "]"
+				)
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
+		it("still swaps and warns when the weapon_templates engine module is unavailable", function()
+			-- Guards against Fatshark renaming the weapon_templates content path:
+			-- a failing require must not throw through the add_bot hook.
+			local saved_require = require
+			local warnings = {}
+
+			local ok, err = pcall(function()
+				local seen_gears = {}
+				local fake_master_items = {
+					get_cached = function()
+						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+					end,
+					get_item_or_fallback = function(item_id)
+						return { name = item_id, source = "fallback" }
+					end,
+					get_item_instance = function(gear)
+						local slot_name = gear.slots and gear.slots[1]
+						seen_gears[slot_name] = gear
+						return { name = gear.masterDataInstance.id, source = "instance" }
+					end,
+				}
+				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function()
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						error("weapon_templates path changed in patch X.Y")
+					end
+					return saved_require(modname)
+				end)
+
+				local warn_mod = {
+					get = mock_mod.get,
+					hook = mock_mod.hook,
+					echo = mock_mod.echo,
+					warning = function(_self, msg)
+						warnings[#warnings + 1] = msg
+					end,
+				}
+
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = warn_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.reset()
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_weapon_quality = "max"
+
+				local vanilla = {
+					archetype = "veteran",
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+					},
+					visual_loadout = {},
+					loadout_item_ids = {},
+					loadout_item_data = {},
+					talents = {},
+					bot_gestalts = { melee = "linesman", ranged = "killshot" },
+				}
+				local resolved, swapped = Profiles.resolve_profile(vanilla)
+
+				assert.is_true(swapped, "must still swap weapons when weapon_templates is unavailable")
+				assert.equals("instance", resolved.loadout.slot_primary.source)
+				assert.equals("instance", resolved.loadout.slot_secondary.source)
+				-- base_stats fallback: empty array (the loop didn't execute), not nil.
+				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
+				assert.equals(0, #seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
+
+				local saw_warning = false
+				for i = 1, #warnings do
+					if warnings[i]:find("weapon_templates engine module unavailable", 1, true) then
+						saw_warning = true
+						break
+					end
+				end
+				assert.is_true(
+					saw_warning,
+					"must warn once when the weapon_templates require fails; got: ["
+						.. table.concat(warnings, " | ")
+						.. "]"
+				)
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
+		it("skips a curio slot whose master_item_id is missing and warns about it", function()
+			local saved_require = require
+			local warnings = {}
+
+			local ok, err = pcall(function()
+				local seen_gears = {}
+				local fake_master_items = {
+					get_cached = function()
+						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+					end,
+					get_item_or_fallback = function(item_id)
+						return { name = item_id, source = "fallback" }
+					end,
+					get_item_instance = function(gear)
+						local slot_name = gear.slots and gear.slots[1]
+						seen_gears[slot_name] = gear
+						return { name = gear.masterDataInstance.id, source = "instance" }
+					end,
+				}
+				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function()
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return {
+							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
+						}
+					end
+					return saved_require(modname)
+				end)
+
+				local warn_mod = {
+					get = mock_mod.get,
+					hook = mock_mod.hook,
+					echo = mock_mod.echo,
+					warning = function(_self, msg)
+						warnings[#warnings + 1] = msg
+					end,
+				}
+
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = warn_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+				})
+				Profiles.reset()
+
+				-- Rewrite one shipped curio's master_item_id to nil before resolution.
+				local profiles_table = Profiles._get_profiles()
+				profiles_table.zealot.curios[2].master_item_id = nil
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_weapon_quality = "max"
+
+				local vanilla = {
+					archetype = "veteran",
+					loadout = {
+						slot_primary = "bot_combatsword_linesman_p1",
+						slot_secondary = "bot_lasgun_killshot",
+					},
+					visual_loadout = {},
+					loadout_item_ids = {},
+					loadout_item_data = {},
+					talents = {},
+					bot_gestalts = { melee = "linesman", ranged = "killshot" },
+				}
+				local resolved, swapped = Profiles.resolve_profile(vanilla)
+
+				assert.is_true(swapped, "weapon resolution still succeeds; curio is skipped, not fatal")
+				assert.is_nil(seen_gears.slot_attachment_2, "attachment_2 must not go through get_item_instance")
+				assert.equals("instance", resolved.loadout.slot_attachment_1.source)
+				assert.equals("instance", resolved.loadout.slot_attachment_3.source)
+
+				local saw_warning = false
+				for i = 1, #warnings do
+					if
+						warnings[i]:find("skipping runtime curio", 1, true)
+						and warnings[i]:find("slot_attachment_2", 1, true)
+						and warnings[i]:find("zealot", 1, true)
+					then
+						saw_warning = true
+						break
+					end
+				end
+				assert.is_true(
+					saw_warning,
+					"must warn unconditionally when a curio master_item_id is missing; got: ["
+						.. table.concat(warnings, " | ")
+						.. "]"
+				)
 			end)
 
 			rawset(_G, "require", saved_require)

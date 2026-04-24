@@ -10,6 +10,7 @@ local POXBURSTER_PUSH_DIST = 3
 local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
 local _poxburster_breed_patched = false
 local POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL = "__bb_poxburster_installed"
+local POXBURSTER_MELEE_PATCH_SENTINEL = "__bb_poxburster_melee_installed"
 
 local _mod
 local _debug_log
@@ -17,6 +18,7 @@ local _debug_enabled
 local _fixed_time
 local _perf
 local _is_enabled
+local _should_suppress_defend
 
 -- One-shot dedup: log poxburster suppression once per bot lifetime (weak-keyed,
 -- cleared on GC). Entries are never explicitly reset.
@@ -157,6 +159,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
 	_is_enabled = deps.is_enabled
+	_should_suppress_defend = deps.should_suppress_defend
 end
 
 function M.register_hooks()
@@ -240,18 +243,28 @@ end
 -- pushes during lunge within 5m, a power=2000 counter-hit triggers
 -- staggered_during_lunge → instakill → attributed explosion.
 function M.install_melee_hooks(BtBotMeleeAction)
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, POXBURSTER_MELEE_PATCH_SENTINEL) then
+		return
+	end
+
+	BtBotMeleeAction[POXBURSTER_MELEE_PATCH_SENTINEL] = true
+
 	-- Defend gate: vanilla requires num_melee_attackers > 0, but an
 	-- approaching poxburster hasn't attacked yet. Override so the bot
 	-- enters the block → push flow.
 	_mod:hook(BtBotMeleeAction, "_should_defend", function(func, self, unit, target_unit, scratchpad)
-		if _is_enabled and not _is_enabled() then
-			return func(self, unit, target_unit, scratchpad)
-		end
-
 		local result = func(self, unit, target_unit, scratchpad)
 		scratchpad._bb_bot_unit = unit
 		if result then
-			return result
+			if _should_suppress_defend and _should_suppress_defend(self, unit, target_unit, scratchpad) then
+				return false
+			end
+
+			return true
+		end
+
+		if _is_enabled and not _is_enabled() then
+			return false
 		end
 
 		local data_ext = ScriptUnit.has_extension(target_unit, "unit_data_system")

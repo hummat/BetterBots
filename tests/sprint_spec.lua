@@ -4,6 +4,7 @@ local test_helper = require("tests.test_helper")
 local _extensions = {}
 local _positions = {}
 local _alive = {}
+local _unit_alive = {}
 local _saved_globals = {}
 local Sprint
 
@@ -102,6 +103,9 @@ local function reset()
 	for k in pairs(_alive) do
 		_alive[k] = nil
 	end
+	for k in pairs(_unit_alive) do
+		_unit_alive[k] = nil
+	end
 	for k in pairs(_blackboards) do
 		_blackboards[k] = nil
 	end
@@ -114,6 +118,7 @@ describe("sprint", function()
 		_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
 		_saved_globals.POSITION_LOOKUP = rawget(_G, "POSITION_LOOKUP")
 		_saved_globals.ALIVE = rawget(_G, "ALIVE")
+		_saved_globals.Unit = rawget(_G, "Unit")
 		_saved_globals.Vector3 = rawget(_G, "Vector3")
 		_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
 		_saved_globals.Managers = rawget(_G, "Managers")
@@ -136,6 +141,12 @@ describe("sprint", function()
 				return _alive[unit]
 			end,
 		})
+
+		_G.Unit = {
+			alive = function(unit)
+				return _unit_alive[unit] == true
+			end,
+		}
 
 		_G.Vector3 = {
 			distance_squared = function(a, b)
@@ -348,6 +359,22 @@ describe("sprint", function()
 			assert.equals("catch_up", reason)
 		end)
 
+		it("sprints to catch up when ALIVE is missing for a live follow unit", function()
+			local unit = "bot1"
+			local follow = "player1"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[follow] = pos(20, 0, 0)
+			_unit_alive[follow] = true
+			setup_perception(unit, {})
+			setup_side_system(unit, {})
+			local self_obj = make_self({
+				group_extension = make_group_extension(follow),
+			})
+			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			assert.is_true(ok)
+			assert.equals("catch_up", reason)
+		end)
+
 		it("does not catch-up sprint when close to follow unit", function()
 			local unit = "bot1"
 			local follow = "player1"
@@ -419,6 +446,32 @@ describe("sprint", function()
 			setup_behavior(unit, {})
 			local self_obj = make_self()
 			local ok, reason = Sprint.should_sprint(self_obj, unit, {})
+			assert.is_false(ok)
+			assert.equals("daemonhost_nearby", reason)
+		end)
+
+		it("scans daemonhost liveness without throwing when ALIVE is missing", function()
+			-- Guards the daemonhost scan's `ALIVE[enemy_unit]` dereference:
+			-- under a nil ALIVE global (e.g. early-spawn window or a future
+			-- engine rename) the path must fall back to Unit.alive instead of
+			-- raising through the sprint hook.
+			local unit = "bot1"
+			local dh = "daemonhost_no_alive"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(10, 0, 0)
+			-- No _alive[dh]; rely on Unit.alive fallback via _unit_alive.
+			_unit_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			setup_behavior(unit, {})
+
+			local saved_alive = rawget(_G, "ALIVE")
+			_G.ALIVE = nil
+			local self_obj = make_self()
+			local ok_call, ok, reason = pcall(Sprint.should_sprint, self_obj, unit, {})
+			_G.ALIVE = saved_alive
+
+			assert.is_true(ok_call, "daemonhost scan must not throw when ALIVE is nil")
 			assert.is_false(ok)
 			assert.equals("daemonhost_nearby", reason)
 		end)

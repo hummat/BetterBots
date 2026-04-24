@@ -32,11 +32,13 @@ Current status:
 | `perception_system` (bot) | `BotPerceptionExtension` | `enemies_in_proximity()` | `scripts/extension_systems/perception/bot_perception_extension.lua:94` | |
 | `perception_system` (minion) | `MinionPerceptionExtension` | `has_line_of_sight()` | `scripts/extension_systems/perception/minion_perception_extension.lua:181` | |
 | `smart_tag_system` via `ScriptUnit.has_extension(unit, ...)` | `SmartTagExtension` | `tag_id()` | `scripts/extension_systems/smart_tag/smart_tag_extension.lua:262` | Same system name, different object than manager lookup |
-| `smart_tag_system` via `Managers.state.extension:system(...)` | `SmartTagSystem` | `set_tag()`, `set_contextual_unit_tag()`, `unit_tag()` | `scripts/extension_systems/smart_tag/smart_tag_system.lua:152`, `:202`, `:318` | `unit_tag()` returns `SmartTag` objects |
+| `smart_tag_system` via `Managers.state.extension:system(...)` | `SmartTagSystem` | `set_tag()`, `set_contextual_unit_tag()`, `trigger_tag_interaction()`, `unit_tag()` | `scripts/extension_systems/smart_tag/smart_tag_system.lua:152`, `:202`, `:229`, `:318` | `unit_tag()` returns `SmartTag` objects |
 | `smart_tag` object returned by `SmartTagSystem:unit_tag()` | `SmartTag` | `template()`, `tagger_player()` | `scripts/extension_systems/smart_tag/smart_tag.lua:46`, `:84` | Used by target-selection tests |
 | `companion_spawner_system` | `CompanionSpawnerExtension` | `companion_units()`, `should_have_companion()` | `scripts/extension_systems/companion_spawner/companion_spawner_extension.lua:292`, `:316` | No `companion_unit()` method exists |
 | `coherency_system` | `UnitCoherencyExtension` | `current_radius()` | `scripts/extension_systems/coherency/unit_coherency_extension.lua:148` | |
-| `talent_system` | `PlayerUnitTalentExtension` / `PlayerHuskTalentExtension` | `has_special_rule()` | `scripts/extension_systems/talent/player_unit_talent_extension.lua:94`, `scripts/extension_systems/talent/player_husk_talent_extension.lua:99` | |
+| `talent_system` (player) | `PlayerUnitTalentExtension` | `has_special_rule()`, `talents()` | `scripts/extension_systems/talent/player_unit_talent_extension.lua:94`, `:90` | `talents()` returns `{ [name] = tier }` flat table |
+| `talent_system` (husk) | `PlayerHuskTalentExtension` | `has_special_rule()` | `scripts/extension_systems/talent/player_husk_talent_extension.lua:99` | Husk does not expose `talents()`; do not mock it there |
+| `buff_system` | `PlayerUnitBuffExtension` (via `BuffExtensionBase`) | `current_stacks()` | `scripts/extension_systems/buff/buff_extension_base.lua:565`, `scripts/extension_systems/buff/buff_extension_interface.lua:8` | Returns 0 for absent stacking buffs |
 | `behavior_system` | `BotBehaviorExtension` + `AiBrain` | `_brain`, `_brain._blackboard` | `scripts/extension_systems/behavior/bot_behavior_extension.lua:83`, `:1048`; `scripts/extension_systems/behavior/ai_brain.lua:8` | Private fields, but production sprint code reads them directly |
 
 ## Audited manager-system doubles

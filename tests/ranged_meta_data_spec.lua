@@ -44,12 +44,12 @@ describe("ranged_meta_data", function()
 			assert.equals("zoom_shoot", fb.aim_fire_action_input)
 		end)
 
-		it("falls back to hardcoded strings when actions missing", function()
+		it("falls back to hardcoded fire input and nil aim inputs when actions are missing", function()
 			local t = make_ranged_template({ actions = {} })
 			local fb = RangedMetaData._resolve_vanilla_fallback(t)
 			assert.equals("shoot", fb.fire_action_input)
-			assert.equals("zoom", fb.aim_action_input)
-			assert.equals("zoom_shoot", fb.aim_fire_action_input)
+			assert.is_nil(fb.aim_action_input)
+			assert.is_nil(fb.aim_fire_action_input)
 		end)
 
 		it("falls back when action exists but start_input is nil", function()
@@ -58,6 +58,36 @@ describe("ranged_meta_data", function()
 			})
 			local fb = RangedMetaData._resolve_vanilla_fallback(t)
 			assert.equals("shoot", fb.fire_action_input)
+			assert.is_nil(fb.aim_action_input)
+			assert.is_nil(fb.aim_fire_action_input)
+		end)
+
+		it("derives brace inputs for braced ranged weapons", function()
+			local t = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = { { input = "action_one_pressed", value = true } } },
+					brace_pressed = { input_sequence = { { input = "action_two_hold", value = true } } },
+					brace_release = { input_sequence = { { input = "action_two_hold", value = false } } },
+					shoot_braced = { input_sequence = { { input = "action_one_hold", value = true } } },
+				},
+				actions = {
+					action_shoot = { start_input = "shoot_pressed" },
+					action_brace = {
+						start_input = "brace_pressed",
+						allowed_chain_actions = {
+							shoot_braced = { action_name = "action_shoot_braced" },
+							brace_release = { action_name = "action_unbrace" },
+						},
+					},
+					action_unbrace = { start_input = "brace_release", kind = "unaim" },
+					action_shoot_braced = { start_input = "shoot_braced" },
+				},
+			})
+			local fb = RangedMetaData._resolve_vanilla_fallback(t)
+
+			assert.equals("shoot_pressed", fb.fire_action_input)
+			assert.equals("brace_pressed", fb.aim_action_input)
+			assert.equals("shoot_braced", fb.aim_fire_action_input)
 		end)
 	end)
 
@@ -84,6 +114,104 @@ describe("ranged_meta_data", function()
 				action_inputs = { shoot_pressed = { input_sequence = {} } },
 			})
 			assert.is_true(RangedMetaData._needs_injection(t))
+		end)
+	end)
+
+	describe("close_range_ranged_policy", function()
+		it("treats flamer as the widest close-range hipfire family", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "flamer_p1_m1",
+				keywords = { "ranged", "flamer", "p1" },
+			})
+
+			assert.equals("flamer", policy.family)
+			assert.equals(144, policy.hold_ranged_target_distance_sq)
+			assert.equals(144, policy.hipfire_distance_sq)
+		end)
+
+		it("treats autopistol-family weapons as close-range hipfire ranged weapons", function()
+			local policy = RangedMetaData.close_range_ranged_policy(make_ranged_template({
+				keywords = { "ranged", "autopistol", "p1" },
+			}))
+
+			assert.equals("autopistol", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(100, policy.hipfire_distance_sq)
+		end)
+
+		it("covers dual autopistols through the same family policy", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "dual_autopistols_p1_m1",
+				keywords = { "ranged", "autopistol", "p1" },
+			})
+
+			assert.equals("autopistol", policy.family)
+			assert.equals(100, policy.hold_ranged_target_distance_sq)
+			assert.equals(100, policy.hipfire_distance_sq)
+		end)
+
+		it("keeps ripperguns ranged at close range without forcing hipfire", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_rippergun_p1_m1",
+				keywords = { "ranged", "rippergun", "p1" },
+			})
+
+			assert.equals("rippergun", policy.family)
+			assert.equals(81, policy.hold_ranged_target_distance_sq)
+			assert.is_nil(policy.hipfire_distance_sq)
+		end)
+
+		it("keeps Purgatus ranged at a wider close-range window than the electrokinetic staff", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "forcestaff_p2_m1",
+				keywords = { "ranged", "staff", "p2" },
+			})
+
+			assert.equals("forcestaff_p2_m1", policy.family)
+			assert.equals(144, policy.hold_ranged_target_distance_sq)
+			assert.is_nil(policy.hipfire_distance_sq)
+		end)
+
+		it("keeps forcestaff_p3_m1 ranged at close range without forcing hipfire", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "forcestaff_p3_m1",
+				keywords = { "ranged", "staff", "p3" },
+			})
+
+			assert.equals("forcestaff_p3_m1", policy.family)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
+			assert.is_nil(policy.hipfire_distance_sq)
+		end)
+
+		it("keeps shotgun family resolution intact after the new keyword branches", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "shotgun_p1_m1",
+				keywords = { "ranged", "shotgun", "p1" },
+			})
+
+			assert.equals("shotgun", policy.family)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
+			assert.equals(64, policy.hipfire_distance_sq)
+		end)
+
+		it("keeps heavy stubbers between shotgun and flamer in the hipfire window", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_heavystubber_p1_m1",
+				keywords = { "ranged", "heavystubber", "p1" },
+			})
+
+			assert.equals("heavystubber", policy.family)
+			assert.equals(121, policy.hold_ranged_target_distance_sq)
+			assert.equals(121, policy.hipfire_distance_sq)
+		end)
+
+		it("returns nil for weapons outside the explicit close-range family set", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "lasgun_p1_m1",
+				keywords = { "ranged", "lasgun", "p1" },
+			})
+
+			assert.is_nil(policy)
 		end)
 	end)
 
@@ -401,6 +529,34 @@ describe("ranged_meta_data", function()
 			RangedMetaData.sync_all()
 
 			assert.is_nil(templates.staff.attack_meta_data)
+		end)
+
+		it("replaces malformed attack_meta_data and restores it on disable", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+				},
+			})
+			template.attack_meta_data = "broken"
+			local templates = { staff = template }
+
+			RangedMetaData.inject(templates)
+
+			assert.is_table(templates.staff.attack_meta_data)
+			assert.equals("shoot_pressed", templates.staff.attack_meta_data.fire_action_input)
+			assert.equals("rapid_left", templates.staff.attack_meta_data.fire_action_name)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("broken", templates.staff.attack_meta_data)
 		end)
 
 		it("restores original attack_meta_data fields when disabling ranged improvements", function()
@@ -911,6 +1067,49 @@ describe("ranged_meta_data", function()
 			assert.equals("charge_flame_release", template.attack_meta_data.unaim_action_input)
 			assert.equals("action_charge_flame_release", template.attack_meta_data.unaim_action_name)
 			assert.equals("shoot_pressed", template.attack_meta_data.fire_action_input)
+		end)
+
+		it("restores invalid original attack_meta_data after the charge-override pass", function()
+			local template = make_ranged_template({
+				action_inputs = {
+					shoot_pressed = { input_sequence = {
+						{ input = "action_one_pressed", value = true },
+					} },
+					charge_flame = { input_sequence = {
+						{ input = "action_two_hold", value = true },
+					} },
+					trigger_charge_flame = {
+						input_sequence = {
+							{ input = "action_one_pressed", value = true, hold_input = "action_two_hold" },
+						},
+					},
+				},
+				actions = {
+					rapid_left = { start_input = "shoot_pressed" },
+					action_charge_flame = {
+						start_input = "charge_flame",
+						stop_input = "charge_flame_release",
+						allowed_chain_actions = {
+							trigger_charge_flame = { action_name = "action_shoot_charged_flame" },
+						},
+					},
+					action_charge_flame_release = { start_input = "charge_flame_release" },
+					action_shoot_charged_flame = {
+						stop_input = "cancel_flame",
+					},
+				},
+			})
+			local templates = { forcestaff_p2 = template }
+
+			template.attack_meta_data = "invalid_meta"
+			RangedMetaData.inject(templates)
+
+			assert.is_table(template.attack_meta_data)
+
+			enabled = false
+			RangedMetaData.sync_all()
+
+			assert.equals("invalid_meta", template.attack_meta_data)
 		end)
 
 		it("overrides aim metadata for braced stream weapons (#87 flamer)", function()

@@ -256,6 +256,37 @@ describe("heuristics", function()
 			assert.matches("emergency", rule)
 		end)
 
+		it("holds low-health-only stealth panic for Martyrdom", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					health_pct = 0.20,
+					talents = {
+						zealot_martyrdom = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("martyrdom_low_health", rule)
+		end)
+
+		it("still activates on low toughness emergency for Martyrdom", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 3,
+					toughness_pct = 0.15,
+					health_pct = 0.20,
+					talents = {
+						zealot_martyrdom = 1,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("emergency", rule)
+		end)
+
 		it("activates when overwhelmed", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 5, toughness_pct = 0.45 }))
 			assert.is_true(ok)
@@ -294,6 +325,56 @@ describe("heuristics", function()
 
 		it("activates on high peril", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 1, peril_pct = 0.80 }))
+			assert.is_true(ok)
+			assert.matches("high_peril", rule)
+		end)
+
+		it("preserves peril longer with Warp Siphon damage talents", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.80,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("preserve_peril", rule)
+		end)
+
+		it("uses an even later peril threshold with vent-on-shout talent", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.85,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+						psyker_shout_vent_warp_charge = 1,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("preserve_peril", rule)
+		end)
+
+		it("still vents at very high peril with the talent-aware threshold", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0.90,
+					talents = {
+						psyker_damage_based_on_warp_charge = 1,
+						psyker_warp_glass_cannon = 1,
+						psyker_shout_vent_warp_charge = 1,
+					},
+				})
+			)
 			assert.is_true(ok)
 			assert.matches("high_peril", rule)
 		end)
@@ -382,6 +463,71 @@ describe("heuristics", function()
 			assert.matches("threat_window", rule)
 		end)
 
+		it("widens the high-peril ceiling for Warp Unbound builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.95,
+					opportunity_target_enemy = "opp_unit",
+					talents = {
+						psyker_overcharge_stance_infinite_casting = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("target_window", rule)
+		end)
+
+		it("keeps Warp Unbound as the final high-peril ceiling when combined with reduced-warp-charge", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.95,
+					opportunity_target_enemy = "opp_unit",
+					talents = {
+						psyker_overcharge_reduced_warp_charge = true,
+						psyker_overcharge_stance_infinite_casting = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("target_window", rule)
+		end)
+
+		it("lowers the threat gate for Disrupt Destiny or weakspot-kill Scrier builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.50,
+					challenge_rating_sum = 3.2,
+					talents = {
+						psyker_new_mark_passive = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("threat_window_build", rule)
+		end)
+
+		it("treats weakspot-kill Scrier builds as aggressive even without Disrupt Destiny", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					peril_pct = 0.50,
+					challenge_rating_sum = 3.2,
+					talents = {
+						psyker_overcharge_weakspot_kill_bonuses = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("threat_window_build", rule)
+		end)
+
 		it("bypasses peril gate when peril is 0 (bot no warp attacks)", function()
 			local ok, rule = evaluate(
 				T,
@@ -421,6 +567,22 @@ describe("heuristics", function()
 			assert.matches("combat_density", rule)
 		end)
 
+		it("does not spend Scrier's Gaze on a lone enemy in the zero-peril fallback for aggressive builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					peril_pct = 0,
+					challenge_rating_sum = 2.0,
+					talents = {
+						psyker_new_mark_passive = true,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
 		it("still blocks at peril 0 with low threat", function()
 			local ok, rule = evaluate(
 				T,
@@ -432,6 +594,48 @@ describe("heuristics", function()
 			)
 			assert.is_false(ok)
 			assert.matches("hold", rule)
+		end)
+
+		it("logs once when build-aware psyker heuristics receive a nil talents table", function()
+			local debug_logs = {}
+			local DiagnosticHeuristics = helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+			})
+			local first_context = ctx({
+				num_nearby = 3,
+				peril_pct = 0.50,
+				challenge_rating_sum = 6.0,
+			})
+			local second_context = ctx({
+				num_nearby = 3,
+				peril_pct = 0.50,
+				challenge_rating_sum = 6.0,
+			})
+
+			first_context.talents = nil
+			second_context.talents = nil
+
+			DiagnosticHeuristics.evaluate_heuristic(T, first_context)
+			DiagnosticHeuristics.evaluate_heuristic(T, second_context)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("missing_talents_context:psyker", debug_logs[1].key)
+			assert.matches(
+				"psyker heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				debug_logs[1].message,
+				1,
+				true
+			)
 		end)
 	end)
 
@@ -633,6 +837,176 @@ describe("heuristics", function()
 			)
 			assert.is_true(ok)
 			assert.matches("ranged_pack", rule)
+		end)
+
+		it("allows armor-pen builds to spend Point-Blank Barrage on hard range targets", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					challenge_rating_sum = 2.0,
+					target_is_super_armor = true,
+					talents = {
+						ogryn_special_ammo_armor_pen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("armor_pen_target", rule)
+		end)
+
+		it("allows armor-pen builds to spend Point-Blank Barrage on the current priority target", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy = "priority_unit",
+					priority_target_enemy = "priority_unit",
+					target_enemy_distance = 8,
+					challenge_rating_sum = 1.0,
+					talents = {
+						ogryn_special_ammo_armor_pen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("armor_pen_target", rule)
+		end)
+
+		it(
+			"does not spend armor-pen Barrage on a non-priority current target just because another priority enemy exists",
+			function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 1,
+						target_enemy = "current_unit",
+						priority_target_enemy = "other_priority_unit",
+						target_enemy_distance = 8,
+						challenge_rating_sum = 1.0,
+						talents = {
+							ogryn_special_ammo_armor_pen = true,
+						},
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("block_low_threat", rule)
+			end
+		)
+
+		it("lets fire-shots builds trigger on medium-range crowd pressure", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 2,
+					target_enemy_distance = 7,
+					target_enemy_type = "melee",
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_special_ammo_fire_shots = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("fire_shots_pressure", rule)
+		end)
+
+		it("relaxes the close-range block for no-movement-penalty builds", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 3.5,
+					challenge_rating_sum = 3.0,
+					urgent_target_enemy = "urgent",
+					talents = {
+						ogryn_special_ammo_movement = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("urgent_target", rule)
+		end)
+
+		it("uses toughness-regen builds as ranged sustain instead of only damage burst", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.45,
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_ranged_stance_toughness_regen = true,
+					},
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("toughness_regen_sustain", rule)
+		end)
+
+		it("does not use toughness-regen sustain when toughness is above the threshold", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					num_nearby = 1,
+					target_enemy_distance = 8,
+					target_enemy_type = "ranged",
+					toughness_pct = 0.65,
+					challenge_rating_sum = 2.0,
+					talents = {
+						ogryn_ranged_stance_toughness_regen = true,
+					},
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
+		end)
+
+		it("logs once when build-aware ogryn heuristics receive a nil talents table", function()
+			local debug_logs = {}
+			local DiagnosticHeuristics = helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+			})
+			local first_context = ctx({
+				num_nearby = 1,
+				target_enemy_distance = 8,
+				challenge_rating_sum = 3.0,
+				urgent_target_enemy = "urgent",
+			})
+			local second_context = ctx({
+				num_nearby = 1,
+				target_enemy_distance = 8,
+				challenge_rating_sum = 3.0,
+				urgent_target_enemy = "urgent",
+			})
+
+			first_context.talents = nil
+			second_context.talents = nil
+
+			DiagnosticHeuristics.evaluate_heuristic(T, first_context)
+			DiagnosticHeuristics.evaluate_heuristic(T, second_context)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("missing_talents_context:ogryn", debug_logs[1].key)
+			assert.matches(
+				"ogryn heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				debug_logs[1].message,
+				1,
+				true
+			)
 		end)
 	end)
 
@@ -1672,6 +2046,12 @@ describe("heuristics", function()
 	end)
 
 	describe("evaluate_grenade_heuristic", function()
+		before_each(function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+		end)
+
 		it("uses anti-horde rules for frag grenades", function()
 			local local_ctx = helper.make_context({ num_nearby = 6, challenge_rating_sum = 3.0 })
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
@@ -1681,6 +2061,60 @@ describe("heuristics", function()
 
 		it("holds frag grenades for small groups", function()
 			local local_ctx = helper.make_context({ num_nearby = 3, challenge_rating_sum = 1.0 })
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("uses frag grenades on severe elite packs even without bleed talent", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 3,
+				challenge_rating_sum = 4.5,
+				target_enemy_distance = 8,
+				talents = {},
+			})
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("lets bleed lower the frag elite-pack threshold", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				special_count = 1,
+				challenge_rating_sum = 4.0,
+				target_enemy_distance = 8,
+			})
+			local baseline_result, baseline_rule =
+				Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
+			assert.is_false(baseline_result)
+			assert.matches("hold", baseline_rule)
+
+			local local_ctx_bleed = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				special_count = 1,
+				challenge_rating_sum = 4.0,
+				target_enemy_distance = 8,
+				talents = {
+					veteran_grenade_apply_bleed = 1,
+				},
+			})
+			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx_bleed)
+			assert.is_true(result)
+			assert.matches("pressure", rule)
+		end)
+
+		it("holds frag grenades on small elite groups without enough pressure", function()
+			local local_ctx = helper.make_context({
+				num_nearby = 3,
+				elite_count = 2,
+				challenge_rating_sum = 3.5,
+				target_enemy_distance = 8,
+				talents = {},
+			})
 			local result, rule = Heuristics.evaluate_grenade_heuristic("veteran_frag_grenade", local_ctx)
 			assert.is_false(result)
 			assert.matches("hold", rule)
@@ -1726,6 +2160,36 @@ describe("heuristics", function()
 				"veteran_krak_grenade",
 				helper.make_context({
 					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_is_super_armor = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds krak grenades against non-armored specials so plasma can handle them", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					target_enemy = "hound",
+					target_breed_name = "chaos_hound",
+					target_is_elite_special = true,
+					target_is_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("uses krak grenades against named high-armor elites", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					target_enemy = "mauler",
+					target_breed_name = "renegade_executor",
 					target_is_elite_special = true,
 					target_enemy_distance = 9,
 				})
@@ -1775,6 +2239,68 @@ describe("heuristics", function()
 			assert.matches("horde", rule)
 		end)
 
+		it("uses standard Ogryn box on mixed elite packs outside melee range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_box",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					special_count = 1,
+					challenge_rating_sum = 4.5,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
+		end)
+
+		it("uses Ogryn frag as a scarce nuke against monsters", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					target_enemy = "plague_ogryn",
+					target_is_monster = true,
+					monster_count = 1,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("monster", rule)
+		end)
+
+		it("uses Ogryn frag on high-challenge mixed packs", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 3,
+					special_count = 1,
+					challenge_rating_sum = 6.0,
+					target_enemy = "crusher",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
+		end)
+
+		it("holds Ogryn frag on ordinary horde pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"ogryn_grenade_frag",
+				helper.make_context({
+					num_nearby = 6,
+					challenge_rating_sum = 3.5,
+					target_enemy = "poxwalker",
+					target_enemy_distance = 8,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
 		it("blocks priority grenades under crowd pressure", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"ogryn_grenade_friend_rock",
@@ -1810,6 +2336,7 @@ describe("heuristics", function()
 					num_nearby = 4,
 					target_enemy = "crusher",
 					target_is_elite_special = true,
+					target_is_super_armor = true,
 					target_enemy_distance = 9,
 				})
 			)
@@ -1855,6 +2382,247 @@ describe("heuristics", function()
 			)
 			assert.is_true(result)
 			assert.matches("pressure", rule)
+		end)
+
+		it("uses zealot shock grenades to interrupt clustered elite pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "rager",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.90,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("interrupt", rule)
+		end)
+
+		it("uses broker flash grenades to interrupt clustered specials without needing low toughness", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("interrupt", rule)
+		end)
+
+		it("holds broker flash grenades on isolated priority targets in calm states", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 1,
+					special_count = 1,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("uses broker tox grenades on monsters at safe range", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					target_enemy = "plague_ogryn",
+					target_is_monster = true,
+					monster_count = 1,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("monster", rule)
+		end)
+
+		it("uses broker tox grenades on high-challenge mixed packs", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 2,
+					special_count = 1,
+					challenge_rating_sum = 4.5,
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority_pack", rule)
+		end)
+
+		it(
+			"fires disruption interrupt_target when priority pressure is low but the focused target is elite/special",
+			function()
+				-- Isolates the target-interrupt branch from interrupt_pack: priority_pressure
+				-- below pack_targets, challenge_rating_sum below pack_challenge, but a
+				-- focused elite/special in a ≥3 cluster at safe distance.
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"broker_flash_grenade",
+					helper.make_context({
+						num_nearby = 3,
+						special_count = 1,
+						elite_count = 0,
+						challenge_rating_sum = 1.0,
+						target_enemy = "trapper",
+						target_is_elite_special = true,
+						target_enemy_distance = 8,
+						toughness_pct = 0.95,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("interrupt_target", rule)
+			end
+		)
+
+		it("fires disruption crowd on pure trash pressure with no priority target", function()
+			-- Isolates the crowd branch: no elite/special, no focused priority
+			-- target, but a crowd at or above crowd_nearby and crowd_challenge.
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 5,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("relaxes disruption pack_nearby by one while an ally is interacting", function()
+			-- num_nearby = pack_nearby - 1. Without the ally relaxation the pack
+			-- branch must NOT fire; the -1 offset is the only thing that flips
+			-- the throw from hold to interrupt_pack.
+			local baseline_ok, baseline_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					challenge_rating_sum = 3.5,
+					target_enemy = "rager",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+			assert.matches("hold", baseline_rule)
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					challenge_rating_sum = 3.5,
+					target_enemy = "rager",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax pack_nearby by one")
+			assert.matches("interrupt_pack", ally_rule)
+		end)
+
+		it("relaxes disruption crowd_nearby by one while an ally is interacting", function()
+			-- num_nearby = crowd_nearby - 1. No elite/special, no focused priority,
+			-- so only the crowd branch (or the defensive fallback) can fire.
+			local baseline_ok = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 0,
+					special_count = 0,
+					challenge_rating_sum = 2.5,
+					target_enemy = "poxwalker",
+					target_is_elite_special = false,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax crowd_nearby by one")
+			assert.matches("crowd", ally_rule)
+		end)
+
+		it("relaxes denial pack_nearby by one while an ally is interacting", function()
+			-- num_nearby = pack_nearby - 1 for broker_tox (pack_nearby = 4, so num_nearby = 3).
+			-- Without the relaxation the priority_pack branch fails and horde fallback
+			-- (min_nearby 6) cannot fire at 3; should return false.
+			local baseline_ok = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					monster_count = 0,
+					challenge_rating_sum = 4.0,
+					target_enemy = "shocktrooper",
+					target_is_elite_special = true,
+					target_is_monster = false,
+					target_enemy_distance = 8,
+					ally_interacting = false,
+				})
+			)
+			assert.is_false(baseline_ok, "baseline without ally_interacting must hold")
+
+			local ally_ok, ally_rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_tox_grenade",
+				helper.make_context({
+					num_nearby = 3,
+					elite_count = 2,
+					special_count = 0,
+					monster_count = 0,
+					challenge_rating_sum = 4.0,
+					target_enemy = "shocktrooper",
+					target_is_elite_special = true,
+					target_is_monster = false,
+					target_enemy_distance = 8,
+					ally_interacting = true,
+				})
+			)
+			assert.is_true(ally_ok, "ally_interacting must relax pack_nearby by one")
+			assert.matches("priority_pack", ally_rule)
 		end)
 
 		it("blocks shock mine only in melee range", function()
@@ -1905,6 +2673,7 @@ describe("heuristics", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
 				helper.make_context({
+					target_enemy = "gunner",
 					num_nearby = 3,
 					ranged_count = 2,
 					target_enemy_distance = 10,
@@ -1912,6 +2681,177 @@ describe("heuristics", function()
 			)
 			assert.is_true(result)
 			assert.matches("ranged", rule)
+		end)
+
+		it("lets charged staffs own ranged pack pressure instead of Assail", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
+					target_enemy = "rifleman",
+					target_enemy_type = "ranged",
+					target_enemy_distance = 10,
+					num_nearby = 4,
+					challenge_rating_sum = 2.5,
+					ranged_count = 2,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("staff_pack", rule)
+		end)
+
+		it("still uses Assail on specials while a charged staff is wielded", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_is_special = true,
+					target_enemy_distance = 10,
+					num_nearby = 4,
+					challenge_rating_sum = 2.5,
+					ranged_count = 2,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("lets charged staffs own ordinary elite packs instead of Assail", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p4_m1",
+					target_enemy = "rager",
+					target_is_elite = true,
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+					num_nearby = 3,
+					challenge_rating_sum = 3.0,
+					elite_count = 2,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("staff_pack", rule)
+		end)
+
+		it("holds Assail ranged pressure when no target unit is resolved", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					num_nearby = 3,
+					ranged_count = 2,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("holds Assail crowd soften when the balanced shard reserve is not met", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 4,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("low_charges", rule)
+		end)
+
+		it("uses Assail crowd soften when the balanced shard reserve is met", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 5,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("still starts Assail crowd soften with enough shards while a charged staff is wielded", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 5,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("lets aggressive Assail crowd soften start one shard earlier than balanced", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 7,
+				num_nearby = 5,
+				challenge_rating_sum = 2.5,
+				grenade_charges_remaining = 4,
+			})
+
+			local ok_agg, rule_agg = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "aggressive",
+			})
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "balanced",
+			})
+
+			assert.is_true(ok_agg)
+			assert.matches("crowd", rule_agg)
+			assert.is_false(ok_bal)
+			assert.matches("low_charges", rule_bal)
+		end)
+
+		it("makes conservative Assail crowd soften require one more shard than balanced", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 7,
+				num_nearby = 5,
+				challenge_rating_sum = 2.5,
+				grenade_charges_remaining = 5,
+			})
+
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "balanced",
+			})
+			local ok_con, rule_con = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", context, {
+				preset = "conservative",
+			})
+
+			assert.is_true(ok_bal)
+			assert.matches("crowd", rule_bal)
+			assert.is_false(ok_con)
+			assert.matches("low_charges", rule_con)
+		end)
+
+		it("holds Assail crowd soften when the remaining shard count is unavailable", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = nil,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("unknown_charges", rule)
 		end)
 
 		it("holds Assail on super armor", function()
@@ -1928,7 +2868,35 @@ describe("heuristics", function()
 			assert.matches("super_armor", rule)
 		end)
 
-		it("holds Assail at high peril", function()
+		it("uses Assail below the configured warp peril threshold", function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+				warp_weapon_peril_threshold = function()
+					return 0.95
+				end,
+			})
+
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					target_enemy = "gunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+					peril_pct = 0.90,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds Assail at or above the configured warp peril threshold", function()
+			helper.init_split_heuristics(Heuristics, {
+				combat_ability_identity = CombatAbilityIdentity,
+				warp_weapon_peril_threshold = function()
+					return 0.95
+				end,
+			})
+
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
 				helper.make_context({
@@ -1940,6 +2908,165 @@ describe("heuristics", function()
 			)
 			assert.is_false(result)
 			assert.matches("peril", rule)
+		end)
+
+		it("paces fire grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_fire_grenade",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 10,
+					num_nearby = 6,
+					challenge_rating_sum = 3.0,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces smoke grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_smoke_grenade",
+				helper.make_context({
+					target_enemy = "gunner",
+					target_enemy_distance = 10,
+					ranged_count = 3,
+					toughness_pct = 0.35,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("lets aggressive non-explosive pacing reopen at six seconds while balanced still blocks", function()
+			local context = helper.make_context({
+				target_enemy = "gunner",
+				target_enemy_distance = 10,
+				ranged_count = 3,
+				toughness_pct = 0.35,
+				seconds_since_last_grenade_charge = 6.0,
+			})
+
+			local ok_agg, rule_agg = Heuristics.evaluate_grenade_heuristic("veteran_smoke_grenade", context, {
+				preset = "aggressive",
+			})
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("veteran_smoke_grenade", context, {
+				preset = "balanced",
+			})
+
+			assert.is_true(ok_agg)
+			assert.matches("pressure", rule_agg)
+			assert.is_false(ok_bal)
+			assert.matches("recent", rule_bal)
+		end)
+
+		it("allows fire grenades again once the pacing window expires", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_fire_grenade",
+				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 10,
+					num_nearby = 6,
+					challenge_rating_sum = 3.0,
+					seconds_since_last_grenade_charge = 9.0,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("horde", rule)
+		end)
+
+		it("keeps conservative non-explosive pacing closed at nine seconds while balanced already allows", function()
+			local context = helper.make_context({
+				target_enemy = "poxwalker",
+				target_enemy_distance = 10,
+				num_nearby = 6,
+				challenge_rating_sum = 3.0,
+				seconds_since_last_grenade_charge = 9.0,
+			})
+
+			local ok_bal, rule_bal = Heuristics.evaluate_grenade_heuristic("zealot_fire_grenade", context, {
+				preset = "balanced",
+			})
+			local ok_con, rule_con = Heuristics.evaluate_grenade_heuristic("zealot_fire_grenade", context, {
+				preset = "conservative",
+			})
+
+			assert.is_true(ok_bal)
+			assert.matches("horde", rule_bal)
+			assert.is_false(ok_con)
+			assert.matches("recent", rule_con)
+		end)
+
+		it("paces zealot shock grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_shock_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					elite_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "rager",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.90,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces broker flash grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces improved broker flash grenades after a recent confirmed throw", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"broker_flash_grenade_improved",
+				helper.make_context({
+					num_nearby = 4,
+					special_count = 2,
+					challenge_rating_sum = 4.0,
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 8,
+					toughness_pct = 0.95,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
+		end)
+
+		it("paces shock mines after a recent confirmed deploy", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"adamant_shock_mine",
+				helper.make_context({
+					num_nearby = 5,
+					challenge_rating_sum = 3.5,
+					elite_count = 3,
+					target_enemy = "rager",
+					target_enemy_distance = 8,
+					seconds_since_last_grenade_charge = 4.0,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("recent", rule)
 		end)
 
 		it("keeps zealot throwing knives opted out of the melee gate", function()
@@ -1970,6 +3097,37 @@ describe("heuristics", function()
 			assert.matches("priority", rule)
 		end)
 
+		it("de-prioritizes manual Smite on ordinary elite or special targets when smite-on-hit is equipped", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					talents = { psyker_smite_on_hit = 1 },
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_enemy_distance = 12,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("proc_cover", rule)
+		end)
+
+		it("keeps manual Smite live for bombers when smite-on-hit is equipped", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					talents = { psyker_smite_on_hit = 1 },
+					target_enemy = "poxburster",
+					target_is_elite_special = true,
+					target_is_bomber = true,
+					target_enemy_distance = 12,
+					peril_pct = 0.50,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
 		it("holds Smite at high peril", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",
@@ -1984,7 +3142,7 @@ describe("heuristics", function()
 			assert.matches("peril", rule)
 		end)
 
-		it("keeps Smite opted out of the melee gate", function()
+		it("blocks Smite under close melee pressure on non-hard targets", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_smite",
 				helper.make_context({
@@ -1995,8 +3153,23 @@ describe("heuristics", function()
 					peril_pct = 0.50,
 				})
 			)
+			assert.is_false(result)
+			assert.matches("melee_pressure", rule)
+		end)
+
+		it("still allows Smite on super-armor targets under moderate pressure", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_smite",
+				helper.make_context({
+					num_nearby = 3,
+					target_enemy = "crusher",
+					target_is_super_armor = true,
+					target_enemy_distance = 7,
+					peril_pct = 0.50,
+				})
+			)
 			assert.is_true(result)
-			assert.matches("priority", rule)
+			assert.matches("super_armor", rule)
 		end)
 
 		it("uses Chain Lightning for low-peril crowd control", function()
@@ -2203,6 +3376,7 @@ describe("heuristics", function()
 		local saved_position_lookup
 		local saved_script_unit
 		local saved_alive
+		local saved_unit
 		local liquid_results_return_mode
 		local liquid_area_system
 		local side_system
@@ -2211,6 +3385,7 @@ describe("heuristics", function()
 		local script_unit_extensions
 		local game_object_ids
 		local game_object_fields
+		local unit_alive_lookup
 
 		before_each(function()
 			liquid_results_return_mode = "table"
@@ -2222,9 +3397,11 @@ describe("heuristics", function()
 			saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 			saved_script_unit = rawget(_G, "ScriptUnit")
 			saved_alive = rawget(_G, "ALIVE")
+			saved_unit = rawget(_G, "Unit")
 			script_unit_extensions = nil
 			game_object_ids = {}
 			game_object_fields = {}
+			unit_alive_lookup = {}
 
 			_G.Managers = {
 				state = {
@@ -2266,6 +3443,11 @@ describe("heuristics", function()
 			}
 			_G.ALIVE = {
 				mastiff = true,
+			}
+			_G.Unit = {
+				alive = function(unit)
+					return unit_alive_lookup[unit] == true
+				end,
 			}
 			_G.ScriptUnit = {
 				has_extension = function(unit, extension_name)
@@ -2314,6 +3496,7 @@ describe("heuristics", function()
 			_G.POSITION_LOOKUP = saved_position_lookup
 			_G.ScriptUnit = saved_script_unit
 			_G.ALIVE = saved_alive
+			_G.Unit = saved_unit
 			_G.GameSession = nil
 		end)
 
@@ -2343,10 +3526,17 @@ describe("heuristics", function()
 		end)
 
 		it("captures the live companion unit and positions in context", function()
+			_G.ALIVE.target_enemy = true
 			script_unit_extensions = {
 				hazard_bot = {
 					companion_spawner_system = helper.make_companion_spawner_extension({
 						companion_units = { "mastiff" },
+					}),
+				},
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
 					}),
 				},
 			}
@@ -2362,7 +3552,25 @@ describe("heuristics", function()
 			assert.equals("target_pos", context.target_enemy_position)
 		end)
 
+		it("captures the live companion when ALIVE is missing but Unit.alive succeeds", function()
+			_G.ALIVE.mastiff = nil
+			unit_alive_lookup.mastiff = true
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals("mastiff", context.companion_unit)
+			assert.equals("dog_pos", context.companion_position)
+		end)
+
 		it("treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+			_G.ALIVE.target_enemy = true
 			game_object_ids.target_enemy = "daemonhost_go"
 			game_object_fields.daemonhost_go = { stage = 5 }
 			script_unit_extensions = {
@@ -2423,6 +3631,20 @@ describe("heuristics", function()
 			assert.equals(0, context.melee_count)
 		end)
 
+		it("captures the current weapon template in context", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					unit_data_system = helper.make_player_unit_data_extension({
+						weapon_action = { template_name = "forcestaff_p1_m1" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals("forcestaff_p1_m1", context.current_weapon_template_name)
+		end)
+
 		it("defaults when no allies are interacting", function()
 			side_system = helper.make_side_system_double({
 				side_by_unit = {
@@ -2450,6 +3672,32 @@ describe("heuristics", function()
 				},
 			})
 			_G.ALIVE.ally_unit = true
+			script_unit_extensions = {
+				ally_unit = {
+					unit_data_system = helper.make_player_unit_data_extension({
+						character_state = { state_name = "interacting" },
+						interacting_character_state = { interaction_template = "scanning" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.is_true(context.ally_interacting)
+			assert.equals("scanning", context.ally_interaction_type)
+			assert.equals("ally_unit", context.ally_interacting_unit)
+			assert.equals("shield", context.ally_interaction_profile)
+		end)
+
+		it("detects live ally interactions when ALIVE is missing but Unit.alive succeeds", function()
+			side_system = helper.make_side_system_double({
+				side_by_unit = {
+					hazard_bot = {
+						valid_player_units = { "hazard_bot", "ally_unit" },
+					},
+				},
+			})
+			unit_alive_lookup.ally_unit = true
 			script_unit_extensions = {
 				ally_unit = {
 					unit_data_system = helper.make_player_unit_data_extension({
@@ -2624,6 +3872,86 @@ describe("heuristics", function()
 			assert.equals("close_ally", context.ally_interacting_unit)
 			assert.equals("shield", context.ally_interaction_profile)
 			assert.is_true(math.abs(context.ally_interacting_distance - 5) < 0.001)
+		end)
+
+		it("exposes empty talents + zero current_stacks for vanilla bots lacking extensions", function()
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
+			assert.equals(0, context.current_stacks("zealot_martyrdom_base"))
+			assert.equals(0, context.current_stacks("any_other_buff"))
+		end)
+
+		it("surfaces talent tiers and buff stacks when player extensions are present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = {
+							zealot_martyrdom = 1,
+							zealot_blazing_piety = 3,
+						},
+					}),
+					buff_system = helper.make_player_buff_extension({
+						stacks = {
+							zealot_martyrdom_base = 2,
+							psyker_warp_charge = 4,
+						},
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.talents["zealot_martyrdom"])
+			assert.equals(3, context.talents["zealot_blazing_piety"])
+			assert.is_nil(context.talents["zealot_not_taken"])
+			assert.equals(2, context.current_stacks("zealot_martyrdom_base"))
+			assert.equals(4, context.current_stacks("psyker_warp_charge"))
+			assert.equals(0, context.current_stacks("absent_buff"))
+		end)
+
+		it("keeps current_stacks at zero when only the talent extension is present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = { zealot_martyrdom = 1 },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(1, context.talents["zealot_martyrdom"])
+			assert.equals(0, context.current_stacks("zealot_martyrdom_base"))
+		end)
+
+		it("keeps talents empty when only the buff extension is present", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					buff_system = helper.make_player_buff_extension({
+						stacks = { psyker_warp_charge = 5 },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
+			assert.equals(5, context.current_stacks("psyker_warp_charge"))
+		end)
+
+		it("falls back to empty talents when the talent extension returns nil", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					talent_system = helper.make_player_talent_extension({
+						talents = nil,
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.are.same({}, context.talents)
 		end)
 	end)
 
@@ -2844,7 +4172,11 @@ describe("heuristics", function()
 						})
 					)
 					assert.is_true(result)
-					assert.matches("priority", rule)
+					if grenade.template == "psyker_smite" then
+						assert.matches("monster", rule)
+					else
+						assert.matches("priority", rule)
+					end
 				end)
 			end
 		end)
@@ -2940,7 +4272,7 @@ describe("heuristics", function()
 					})
 				)
 				assert.is_true(result)
-				assert.matches("priority", rule)
+				assert.matches("monster", rule)
 			end)
 		end)
 	end)

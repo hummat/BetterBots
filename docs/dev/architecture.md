@@ -54,7 +54,7 @@ This mod targets bot ability activation in three paths:
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
     - **Semantic combat-ability gate**: shared templates resolve through `combat_ability_identity.lua`; Veteran shout routes to `enable_shouts`, Veteran stance/base/unknown falls back to `enable_stances` for settings compatibility, while engine metadata/input validation remains keyed by template name
-    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. Disabling all gates + all categories reverts to vanilla bot behavior.
+    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. `melee_improvements` covers both armor/horde attack selection and supported melee weapon specials; `ranged_improvements` covers ADS/charged-fire improvements plus supported shotgun special-shell preloads, rippergun bayonet rewrites, and direct ranged-bash/pistol-whip rewrites. Disabling all gates + all categories reverts to vanilla bot behavior.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
@@ -70,31 +70,38 @@ This mod targets bot ability activation in three paths:
     - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
     - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
 15. Warp weapon peril block (#27, via `weapon_action.lua`):
-    - blocks `weapon_action` inputs (except `wield`) for warp weapons at ≥97% peril
+    - blocks `weapon_action` inputs (except `wield`) for warp weapons at the configurable `warp_weapon_peril_threshold` slider (default ≥99% peril)
     - prevents Scrier's Gaze overcharge explosions by stopping warp weapon attacks at critical peril
+    - the same shared threshold is also used by Assail crowd-burst followups in `grenade_fallback.lua`
     - bots cannot manually vent — no BT node for warp charge venting (`should_reload` checks ammo, not peril); bots rely on passive auto-vent (3s delay, tiered decay rates)
 16. Poxburster targeting (#34, via `poxburster.lua`):
     - patches `chaos_poxwalker_bomber` breed data to remove `not_bot_target` flag, re-enabling targeting at range
     - hook `BotPerceptionExtension._update_target_enemy` (post-process): suppresses poxburster as target/opportunity/urgent/priority target when within 5m of the bot or within 8m of any human player
-17. Animation variable guard (#50, via `animation_guard.lua`):
+17. Elite/special pinging (#16, via `ping_system.lua`):
+    - hooks bot perception slots and emits contextual smart tags only for elites/specials/monsters with LOS
+    - retains anti-spam behavior (`hold_last_tag`, failure backoff, companion-target carve-outs)
+    - Focus Target veterans may override an existing enemy tag once so `enemy_over_here_veteran` can still proc on an already-tagged priority target; non-Focus-Target bots keep the normal `already_tagged` suppression
+18. Animation variable guard (#50, via `animation_guard.lua`):
     - hook `AuthoritativePlayerUnitAnimationExtension.anim_event_with_variable_float`
     - for bot units only, degrades invalid animation variable IDs (`nil` / `4294967295`) or lookup failures to a plain `anim_event`, matching vanilla's multi-variable fallback instead of crashing the animation path
-18. Smart-target seeding (#61/#62, via `smart_targeting.lua`):
+19. Smart-target seeding (#61/#62, via `smart_targeting.lua`):
     - hook `SmartTargetingActionModule.fixed_update`
     - swaps bot perception's selected target into `smart_targeting_extension:targeting_data().unit` only for the duration of vanilla `fixed_update()`
     - preserves vanilla sticky-targeting, soft-sticky fallback, and precision-range checks while giving bot-only precision blitzes a real enemy target to aim at
-19. Grenade ballistic aim correction (#93, via `grenade_fallback.lua`):
+20. Grenade ballistic aim correction (#93, via `grenade_fallback.lua`):
     - replaces flat `set_aim_position` only for supported gravity-affected projectile families in the grenade fallback path
     - resolves projectile locomotion data from the equipped grenade weapon template at runtime, then mirrors vanilla `Trajectory.angle_to_hit_moving_target(...)` solving with target-velocity lead
     - uses `set_aim_rotation` for standard grenades, handleless grenades, Ogryn grenade throws, and zealot throwing knives; preserves flat fallback for near-flat, true-flight, and non-ballistic families
-20. Healing deferral (#39, via `healing_deferral.lua`):
+21. Healing deferral (#39, via `healing_deferral.lua`):
     - hook `BotBehaviorExtension._update_health_stations` (post-process): clears `needs_health` when any human player is below the configured threshold (default 90%) and the bot is not in the configured emergency override state (default <25%)
-    - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled
+    - when every eligible human is above reserve, the same hook now promotes health-station demand for any damaged non-Martyrdom bot and forces queue number `1`, overriding vanilla's heavier-damage threshold so slightly-damaged or corruption-only bots stop leaving spare medicae charges stranded
+    - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled; when humans are above reserve, vanilla's existing `needs_non_permanent_health` flag already gives crates an "any healable damage" onset
+    - Martyrdom zealots are an explicit exception to the generic emergency override: when healing deferral is enabled, live station and med-crate seams stay blocked so the bot preserves its low-health keystone value
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
-    - intentionally does not hook pocketable health pickups: the decompiled bot mule path is dead for medkits/wound cures, so BetterBots does not claim unsupported behavior
-21. Ammo, grenade, and mule pickup policy (#72 / #89 / #32, via `ammo_policy.lua` + `mule_pickup.lua`):
-    - hook `BotBehaviorExtension._update_ammo` (post-process): aligns ammo pickup onset with the configured opportunistic ranged threshold
-    - opportunistic ranged fire threshold (`condition_patch.lua`) and ammo pickup onset share one DMF numeric setting
+    - still does not claim generic wound-cure / give-to-ally pocketable behavior; Sprint 4 only ships medicae discipline here, with carried stims/crates handled separately in `pocketable_pickup.lua`
+22. Ammo, grenade, and mule pickup policy (#72 / #89 / #32 / #24 / #88, via `ammo_policy.lua` + `mule_pickup.lua` + `pocketable_pickup.lua`):
+    - hook `BotBehaviorExtension._update_ammo` (post-process): once every eligible human ammo user is above reserve, any missing ammo amount (`ammo_percentage < 1`) is enough to keep `needs_ammo` true; the configured opportunistic ranged threshold only survives as the desperation fallback while humans still need the resource
+    - opportunistic ranged fire threshold (`condition_patch.lua`) and the desperation branch in ammo pickup onset share one DMF numeric setting
     - ammo pickup is blocked unless every eligible human ammo user is above the configured reserve threshold
     - `small_grenade` pickup support piggybacks the same vanilla `pickup_component.ammo_pickup` slot because vanilla never routes `group = "ability"` grenade refills into bot pickup awareness
     - grenade refills bind for charge-based grenade users whenever every eligible human is above the configured reserve threshold; cooldown-only blitz users are ignored
@@ -106,35 +113,50 @@ This mod targets bot ability activation in three paths:
     - hook `BotBehaviorExtension._refresh_destination` (post-process): sanitizes live mule state (stale drops for any type; blocked references for whichever type is currently disabled)
     - hook `BotGroup.init`, `BotGroup._update_mule_pickups`, and setting-change sync: backfills missing mule slot caches on construction, then prunes cached reservations and explicit `slot_pocketable` pickup orders immediately when a pickup type is disabled, so bots can fall through to the other type without waiting for the vanilla cache to expire
     - post-processes vanilla `_update_mule_pickups()` assignment to ignore the stock "suppress mule pickup while any human is within ~20m of the book" rule; BetterBots now claims the nearest eligible unassigned book for a bot with a free mule slot and an in-leash follow position, then marks destination refresh so ordinary book pickup can happen in the common nearby-player case
-    - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled; leaves orders for enabled types intact
-22. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
+    - `pocketable_pickup.lua` extends the same carry path to supported pocketables (`ammo_cache_pocketable`, `medical_crate_pocketable`, the three combat stims, and `syringe_corruption_pocketable`) by patching `bots_mule_pickup`, mirroring `inventory_slot_name -> slot_name`, and letting vanilla `PocketableInteraction.stop` perform the actual slot insert
+    - proactive pocketable assignment is human-first: BetterBots refuses to claim a supported pocketable while any human still has the matching slot open, unless the pickup came from an explicit bot order
+    - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled, rejects unsupported pocketables entirely, and leaves supported pocketable orders intact when the feature is enabled
+    - `update_dispatcher.lua` runs the carried pocketable state machine once the bot already owns the item: combat stims self-use on high-threat entry, the corruption-heal syringe self-uses conservatively when the bot itself needs healing/corruption relief and combat is calm, and ammo/medical crates auto-deploy only when at least two allies are in coherency, no enemy is currently engaged, and the team actually needs the resource
+    - `smart_tag_orders.lua` hooks `SmartTagSystem.set_contextual_unit_tag` for first-time item pings and `SmartTagSystem.trigger_tag_interaction` for already-tagged items, then routes explicit item-tag interactions back into the existing `BotOrder.pickup(...)` path instead of inventing a second order system
+    - smart-tag routing stays intentionally narrow for the MVP: ammo, world grenade refills, tomes/grimoires, and supported pocketables only; health stations and location-style interactions are ignored
+    - the routing layer reuses `MulePickup.should_block_pickup_order(...)` so existing BetterBots policy gates still apply (unsupported pocketables, disabled books, human-slot-open pocketables), selects the nearest eligible live bot on the interactor's side, and is guarded by the `enable_smart_tag_orders` setting plus a class-table hot-reload sentinel on `SmartTagSystem`
+22b. Communication-wheel response (#56, via `com_wheel_response.lua` + `settings.lua` + resource policy hooks):
+    - hooks `Vo.on_demand_vo_event` through a class-table hot-reload sentinel on `scripts/utilities/vo`, so vanilla and ForTheEmperor wheel events share one cheap Solo Play-safe detection point
+    - MVP scope is intentionally narrow: `com_cheer` temporarily overrides the resolved behavior preset to `aggressive`, while `com_need_ammo` and `com_need_health` set short-lived human request flags that `ammo_policy.lua` and `healing_deferral.lua` treat as stronger-than-reserve deferral signals
+    - the bridge is user-toggleable (`enable_com_wheel_responses`) and resets its transient request state on `GameplayStateRun` entry so one mission's wheel traffic cannot bleed into the next
+    - no fake location/pathing orders ship here; `Need Help`, `location_this_way`, and similar world-marker flows remain out of scope until BetterBots has a real movement-directive layer
+23. ADS fix for T5/T6 bots (#35, via `gestalt_injector.lua`):
     - hook `BotBehaviorExtension._init_blackboard_components`: injects default `bot_gestalts` (`ranged = "killshot"`, `melee = "linesman"`) when profile omits them
     - without this, engine falls back to `"none"` gestalt which disables aim-down-sights
-23. Bot sprinting (#36, via `sprint.lua`):
+24. Bot sprinting (#36, via `sprint.lua`):
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-24. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
+25. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
-25. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
-    - hook `BtBotMeleeAction._choose_attack`
+26. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
+    - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`; export the defend-suppression predicate into `poxburster.lua` so the existing single `_should_defend` hook owns both poxburster push setup and general melee attack-commit suppression
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
-26. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
+    - suppresses vanilla's blunt `num_melee_attackers() > 0` defend gate for low-count pressure against high-value armored commit targets when the current target is not actively attacking the bot
+    - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families
+    - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, 1H force swords stay targeted at elite/special/monster/super-armor value, 2H force swords instead require at least 10 stored special charges and an unarmored horde window, thunder hammers widen to armored/heavy elites plus captain/monster/boss, chain-family `toggle_special` weapons stay armor/heavy biased, ordinary human/Ogryn power mauls arm for high-health or armored targets, Ogryn `ogryn_club_p1_m2/m3` latrine shovels fold for high-health or armored targets, and direct combat axe/sword/knife plus Ogryn club/pickaxe/combat-blade specials use the same high-value target gate
+27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - feeds the BetterBots `_choose_attack` replacement with weapon-specific arc/penetration data instead of leaving bots on the vanilla light-only fallback
     - syncs with `enable_melee_improvements`: disabling the setting removes BetterBots-injected melee metadata from the live weapon templates so bots truly fall back to vanilla behavior
-27. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
+28. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
-28. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
-    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to `SustainedFire.observe_queued_weapon_action(...)`
-    - this avoids same-method hook clobbering between runtime weapon-action translation/protection and sustained-fire queue observation
+29. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
+    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to downstream observers rather than letting multiple modules hook the method independently
+    - `SustainedFire.observe_queued_weapon_action(...)` remains one observer, and `ranged_special_action.lua` now shares the same seam for shotgun special-shell preload tracking
+    - the same hook also exposes a narrow rewrite seam before the queued input is forwarded, so `ranged_special_action.lua` can rewrite supported shotgun fire requests into `special_action` without owning the engine hook itself
     - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
     - `BetterBots.lua` also owns the shared `hook_require("...group/bot_group")` callback for healing deferral + mule pickup and wraps `mod:hook_require` with a duplicate-path guard so same-path registrations fail loudly instead of silently clobbering each other
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
@@ -145,42 +167,74 @@ This mod targets bot ability activation in three paths:
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted finesse families (lasgun, autogun, bolter, stub revolver) when the template leaves `aim_at_node` unset (#91 MVP)
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-28. Melee target selection distance penalty (#19, via `target_selection.lua`):
+29a. Ranged weapon specials (#33 follow-up, via `ranged_special_action.lua` + `weapon_action.lua`):
+    - rewrites queued `shoot_pressed` / `zoom_shoot` inputs into `special_action` for the verified `ranged_load_special` shotgun families only (`shotgun_p1_m1/m2/m3`, `shotgun_p4_m1/m2`)
+    - rewrites queued close-range rippergun fire into `stab` for `ogryn_rippergun_p1_m1/m2/m3` when the current target is inside the configured bayonet distance and is elite/special/captain/monster/boss or armored/super-armor
+    - rewrites queued close-range Ogryn heavy-stubber p1 `shoot` fire into `stab` and thumper `shoot_pressed` fire into `bash` under the same target-value policy, controlled by the separate ranged-bash distance slider
+    - rewrites verified one-step human ranged bashes/pistol whips (`autogun_p2`, bolters, bolt pistols, flamer, laspistol, stub revolver, dual autopistols) under the same close-range target-value policy
+    - rewrite policy is target-value driven: visible elite/special/captain/monster/boss or armored/super-armor target required; `shotgun_p2_m1`, autogun p3, force-staff stabs, flashlight variants, mauls, and other hold/release or non-combat specials are still out of scope
+    - state is tracked per bot unit so BetterBots can log both shell-arm and shell-spend with the current target breed name, which is the validation signal for “loaded and used on something worthwhile” versus “loaded and wasted on trash”
+    - rippergun bayonet and direct ranged-bash support are single-step: successful queueing logs `queued rippergun bayonet ...` or `queued ranged bash ...` with template, target breed, bot slot, and original fire input
+30. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)
     - hook `BotTargetSelection.monster_weight` to restore vanilla monster weight when the boss/miniboss blackboard says it is explicitly aggroed on this bot, even if nearby trash would normally zero the weight (#18)
-29. Target-type hysteresis (#90, via `target_type_hysteresis.lua`):
+31. Target-type hysteresis (#90, via `target_type_hysteresis.lua`):
     - hooks `BotPerceptionExtension._update_target_enemy` after vanilla target selection writes `perception_component`, leaving BT and weapon actions untouched
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
-30. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
+31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
+    - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
+    - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
+    - the same `weapon_action.lua` hook stack also suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
+    - the shared stack now also carries the Voidblast (`forcestaff_p1_m1`) charged-shot fixes without stealing weakspot-owned hook slots:
+      - `_update_aim` provides scratchpad context plus temporary retarget freezing once a charge anchor exists and restores the forced target even if vanilla `_update_aim` throws
+      - `_wanted_aim_rotation` replaces the live `action_charge` torso tracking with a locked target-root anchor plus a short flat-velocity lead while keeping vanilla's straight-look vertical aim
+      - `_fire` forces the charged release through `trigger_explosion` when the p1 charge path would otherwise fall back to plain `shoot_pressed`
+    - `_set_new_aim_target` post-hook pins `scratchpad.aim_at_node` to a breed-specific node for Scab Mauler (`renegade_executor` → `j_spine`), to `j_head` for Bulwark only when the shield is open or the bot is outside the Bulwark's 70° blocking cone, and provisionally to `j_head` for Crusher only when the bot is in the rear arc
+    - an `_aim_position` wrapper re-evaluates the two stateful cases (Bulwark shield exposure, Crusher rear arc) while the target stays locked, so turning or shield-state changes update live instead of going stale for the rest of the burst; when the exposure disappears or the bot retargets away, BetterBots restores the cached baseline so overrides do not leak across targets
+    - baseline capture is lazy: the first `apply_override` call snapshots the current `scratchpad.aim_at_node` / `aim_at_node_charged` **before** mutation. An `enter`-level post-hook would be too late because vanilla `enter` calls `_set_new_aim_target` (and therefore our post-hook) before it returns, which on a Mauler-first acquisition would stamp the baseline with the already-overridden `j_spine`
+    - Bulwark/Crusher exposure uses the engine's flat-ground block-angle model (`x/y` only, same 0.01 epsilon as `scripts/utilities/attack/block.lua:_calculate_block_angle`) rather than a full 3D angle, so stairs and ledges do not falsely mark a frontal shield as exposed
+    - the Crusher path is explicitly provisional: the original "back-of-head node" claim is still not backed by the decompiled rig, so BetterBots does **not** invent a fake node name; it uses rear-arc `j_head` as a documented proxy until live validation or rig evidence says otherwise
+    - guards with `Unit.has_node` before assignment; when debug logging is enabled it emits one-shot warnings for Bulwark shield API drift (`weakspot_aim:shield_api_missing:<unit>`) and configured node drift (`weakspot_aim:missing_node:<breed>:<node>`), then falls back to the cached vanilla baseline
+    - runtime cost: one breed lookup on target acquisition for all breeds, plus live facing/shield checks only for Bulwark/Crusher while they remain the current target
+31b. Charge/dash nav validation (#13, via `charge_nav_validation.lua`):
+    - shared validator runs only after a charge/dash heuristic already wants to fire; it is not part of `build_context()` and does not add per-frame GwNav queries
+    - validates the launch endpoint the lunge will actually use: explicit ally aim for rescue charges, current targeted-dash enemy position for zealot dash variants, and `BotNavigationExtension:destination()` only as the fallback for directional charges
+    - wired into both `BtBotActivateAbilityAction.enter` and `ability_queue.lua`; both paths validate before mutating rescue aim, so a blocked charge does not leave `BotUnitInput` stuck on the ally position
+    - caches same-destination failures per bot for 0.5s; a refreshed destination bypasses the cache immediately, preventing repeated queries against an unchanged bad path while still allowing prompt retries after follow-path refresh
+    - exposed through the `enable_charge_nav_validation` setting so users have a kill switch if Fatshark changes BotNavigationExtension or GwNav behavior before BetterBots catches up
+32. Human-likeness Tier A tuning (#44, via `human_likeness.lua` + queue/leash integration):
     - resolves two DMF-driven profiles in `settings.lua`: `human_timing_profile` (`auto` / `off` / `fast` / `medium` / `slow` / `custom`) and `pressure_leash_profile` (`auto` / `off` / `light` / `medium` / `strong` / `custom`)
     - `auto` resolves independently from current mission difficulty: Sedition/Uprising → `slow`/`light`, Malice → `medium`/`medium`, Heresy → `fast`/`medium`, Damnation/Havoc → `fast`/`strong`
     - patches `BotSettings.opportunity_target_reaction_times.normal` from vanilla `10-20` to the selected timing profile (default medium = `2-4`), restoring the original values when timing is off
     - classifies fallback ability rules into `immediate`, `defensive`, and `opportunistic` jitter buckets; emergency/rescue/hazard rules still bypass jitter, defensive rules use the smaller defensive range, and opportunistic rules use the larger opportunistic range
     - scales BetterBots' effective melee engagement leash from the selected pressure profile (default medium = start at `12`, full at `30`, scale to `65%`, floor `7m`) instead of the old fixed half-leash model
-31. Runtime perf measurement (`perf.lua`):
+33. Runtime perf measurement (`perf.lua`):
     - central recorder keyed by the `enable_perf_timing` mod setting
     - instruments BetterBots-owned hot hooks and the main bot update slice with per-tag timing buckets
     - `/bb_perf` prints and resets the current recording window instead of toggling recording state
     - `GameplayStateRun` exit auto-dumps the same report to the console log with `bb-perf:auto:` prefixes when the recording window contains sampled bot frames, so mission-end and quit paths leave a perf snapshot even when `/bb_perf` is forgotten without spamming hub-only startup transitions
-32. Tiered debug log levels (#40, via `log_levels.lua`):
+34. Tiered debug log levels (#40, via `log_levels.lua`):
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
     - backward-compatible: nil `call_level` defaults to `"debug"`
-33. Shared rule tables (`shared_rules.lua`):
+34a. Combat utility diagnostics (via `debug.lua`):
+    - hook `BtRandomUtilityNode.evaluate` only for the bot tree's `in_combat` node and only performs expensive reads after `_debug_enabled()` passes
+    - logs the chosen branch/leaf, current utility scores, target type/distance, ally distance, and current weapon so close-range hesitation can be distinguished between utility choice (`follow` vs `combat`) and downstream action execution (`shoot`/`fight_melee`)
+35. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
-34. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
+36. Default class-diverse bot profiles (#45/#63, via `bot_profiles.lua`):
     - hook `BotSynchronizerHost.add_bot`: resolve per-slot class setting → swap archetype, weapons, talents, cosmetics, blessings/perks
     - hook `BotPlayer.set_profile` (#65): block lossy network-sync overwrite for BetterBots-resolved profiles (`_bb_resolved` sentinel). Tags profiles with `is_local_profile = true` to bypass 1.11+ `validate_talent_layouts` in `unit_templates.lua`
-35. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
+37. Coherency-anchored engagement leash (#47, via `engagement_leash.lua`):
     - hook `BtBotMeleeAction._allow_engage`: dynamically inflate `override_engage_range_to_follow_position` based on combat context (already engaged → 20m stickiness, post-charge grace → 20m for 4s, under melee attack → 20m, ranged foray → 20m when ranged enemy targets bot)
     - hook `BtBotMeleeAction._is_in_engage_range`: extend approach range from 6m to 10m when engagement extension conditions hold
     - coherency-scaled base leash: `max(12m, coherency_radius + 4m)` via `UnitCoherencyExtension:current_radius()`, hard cap 25m (30m with always-in-coherency talent)
     - per-bot state in weak-keyed table with 1s coherency cache refresh
-36. Team-level ability cooldown staggering (#14, via `team_cooldown.lua`):
+38. Team-level ability cooldown staggering (#14, via `team_cooldown.lua`):
     - pure state tracker: records activations per ability category, suppresses same-category activations from other bots within a time window
     - 3 categories: `taunt` (8s window), `aoe_shout` (6s), `dash` (4s) — roughly half the ability cooldown
     - stances and grenades excluded: stances are self-buffs (independent benefit), grenades are consumable charges (no regeneration)
@@ -205,7 +259,7 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 |---|---|---|
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
 | `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
-| `BtBotMeleeAction.attack` | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
+| `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
 
 **Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
 
@@ -267,6 +321,8 @@ The mod piggybacks on data the engine already computes. There are no new per-fra
 
 `/bb_perf` reports the sum of top-level instrumented BetterBots hook time over the current recording window, normalized as `µs/bot/frame` using bot update samples. Some rows are breakdown-only child tags for diagnosis; these appear in the per-tag table but are excluded from the headline total when their parent hook already includes the same work. Recording is controlled by the `enable_perf_timing` setting; the chat command only prints and resets accumulated counters. The same formatter is also emitted automatically on `GameplayStateRun` exit with the `bb-perf:auto:` prefix when the window contains at least one sampled bot frame.
 
+For v1.0.0 release decisions, BetterBots now treats perf as a mission-end benchmark problem, not a one-off headline chase. The canonical measurement is the mission-end `bb-perf:auto:` total from three combat-heavy Solo Play runs on the same build, with `Performance timings` enabled and other diagnostics quiet. The acceptance bar is **median <= `125 µs/bot/frame` with no single run > `140 µs/bot/frame`**. The old `<80 µs/bot/frame` target is retired because it was never backed by a stable protocol.
+
 **Hot paths (per fixed frame, per bot — ~90 calls/sec total with 3 bots):**
 
 | Path | Cost | Notes |
@@ -311,11 +367,11 @@ When implementing these issues, verify the change doesn't add per-frame engine c
 | Issue | Risk | What to watch |
 |---|---|---|
 | #4 Grenade/blitz support | **Low** | Same architecture — one more heuristic per bot. Context cache shared. |
-| #13 Navmesh validation for charges | **Medium-High** | Navmesh queries (`GwNavQueries`) are expensive. Must not run every frame — gate behind heuristic returning true, then validate once before queueing. Cache negative results with a cooldown. |
+| #13 Charge/dash nav validation | **Implemented** | Keep it as a post-heuristic one-shot check only. Do not move GwNav queries into `build_context()` or other per-frame hooks, and preserve the same-destination negative cache so repeated invalid launches do not spam `ray_can_go`. |
 | #15 Suppress dodge during ability hold | **Low** | One additional condition check in an existing hook. No new per-frame hook needed. |
 | #22 Utility-based ability scoring | **Low-Medium** | If it replaces if/else heuristics with a scoring pass over all abilities, context build is still cached. Scoring itself would be cheap. Risk is if it queries additional engine state per ability. |
 | #23 Smart melee attack selection | **Medium** | Could require reading weapon template data per frame. Keep reads cached and avoid per-frame `rawget` chains on large template tables. |
-| New per-frame hooks (general) | **Medium** | DMF hook dispatch has non-trivial cost (closure call + argument forwarding + chain-call). Currently 5 hooks on per-frame paths — acceptable. Consolidate logic into fewer hook sites rather than adding one hook per feature if count grows past ~10. |
+| New per-frame hooks (general) | **Medium** | DMF hook dispatch has non-trivial cost (closure call + argument forwarding + chain-call). Currently 6 hooks on per-frame paths — acceptable. Consolidate logic into fewer hook sites rather than adding one hook per feature if count grows past ~10. |
 
 ### Rules for new per-frame code
 

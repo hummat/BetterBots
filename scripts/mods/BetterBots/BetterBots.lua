@@ -23,12 +23,14 @@ local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_charge_event_by_unit = setmetatable({}, { __mode = "k" })
+local _pocketable_state_by_unit = setmetatable({}, { __mode = "k" })
 local _fallback_queue_dumped_by_key = {}
 local _decision_context_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _resolve_decision_cache_hits_logged_by_unit = setmetatable({}, { __mode = "k" })
 local _suppression_cache_by_unit = setmetatable({}, { __mode = "k" })
 local _session_start_state = { emitted = false }
+local _fixed_time_bootstrap_unavailable_logged = false
 local _SNAPSHOT_INTERVAL_S = 30
 local _last_snapshot_t_by_unit = setmetatable({}, { __mode = "k" })
 local _super_armor_breed_flag_by_name = {}
@@ -86,10 +88,6 @@ function mod:hook_require(path, callback)
 	return _original_hook_require(self, path, callback)
 end
 
-local function _fixed_time()
-	return FixedFrame.get_latest_fixed_time() or 0
-end
-
 local function _refresh_debug_log_level()
 	_log_level = LogLevels.resolve_setting(mod:get(DEBUG_SETTING_ID))
 end
@@ -112,6 +110,24 @@ local function _debug_log(key, fixed_t, message, min_interval_s, level)
 
 	_last_debug_log_t_by_key[key] = t
 	mod:echo("BetterBots DEBUG: " .. message:gsub("%%", "%%%%"))
+end
+
+local function _fixed_time()
+	local managers_state = Managers and Managers.state
+	local extension_manager = managers_state and managers_state.extension
+	if not extension_manager or not extension_manager.latest_fixed_t then
+		if not _fixed_time_bootstrap_unavailable_logged and _debug_enabled() then
+			_fixed_time_bootstrap_unavailable_logged = true
+			_debug_log(
+				"bootstrap:fixed_time_unavailable",
+				0,
+				"fixed_time unavailable during bootstrap; using 0 until extension manager is ready"
+			)
+		end
+		return 0
+	end
+
+	return FixedFrame.get_latest_fixed_time()
 end
 
 _refresh_debug_log_level()
@@ -294,6 +310,9 @@ assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
 assert(WeaponAction, "BetterBots: failed to load weapon_action module")
 
+local RangedSpecialAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ranged_special_action")
+assert(RangedSpecialAction, "BetterBots: failed to load ranged_special_action module")
+
 local SustainedFire = mod:io_dofile("BetterBots/scripts/mods/BetterBots/sustained_fire")
 assert(SustainedFire, "BetterBots: failed to load sustained_fire module")
 
@@ -318,8 +337,17 @@ assert(HealingDeferral, "BetterBots: failed to load healing_deferral module")
 local AmmoPolicy = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ammo_policy")
 assert(AmmoPolicy, "BetterBots: failed to load ammo_policy module")
 
+local ComWheelResponse = mod:io_dofile("BetterBots/scripts/mods/BetterBots/com_wheel_response")
+assert(ComWheelResponse, "BetterBots: failed to load com_wheel_response module")
+
 local MulePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/mule_pickup")
 assert(MulePickup, "BetterBots: failed to load mule_pickup module")
+
+local PocketablePickup = mod:io_dofile("BetterBots/scripts/mods/BetterBots/pocketable_pickup")
+assert(PocketablePickup, "BetterBots: failed to load pocketable_pickup module")
+
+local SmartTagOrders = mod:io_dofile("BetterBots/scripts/mods/BetterBots/smart_tag_orders")
+assert(SmartTagOrders, "BetterBots: failed to load smart_tag_orders module")
 
 local BotProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/bot_profiles")
 assert(BotProfiles, "BetterBots: failed to load bot_profiles module")
@@ -329,6 +357,12 @@ assert(HumanLikeness, "BetterBots: failed to load human_likeness module")
 
 local TargetTypeHysteresis = mod:io_dofile("BetterBots/scripts/mods/BetterBots/target_type_hysteresis")
 assert(TargetTypeHysteresis, "BetterBots: failed to load target_type_hysteresis module")
+
+local WeakspotAim = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weakspot_aim")
+assert(WeakspotAim, "BetterBots: failed to load weakspot_aim module")
+
+local ChargeNavValidation = mod:io_dofile("BetterBots/scripts/mods/BetterBots/charge_nav_validation")
+assert(ChargeNavValidation, "BetterBots: failed to load charge_nav_validation module")
 
 local EngagementLeash = mod:io_dofile("BetterBots/scripts/mods/BetterBots/engagement_leash")
 assert(EngagementLeash, "BetterBots: failed to load engagement_leash module")
@@ -368,10 +402,30 @@ TargetTypeHysteresis.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
 	is_enabled = function()
 		return Settings.is_feature_enabled("target_type_hysteresis")
 	end,
 	perf = Perf,
+})
+
+WeakspotAim.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	is_enabled = function()
+		return Settings.is_feature_enabled("weakspot_aim")
+	end,
+})
+
+ChargeNavValidation.init({
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_targeting = BotTargeting,
+	is_enabled = function()
+		return Settings.is_feature_enabled("charge_nav_validation")
+	end,
 })
 
 EngagementLeash.init({
@@ -411,6 +465,7 @@ Heuristics.init({
 	is_daemonhost_avoidance_enabled = function()
 		return Settings.is_feature_enabled("daemonhost_avoidance")
 	end,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 	context_module = HeuristicsContext,
 	veteran_module = HeuristicsVeteran,
 	zealot_module = HeuristicsZealot,
@@ -479,6 +534,7 @@ UpdateDispatcher.init({
 	debug = Debug,
 	ability_queue = AbilityQueue,
 	grenade_fallback = GrenadeFallback,
+	pocketable_pickup = PocketablePickup,
 	ping_system = PingSystem,
 	companion_tag = CompanionTag,
 	settings = Settings,
@@ -517,6 +573,7 @@ MeleeMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
 	is_enabled = function()
 		return Settings.is_feature_enabled("melee_improvements")
@@ -529,6 +586,7 @@ MeleeAttackChoice.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	is_enabled = function()
 		return Settings.is_feature_enabled("melee_improvements")
 	end,
@@ -540,9 +598,11 @@ RangedMetaData.init({
 	patched_weapon_templates = _patched_weapon_templates_ranged,
 	debug_log = _debug_log,
 	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
+	rippergun_bayonet_distance = Settings.rippergun_bayonet_distance,
 })
 
 TargetSelection.init({
@@ -568,6 +628,7 @@ Poxburster.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("poxburster")
 	end,
+	should_suppress_defend = MeleeAttackChoice.should_suppress_defend,
 })
 
 AnimationGuard.init({
@@ -608,9 +669,29 @@ WeaponAction.init({
 	fixed_time = _fixed_time,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	perf = Perf,
+	close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
+	is_weakspot_aim_enabled = function()
+		return Settings.is_feature_enabled("weakspot_aim")
+	end,
+})
+
+RangedSpecialAction.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	ARMOR_TYPE_ARMORED = ARMOR_TYPES and ARMOR_TYPES.armored,
+	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
+	is_enabled = function()
+		return Settings.is_feature_enabled("ranged_improvements")
+	end,
+	rippergun_bayonet_distance = Settings.rippergun_bayonet_distance,
+	ranged_bash_distance = Settings.ranged_bash_distance,
 })
 
 SustainedFire.init({
@@ -685,6 +766,7 @@ GrenadeFallback.init({
 	grenade_state_by_unit = _grenade_state_by_unit,
 	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
 	perf = Perf,
+	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 })
 
 PingSystem.init({
@@ -720,6 +802,7 @@ HealingDeferral.init({
 	debug_enabled = _debug_enabled,
 	fixed_time = _fixed_time,
 	perf = Perf,
+	com_wheel = ComWheelResponse,
 })
 
 AmmoPolicy.init({
@@ -730,8 +813,42 @@ AmmoPolicy.init({
 	perf = Perf,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
 	settings = Settings,
+	com_wheel = ComWheelResponse,
 	is_enabled = function()
 		return Settings.is_feature_enabled("ammo_policy")
+	end,
+})
+
+ComWheelResponse.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	is_enabled = function()
+		return Settings.is_feature_enabled("com_wheel_responses")
+	end,
+})
+
+PocketablePickup.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	state_by_unit = _pocketable_state_by_unit,
+	build_context = Heuristics.build_context,
+	is_enabled = function()
+		return Settings.is_feature_enabled("pocketable_support")
+	end,
+})
+
+SmartTagOrders.init({
+	mod = mod,
+	debug_log = _debug_log,
+	debug_enabled = _debug_enabled,
+	fixed_time = _fixed_time,
+	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	is_enabled = function()
+		return Settings.is_feature_enabled("smart_tag_orders")
 	end,
 })
 
@@ -746,6 +863,26 @@ MulePickup.init({
 	is_tome_pickup_enabled = function()
 		return Settings.is_feature_enabled("bot_tome_pickup")
 	end,
+	should_allow_mule_pickup = PocketablePickup.should_allow_mule_pickup,
+	should_block_pickup_order = PocketablePickup.should_block_pickup_order,
+})
+
+SmartTagOrders.wire({
+	should_block_pickup_order = MulePickup.should_block_pickup_order,
+	needs_ammo_pickup = function(unit)
+		local Ammo = require("scripts/utilities/ammo")
+		local missing_reserve_ammo = Ammo and not Ammo.reserve_ammo_is_full(unit) or false
+
+		return missing_reserve_ammo
+			or (
+				AmmoPolicy.needs_ammo_pickup_for_grenade_refill
+				and AmmoPolicy.needs_ammo_pickup_for_grenade_refill(unit)
+			)
+	end,
+})
+
+Settings.wire({
+	behavior_profile_override = ComWheelResponse.override_behavior_profile,
 })
 
 -- Wire cross-module references (late-bound to avoid circular deps)
@@ -755,6 +892,14 @@ ItemFallback.wire({
 	fallback_state_snapshot = Debug.fallback_state_snapshot,
 	evaluate_item_heuristic = Heuristics.evaluate_item_heuristic,
 	is_item_ability_enabled = Settings.is_item_ability_enabled,
+	query_weapon_switch_lock = function(unit)
+		local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+		if should_lock then
+			return should_lock, ability_name, lock_reason, slot_to_keep
+		end
+
+		return GrenadeFallback.should_lock_weapon_switch(unit)
+	end,
 })
 
 Debug.wire({
@@ -785,6 +930,7 @@ AbilityQueue.wire({
 	Debug = Debug,
 	EventLog = EventLog,
 	EngagementLeash = EngagementLeash,
+	ChargeNavValidation = ChargeNavValidation,
 	TeamCooldown = TeamCooldown,
 	CombatAbilityIdentity = CombatAbilityIdentity,
 	HumanLikeness = HumanLikeness,
@@ -801,6 +947,10 @@ end
 
 mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
 	_patch_human_likeness_bot_settings(BotSettings)
+end)
+
+mod:hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", function(BtRandomUtilityNode)
+	Debug.install_combat_utility_diagnostics(BtRandomUtilityNode)
 end)
 
 do
@@ -832,6 +982,14 @@ GrenadeFallback.wire({
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
 	bot_targeting = BotTargeting,
+	query_weapon_switch_lock = function(unit)
+		local should_lock, ability_name, lock_reason, slot_to_keep = ItemFallback.should_lock_weapon_switch(unit)
+		if should_lock then
+			return should_lock, ability_name, lock_reason, slot_to_keep
+		end
+
+		return GrenadeFallback.should_lock_weapon_switch(unit)
+	end,
 })
 
 local function _should_lock_weapon_switch(unit)
@@ -859,6 +1017,15 @@ local function _should_block_weapon_action_input(unit, action_input)
 	return GrenadeFallback.should_block_weapon_action_input(unit, action_input)
 end
 
+local function _rewrite_weapon_action_input(unit, action_input, raw_input)
+	return RangedSpecialAction.rewrite_weapon_action_input(unit, action_input, raw_input)
+end
+
+local function _observe_queued_weapon_action(unit, action_input, original_action_input)
+	SustainedFire.observe_queued_weapon_action(unit, action_input)
+	RangedSpecialAction.observe_queued_weapon_action(unit, action_input, original_action_input)
+end
+
 -- Register hooks for extracted modules
 TargetSelection.register_hooks()
 TargetTypeHysteresis.register_hooks()
@@ -872,12 +1039,16 @@ WeaponAction.register_hooks({
 	should_lock_weapon_switch = _should_lock_weapon_switch,
 	should_block_wield_input = _should_block_wield_input,
 	should_block_weapon_action_input = _should_block_weapon_action_input,
-	observe_queued_weapon_action = SustainedFire.observe_queued_weapon_action,
+	rewrite_weapon_action_input = _rewrite_weapon_action_input,
+	observe_queued_weapon_action = _observe_queued_weapon_action,
+	install_weakspot_aim = WeakspotAim.install_on_shoot_action,
 })
 ConditionPatch.register_hooks()
 HealingDeferral.register_hooks()
 AmmoPolicy.register_hooks()
+ComWheelResponse.register_hooks()
 MulePickup.register_hooks()
+SmartTagOrders.register_hooks()
 BotProfiles.register_hooks()
 EngagementLeash.register_hooks()
 ReviveAbility.register_hooks()
@@ -1031,7 +1202,13 @@ end)
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
 -- same mod on the same path silently clobber each other. Install all BotGroup
 -- hooks through one callback so healing deferral and mule pickup both survive.
+local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
 mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
+		return
+	end
+
+	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = true
 	HealingDeferral.install_bot_group_hooks(BotGroup)
 	MulePickup.install_bot_group_hooks(BotGroup)
 end)
@@ -1048,21 +1225,12 @@ mod:hook_require(
 				-- the original enter() reads first_person_component.rotation for
 				-- the lunge direction.
 				local ally_unit = _rescue_intent[unit]
+				local rescue_ally_position
 				if ally_unit then
 					_rescue_intent[unit] = nil
 					local ally_pos = POSITION_LOOKUP and POSITION_LOOKUP[ally_unit]
 					if ally_pos then
-						local input_ext = ScriptUnit.has_extension(unit, "input_system")
-						local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
-						if bot_input then
-							bot_input:set_aiming(true)
-							bot_input:set_aim_position(ally_pos)
-							_debug_log(
-								"rescue_aim:" .. tostring(unit),
-								_fixed_time(),
-								"rescue aim: directed charge toward disabled ally"
-							)
-						end
+						rescue_ally_position = ally_pos
 					end
 				end
 
@@ -1099,6 +1267,40 @@ mod:hook_require(
 							)
 							return
 						end
+					end
+					if gate_template and ChargeNavValidation.should_validate(gate_template) then
+						local nav_ok, nav_reason = ChargeNavValidation.validate(unit, gate_template, "bt_enter", {
+							blackboard = blackboard,
+							target_position = rescue_ally_position,
+						})
+						if not nav_ok then
+							if EventLog.is_enabled() then
+								EventLog.emit({
+									t = _fixed_time(),
+									event = "blocked",
+									bot = Debug.bot_slot_for_unit(unit),
+									ability = _equipped_combat_ability_name(unit),
+									template = gate_template,
+									source = "bt_enter",
+									reason = nav_reason,
+								})
+							end
+							return
+						end
+					end
+				end
+
+				if rescue_ally_position then
+					local input_ext = ScriptUnit.has_extension(unit, "input_system")
+					local bot_input = input_ext and input_ext.bot_unit_input and input_ext:bot_unit_input()
+					if bot_input then
+						bot_input:set_aiming(true)
+						bot_input:set_aim_position(rescue_ally_position)
+						_debug_log(
+							"rescue_aim:" .. tostring(unit),
+							_fixed_time(),
+							"rescue aim: directed charge toward disabled ally"
+						)
 					end
 				end
 
@@ -1343,6 +1545,7 @@ function mod.on_game_state_changed(status, state)
 		_refresh_debug_log_level()
 		Perf.enter_run()
 		BotProfiles.reset()
+		ComWheelResponse.reset()
 		TeamCooldown.reset()
 		for key in pairs(_fallback_queue_dumped_by_key) do
 			_fallback_queue_dumped_by_key[key] = nil
@@ -1388,6 +1591,11 @@ function mod.on_setting_changed(setting_id)
 
 	if setting_id == "enable_bot_grimoire_pickup" then
 		MulePickup.patch_pickups()
+		MulePickup.sync_live_bot_groups()
+	end
+
+	if setting_id == "enable_pocketable_support" then
+		PocketablePickup.patch_pickups()
 		MulePickup.sync_live_bot_groups()
 	end
 

@@ -10,6 +10,15 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 2. Tier 2 ability validation (`#1`)
 3. Tier 3 item-ability fallback validation (`#3`)
 4. Regression sanity checks (revive/rescue/navigation/basic combat)
+5. v1.0.0 release-validation queue (Sprint 1-6 code is landed on `dev/v1.0.0`; live runs still needed before release)
+
+## Current v1.0.0 Validation Queue (2026-04-18)
+
+- Sprint 2: confirm Martyrdom healing suppression, Shroudfield low-health carve-out, talent-aware Venting Shriek peril preservation, and Focus Target tag ownership in a real mission.
+- Sprint 3: confirm close-range ranged families keep ranged target type without breaking Purgatus charge-fire, and melee specials still arm correctly in live combat for both powered and chain-family rules.
+- Sprint 4: confirm supported pocketables are carried, wielded, consumed/deployed, and logged cleanly under both success and uncertain-end cases.
+- Sprint 5: confirm com-wheel requests reset cleanly between missions, smart-tag orders only fire on real tag set/override events, and explicit ammo tags still cover grenade-refill bots.
+- Sprint 6: cold-boot both load orders, grep raw logs for DMF warnings / parser noise, and re-check that the metadata guards restore original values on disable.
 
 ## Run Entry Template
 
@@ -52,6 +61,196 @@ Conclusion:
 ```
 
 ## Recorded Runs
+
+### Run 2026-04-22-v1-0-0-followup-02
+
+```text
+Run ID: 2026-04-22-v1-0-0-followup-02
+Date (local): 2026-04-22
+Date (UTC): 2026-04-22
+Git commit: local (post corruption-stim pickup follow-up)
+Log file: console-2026-04-22-10.46.31-a0fff67f-573b-4d89-9e32-eb3b9675ed14.log
+Bot lineup / abilities: current validation-first defaults — Veteran (Voice of Command + Focus Target + precision lasgun + chainsword), Zealot (Fury + Martyrdom + chainaxe + stub revolver), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + Kickback + latrine shovel)
+Map + difficulty: live mission test run (exact map/difficulty not recorded in log)
+
+Regression checks:
+- fresh launch / startup load: PASS
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 10:50:17 / 10:53:38 / 10:55:20, plus `psyker_stance_combat_density_build` at 10:51:45
+- Ogryn Point-Blank Barrage: PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_armor_pen_target)` at 10:50:27, `ogryn_gunlugger_ranged_pack` at 10:54:06, and `ogryn_gunlugger_high_threat` at 10:55:19
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+
+Sprint 3 / #103 + #105 evidence:
+- Chain-family melee special execution: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: `chainsword_p1_m1 action=special_action` at 10:50:17 and `chainaxe_p1_m2 action=special_action` at 10:50:19
+- Force sword melee special execution: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: `forcesword_p1_m1 action=special_action` at 10:50:18
+- Rippergun close-range ranged hold: PASS
+  - visual: unknown
+  - key lines / timestamps: repeated `ogryn_rippergun_p1_m2 action=zoom_shoot` / `holding sustained fire inputs` from 10:50:48 onward, with repeated same-window `type hold ranged over raw melee` lines
+- `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - key lines / timestamps: `forcestaff_p3_m1` did fire (`vent`, `charge`, `shoot_pressed`, later `grenade_ability`), but this run still has no isolated positive keep-ranged marker for the family
+
+Sprint 4 / pocketable carry evidence:
+- Combat stim pickup primitive: PASS
+  - key lines / timestamps: `assigned proactive mule pickup for syringe_power_boost_pocketable` at 10:52:49 and `mule pickup success: syringe_power_boost_pocketable (bot=5)` at 10:54:24
+- Smart-tag item bridge: PARTIAL PASS
+  - key lines / timestamps: repeated `smart-tag pickup ignored for syringe_power_boost_pocketable (reason=no_eligible_bot)` from 10:51:34 onward
+  - remaining gap: no positive `smart-tag pickup routed ...` line in this run
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` / `weakspot override applied` line in this run
+- Daemonhost avoidance (`#17`): UNKNOWN
+  - no real daemonhost spawn; only debug context lines with `target_is_dormant_daemonhost = false`
+
+Conclusion:
+- This run is enough to close `#103` and `#104`.
+- On a lenient close standard, it is also enough to close `#105`: autopistol already had live proof from the 2026-04-19 smoke run, and this run adds the missing rippergun live evidence.
+- This run is still not enough to close `#17`, `#92`, or `#96`, and it does not prove corruption-stim self-use yet.
+```
+
+### Run 2026-04-19-v1-0-0-smoke-01
+
+```text
+Run ID: 2026-04-19-v1-0-0-smoke-01
+Date (local): 2026-04-19
+Date (UTC): 2026-04-19
+Git commit: local (post weapon_action / weakspot_aim hook conflict fix)
+Log file: console-2026-04-19-13.47.30-9f74e98d-a19e-4398-b3bf-93c243233c93.log
+Bot lineup / abilities: validation-first lineup used in this run — Veteran (Voice of Command + Focus Target + boltgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electro staff + force sword), Ogryn (Point-Blank Barrage + armor-pen + rippergun + Bully Club)
+Map + difficulty: live mission smoke run
+
+Regression checks:
+- fresh launch / startup load: PASS
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 13:50:23 / 13:51:37 / 13:55:05, plus `psyker_stance_combat_density_build` at 13:52:21
+- Ogryn Point-Blank Barrage: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_ranged_pack)` at 13:52:12 / 13:54:55 / 13:56:58
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+  - remaining gap: no `ogryn_gunlugger_armor_pen_target` confirmation in this run
+
+Sprint 3 / #103 + #105 evidence:
+- Powered melee special prelude: PARTIAL PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=powered)` from 13:50:15 onward
+- Chain-family melee special prelude: PARTIAL PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before heavy_attack (family=chain)` and later `light_attack (family=chain)` from 13:51:02 onward
+  - remaining gap: current lineup only proves the equipped chain-family path, not all chain subfamilies
+- Autopistol close-range ADS suppression: PARTIAL PASS
+  - visual: unknown
+  - key lines / timestamps: `close-range hipfire suppressed ADS (family=autopistol, distance=7.95)` at 13:51:32
+- Rippergun / `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - no `close-range ranged family kept ranged target type` line for either family in this run
+
+Brain Burst / psyker_smite follow-up evidence:
+- Arbitration hold rules: PARTIAL PASS
+  - key lines / timestamps: `grenade_smite_block_melee_pressure`, `grenade_smite_block_melee_range`, and `grenade_smite_block_peril` all observed repeatedly from 13:50:19 onward
+  - remaining gap: no clean end-to-end positive execute trace on the intended hard target in this run; multiple `grenade aim aborted after revalidation` lines remain
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` line in this run
+
+Conclusion:
+- The `BtBotShootAction.enter` rehook warning is resolved in a real cold run: 0 BetterBots warnings, 0 Lua errors.
+- This run partially validates the validation-first lineup and the post-v0.11.3 follow-up batch, but it is not enough to close `#103`, `#104`, or `#105`.
+- Next targeted checks: weakspot aim, rippergun + `forcestaff_p3_m1` close-range hold, and a clean positive Brain Burst execution trace.
+```
+
+### Run 2026-04-20-v1-0-0-followup-01
+
+```text
+Run ID: 2026-04-20-v1-0-0-followup-01
+Date (local): 2026-04-20
+Date (UTC): 2026-04-20
+Git commit: 0cecb61 (dev/v1.0.0, local dirty)
+Log file: console-2026-04-20-18.30.47-c687b3e8-22d8-4beb-b875-379986fd2fd4.log
+Bot lineup / abilities: then-current defaults at run time — Veteran (Voice of Command + Focus Target + precision lasgun + power sword), Zealot (Fury + Martyrdom + heavy eviscerator + autopistol), Psyker (Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword), Ogryn (Point-Blank Barrage + armor-pen rippergun + Bully Club)
+Map + difficulty: live mission follow-up run
+
+Regression checks:
+- fresh launch / startup load: PASS
+  - dedicated new console log file for the session
+- duplicate startup spam: no
+- BetterBots warnings: no (`./bb-log warnings` = none)
+- Lua errors: no
+
+Sprint 2 / #104 evidence:
+- Psyker Scrier's Gaze: PARTIAL PASS
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued psyker_overcharge_stance ... (rule=psyker_stance_threat_window_build)` at 18:34:20 / 18:35:18 / 18:37:29 / 18:39:07
+- Ogryn Point-Blank Barrage: PASS (targeted armor-pen follow-up)
+  - visual: unknown
+  - charge consumed log: yes
+  - key lines / timestamps: `fallback queued ogryn_gunlugger_stance ... (rule=ogryn_gunlugger_armor_pen_target)` at 18:34:46 / 18:36:11
+  - blocking rules observed: `ogryn_gunlugger_block_melee_pressure`, `ogryn_gunlugger_block_target_too_close`, `ogryn_gunlugger_block_low_threat`
+
+Sprint 3 / #103 + #105 evidence:
+- 1H power sword melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=powersword_1h)` from 18:34:12 onward
+- Chain-family melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=chain)` from 18:34:21 onward
+- 1H force sword melee special prelude: PASS
+  - visual: unknown
+  - queue log: yes
+  - key lines / timestamps: repeated `melee special prelude queued before ... (family=forcesword_1h)` from 18:34:22 onward
+- Autopistol close-range ADS suppression: PASS
+  - visual: unknown
+  - key lines / timestamps: `close-range hipfire suppressed ADS (family=autopistol, distance=9.57)` at 18:33:36
+- Rippergun / `forcestaff_p3_m1` close-range ranged hold: UNKNOWN
+  - no `close-range ranged family kept ranged target type` line for either family in this run
+- Shotgun special-shell support: UNKNOWN
+  - no `armed shotgun special for` / `spent shotgun special for` lines in this run
+
+Brain Burst / psyker_smite follow-up evidence:
+- Proc-cover suppression: PASS
+  - key lines / timestamps: repeated `grenade held psyker_smite (rule=grenade_smite_block_proc_cover, ...)` from 18:33:19 onward, plus `grenade aim aborted after revalidation (rule=grenade_smite_block_proc_cover)` at 18:35:48 / 18:38:11
+- Positive executes preserved: PARTIAL PASS
+  - key lines / timestamps: `grenade queued wield for psyker_smite (rule=grenade_smite_monster)` at 18:34:49 / 18:35:06, `grenade external action confirmed for psyker_smite` at 18:34:52 (close); `grenade queued wield for psyker_smite (rule=grenade_smite_priority_target)` at 18:35:15 / 18:35:23 / 18:38:03 with `grenade external action confirmed for psyker_smite` at 18:35:26 (mid) / 18:38:05 (far)
+  - remaining gap: no explicit bomber-specific confirmation in this run
+
+Other gaps:
+- Weakspot aim (`#92`): UNKNOWN
+  - no `weakspot aim selected` line in this run despite the Veteran precision-lasgun default swap
+
+Conclusion:
+- The new Brain Burst proc-cover carve-out is working in a live run: manual casts are being suppressed by `grenade_smite_block_proc_cover` without removing positive monster / priority-target executes.
+- The melee special family split is live for `powersword_1h`, `chain`, and `forcesword_1h`.
+- `ogryn_gunlugger_armor_pen_target` now has positive live evidence.
+- This run still does not close `#92`, shotgun support validation, or the close-range rippergun / `forcestaff_p3_m1` hold path.
+```
 
 ### Run 2026-03-05-tier1-01
 
@@ -665,14 +864,16 @@ Date (UTC): 2026-03-11
 Git commit: 8cce4bd (fresh launch, no hot-reload)
 Log file: console-2026-03-11-20.01.33-7a0c9c5e-47ea-4b35-994c-aca0c09fc50b.log
 Bot lineup / abilities: Arbites (whistle), Psyker (smite), Zealot (throwing knives), Ogryn (cluster grenades)
-  Bot 2: forcestaff_p1_m1 (Voidstrike)
+  Bot 2: forcestaff_p1_m1 (Voidblast)
 Map + difficulty: Standard mission
 
 Staff charged fire (#43):
-- p1 Voidstrike (trigger_explosion): PASS
+- p1 Voidblast (trigger_explosion): PASS
   - _may_fire swap: fire=shoot_pressed -> aim_fire=trigger_explosion (20:04:16.133)
   - bot=2, weapon_template=forcestaff_p1_m1
 - All 4 staves now confirmed PASS (p2 Purgatus in earlier session, p3/p4 in earlier session, p1 this session)
+
+Later note (2026-04-23): that p1 signal turned out to be insufficient. A later live log still showed `forcestaff_p1_m1` entering `action_charge` and then falling back to plain `shoot_pressed` / `vent` with no `voidblast ...` confirmation, so the current branch treats p1 as re-validation pending after the live-`action_charge` fix.
 
 Grenade/blitz (#4):
 - Adamant whistle: PASS — 3/3 charge confirmed
@@ -1051,6 +1252,11 @@ Profile loading:
   - all 4 classes loaded successfully after hot-reload
   - user confirmed "works" — bots spawned with correct archetypes and weapons
   - Tertium "None" yield fix (#68): profile.name guard prevents overwriting
+
+Later default-profile swap (2026-04-20):
+- The shipped built-in defaults were later retuned for validation coverage and no longer match the April 7 lineup above.
+- Current defaults: Veteran = VoC + Focus Target + precision lasgun + chainsword; Zealot = Fury + Martyrdom + chainaxe + stub revolver; Psyker = Scrier's Gaze + Brain Rupture + electrokinetic staff + force sword; Ogryn = Point-Blank Barrage + Kickback + latrine shovel.
+- That later swap has static coverage and profile-loading coverage, but it does not yet have a dedicated live mission entry in this tracker.
     Tertium/SoloPlay external profiles (validated in earlier run 0)
 
 Ability activation:
@@ -1452,6 +1658,29 @@ Run ID: 2026-04-15-v0.11.0-small-grenade-confirmation
 Date (local): 2026-04-15
 Date (UTC): 2026-04-15
 Git commit: dev/v0.11.0 working tree after grenade-pickup success logging and sticky reservation fixes
+Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
+Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
+Map + difficulty: live combat session
+
+v0.11.0 evidence:
+- #89 grenade pickup heuristic: PASS
+  - policy log: yes
+  - standalone `small_grenade` success log: yes
+  - key lines / timestamps:
+    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:46:59.743 ... grenade pickup bound into ammo slot`
+    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:48:20.564 ... grenade pickup bound into ammo slot`
+    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
+  - supporting signals:
+    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
+    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+
+Conclusion:
+- #89 is closeable from this run.
+- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
+```
 
 ### Run 2026-04-15-v0.11.0-daemonhost-regression-03
 
@@ -1483,28 +1712,41 @@ Follow-up fix staged after this run:
 - restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
 - keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
 ```
-Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
-Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
-Map + difficulty: live combat session
 
-v0.11.0 evidence:
-- #89 grenade pickup heuristic: PASS
-  - policy log: yes
-  - standalone `small_grenade` success log: yes
-  - key lines / timestamps:
-    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
-    - `14:46:59.743 ... grenade pickup bound into ammo slot`
-    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
-    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
-    - `14:48:20.564 ... grenade pickup bound into ammo slot`
-    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
-  - supporting signals:
-    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
-    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+### Run 2026-04-24-v1.0.0-daemonhost-observation-04
+
+```text
+Run ID: 2026-04-24-v1.0.0-daemonhost-observation-04
+Date (local): 2026-04-24
+Date (UTC): 2026-04-24
+Git commit: dev/v1.0.0 after charged-weapon/blitz targeting fixes
+Log file: console-2026-04-24-09.15.48-d7fdfcb1-dd40-4a14-b8cd-de990858a54b.log
+Bot lineup / abilities: mixed squad; first segment preserved external profiles, second segment used BetterBots profiles
+Map + difficulty: live combat session with daemonhost spawn
+
+#17 daemonhost avoidance: INCONCLUSIVE / NOT VALIDATED
+- daemonhost spawned:
+  - `09:20:00.674 ... Spawned monster chaos_daemonhost successfully`
+- bots later targeted and engaged it:
+  - `09:22:29.102 ... bot 5 pinged chaos_daemonhost (reason: target_enemy)`
+  - `09:22:29.315 ... bot weapon: ... stubrevolver_p1_m2 ... action=grenade_ability ... target_breed=chaos_daemonhost`
+  - `09:22:29.315 ... bot weapon: ... lasgun_p3_m3 ... action=zoom_shoot ... target_breed=chaos_daemonhost`
+  - `09:22:29.340 ... grenade aim ballistic for veteran_krak_grenade ... target_breed=chaos_daemonhost`
+  - `09:22:29.341 ... grenade aim flat fallback for psyker_smite ... target_breed=chaos_daemonhost`
+  - `09:22:30.487 ... grenade releasing toward ... target_breed=chaos_daemonhost`
+- no `dormant_daemonhost` suppression lines appeared in this encounter
+- supporting context only shows BetterBots treating the current target as non-dormant:
+  - `09:21:36.777 ... [target_is_dormant_daemonhost] = false`
+  - later context snapshots also print `target_is_dormant_daemonhost = false`
+- adjacent logs:
+  - `console-2026-04-23-16.43.14-de19ea9a-78df-4316-b878-c15036ee76cd.log` spawned daemonhosts at `16:46:06.543` and `16:52:21.380`; bots pinged/restored monster weight for one at `16:47:12-16:47:25`, with no suppression proof
+  - `console-2026-04-24-08.21.22-853d01c4-0e56-4784-a2fd-7afb169be015.log` spawned a daemonhost at `08:24:58.361`, with no BetterBots engagement/suppression proof
 
 Conclusion:
-- #89 is closeable from this run.
-- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
+- this does not validate #17
+- if the daemonhost was already fully aggroed before `09:22:29`, bot commitment was expected
+- if it was still dormant or only waking, this is still a daemonhost-avoidance failure
+- the text log lacks the decisive first-action `target_daemonhost_stage` / `target_daemonhost_aggro_state` values, so the next validation pass needs those values logged when a daemonhost target/action is allowed or suppressed
 ```
 
 ### Run 2026-04-16-v0.11.0-target-type-hysteresis-closure
