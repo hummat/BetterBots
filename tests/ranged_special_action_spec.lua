@@ -403,6 +403,86 @@ describe("ranged_special_action", function()
 		assert.is_truthy(find_debug_log("queued ranged bash for ogryn_heavystubber_p1_m3 target=renegade_executor"))
 	end)
 
+	it("rewrites direct human ranged bash fire for armored elite targets", function()
+		local cases = {
+			{ template = "autogun_p2_m1", fire_input = "shoot", expected_input = "special_action" },
+			{ template = "bolter_p1_m1", fire_input = "shoot_pressed", expected_input = "special_action" },
+			{ template = "boltpistol_p1_m2", fire_input = "zoom_shoot", expected_input = "special_action" },
+			{ template = "flamer_p1_m1", fire_input = "shoot_braced", expected_input = "special_action" },
+			{ template = "laspistol_p1_m3", fire_input = "shoot_pressed", expected_input = "special_action_push" },
+			{
+				template = "stubrevolver_p1_m2",
+				fire_input = "shoot_pressed",
+				expected_input = "special_action_pistol_whip",
+			},
+			{ template = "dual_autopistols_p1_m1", fire_input = "shoot", expected_input = "weapon_special" },
+		}
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		for _, case in ipairs(cases) do
+			local bot_unit = "bot_" .. case.template
+			local target_unit = "crusher_" .. case.template
+
+			mount_bot(bot_unit, case.template, false)
+			mount_target(target_unit, {
+				name = "renegade_executor",
+				tags = { elite = true },
+			})
+			set_target(bot_unit, target_unit, 2.4)
+
+			local action_input, raw_input =
+				RangedSpecialAction.rewrite_weapon_action_input(bot_unit, case.fire_input, nil)
+
+			assert.equals(case.expected_input, action_input, case.template)
+			assert.is_nil(raw_input)
+		end
+	end)
+
+	it("keeps hold-release ranged bash families unsupported", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+
+		mount_bot(bot_unit, "autogun_p3_m1", false)
+		set_target(bot_unit, target_unit, 2.4)
+		assert.equals("shoot", RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot", nil))
+
+		mount_bot(bot_unit, "shotgun_p2_m1", false)
+		set_target(bot_unit, target_unit, 2.4)
+		assert.equals("shoot_pressed", RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil))
+	end)
+
+	it("logs queued direct human ranged bashes against the current target breed", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		mount_bot(bot_unit, "stubrevolver_p1_m2", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		RangedSpecialAction.observe_queued_weapon_action(bot_unit, "special_action_pistol_whip", "shoot_pressed")
+
+		assert.is_truthy(find_debug_log("queued ranged bash for stubrevolver_p1_m2 target=renegade_executor"))
+	end)
+
 	it("does not rewrite when the shotgun special is already active", function()
 		local bot_unit = "bot_1"
 		local target_unit = "crusher_1"

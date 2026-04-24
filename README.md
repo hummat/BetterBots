@@ -25,10 +25,10 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
-- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets/ranged bashes, and supported shotgun special shells
+- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
 - Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
-- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, rippergun bayonet/ranged bash range, and warp-weapon max peril
+- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, rippergun bayonet/direct ranged bash range, and warp-weapon max peril
 - Smart targeting, daemonhost avoidance, and poxburster safety toggles
 - Comprehensive busted test suite
 
@@ -95,7 +95,7 @@ Bots use 18 per-ability heuristic functions split across class-specific modules 
 - Melee horde light bias (slider, 0 = vanilla attack selection)
 - Warp weapon max peril before attack blocking
 - Melee improvements toggle (also covers supported melee weapon specials)
-- Ranged improvements toggle (also covers supported shotgun shells, bayonets, and ranged bashes)
+- Ranged improvements toggle (also covers supported shotgun shells, bayonets, and direct ranged bashes/pistol whips)
 - Smart blitz targeting toggle
 - Daemonhost avoidance toggle
 - Poxburster safe targeting toggle

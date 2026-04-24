@@ -35,14 +35,28 @@ local SUPPORTED_RIPPERGUN_TEMPLATES = {
 }
 
 local SUPPORTED_RANGED_BASH_TEMPLATES = {
+	autogun_p2_m1 = "special_action",
+	autogun_p2_m2 = "special_action",
+	autogun_p2_m3 = "special_action",
+	bolter_p1_m1 = "special_action",
+	bolter_p1_m2 = "special_action",
+	boltpistol_p1_m1 = "special_action",
+	boltpistol_p1_m2 = "special_action",
+	dual_autopistols_p1_m1 = "weapon_special",
+	flamer_p1_m1 = "special_action",
+	laspistol_p1_m1 = "special_action_push",
+	laspistol_p1_m3 = "special_action_push",
 	ogryn_heavystubber_p1_m1 = "stab",
 	ogryn_heavystubber_p1_m2 = "stab",
 	ogryn_heavystubber_p1_m3 = "stab",
 	ogryn_thumper_p1_m1 = "bash",
+	stubrevolver_p1_m1 = "special_action_pistol_whip",
+	stubrevolver_p1_m2 = "special_action_pistol_whip",
 }
 
 local FIRE_ACTION_INPUTS = {
 	shoot = true,
+	shoot_braced = true,
 	shoot_pressed = true,
 	zoom_shoot = true,
 }

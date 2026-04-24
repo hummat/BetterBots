@@ -356,11 +356,11 @@ return {
 			.. "and only against valuable targets. Set to 0 to disable bayonet rewrites.",
 	},
 	ranged_bash_distance = {
-		en = "Ranged bash range (m)",
+		en = "Ranged bash/whip range (m)",
 	},
 	ranged_bash_distance_description = {
-		en = "Bots use supported ranged weapon bashes instead of firing only inside this distance, "
-			.. "and only against valuable targets. Set to 0 to disable ranged bash rewrites.",
+		en = "Bots use supported ranged weapon bashes and pistol whips instead of firing only inside this distance, "
+			.. "and only against valuable targets. Set to 0 to disable ranged bash/whip rewrites.",
 	},
 	bot_ranged_ammo_threshold = {
 		en = "Bot ammo reserve (%%)",
