@@ -628,6 +628,7 @@ Poxburster.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("poxburster")
 	end,
+	should_suppress_defend = MeleeAttackChoice.should_suppress_defend,
 })
 
 AnimationGuard.init({
@@ -946,6 +947,10 @@ end
 
 mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
 	_patch_human_likeness_bot_settings(BotSettings)
+end)
+
+mod:hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", function(BtRandomUtilityNode)
+	Debug.install_combat_utility_diagnostics(BtRandomUtilityNode)
 end)
 
 do

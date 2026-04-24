@@ -9,8 +9,10 @@ local _fixed_time
 local _armored_type
 local _super_armor_type
 local _armor
+local _is_enabled
 local _logged_choice_keys = {}
 local _logged_missing_special_action_meta = {}
+local _logged_defend_suppression_keys = {}
 local _melee_horde_light_bias
 local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
@@ -390,7 +392,7 @@ local function _is_power_sword_target(scratchpad, target_breed, target_armor)
 		return true
 	end
 
-	return num_nearby >= 2
+	return num_nearby >= 2 and num_nearby <= 3
 end
 
 local function _is_high_health_target(target_breed)
@@ -662,7 +664,121 @@ local function _armor_api()
 	return _armor
 end
 
-local _is_enabled
+local function _target_breed(target_unit)
+	local unit_data_extension = target_unit
+			and ScriptUnit
+			and ScriptUnit.has_extension
+			and ScriptUnit.has_extension(target_unit, "unit_data_system")
+		or nil
+
+	return unit_data_extension and unit_data_extension.breed and unit_data_extension:breed() or nil
+end
+
+local function _num_melee_attackers(scratchpad)
+	local attack_intensity_extension = scratchpad and scratchpad.attack_intensity_extension or nil
+	if not attack_intensity_extension or not attack_intensity_extension.num_melee_attackers then
+		return nil
+	end
+
+	local ok, attackers = pcall(attack_intensity_extension.num_melee_attackers, attack_intensity_extension)
+	return ok and attackers or nil
+end
+
+local function _target_is_attacking_me(self, unit, target_unit)
+	if not (self and self._is_attacking_me) then
+		return false
+	end
+
+	local ok, attacking = pcall(self._is_attacking_me, self, unit, target_unit)
+	return ok and attacking == true or false
+end
+
+local function _is_commit_defend_suppression_target(target_breed, target_armor)
+	local tags = target_breed and target_breed.tags or nil
+	if target_breed and target_breed.is_boss or tags and (tags.monster or tags.captain) then
+		return false
+	end
+
+	if _super_armor_type ~= nil and target_armor == _super_armor_type then
+		return true
+	end
+
+	local armored_bucket = _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
+	if tags and (tags.elite or tags.special) and armored_bucket then
+		return true
+	end
+
+	return _is_high_health_target(target_breed)
+end
+
+local function _log_defend_suppressed(unit, target_unit, scratchpad, target_breed, attackers, nearby)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local weapon_template = scratchpad and scratchpad.weapon_template or nil
+	local weapon_name = tostring(weapon_template and (weapon_template.name or weapon_template.display_name) or "weapon")
+	local breed_name = tostring(target_breed and target_breed.name or "unknown")
+	local key = tostring(unit)
+		.. ":"
+		.. tostring(target_unit)
+		.. ":"
+		.. tostring(attackers)
+		.. ":"
+		.. tostring(nearby)
+		.. ":"
+		.. weapon_name
+
+	if _logged_defend_suppression_keys[key] then
+		return
+	end
+	_logged_defend_suppression_keys[key] = true
+
+	_debug_log(
+		"melee_defend_suppressed:" .. key,
+		_fixed_time(),
+		"melee defend suppressed for attack commit (target="
+			.. breed_name
+			.. ", attackers="
+			.. tostring(attackers)
+			.. ", nearby="
+			.. tostring(nearby)
+			.. ", weapon="
+			.. weapon_name
+			.. ")"
+	)
+end
+
+local function should_suppress_defend(self, unit, target_unit, scratchpad, target_breed_override)
+	if _is_enabled and not _is_enabled() then
+		return false
+	end
+
+	local attackers = _num_melee_attackers(scratchpad)
+	if not attackers or attackers <= 0 or attackers > 2 then
+		return false
+	end
+
+	local nearby = scratchpad and scratchpad.num_enemies_in_proximity or attackers
+	if nearby > 3 then
+		return false
+	end
+
+	local target_breed = target_breed_override or _target_breed(target_unit)
+	local armor = _armor_api()
+	local target_armor = armor and armor.armor_type(target_unit, target_breed) or nil
+	if not _is_commit_defend_suppression_target(target_breed, target_armor) then
+		return false
+	end
+
+	if _target_is_attacking_me(self, unit, target_unit) then
+		return false
+	end
+
+	_log_defend_suppressed(unit, target_unit, scratchpad, target_breed, attackers, nearby)
+
+	return true
+end
 
 function M.init(deps)
 	_mod = deps.mod
@@ -797,5 +913,6 @@ function M.register_hooks() end
 
 M.choose_attack_meta_data = choose_attack_meta_data
 M.DEFAULT_ATTACK_META_DATA = DEFAULT_ATTACK_META_DATA
+M.should_suppress_defend = should_suppress_defend
 
 return M

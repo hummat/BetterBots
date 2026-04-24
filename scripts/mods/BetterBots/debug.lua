@@ -11,6 +11,8 @@ local _build_context
 local _resolve_decision
 local _enemy_breed
 local _can_use_item_fallback
+local _combat_utility_logged_by_unit = setmetatable({}, { __mode = "k" })
+local COMBAT_UTILITY_DIAGNOSTIC_SENTINEL = "__bb_combat_utility_diagnostics_installed"
 
 local function fmt_percent(value)
 	if value == nil then
@@ -52,7 +54,7 @@ local function enemy_unit_label(enemy_unit)
 		return "none"
 	end
 
-	local breed = _enemy_breed(enemy_unit)
+	local breed = _enemy_breed and _enemy_breed(enemy_unit) or nil
 
 	return (breed and breed.name) or tostring(enemy_unit)
 end
@@ -190,6 +192,122 @@ local function _bot_blackboard(unit)
 	local brain = behavior_extension and behavior_extension._brain
 
 	return brain and brain._blackboard or nil
+end
+
+local function _node_name(node)
+	local tree_node = node and node.tree_node
+
+	return tree_node and tree_node.name or "none"
+end
+
+local function _format_score(action)
+	if not action then
+		return "unknown=n/a"
+	end
+
+	local score = action.utility_score
+	if score == nil then
+		return tostring(action.name or "unknown") .. "=n/a"
+	end
+
+	return tostring(action.name or "unknown") .. "=" .. string.format("%.2f", score)
+end
+
+local function _format_utility_scores(action_list)
+	if type(action_list) ~= "table" then
+		return "n/a"
+	end
+
+	local parts = {}
+	for i = 1, #action_list do
+		parts[#parts + 1] = _format_score(action_list[i])
+	end
+
+	return #parts > 0 and table.concat(parts, ",") or "n/a"
+end
+
+local function _combat_target_label(perception)
+	local target_unit = perception and perception.target_enemy
+	if not target_unit then
+		return "none"
+	end
+
+	return enemy_unit_label(target_unit)
+end
+
+local function _combat_weapon_label(unit)
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
+	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action")
+
+	return tostring(inventory_component and inventory_component.wielded_slot or "none")
+		.. "/"
+		.. tostring(weapon_action_component and weapon_action_component.template_name or "none")
+end
+
+local function _log_combat_utility(unit, blackboard, t, self_node, leaf_node, evaluate_utility, running_child_nodes)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local node_identifier = self_node and self_node.identifier
+	local branch_node = node_identifier and running_child_nodes and running_child_nodes[node_identifier] or nil
+	local branch_name = _node_name(branch_node)
+	local leaf_name = _node_name(leaf_node)
+	local perception = blackboard and blackboard.perception
+	local target_unit = perception and perception.target_enemy
+	if not target_unit then
+		return
+	end
+
+	local slot = bot_slot_for_unit(unit) or "?"
+	local weapon_label = _combat_weapon_label(unit)
+	local log_key = table.concat({
+		tostring(unit),
+		branch_name,
+		leaf_name,
+		tostring(target_unit),
+		tostring(perception and perception.target_enemy_type or "none"),
+		weapon_label,
+	}, ":")
+	local last = _combat_utility_logged_by_unit[unit]
+
+	if last and last.key == log_key then
+		return
+	end
+
+	_combat_utility_logged_by_unit[unit] = {
+		key = log_key,
+		t = t,
+	}
+
+	_debug_log(
+		"combat_utility:" .. tostring(unit),
+		t,
+		"combat utility selected "
+			.. tostring(branch_name)
+			.. "/"
+			.. tostring(leaf_name)
+			.. " (bot="
+			.. tostring(slot)
+			.. ", reeval="
+			.. tostring(evaluate_utility == true)
+			.. ", scores="
+			.. _format_utility_scores(self_node and self_node._action_list)
+			.. ", target="
+			.. _combat_target_label(perception)
+			.. ", target_type="
+			.. tostring(perception and perception.target_enemy_type or "none")
+			.. ", target_dist="
+			.. fmt_percent(perception and perception.target_enemy_distance or nil)
+			.. ", ally_dist="
+			.. fmt_percent(perception and perception.target_ally_distance or nil)
+			.. ", weapon="
+			.. weapon_label
+			.. ")",
+		1,
+		"debug"
+	)
 end
 
 local function log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
@@ -441,6 +559,84 @@ local function register_commands()
 	end)
 end
 
+local function install_combat_utility_diagnostics(BtRandomUtilityNode)
+	if not (_mod and _mod.hook and BtRandomUtilityNode) then
+		return
+	end
+
+	if rawget(BtRandomUtilityNode, COMBAT_UTILITY_DIAGNOSTIC_SENTINEL) then
+		return
+	end
+	BtRandomUtilityNode[COMBAT_UTILITY_DIAGNOSTIC_SENTINEL] = true
+
+	_mod:hook(
+		BtRandomUtilityNode,
+		"evaluate",
+		function(
+			func,
+			self,
+			unit,
+			blackboard,
+			scratchpad,
+			dt,
+			t,
+			evaluate_utility,
+			node_data,
+			old_running_child_nodes,
+			new_running_child_nodes,
+			last_leaf_node_running
+		)
+			local tree_node = self and self.tree_node
+			if not (_debug_enabled and _debug_enabled()) or not tree_node or tree_node.name ~= "in_combat" then
+				return func(
+					self,
+					unit,
+					blackboard,
+					scratchpad,
+					dt,
+					t,
+					evaluate_utility,
+					node_data,
+					old_running_child_nodes,
+					new_running_child_nodes,
+					last_leaf_node_running
+				)
+			end
+
+			local ok, leaf_node = pcall(
+				func,
+				self,
+				unit,
+				blackboard,
+				scratchpad,
+				dt,
+				t,
+				evaluate_utility,
+				node_data,
+				old_running_child_nodes,
+				new_running_child_nodes,
+				last_leaf_node_running
+			)
+
+			if not ok then
+				error(leaf_node, 0)
+			end
+
+			_log_combat_utility(
+				unit,
+				blackboard,
+				t or _fixed_time(),
+				self,
+				leaf_node,
+				evaluate_utility,
+				new_running_child_nodes
+			)
+
+			return leaf_node
+		end
+	)
+end
+
 return {
 	init = function(deps)
 		_mod = deps.mod
@@ -458,6 +654,7 @@ return {
 		_can_use_item_fallback = refs.can_use_item_fallback
 	end,
 	register_commands = register_commands,
+	install_combat_utility_diagnostics = install_combat_utility_diagnostics,
 	log_ability_decision = log_ability_decision,
 	context_snapshot = context_snapshot,
 	fallback_state_snapshot = fallback_state_snapshot,

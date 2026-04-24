@@ -57,23 +57,25 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback item blocked` | Tier 3 sequence failed (timeout, drift, etc.) |
 | `unsupported grenade template` | Grenade/blitz heuristic approved a template with no mapped throw profile |
 | `grenade queued <input> for <grenade>` | Grenade/blitz stage machine advanced a named input for a specific grenade; use this to distinguish Assail aimed `zoom`/`zoom_shoot` from crowd-burst `shoot` |
-| `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>` / `grenade aim unavailable for <grenade>` | Aim solver path chosen for the current grenade/blitz; strongest runtime signal for new Assail/area-grenade aiming logic |
+| `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>` / `grenade aim unavailable for <grenade>` | Aim solver path chosen for the current grenade/blitz; strongest runtime signal for new Assail/area-grenade aiming logic. Aim lines include `bot=`, `target=`, `target_alive=`, and `target_breed=` so no-LOS aborts can be correlated with later throws. `(no_los)` means the target perception reported wall occlusion, so the throw was refused before release. |
 | `grenade aim lost dead target for <grenade>` | The grenade/blitz had a target earlier in the sequence, but that unit died before release so BetterBots aborted instead of using a stale aim point |
 | `grenade charge query failed for <grenade>` | The live ability extension threw while BetterBots queried grenade/blitz charges; Assail crowd bursts then fail closed as `charges unknown` |
 | `grenade retained live precision target for <grenade>` | Precision blitz lost the live perception slot during the handoff but kept the already-resolved still-alive target instead of aborting immediately |
 | `grenade burst unavailable for <grenade>` | A depletion-style Assail crowd burst was refused because the live shard count could not be resolved, so BetterBots failed closed instead of guessing |
 | `grenade followup stopped at peril for <grenade>` | Assail or another multi-shot blitz stopped its followup chain because the configured shared warp peril line was reached |
 | `grenade followup stopped at peril guard for <grenade>` | A multi-shot blitz stopped defensively because the peril stop line was armed but the live peril reading disappeared |
-| `voidblast aim fallback` | `forcestaff_p1_m1` had a locked charge anchor but BetterBots had to fall back to vanilla aim because anchor resolution or direct-look rotation setup failed |
+| `voidblast aim fallback` | `forcestaff_p1_m1` had a locked charge anchor but BetterBots had to fall back to vanilla aim because anchor resolution, target-velocity lookup, or direct-look rotation setup failed |
 | `restored Voidblast locked target after vanilla _update_aim error` | BetterBots restored `perception_component.target_enemy` after a forced-target `forcestaff_p1_m1` `_update_aim` call threw |
 | `voidblast charged fire override` | `forcestaff_p1_m1` forced the charged release input (`trigger_explosion`) even though vanilla was still on the non-ADS `shoot_pressed` path |
+| `grenade deferred during active weapon charge` | Grenade fallback refused to interrupt an already-charging non-grenade weapon action, notably Voidblast staff `action_charge` |
 | `patched poxburster breed` | Poxburster `not_bot_target` flag removed (#34) |
 | `suppressed poxburster target_enemy (` | Bot cleared `target_enemy` when a poxburster was unsafe to shoot (#34) |
 | `suppressed poxburster opportunity_target_enemy (` / `suppressed poxburster urgent_target_enemy (` / `suppressed poxburster priority_target_enemy (` | Bot cleared unsafe poxbursters from the secondary perception slots (#34) |
 | `pushing poxburster (bypassed outnumbered gate)` | Bot forced the melee push path against a poxburster; key is per-bot via `scratchpad.unit` to avoid throttle collisions (#54) |
 | `injected default bot_gestalts` | T5/T6 bot received killshot/linesman gestalts (#35) |
 | `bot ADS confirmed (ranged_gestalt=` | Bot entered aim-down-sights with injected gestalt (#35) |
-| `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input |
+| `bot weapon: bot=` | Template-tagged queued weapon input for `#43` diagnosis; includes bot slot, wielded slot, weapon template, warp template, action, raw_input, target slot, target unit, target liveness, and target breed |
+| `combat utility selected` | Debug-only `BtRandomUtilityNode` diagnostic for the bot `in_combat` selector; shows chosen branch/leaf (`combat/shoot`, `follow/successful_follow`, etc.), utility scores, target type/distance, ally distance, and current weapon so hesitation can be localized to utility choice vs action execution. The selector is weighted-random, so the highest utility score does not always win. No-target follow selections are intentionally suppressed, and repeated identical selection/target/weapon tuples are logged once per bot. |
 | `stream action queued for` | Direct confirmation that a stream-specific queue input (`shoot_braced`, `trigger_charge_flame`, etc.) actually reached `bot_queue_action_input` successfully (#87) |
 | `patched opportunity reaction times` | Human-likeness timing patch applied live (#44) |
 | `HumanLikeness: BotSettings.opportunity_target_reaction_times is nil or missing .normal` | Human-likeness timing patch could not bind because the engine settings shape changed |
@@ -82,6 +84,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip at the perception/math layer (#90) |
 | `close-range ranged family kept ranged target type` | Supported close-range ranged family overrode the normal melee fallback and kept the bot in ranged mode (#41 narrow) |
 | `close-range hipfire suppressed ADS` | Supported close-range ranged family stayed in hipfire instead of ADS inside the close-range window (#41 narrow) |
+| `melee defend suppressed for attack commit` | BetterBots suppressed vanilla's broad melee block gate so the bot can commit attacks into a high-value armored target when only one or two melee attackers are registered and the current target is not actively attacking the bot |
 | `melee special prelude queued before` | Melee special was armed before the chosen attack; the `(family=...)` suffix now distinguishes `powersword_1h`, `powersword_2h`, `forcesword_1h`, `forcesword_2h`, `thunderhammer`, `chain`, `combat_axe_special`, `combat_sword_special`, `combat_knife_jab`, `powermaul`, `ogryn_powermaul`, `ogryn_latrine_shovel`, `ogryn_club_uppercut`, `ogryn_club_fist`, `ogryn_pickaxe`, and `ogryn_combatblade_uppercut` |
 | `armed shotgun special for` | Supported shotgun special-shell loader rewrote a queued fire input into `special_action`; line includes template, current target breed, bot slot, and the original fire input |
 | `spent shotgun special for` | A previously armed supported shotgun later fired; line includes template, current spend-time target breed, bot slot, and fire input so wasted shells can be distinguished from good spends |
@@ -90,7 +93,9 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `resolve_decision cache hit ` | Same-frame `Heuristics.resolve_decision(...)` reuse fired for a bot/template; direct runtime proof for the final `#82` BT↔fallback cache path |
 | `weakspot aim selected` | Bot entered `BtBotShootAction` with the head/spine weakspot aim table active while the `Weakspot aim` feature was enabled (#91) |
+| `normalized shoot scratchpad inputs` | `BtBotShootAction.enter` repaired stale/default fire, aim-fire, aim, or unaim inputs against the live wielded template before vanilla `_may_fire` validates them; for plasma, expect `fire=shoot_charge, aim_fire=shoot_charge` |
 | `suppressed stale shoot aim input` / `suppressed stale shoot unaim input` | `BtBotShootAction` tried to carry old ADS inputs onto a live non-aim weapon after a weapon/context change; BetterBots suppressed the stale queue instead of relying on the parser drop guard |
+| `plasma _may_fire blocked` | Plasma was selected for `combat/shoot`, but vanilla `_may_fire` refused to queue `shoot_charge`; includes the first block reason per scratchpad (`obstructed`, `aiming`, `range`, `invalid_input`, etc.) |
 | `fixed_time unavailable during bootstrap` | `_fixed_time()` is intentionally returning `0` during bootstrap because the extension manager is not ready yet; one-shot breadcrumb, not a failure |
 | `shoot scratchpad normalization skipped` | Bot shoot-action enter hook could not see `unit_data_system` or `visual_loadout_system`; #43 diagnostics are incomplete for that unit |
 | `shoot scratchpad normalization skipped for` | One-shot warning counterpart to the debug line above; emitted even with debug logs off so operators can still see why `#43` diagnostics were incomplete |
@@ -106,6 +111,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `ammo policy skipped: no pickup_component` | `_update_ammo` ran on a bot without a pickup component; ammo/grenade pickup policy did not run for that tick |
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `grenade blocked during <stage> by <ability> <reason>` | Grenade fallback hit the shared BetterBots slot-lock fast retry instead of idling into a wield timeout |
+| `grenade deferred during active weapon charge` | Grenade fallback saw a non-grenade charged weapon action in progress and skipped starting a new grenade/blitz sequence for that tick |
 | `grenade held <grenade> (rule=*_block_recent_use` | Non-explosive reuse pacing suppressed a second fire/smoke-style grenade too soon after the last confirmed spend |
 | `fallback item blocked <ability> (slot locked by <ability> <reason>)` | Item fallback hit the same shared slot-lock fast retry path |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |

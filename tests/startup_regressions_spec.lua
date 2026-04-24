@@ -109,6 +109,87 @@ local function count_hooks(hook_registrations, target, method_name, hook_type)
 	return count
 end
 
+local function trim(str)
+	return (str:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function line_for_position(source, position)
+	local line = 1
+	for _ in source:sub(1, position):gmatch("\n") do
+		line = line + 1
+	end
+
+	return line
+end
+
+local function read_call_argument(source, position)
+	local depth = 0
+	local quote
+	local escaped = false
+
+	for i = position, #source do
+		local char = source:sub(i, i)
+		if quote then
+			if escaped then
+				escaped = false
+			elseif char == "\\" then
+				escaped = true
+			elseif char == quote then
+				quote = nil
+			end
+		else
+			if char == '"' or char == "'" then
+				quote = char
+			elseif char == "(" or char == "{" or char == "[" then
+				depth = depth + 1
+			elseif char == ")" or char == "}" or char == "]" then
+				if depth > 0 then
+					depth = depth - 1
+				end
+			elseif char == "," and depth == 0 then
+				return trim(source:sub(position, i - 1)), i + 1
+			end
+		end
+	end
+
+	return nil, position
+end
+
+local function collect_method_hooks(path, source)
+	local hooks = {}
+	local patterns = {
+		{ hook_type = "hook_safe", pattern = "([_%w]*mod):hook_safe%s*%(" },
+		{ hook_type = "hook", pattern = "([_%w]*mod):hook%s*%(" },
+	}
+
+	for _, spec in ipairs(patterns) do
+		local position = 1
+		while true do
+			local start_pos, open_pos = source:find(spec.pattern, position)
+			if not start_pos then
+				break
+			end
+
+			local target, method_pos = read_call_argument(source, open_pos + 1)
+			local method_arg = target and read_call_argument(source, method_pos)
+			local method_name = method_arg and method_arg:match([[^%s*["']([^"']+)["']%s*$]])
+			if method_name then
+				hooks[#hooks + 1] = {
+					path = path,
+					line = line_for_position(source, start_pos),
+					target = target,
+					method_name = method_name,
+					hook_type = spec.hook_type,
+				}
+			end
+
+			position = open_pos + 1
+		end
+	end
+
+	return hooks
+end
+
 local function make_runtime_module(module_name, install_calls, extra)
 	local module = extra or {}
 
@@ -324,6 +405,9 @@ local function make_bootstrap_harness(module_overrides)
 			return 1
 		end,
 		register_commands = function() end,
+		install_combat_utility_diagnostics = function(...)
+			record_install("Debug", "install_combat_utility_diagnostics", ...)
+		end,
 		collect_alive_bots = function()
 			return {}
 		end,
@@ -1076,6 +1160,7 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", {
 			_update_target_enemy = function() end,
 		})
+		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", {})
 		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
 		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
 		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
@@ -1088,6 +1173,7 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
+		assert.is_truthy(find_install_call(harness.install_calls, "Debug", "install_combat_utility_diagnostics"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
 
@@ -1101,6 +1187,7 @@ describe("startup regressions", function()
 			"scripts/extension_systems/behavior/bot_behavior_extension",
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
+			"scripts/extension_systems/behavior/nodes/bt_random_utility_node",
 			"scripts/extension_systems/group/bot_group",
 			"scripts/extension_systems/input/bot_unit_input",
 			"scripts/extension_systems/perception/bot_perception_extension",
@@ -1553,6 +1640,40 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("local _original_hook_require = mod%._raw_hook_require", 1))
 		assert.is_truthy(source:find("local _hook_require_callsite_by_path = {}", 1, true))
 		assert.is_truthy(source:find("BetterBots duplicate hook_require for %%s", 1))
+	end)
+
+	it("rejects duplicate DMF method hook ownership across BetterBots source files", function()
+		local allowed_duplicates = {
+			-- Test-only legacy helpers kept beside the production consolidated
+			-- BotPerceptionExtension dispatcher; BetterBots.lua owns runtime install.
+			["BotPerceptionExtension::_update_target_enemy"] = true,
+		}
+		local owners_by_target_method = {}
+		local duplicates = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+			for _, hook in ipairs(collect_method_hooks(path, source)) do
+				local key = hook.target .. "::" .. hook.method_name
+				local owners = owners_by_target_method[key]
+				if not owners then
+					owners = {}
+					owners_by_target_method[key] = owners
+				end
+
+				owners[#owners + 1] = string.format("%s:%d:%s", hook.path, hook.line, hook.hook_type)
+			end
+		end)
+
+		for key, owners in pairs(owners_by_target_method) do
+			if #owners > 1 and not allowed_duplicates[key] then
+				table.sort(owners)
+				duplicates[#duplicates + 1] = key .. " => " .. table.concat(owners, ", ")
+			end
+		end
+
+		table.sort(duplicates)
+		assert.same({}, duplicates)
 	end)
 
 	it("keeps mod-local helper loading in BetterBots.lua instead of leaf modules", function()

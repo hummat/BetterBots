@@ -138,8 +138,9 @@ This mod targets bot ability activation in three paths:
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
 26. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
-    - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`
+    - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`; export the defend-suppression predicate into `poxburster.lua` so the existing single `_should_defend` hook owns both poxburster push setup and general melee attack-commit suppression
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
+    - suppresses vanilla's blunt `num_melee_attackers() > 0` defend gate for low-count pressure against high-value armored commit targets when the current target is not actively attacking the bot
     - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families
     - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, 1H force swords stay targeted at elite/special/monster/super-armor value, 2H force swords instead require at least 10 stored special charges and an unarmored horde window, thunder hammers widen to armored/heavy elites plus captain/monster/boss, chain-family `toggle_special` weapons stay armor/heavy biased, ordinary human/Ogryn power mauls arm for high-health or armored targets, Ogryn `ogryn_club_p1_m2/m3` latrine shovels fold for high-health or armored targets, and direct combat axe/sword/knife plus Ogryn club/pickaxe/combat-blade specials use the same high-value target gate
 27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
@@ -219,6 +220,9 @@ This mod targets bot ability activation in three paths:
     - replaces boolean debug toggle with info/debug/trace dropdown
     - `should_log(current_level, call_level)` gates `_debug_log` calls by severity
     - backward-compatible: nil `call_level` defaults to `"debug"`
+34a. Combat utility diagnostics (via `debug.lua`):
+    - hook `BtRandomUtilityNode.evaluate` only for the bot tree's `in_combat` node and only performs expensive reads after `_debug_enabled()` passes
+    - logs the chosen branch/leaf, current utility scores, target type/distance, ally distance, and current weapon so close-range hesitation can be distinguished between utility choice (`follow` vs `combat`) and downstream action execution (`shoot`/`fight_melee`)
 35. Shared rule tables (`shared_rules.lua`):
     - single source of truth for `DAEMONHOST_BREED_NAMES` and `RESCUE_CHARGE_RULES`
     - consumed by `condition_patch.lua`, `ability_queue.lua`, and `sprint.lua` to prevent cross-module drift
@@ -255,7 +259,7 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 |---|---|---|
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
 | `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
-| `BtBotMeleeAction.attack` | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
+| `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
 
 **Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
 
@@ -367,7 +371,7 @@ When implementing these issues, verify the change doesn't add per-frame engine c
 | #15 Suppress dodge during ability hold | **Low** | One additional condition check in an existing hook. No new per-frame hook needed. |
 | #22 Utility-based ability scoring | **Low-Medium** | If it replaces if/else heuristics with a scoring pass over all abilities, context build is still cached. Scoring itself would be cheap. Risk is if it queries additional engine state per ability. |
 | #23 Smart melee attack selection | **Medium** | Could require reading weapon template data per frame. Keep reads cached and avoid per-frame `rawget` chains on large template tables. |
-| New per-frame hooks (general) | **Medium** | DMF hook dispatch has non-trivial cost (closure call + argument forwarding + chain-call). Currently 5 hooks on per-frame paths — acceptable. Consolidate logic into fewer hook sites rather than adding one hook per feature if count grows past ~10. |
+| New per-frame hooks (general) | **Medium** | DMF hook dispatch has non-trivial cost (closure call + argument forwarding + chain-call). Currently 6 hooks on per-frame paths — acceptable. Consolidate logic into fewer hook sites rather than adding one hook per feature if count grows past ~10. |
 
 ### Rules for new per-frame code
 

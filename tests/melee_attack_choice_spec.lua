@@ -101,6 +101,54 @@ local function install_choose_attack_handler(MeleeAttackChoice, target_armor)
 	return choose_attack_handler
 end
 
+local function init_defend_suppression(MeleeAttackChoice, target_armor, opts)
+	opts = opts or {}
+	local debug_logs = {}
+	local stub_mod = {
+		hook = function() end,
+	}
+
+	_G.Armor = {
+		armor_type = function()
+			return target_armor
+		end,
+	}
+
+	MeleeAttackChoice.init({
+		mod = stub_mod,
+		debug_log = function(key, fixed_t, message)
+			debug_logs[#debug_logs + 1] = {
+				key = key,
+				fixed_t = fixed_t,
+				message = message,
+			}
+		end,
+		debug_enabled = function()
+			return opts.debug_enabled == true
+		end,
+		fixed_time = function()
+			return 13
+		end,
+		ARMOR_TYPE_ARMORED = ARMORED,
+		ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		is_enabled = opts.is_enabled,
+	})
+
+	return debug_logs
+end
+
+local function defend_scratchpad(num_attackers, num_nearby)
+	return {
+		num_enemies_in_proximity = num_nearby or num_attackers,
+		weapon_template = { name = "ogryn_club_p1_m1" },
+		attack_intensity_extension = {
+			num_melee_attackers = function()
+				return num_attackers
+			end,
+		},
+	}
+end
+
 describe("melee_attack_choice", function()
 	after_each(function()
 		_G.ScriptUnit = saved_script_unit
@@ -294,6 +342,113 @@ describe("melee_attack_choice", function()
 		MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
 
 		assert.equals(2, #hook_calls)
+	end)
+
+	it(
+		"requests vanilla defend suppression for a high-value armored melee commit when the target is not attacking",
+		function()
+			local MeleeAttackChoice = load_module()
+			local debug_logs = init_defend_suppression(MeleeAttackChoice, SUPER_ARMOR, {
+				debug_enabled = true,
+			})
+
+			local self_node = {
+				_is_attacking_me = function()
+					return false
+				end,
+			}
+			local target_breed = {
+				name = "chaos_ogryn_executor",
+				tags = { elite = true },
+			}
+			local scratchpad = defend_scratchpad(2, 2)
+
+			local suppress =
+				MeleeAttackChoice.should_suppress_defend(self_node, "bot_unit", "target_unit", scratchpad, target_breed)
+
+			assert.is_true(suppress)
+			assert.equals(1, #debug_logs)
+			assert.matches("melee defend suppressed for attack commit", debug_logs[1].message, 1, true)
+		end
+	)
+
+	it("does not suppress vanilla defend when the current high-value target is actively attacking the bot", function()
+		local MeleeAttackChoice = load_module()
+		init_defend_suppression(MeleeAttackChoice, SUPER_ARMOR)
+
+		local self_node = {
+			_is_attacking_me = function()
+				return true
+			end,
+		}
+		local target_breed = {
+			name = "chaos_ogryn_executor",
+			tags = { elite = true },
+		}
+
+		local suppress = MeleeAttackChoice.should_suppress_defend(
+			self_node,
+			"bot_unit",
+			"target_unit",
+			defend_scratchpad(1, 1),
+			target_breed
+		)
+
+		assert.is_false(suppress)
+	end)
+
+	it("does not suppress vanilla defend under horde melee pressure", function()
+		local MeleeAttackChoice = load_module()
+		init_defend_suppression(MeleeAttackChoice, SUPER_ARMOR)
+
+		local self_node = {
+			_is_attacking_me = function()
+				return false
+			end,
+		}
+		local target_breed = {
+			name = "chaos_ogryn_executor",
+			tags = { elite = true },
+		}
+
+		local suppress = MeleeAttackChoice.should_suppress_defend(
+			self_node,
+			"bot_unit",
+			"target_unit",
+			defend_scratchpad(3, 4),
+			target_breed
+		)
+
+		assert.is_false(suppress)
+	end)
+
+	it("does not suppress vanilla defend when melee improvements are disabled", function()
+		local MeleeAttackChoice = load_module()
+		init_defend_suppression(MeleeAttackChoice, SUPER_ARMOR, {
+			is_enabled = function()
+				return false
+			end,
+		})
+
+		local self_node = {
+			_is_attacking_me = function()
+				return false
+			end,
+		}
+		local target_breed = {
+			name = "chaos_ogryn_executor",
+			tags = { elite = true },
+		}
+
+		local suppress = MeleeAttackChoice.should_suppress_defend(
+			self_node,
+			"bot_unit",
+			"target_unit",
+			defend_scratchpad(1, 1),
+			target_breed
+		)
+
+		assert.is_false(suppress)
 	end)
 
 	it("logs the chosen attack context for unarmored horde targets", function()
@@ -566,7 +721,7 @@ describe("melee_attack_choice", function()
 		assert.equals(light_attack, chosen)
 	end)
 
-	it("arms 1h power swords in live combat windows even against non-elite pack pressure", function()
+	it("arms 1h power swords against non-elite pack pressure", function()
 		local MeleeAttackChoice = load_module()
 		local choose_attack_handler
 		local stub_mod = {
@@ -635,6 +790,76 @@ describe("melee_attack_choice", function()
 
 		assert.equals("special_action", chosen.action_inputs[1].action_input)
 		assert.equals("start_attack", chosen.action_inputs[2].action_input)
+	end)
+
+	it("does not arm 1h power swords against non-elite hordes", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return 1
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 5,
+			weapon_template = {
+				name = "powersword_p1_m1",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.3,
+				family = "powersword_1h",
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", {}, scratchpad)
+
+		assert.equals(light_attack, chosen)
 	end)
 
 	it("keeps 1h force swords targeted at elite or harder targets", function()
