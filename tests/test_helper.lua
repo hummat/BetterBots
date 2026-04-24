@@ -38,6 +38,8 @@ function M.make_context(overrides)
 		toughness_pct = 1,
 		peril_pct = nil,
 		target_enemy = nil,
+		current_weapon_template_name = nil,
+		target_breed_name = nil,
 		target_enemy_position = nil,
 		target_enemy_distance = nil,
 		target_enemy_type = nil,

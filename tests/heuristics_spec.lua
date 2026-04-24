@@ -2161,6 +2161,36 @@ describe("heuristics", function()
 				helper.make_context({
 					target_enemy = "crusher",
 					target_is_elite_special = true,
+					target_is_super_armor = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds krak grenades against non-armored specials so plasma can handle them", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					target_enemy = "hound",
+					target_breed_name = "chaos_hound",
+					target_is_elite_special = true,
+					target_is_special = true,
+					target_enemy_distance = 9,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
+		end)
+
+		it("uses krak grenades against named high-armor elites", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"veteran_krak_grenade",
+				helper.make_context({
+					target_enemy = "mauler",
+					target_breed_name = "renegade_executor",
+					target_is_elite_special = true,
 					target_enemy_distance = 9,
 				})
 			)
@@ -2306,6 +2336,7 @@ describe("heuristics", function()
 					num_nearby = 4,
 					target_enemy = "crusher",
 					target_is_elite_special = true,
+					target_is_super_armor = true,
 					target_enemy_distance = 9,
 				})
 			)
@@ -2642,6 +2673,7 @@ describe("heuristics", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
 				helper.make_context({
+					target_enemy = "gunner",
 					num_nearby = 3,
 					ranged_count = 2,
 					target_enemy_distance = 10,
@@ -2649,6 +2681,72 @@ describe("heuristics", function()
 			)
 			assert.is_true(result)
 			assert.matches("ranged", rule)
+		end)
+
+		it("lets charged staffs own ranged pack pressure instead of Assail", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
+					target_enemy = "rifleman",
+					target_enemy_type = "ranged",
+					target_enemy_distance = 10,
+					num_nearby = 4,
+					challenge_rating_sum = 2.5,
+					ranged_count = 2,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("staff_pack", rule)
+		end)
+
+		it("still uses Assail on specials while a charged staff is wielded", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
+					target_enemy = "trapper",
+					target_is_elite_special = true,
+					target_is_special = true,
+					target_enemy_distance = 10,
+					num_nearby = 4,
+					challenge_rating_sum = 2.5,
+					ranged_count = 2,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("lets charged staffs own ordinary elite packs instead of Assail", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p4_m1",
+					target_enemy = "rager",
+					target_is_elite = true,
+					target_is_elite_special = true,
+					target_enemy_distance = 10,
+					num_nearby = 3,
+					challenge_rating_sum = 3.0,
+					elite_count = 2,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("staff_pack", rule)
+		end)
+
+		it("holds Assail ranged pressure when no target unit is resolved", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					num_nearby = 3,
+					ranged_count = 2,
+					target_enemy_distance = 10,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("hold", rule)
 		end)
 
 		it("holds Assail crowd soften when the balanced shard reserve is not met", function()
@@ -2670,6 +2768,22 @@ describe("heuristics", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"psyker_throwing_knives",
 				helper.make_context({
+					target_enemy = "poxwalker",
+					target_enemy_distance = 7,
+					num_nearby = 5,
+					challenge_rating_sum = 2.5,
+					grenade_charges_remaining = 5,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("crowd", rule)
+		end)
+
+		it("still starts Assail crowd soften with enough shards while a charged staff is wielded", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"psyker_throwing_knives",
+				helper.make_context({
+					current_weapon_template_name = "forcestaff_p1_m1",
 					target_enemy = "poxwalker",
 					target_enemy_distance = 7,
 					num_nearby = 5,
@@ -3412,10 +3526,17 @@ describe("heuristics", function()
 		end)
 
 		it("captures the live companion unit and positions in context", function()
+			_G.ALIVE.target_enemy = true
 			script_unit_extensions = {
 				hazard_bot = {
 					companion_spawner_system = helper.make_companion_spawner_extension({
 						companion_units = { "mastiff" },
+					}),
+				},
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
 					}),
 				},
 			}
@@ -3449,6 +3570,7 @@ describe("heuristics", function()
 		end)
 
 		it("treats waking daemonhost stages as dormant even if aggro_state already flipped", function()
+			_G.ALIVE.target_enemy = true
 			game_object_ids.target_enemy = "daemonhost_go"
 			game_object_fields.daemonhost_go = { stage = 5 }
 			script_unit_extensions = {
@@ -3507,6 +3629,20 @@ describe("heuristics", function()
 
 			assert.equals(1, context.ranged_count)
 			assert.equals(0, context.melee_count)
+		end)
+
+		it("captures the current weapon template in context", function()
+			script_unit_extensions = {
+				hazard_bot = {
+					unit_data_system = helper.make_player_unit_data_extension({
+						weapon_action = { template_name = "forcestaff_p1_m1" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals("forcestaff_p1_m1", context.current_weapon_template_name)
 		end)
 
 		it("defaults when no allies are interacting", function()

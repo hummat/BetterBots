@@ -183,6 +183,7 @@ local function reset()
 			end,
 		}),
 	}
+	_extensions.enemy_1 = nil
 
 	_G.POSITION_LOOKUP = {
 		[unit] = { x = 0, y = 0, z = 0 },
@@ -363,6 +364,41 @@ describe("grenade_fallback", function()
 			assert.same({
 				"grenade_fallback.stage_machine:false",
 			}, perf_tags())
+		end)
+
+		it("defers new grenade sequences while a non-grenade weapon charge is active", function()
+			_debug_enabled_result = true
+			_component_state_by_name.weapon_action = {
+				template_name = "forcestaff_p1_m1",
+				current_action_name = "action_charge",
+			}
+			GrenadeFallback.wire({
+				build_context = function()
+					return {
+						target_enemy = "enemy_1",
+						target_enemy_distance = 10,
+						target_is_special = true,
+					}
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_assail_priority_target"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "psyker_throwing_knives" }
+				end,
+				is_combat_ability_active = function()
+					return false
+				end,
+				is_grenade_enabled = function()
+					return true
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.equals(0, #_recorded_inputs)
+			assert.truthy(find_debug_log("grenade deferred during active weapon charge"))
 		end)
 	end)
 
@@ -819,6 +855,29 @@ describe("grenade_fallback", function()
 		assert.equals("wield", state.stage)
 	end)
 
+	it("does not start an aimed grenade sequence when the target has no line of sight", function()
+		_debug_enabled_result = true
+		_extensions.enemy_1 = {
+			perception_system = test_helper.make_minion_perception_extension({
+				has_line_of_sight_fn = function(_self, candidate_unit)
+					return candidate_unit ~= unit
+				end,
+			}),
+			unit_data_system = test_helper.make_minion_unit_data_extension({
+				name = "renegade_rifleman",
+			}),
+		}
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+		assert.truthy(find_debug_log("grenade aim unavailable for veteran_frag_grenade (no_los)"))
+		assert.truthy(find_debug_log("target=enemy_1"))
+		assert.truthy(find_debug_log("target_alive=alive"))
+		assert.truthy(find_debug_log("target_breed=renegade_rifleman"))
+	end)
+
 	it("marks the grenade sequence active before queueing grenade_ability", function()
 		GrenadeFallback.try_queue(unit, blackboard)
 
@@ -908,6 +967,26 @@ describe("grenade_fallback", function()
 		assert.equals("weapon_action", _recorded_inputs[1].component)
 		assert.equals("aim_hold", _recorded_inputs[1].input)
 		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+	end)
+
+	it("aborts an aimed grenade sequence when line of sight is lost before aim_hold", function()
+		_debug_enabled_result = true
+		advance_to_stage("wait_aim")
+		_extensions.enemy_1 = {
+			perception_system = test_helper.make_minion_perception_extension({
+				has_line_of_sight_fn = function(_self, candidate_unit)
+					return candidate_unit ~= unit
+				end,
+			}),
+		}
+
+		_recorded_inputs = {}
+		_mock_time = _mock_time + 1.0
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals(0, #_recorded_inputs)
+		assert.is_nil(_grenade_state_by_unit[unit].stage)
+		assert.truthy(find_debug_log("grenade aim unavailable for veteran_frag_grenade (no_los)"))
 	end)
 
 	it("queues aim_released in wait_throw stage", function()
@@ -1962,7 +2041,7 @@ describe("grenade_fallback", function()
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 		end)
 
-		it("supports Assail as an aimed homing blitz", function()
+		it("uses fast Assail throws for ranged pressure trash", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
@@ -1988,17 +2067,9 @@ describe("grenade_fallback", function()
 			_mock_time = _mock_time + 0.5
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(1, #_recorded_inputs)
-			assert.equals("zoom", _recorded_inputs[1].input)
-			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
-			assert.truthy(find_debug_log("grenade queued zoom for psyker_throwing_knives"))
-
-			_recorded_inputs = {}
-			_mock_time = _mock_time + 0.6
-			GrenadeFallback.try_queue(unit, blackboard)
-			assert.equals(1, #_recorded_inputs)
-			assert.equals("zoom_shoot", _recorded_inputs[1].input)
+			assert.equals("shoot", _recorded_inputs[1].input)
 			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
-			assert.truthy(find_debug_log("grenade queued zoom_shoot for psyker_throwing_knives"))
+			assert.truthy(find_debug_log("grenade queued shoot for psyker_throwing_knives"))
 		end)
 
 		it("supports Assail as a rapid close-range burst to depletion under crowd pressure", function()
@@ -2258,6 +2329,13 @@ describe("grenade_fallback", function()
 			assert.equals(1, #_recorded_inputs)
 			assert.equals("zoom", _recorded_inputs[1].input)
 			assert.equals("wait_followup", _grenade_state_by_unit[unit].stage)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.6
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals(1, #_recorded_inputs)
+			assert.equals("zoom_shoot", _recorded_inputs[1].input)
+			assert.equals("wait_unwield", _grenade_state_by_unit[unit].stage)
 		end)
 
 		it("normalizes Assail to the precision-priority target before evaluating", function()
@@ -2324,10 +2402,15 @@ describe("grenade_fallback", function()
 		it("does not queue invalid unwield_to_previous cleanup for Assail", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return {
+						target_enemy = "enemy_1",
+						num_nearby = 3,
+						target_enemy_distance = 10,
+						target_is_special = true,
+					}
 				end,
 				evaluate_grenade_heuristic = function()
-					return true, "grenade_assail_ranged_pressure"
+					return true, "grenade_assail_priority_target"
 				end,
 				equipped_grenade_ability = function()
 					return mock_ability_extension, { name = "psyker_throwing_knives" }
@@ -2367,10 +2450,15 @@ describe("grenade_fallback", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
-					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return {
+						target_enemy = "enemy_1",
+						num_nearby = 3,
+						target_enemy_distance = 10,
+						target_is_special = true,
+					}
 				end,
 				evaluate_grenade_heuristic = function()
-					return true, "grenade_assail_ranged_pressure"
+					return true, "grenade_assail_priority_target"
 				end,
 				equipped_grenade_ability = function()
 					return mock_ability_extension, { name = "psyker_throwing_knives" }
@@ -2412,10 +2500,15 @@ describe("grenade_fallback", function()
 			_debug_enabled_result = true
 			GrenadeFallback.wire({
 				build_context = function()
-					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return {
+						target_enemy = "enemy_1",
+						num_nearby = 3,
+						target_enemy_distance = 10,
+						target_is_special = true,
+					}
 				end,
 				evaluate_grenade_heuristic = function()
-					return true, "grenade_assail_ranged_pressure"
+					return true, "grenade_assail_priority_target"
 				end,
 				equipped_grenade_ability = function()
 					return mock_ability_extension, { name = "psyker_throwing_knives" }
@@ -2458,10 +2551,15 @@ describe("grenade_fallback", function()
 		it("releases Assail wield lock on timeout when charge event never arrives", function()
 			GrenadeFallback.wire({
 				build_context = function()
-					return { target_enemy = "enemy_1", num_nearby = 3, ranged_count = 2, target_enemy_distance = 10 }
+					return {
+						target_enemy = "enemy_1",
+						num_nearby = 3,
+						target_enemy_distance = 10,
+						target_is_special = true,
+					}
 				end,
 				evaluate_grenade_heuristic = function()
-					return true, "grenade_assail_ranged_pressure"
+					return true, "grenade_assail_priority_target"
 				end,
 				equipped_grenade_ability = function()
 					return mock_ability_extension, { name = "psyker_throwing_knives" }

@@ -44,6 +44,19 @@ local NONEXPLOSIVE_GRENADE_REUSE_DELAY_S = {
 	conservative = 10,
 }
 
+local KRAK_HIGH_ARMOR_BREEDS = {
+	chaos_ogryn_bulwark = true,
+	chaos_ogryn_executor = true,
+	renegade_executor = true,
+}
+
+local STAFF_CHARGED_PACK_TEMPLATES = {
+	forcestaff_p1_m1 = true,
+	forcestaff_p2_m1 = true,
+	forcestaff_p3_m1 = true,
+	forcestaff_p4_m1 = true,
+}
+
 local CHAIN_LIGHTNING_THRESHOLDS = {
 	aggressive = { crowd = 3, mixed_nearby = 2 },
 	balanced = { crowd = 4, mixed_nearby = 3 },
@@ -197,6 +210,44 @@ local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	end
 
 	return false, rule_prefix .. "_hold"
+end
+
+local function _grenade_krak(context, preset)
+	local hard_target_context = {}
+	for k, v in pairs(context) do
+		hard_target_context[k] = v
+	end
+
+	local breed_name = context.target_breed_name
+	local high_armor_breed = breed_name ~= nil and KRAK_HIGH_ARMOR_BREEDS[breed_name] == true
+	hard_target_context.target_is_elite_special = context.target_is_super_armor == true or high_armor_breed
+	hard_target_context.priority_target_enemy = nil
+	hard_target_context.opportunity_target_enemy = nil
+	hard_target_context.urgent_target_enemy = nil
+
+	if context.target_is_monster then
+		hard_target_context.target_is_elite_special = true
+	end
+
+	return _grenade_priority_target(hard_target_context, "grenade_krak", { min_distance = 4 }, preset)
+end
+
+local function _charged_staff_should_own_pack(context)
+	local weapon_name = context.current_weapon_template_name
+	if not (weapon_name and STAFF_CHARGED_PACK_TEMPLATES[weapon_name]) then
+		return false
+	end
+
+	local target_distance = context.target_enemy_distance or 0
+	if target_distance < 6 then
+		return false
+	end
+
+	if context.num_nearby >= 4 and context.challenge_rating_sum >= 2.0 then
+		return true
+	end
+
+	return (context.elite_count + context.special_count + context.monster_count) >= 2 and context.num_nearby >= 2
 end
 
 local function _grenade_defensive(context, rule_prefix, preset)
@@ -450,25 +501,54 @@ local function _grenade_assail(context)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
+	local has_resolved_target = context.target_enemy ~= nil
+		or context.priority_target_enemy ~= nil
+		or context.opportunity_target_enemy ~= nil
+		or context.urgent_target_enemy ~= nil
+	if not has_resolved_target then
+		return false, "grenade_assail_hold"
+	end
+
 	local has_priority_target = _is_monster_signal_allowed(context)
 		or context.target_is_elite_special
 		or context.priority_target_enemy ~= nil
 		or context.opportunity_target_enemy ~= nil
 		or context.urgent_target_enemy ~= nil
 
+	if
+		_charged_staff_should_own_pack(context)
+		and context.target_is_elite
+		and not context.target_is_special
+		and not context.target_is_monster
+	then
+		return false, "grenade_assail_block_staff_pack"
+	end
+
 	if has_priority_target then
 		return true, "grenade_assail_priority_target"
 	end
 
 	if context.target_enemy_type == "ranged" or context.ranged_count >= 2 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_ranged_pressure"
 	end
 
 	if context.ranged_count >= 1 and target_distance >= 8 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_ranged_pressure"
 	end
 
 	if (context.elite_count + context.special_count + context.monster_count) >= 1 then
+		if _charged_staff_should_own_pack(context) then
+			return false, "grenade_assail_block_staff_pack"
+		end
+
 		return true, "grenade_assail_priority_pack"
 	end
 
@@ -588,7 +668,7 @@ local GRENADE_HEURISTICS = {
 		return _grenade_frag(context, context.preset)
 	end,
 	veteran_krak_grenade = function(context)
-		return _grenade_priority_target(context, "grenade_krak", { min_distance = 4 }, context.preset)
+		return _grenade_krak(context, context.preset)
 	end,
 	veteran_smoke_grenade = function(context)
 		return _grenade_defensive_nonexplosive(context, "grenade_smoke", context.preset)

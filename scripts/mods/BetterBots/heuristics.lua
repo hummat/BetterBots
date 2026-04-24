@@ -12,6 +12,17 @@ local _heuristic_thresholds = {}
 local _item_heuristics = {}
 local _item_thresholds = {}
 local _grenade_heuristics = {}
+local PERCEPTION_CACHE_FIELDS = {
+	"target_enemy",
+	"target_enemy_distance",
+	"target_enemy_type",
+	"priority_target_enemy",
+	"opportunity_target_enemy",
+	"urgent_target_enemy",
+	"target_ally_needs_aid",
+	"target_ally_distance",
+	"target_ally",
+}
 
 local function _merge_into(dst, src)
 	for key, value in pairs(src or {}) do
@@ -126,6 +137,36 @@ local function _log_resolve_decision_cache_hit(unit, ability_template_name, fixe
 	)
 end
 
+local function _resolve_cache_matches_perception(cache_entry, fixed_t, perception_component)
+	if not cache_entry or cache_entry.fixed_t ~= fixed_t then
+		return false
+	end
+
+	for i = 1, #PERCEPTION_CACHE_FIELDS do
+		local field_name = PERCEPTION_CACHE_FIELDS[i]
+		local current_value = perception_component and perception_component[field_name] or nil
+		if cache_entry[field_name] ~= current_value then
+			return false
+		end
+	end
+
+	return true
+end
+
+local function _new_resolve_cache_entry(fixed_t, perception_component)
+	local entry = {
+		fixed_t = fixed_t,
+		results = {},
+	}
+
+	for i = 1, #PERCEPTION_CACHE_FIELDS do
+		local field_name = PERCEPTION_CACHE_FIELDS[i]
+		entry[field_name] = perception_component and perception_component[field_name] or nil
+	end
+
+	return entry
+end
+
 local function _evaluate_template_heuristic(
 	ability_template_name,
 	conditions,
@@ -178,13 +219,11 @@ local function resolve_decision(
 	ability_extension
 )
 	local fixed_t = _fixed_time and _fixed_time() or nil
+	local perception_component = blackboard and blackboard.perception or nil
 	if fixed_t ~= nil and _resolve_decision_cache then
 		local cache_entry = _resolve_decision_cache[unit]
-		if not cache_entry or cache_entry.fixed_t ~= fixed_t then
-			cache_entry = {
-				fixed_t = fixed_t,
-				results = {},
-			}
+		if not _resolve_cache_matches_perception(cache_entry, fixed_t, perception_component) then
+			cache_entry = _new_resolve_cache_entry(fixed_t, perception_component)
 			_resolve_decision_cache[unit] = cache_entry
 		end
 

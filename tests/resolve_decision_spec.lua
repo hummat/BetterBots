@@ -297,6 +297,148 @@ describe("resolve_decision", function()
 		end)
 	end)
 
+	describe("build_context target sanitization", function()
+		local _saved_has_extension
+		local _saved_alive
+		local _saved_health_alive
+		local _saved_unit
+		local _saved_position_lookup
+
+		before_each(function()
+			_saved_has_extension = _G.ScriptUnit.has_extension
+			_saved_alive = rawget(_G, "ALIVE")
+			_saved_health_alive = rawget(_G, "HEALTH_ALIVE")
+			_saved_unit = rawget(_G, "Unit")
+			_saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
+
+			_G.ScriptUnit.has_extension = function(unit, system_name)
+				if unit == "enemy_1" and system_name == "unit_data_system" then
+					return helper.make_minion_unit_data_extension({
+						name = "renegade_shocktrooper",
+						tags = { special = true },
+						ranged = true,
+						game_object_type = "minion_ranged",
+					})
+				end
+
+				return nil
+			end
+
+			_G.POSITION_LOOKUP = {
+				bot1 = { x = 0, y = 0, z = 0 },
+				enemy_1 = { x = 10, y = 0, z = 0 },
+			}
+			_G.ALIVE = { enemy_1 = true }
+			_G.HEALTH_ALIVE = { enemy_1 = true }
+			_G.Unit = {
+				alive = function(target_unit)
+					return _G.ALIVE and _G.ALIVE[target_unit] == true
+				end,
+			}
+		end)
+
+		after_each(function()
+			_G.ScriptUnit.has_extension = _saved_has_extension
+			rawset(_G, "ALIVE", _saved_alive)
+			rawset(_G, "HEALTH_ALIVE", _saved_health_alive)
+			rawset(_G, "Unit", _saved_unit)
+			rawset(_G, "POSITION_LOOKUP", _saved_position_lookup)
+		end)
+
+		it("drops stale target distance and type when target_enemy is nil", function()
+			local blackboard = {
+				perception = {
+					target_enemy = nil,
+					target_enemy_distance = 20,
+					target_enemy_type = "ranged",
+				},
+			}
+
+			local ctx = Heuristics.build_context("bot1", blackboard)
+			local ok, rule = Heuristics.evaluate_grenade_heuristic("psyker_throwing_knives", ctx)
+
+			assert.is_nil(ctx.target_enemy)
+			assert.is_nil(ctx.target_enemy_distance)
+			assert.is_nil(ctx.target_enemy_type)
+			assert.is_false(ok)
+			assert.equals("grenade_assail_hold", rule)
+		end)
+
+		it("drops HEALTH_ALIVE-dead target slots before heuristics inspect target metadata", function()
+			_G.ALIVE.enemy_1 = true
+			_G.HEALTH_ALIVE.enemy_1 = false
+
+			local blackboard = {
+				perception = {
+					target_enemy = "enemy_1",
+					target_enemy_distance = 10,
+					target_enemy_type = "ranged",
+				},
+			}
+
+			local ctx = Heuristics.build_context("bot1", blackboard)
+
+			assert.is_nil(ctx.target_enemy)
+			assert.is_nil(ctx.target_enemy_distance)
+			assert.is_nil(ctx.target_enemy_type)
+			assert.is_false(ctx.target_is_elite_special)
+		end)
+
+		it("refreshes same-frame build_context cache when perception target fields change", function()
+			local blackboard = {
+				perception = {
+					target_enemy = "enemy_1",
+					target_enemy_distance = 10,
+					target_enemy_type = "ranged",
+				},
+			}
+
+			local first = Heuristics.build_context("bot1", blackboard)
+			blackboard.perception.target_enemy = nil
+			blackboard.perception.target_enemy_distance = 20
+			blackboard.perception.target_enemy_type = "ranged"
+			local second = Heuristics.build_context("bot1", blackboard)
+
+			assert.equals("enemy_1", first.target_enemy)
+			assert.is_nil(second.target_enemy)
+			assert.is_nil(second.target_enemy_distance)
+			assert.is_nil(second.target_enemy_type)
+		end)
+
+		it("refreshes same-frame resolve_decision cache when perception target fields change", function()
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return fixed_t
+				end,
+				decision_context_cache = {},
+				resolve_decision_cache = {},
+				resolve_decision_cache_hits_logged = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				combat_ability_identity = CombatAbilityIdentity,
+			})
+
+			local blackboard = {
+				perception = {
+					target_enemy = nil,
+					target_enemy_distance = nil,
+					target_enemy_type = nil,
+				},
+			}
+
+			local first_ok, first_rule = resolve("zealot_dash", {}, "bot1", blackboard, nil, nil, nil, false, nil)
+			blackboard.perception.target_enemy = "enemy_1"
+			blackboard.perception.target_enemy_distance = 10
+			blackboard.perception.target_enemy_type = "ranged"
+			local second_ok, second_rule = resolve("zealot_dash", {}, "bot1", blackboard, nil, nil, nil, false, nil)
+
+			assert.is_false(first_ok)
+			assert.equals("zealot_dash_block_no_target", first_rule)
+			assert.is_true(second_ok)
+			assert.equals("zealot_dash_elite_special_gap", second_rule)
+		end)
+	end)
+
 	-- Issue #17: Verify build_context actually populates the
 	-- target_is_dormant_daemonhost flag from the target perception blackboard.
 	-- The heuristic carve-out tests in heuristics_spec.lua inject the flag

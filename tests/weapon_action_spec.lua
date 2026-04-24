@@ -101,6 +101,9 @@ end
 setup(function()
 	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
 	_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
+	_saved_globals.HEALTH_ALIVE = rawget(_G, "HEALTH_ALIVE")
+	_saved_globals.ALIVE = rawget(_G, "ALIVE")
+	_saved_globals.Unit = rawget(_G, "Unit")
 
 	rawset(_G, "ScriptUnit", {
 		has_extension = function(unit, system_name)
@@ -379,6 +382,17 @@ local function find_debug_log(pattern)
 	return nil
 end
 
+local function count_debug_logs(pattern)
+	local count = 0
+	for i = 1, #_debug_logs do
+		if string.find(_debug_logs[i].message, pattern, 1, true) then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 local function find_warning(pattern)
 	for i = 1, #_warnings do
 		if string.find(_warnings[i], pattern, 1, true) then
@@ -408,6 +422,9 @@ describe("weapon_action", function()
 		rawset(_G, "POSITION_LOOKUP", _saved_position_lookup)
 		rawset(_G, "Vector3", _saved_vector3)
 		rawset(_G, "Quaternion", _saved_quaternion)
+		rawset(_G, "HEALTH_ALIVE", _saved_globals.HEALTH_ALIVE)
+		rawset(_G, "ALIVE", _saved_globals.ALIVE)
+		rawset(_G, "Unit", _saved_globals.Unit)
 	end)
 
 	it("detects normal ranged fire in the old ammo dead zone", function()
@@ -551,6 +568,32 @@ describe("weapon_action", function()
 		assert.is_nil(scratchpad.aim_action_name)
 		assert.is_nil(scratchpad.unaim_action_input)
 		assert.is_nil(scratchpad.unaim_action_name)
+	end)
+
+	it("normalizes plasma scratchpads away from vanilla shoot defaults", function()
+		local weapon_template = {
+			action_inputs = {
+				shoot_charge = { input_sequence = { { input = "action_one_pressed", value = true } } },
+				vent = { input_sequence = { { input = "weapon_extra_hold", value = true } } },
+			},
+			actions = {
+				action_charge_direct = { start_input = "shoot_charge" },
+			},
+		}
+		local scratchpad = {
+			fire_action_input = "shoot",
+			aim_fire_action_input = "zoom_shoot",
+			aim_action_input = "zoom",
+			unaim_action_input = "vent",
+		}
+
+		local changed = WeaponAction._normalize_bt_shoot_scratchpad(weapon_template, scratchpad)
+
+		assert.is_true(changed)
+		assert.equals("shoot_charge", scratchpad.fire_action_input)
+		assert.equals("shoot_charge", scratchpad.aim_fire_action_input)
+		assert.is_nil(scratchpad.aim_action_input)
+		assert.is_nil(scratchpad.unaim_action_input)
 	end)
 
 	it("logs stream action confirmations for flamer and purgatus queue inputs", function()
@@ -805,6 +848,77 @@ describe("weapon_action", function()
 		assert.is_truthy(find_debug_log("stream action queued for flamer_p1_m1 via shoot_braced"))
 	end)
 
+	it("logs queued weapon action target context and refreshes per target", function()
+		local PlayerUnitActionInputExtension = {
+			extensions_ready = function() end,
+			bot_queue_action_input = function()
+				return 0
+			end,
+		}
+		local bot_unit = "bot_1"
+		local first_target = "gunner_1"
+		local second_target = "shotgunner_1"
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/action_input/player_unit_action_input_extension"] = PlayerUnitActionInputExtension,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				inventory = { wielded_slot = "slot_secondary" },
+				weapon_action = { template_name = "bolter_p1_m2" },
+				weapon_tweak_templates = { warp_charge_template_name = "none" },
+			}),
+		}
+		_extensions[first_target] = {
+			unit_data_system = test_helper.make_minion_unit_data_extension({
+				name = "renegade_gunner",
+				tags = { special = true },
+			}),
+		}
+		_extensions[second_target] = {
+			unit_data_system = test_helper.make_minion_unit_data_extension({
+				name = "renegade_shocktrooper",
+				tags = { minion = true },
+			}),
+		}
+		_blackboards[bot_unit] = {
+			perception = {
+				target_enemy = first_target,
+			},
+		}
+		rawset(_G, "HEALTH_ALIVE", {
+			[first_target] = true,
+			[second_target] = false,
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+		})
+
+		PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", nil)
+		_blackboards[bot_unit].perception.target_enemy = second_target
+		PlayerUnitActionInputExtension.bot_queue_action_input({
+			_betterbots_player_unit = bot_unit,
+		}, "weapon_action", "shoot_pressed", nil)
+
+		assert.is_truthy(find_debug_log("target=gunner_1 target_alive=alive target_breed=renegade_gunner"))
+		assert.is_truthy(find_debug_log("target=shotgunner_1 target_alive=dead target_breed=renegade_shocktrooper"))
+		assert.equals(2, count_debug_logs("bot weapon: bot=3"))
+	end)
+
 	it("applies weapon_action rewrites before forwarding queued inputs", function()
 		local forwarded_id, forwarded_action_input, forwarded_raw_input
 		local observed_action_input, observed_original_action_input
@@ -904,6 +1018,68 @@ describe("weapon_action", function()
 		rawset(_G, "require", saved_require)
 
 		assert.is_truthy(find_debug_log("shoot scratchpad normalization skipped"))
+	end)
+
+	it("logs a plasma _may_fire block reason when shoot selection never queues a shot", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return false
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			action_input_extension = {
+				_betterbots_player_unit = bot_unit,
+			},
+			fire_action_input = "shoot_charge",
+			aim_fire_action_input = "shoot_charge",
+			obstructed = true,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "plasmagun_p1_m1" },
+			}),
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		assert.is_false(BtBotShootAction._may_fire({}, bot_unit, scratchpad, 100, 12))
+
+		rawset(_G, "require", saved_require)
+
+		assert.is_truthy(find_debug_log("plasma _may_fire blocked (reason=obstructed"))
 	end)
 
 	it("does not reinstall bt_bot_shoot_action hooks when hook_require callback runs twice", function()
@@ -1114,7 +1290,7 @@ describe("weapon_action", function()
 		assert.equals("bot_1", scratchpad.__bb_weakspot_self_unit)
 	end)
 
-	it("locks Voidblast charged aim to the first anchored target-root point across target swaps", function()
+	it("locks Voidblast charged aim to the first target while refreshing its target-root point", function()
 		local saved_require = require
 		local BtBotShootAction = {
 			enter = function() end,
@@ -1250,6 +1426,7 @@ describe("weapon_action", function()
 		local first_aim_position = scratchpad.last_aim_position
 		local first_wanted_rotation = scratchpad.last_wanted_rotation
 
+		POSITION_LOOKUP.target_a = vec(0, 12, 0)
 		scratchpad.perception_component.target_enemy = "target_b"
 		BtBotShootAction._update_aim(BtBotShootAction, bot_unit, scratchpad, {}, 1, 0.1)
 		local second_aim_position = scratchpad.last_aim_position
@@ -1260,15 +1437,15 @@ describe("weapon_action", function()
 		assert.equals("target_a", scratchpad.target_unit)
 		assert.is_true(first_wanted_rotation.pitch < 0)
 		assert.is_true(second_wanted_rotation.pitch < 0)
-		assert.is_true(first_aim_position.y > POSITION_LOOKUP.target_a.y)
+		assert.is_true(first_aim_position.y > 10)
 		assert.equals(first_aim_position.x, second_aim_position.x)
-		assert.equals(first_aim_position.y, second_aim_position.y)
+		assert.is_true(second_aim_position.y > first_aim_position.y)
 		assert.equals(first_aim_position.z, second_aim_position.z)
 		assert.is_truthy(find_debug_log("voidblast anchor locked"))
 		assert.is_truthy(find_debug_log("voidblast anchor held through retarget"))
 	end)
 
-	it("locks Voidblast aim-driven charge to the first anchored target-root point across target swaps", function()
+	it("locks Voidblast aim-driven charge to the first target while refreshing its target-root point", function()
 		local saved_require = require
 		local BtBotShootAction = {
 			enter = function() end,
@@ -1409,6 +1586,7 @@ describe("weapon_action", function()
 		local first_aim_position = scratchpad.last_aim_position
 		local first_wanted_rotation = scratchpad.last_wanted_rotation
 
+		POSITION_LOOKUP.target_a = vec(0, 12, 0)
 		scratchpad.perception_component.target_enemy = "target_b"
 		BtBotShootAction._update_aim(BtBotShootAction, bot_unit, scratchpad, {}, 1, 0.1)
 		local second_aim_position = scratchpad.last_aim_position
@@ -1419,9 +1597,9 @@ describe("weapon_action", function()
 		assert.equals("target_a", scratchpad.target_unit)
 		assert.is_true(first_wanted_rotation.pitch < 0)
 		assert.is_true(second_wanted_rotation.pitch < 0)
-		assert.is_true(first_aim_position.y > POSITION_LOOKUP.target_a.y)
+		assert.is_true(first_aim_position.y > 10)
 		assert.equals(first_aim_position.x, second_aim_position.x)
-		assert.equals(first_aim_position.y, second_aim_position.y)
+		assert.is_true(second_aim_position.y > first_aim_position.y)
 		assert.equals(first_aim_position.z, second_aim_position.z)
 		assert.is_truthy(find_debug_log("voidblast anchor locked"))
 		assert.is_truthy(find_debug_log("voidblast anchor held through retarget"))
@@ -2246,6 +2424,148 @@ describe("weapon_action", function()
 		assert.equals(POSITION_LOOKUP.target_b.x, aim_position.x)
 		assert.equals(POSITION_LOOKUP.target_b.y, aim_position.y)
 		assert.equals(POSITION_LOOKUP.target_b.z, aim_position.z)
+	end)
+
+	it("drops a stale Voidblast anchor when target velocity lookup fails before retargeting vanilla aim", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_update_aim = function(self, unit, scratchpad, action_data, dt, t)
+				local target_unit = scratchpad.perception_component.target_enemy
+				if target_unit ~= scratchpad.target_unit then
+					self:_set_new_aim_target(t, target_unit, scratchpad, action_data)
+				end
+
+				local _, _, _, _, aim_position = self:_aim_position(
+					unit,
+					scratchpad,
+					action_data,
+					dt,
+					scratchpad.current_position,
+					scratchpad.current_rotation,
+					target_unit
+				)
+
+				scratchpad.last_aim_position = aim_position
+
+				return false, false
+			end,
+			_set_new_aim_target = function(_self, _t, target_unit, scratchpad)
+				scratchpad.target_unit = target_unit
+				scratchpad.target_breed = { name = "chaos_poxwalker" }
+			end,
+			_aim_position = function(
+				self,
+				self_unit,
+				scratchpad,
+				_action_data,
+				_dt,
+				current_position,
+				current_rotation,
+				target_unit
+			)
+				local wanted_rotation, aim_position = self:_wanted_aim_rotation(
+					self_unit,
+					target_unit,
+					scratchpad.target_breed,
+					current_position,
+					nil,
+					scratchpad.aim_at_node
+				)
+
+				return 0, 0, wanted_rotation, current_rotation, aim_position
+			end,
+			_wanted_aim_rotation = function(_self, _self_unit, target_unit)
+				return { yaw = 0, pitch = 0 }, POSITION_LOOKUP[target_unit]
+			end,
+			_target_velocity = function(_self, target_unit)
+				if target_unit == "target_a" then
+					error("missing locomotion_system")
+				end
+
+				return vec(0, 0, 0)
+			end,
+			_should_aim = function()
+				return true
+			end,
+			_start_aiming = function() end,
+			_stop_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			action_input_extension = {
+				_betterbots_player_unit = bot_unit,
+			},
+			charging_shot = true,
+			current_position = vec(0, 0, 1.5),
+			current_rotation = { yaw = 0, pitch = 0 },
+			minimum_charge_time = 0.3,
+			perception_component = {
+				target_enemy = "target_b",
+			},
+			target_breed = { name = "chaos_poxwalker" },
+			target_unit = "target_b",
+			__bb_voidblast_anchor = {
+				target_unit = "target_a",
+				position = vec(0, 11.2, 0),
+			},
+		}
+
+		install_rotation_math_globals()
+		_G.POSITION_LOOKUP = {
+			target_a = vec(0, 10, 0),
+			target_b = vec(10, 0, 0),
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "forcestaff_p1_m1" },
+			}),
+		}
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction._update_aim(BtBotShootAction, bot_unit, scratchpad, {}, 1, 0)
+		rawset(_G, "require", saved_require)
+
+		assert.equals("target_b", scratchpad.perception_component.target_enemy)
+		assert.is_nil(scratchpad.__bb_voidblast_anchor)
+		assert.equals(POSITION_LOOKUP.target_b.x, scratchpad.last_aim_position.x)
+		assert.equals(POSITION_LOOKUP.target_b.y, scratchpad.last_aim_position.y)
+		assert.equals(POSITION_LOOKUP.target_b.z, scratchpad.last_aim_position.z)
+		assert.truthy(find_debug_log("voidblast aim fallback (reason=target_velocity_unavailable"))
 	end)
 
 	it("reinstalls bt_bot_shoot_action hooks after init resets the module-local guard", function()
@@ -3235,6 +3555,201 @@ describe("weapon_action", function()
 		assert.is_false(scratchpad.aiming_shot)
 		assert.equals(0, scratchpad.aim_done_t)
 		assert.is_nil(find_echo("bot ADS confirmed"))
+	end)
+
+	it("does not queue plasma vent when stale ADS cleanup leaves no aim input", function()
+		local saved_require = require
+		local queued_calls = {}
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_stop_aiming = function(_self, scratchpad)
+				if scratchpad.aiming_shot then
+					scratchpad.aiming_shot = false
+					scratchpad.aim_done_t = 0
+					scratchpad.action_input_extension:bot_queue_action_input(
+						"weapon_action",
+						scratchpad.unaim_action_input,
+						nil
+					)
+				end
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			aim_action_input = nil,
+			unaim_action_input = "vent",
+			aiming_shot = true,
+			aim_done_t = 1,
+			action_input_extension = {
+				_betterbots_player_unit = bot_unit,
+				_action_input_parsers = {
+					weapon_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							plasmagun_p1_m1 = {
+								shoot_charge = true,
+								vent = true,
+							},
+						},
+					},
+				},
+				bot_queue_action_input = function(_, id, action_input, raw_input)
+					queued_calls[#queued_calls + 1] = {
+						id = id,
+						action_input = action_input,
+						raw_input = raw_input,
+					}
+				end,
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "plasmagun_p1_m1" },
+			}),
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction._stop_aiming({}, scratchpad)
+
+		rawset(_G, "require", saved_require)
+
+		assert.equals(0, #queued_calls)
+		assert.is_false(scratchpad.aiming_shot)
+		assert.equals(0, scratchpad.aim_done_t)
+		assert.is_truthy(find_debug_log("suppressed stale shoot unaim input vent for plasmagun_p1_m1"))
+	end)
+
+	it("preserves valid ADS unaim inputs for live aim-capable weapons", function()
+		local saved_require = require
+		local queued_calls = {}
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_stop_aiming = function(_self, scratchpad)
+				if scratchpad.aiming_shot then
+					scratchpad.aiming_shot = false
+					scratchpad.aim_done_t = 0
+					scratchpad.action_input_extension:bot_queue_action_input(
+						"weapon_action",
+						scratchpad.unaim_action_input,
+						nil
+					)
+				end
+			end,
+			_may_fire = function()
+				return true
+			end,
+		}
+		local bot_unit = "bot_1"
+		local scratchpad = {
+			aim_action_input = "zoom",
+			unaim_action_input = "zoom_release",
+			aiming_shot = true,
+			aim_done_t = 1,
+			action_input_extension = {
+				_betterbots_player_unit = bot_unit,
+				_action_input_parsers = {
+					weapon_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							autogun_ads_test = {
+								zoom = true,
+								zoom_release = true,
+								shoot = true,
+							},
+						},
+					},
+				},
+				bot_queue_action_input = function(_, id, action_input, raw_input)
+					queued_calls[#queued_calls + 1] = {
+						id = id,
+						action_input = action_input,
+						raw_input = raw_input,
+					}
+				end,
+			},
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		_extensions[bot_unit] = {
+			unit_data_system = test_helper.make_player_unit_data_extension({
+				weapon_action = { template_name = "autogun_ads_test" },
+			}),
+		}
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		BtBotShootAction._stop_aiming({}, scratchpad)
+
+		rawset(_G, "require", saved_require)
+
+		assert.equals(1, #queued_calls)
+		assert.equals("weapon_action", queued_calls[1].id)
+		assert.equals("zoom_release", queued_calls[1].action_input)
+		assert.is_false(scratchpad.aiming_shot)
+		assert.equals(0, scratchpad.aim_done_t)
+		assert.is_nil(find_debug_log("suppressed stale shoot unaim input zoom_release for autogun_ads_test"))
 	end)
 
 	it("redirects wield_slot to slot_combat_ability while lock is active", function()

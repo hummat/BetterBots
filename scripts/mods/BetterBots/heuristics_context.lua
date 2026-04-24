@@ -40,6 +40,13 @@ local function _zero_stacks()
 end
 
 local function _unit_is_alive(unit)
+	if HEALTH_ALIVE ~= nil then
+		local alive = HEALTH_ALIVE[unit]
+		if alive ~= nil then
+			return alive == true
+		end
+	end
+
 	if ALIVE ~= nil then
 		local alive = ALIVE[unit]
 		if alive ~= nil then
@@ -188,6 +195,28 @@ local function _enemy_breed(unit)
 	return unit_data_extension and unit_data_extension:breed() or nil
 end
 
+local function _live_enemy_unit(unit)
+	if not unit or not _unit_is_alive(unit) then
+		return nil
+	end
+
+	if not _enemy_breed(unit) then
+		return nil
+	end
+
+	return unit
+end
+
+local function _current_weapon_template_name(unit)
+	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
+	if not unit_data_extension then
+		return nil
+	end
+
+	local weapon_action = unit_data_extension:read_component("weapon_action")
+	return weapon_action and weapon_action.template_name or nil
+end
+
 local function _breed_has_super_armor(breed)
 	if not breed then
 		return false
@@ -236,6 +265,40 @@ local function _copy_context(context)
 	return copy
 end
 
+local function _perception_cache_matches(entry, fixed_t, perception_component, current_weapon_template_name)
+	if not entry or entry.fixed_t ~= fixed_t then
+		return false
+	end
+
+	return entry.current_weapon_template_name == current_weapon_template_name
+		and entry.target_enemy == (perception_component and perception_component.target_enemy or nil)
+		and entry.target_enemy_distance == (perception_component and perception_component.target_enemy_distance or nil)
+		and entry.target_enemy_type == (perception_component and perception_component.target_enemy_type or nil)
+		and entry.priority_target_enemy == (perception_component and perception_component.priority_target_enemy or nil)
+		and entry.opportunity_target_enemy == (perception_component and perception_component.opportunity_target_enemy or nil)
+		and entry.urgent_target_enemy == (perception_component and perception_component.urgent_target_enemy or nil)
+		and entry.target_ally_needs_aid == (perception_component and perception_component.target_ally_needs_aid or nil)
+		and entry.target_ally_distance == (perception_component and perception_component.target_ally_distance or nil)
+		and entry.target_ally == (perception_component and perception_component.target_ally or nil)
+end
+
+local function _store_context_cache(unit, fixed_t, perception_component, current_weapon_template_name, context)
+	_decision_context_cache[unit] = {
+		fixed_t = fixed_t,
+		context = context,
+		current_weapon_template_name = current_weapon_template_name,
+		target_enemy = perception_component and perception_component.target_enemy or nil,
+		target_enemy_distance = perception_component and perception_component.target_enemy_distance or nil,
+		target_enemy_type = perception_component and perception_component.target_enemy_type or nil,
+		priority_target_enemy = perception_component and perception_component.priority_target_enemy or nil,
+		opportunity_target_enemy = perception_component and perception_component.opportunity_target_enemy or nil,
+		urgent_target_enemy = perception_component and perception_component.urgent_target_enemy or nil,
+		target_ally_needs_aid = perception_component and perception_component.target_ally_needs_aid or nil,
+		target_ally_distance = perception_component and perception_component.target_ally_distance or nil,
+		target_ally = perception_component and perception_component.target_ally or nil,
+	}
+end
+
 local function normalize_grenade_context(unit, context, target_unit)
 	if not context or not target_unit or context.target_enemy == target_unit then
 		return context
@@ -249,6 +312,9 @@ local function normalize_grenade_context(unit, context, target_unit)
 	normalized.target_enemy_position = target_position
 	normalized.target_enemy_distance = nil
 	normalized.target_enemy_type = nil
+	normalized.target_breed_name = nil
+	normalized.target_is_elite = false
+	normalized.target_is_special = false
 	normalized.target_is_elite_special = false
 	normalized.target_is_bomber = false
 	normalized.target_is_monster = false
@@ -269,6 +335,9 @@ local function normalize_grenade_context(unit, context, target_unit)
 	end
 
 	local tags = target_breed.tags
+	normalized.target_breed_name = target_breed.name
+	normalized.target_is_elite = _is_tagged(tags, "elite")
+	normalized.target_is_special = _is_tagged(tags, "special")
 	normalized.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
 	normalized.target_is_bomber = _is_tagged(tags, "bomber")
 	normalized.target_is_monster = _is_tagged(tags, "monster")
@@ -301,8 +370,10 @@ end
 
 local function build_context(unit, blackboard)
 	local fixed_t = _fixed_time()
+	local perception_component = blackboard and blackboard.perception
+	local current_weapon_template_name = _current_weapon_template_name(unit)
 	local cached_entry = _decision_context_cache[unit]
-	if cached_entry and cached_entry.fixed_t == fixed_t then
+	if _perception_cache_matches(cached_entry, fixed_t, perception_component, current_weapon_template_name) then
 		return cached_entry.context
 	end
 
@@ -318,6 +389,7 @@ local function build_context(unit, blackboard)
 		toughness_pct = 1,
 		peril_pct = nil,
 		target_enemy = nil,
+		current_weapon_template_name = current_weapon_template_name,
 		target_enemy_position = nil,
 		target_enemy_distance = nil,
 		target_enemy_type = nil,
@@ -329,6 +401,8 @@ local function build_context(unit, blackboard)
 		target_ally_needs_aid = false,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
+		target_is_elite = false,
+		target_is_special = false,
 		target_is_elite_special = false,
 		target_is_bomber = false,
 		target_is_monster = false,
@@ -369,15 +443,16 @@ local function build_context(unit, blackboard)
 		end
 	end
 
-	local perception_component = blackboard and blackboard.perception
 	if perception_component then
-		context.target_enemy = perception_component.target_enemy
-		context.target_enemy_position = POSITION_LOOKUP and POSITION_LOOKUP[context.target_enemy] or nil
-		context.target_enemy_distance = perception_component.target_enemy_distance
-		context.target_enemy_type = perception_component.target_enemy_type
-		context.priority_target_enemy = perception_component.priority_target_enemy
-		context.opportunity_target_enemy = perception_component.opportunity_target_enemy
-		context.urgent_target_enemy = perception_component.urgent_target_enemy
+		context.target_enemy = _live_enemy_unit(perception_component.target_enemy)
+		if context.target_enemy then
+			context.target_enemy_position = POSITION_LOOKUP and POSITION_LOOKUP[context.target_enemy] or nil
+			context.target_enemy_distance = perception_component.target_enemy_distance
+			context.target_enemy_type = perception_component.target_enemy_type
+		end
+		context.priority_target_enemy = _live_enemy_unit(perception_component.priority_target_enemy)
+		context.opportunity_target_enemy = _live_enemy_unit(perception_component.opportunity_target_enemy)
+		context.urgent_target_enemy = _live_enemy_unit(perception_component.urgent_target_enemy)
 		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
 		context.target_ally_distance = perception_component.target_ally_distance
 		context.target_ally_unit = perception_component.target_ally
@@ -485,7 +560,10 @@ local function build_context(unit, blackboard)
 		local target_breed = _enemy_breed(context.target_enemy)
 		if target_breed then
 			local tags = target_breed.tags
-			context.target_is_elite_special = _is_tagged(tags, "elite") or _is_tagged(tags, "special")
+			context.target_breed_name = target_breed.name
+			context.target_is_elite = _is_tagged(tags, "elite")
+			context.target_is_special = _is_tagged(tags, "special")
+			context.target_is_elite_special = context.target_is_elite or context.target_is_special
 			context.target_is_bomber = _is_tagged(tags, "bomber")
 			context.target_is_monster = _is_tagged(tags, "monster")
 			context.target_is_super_armor = _breed_has_super_armor(target_breed)
@@ -560,10 +638,7 @@ local function build_context(unit, blackboard)
 		end
 	end
 
-	_decision_context_cache[unit] = {
-		fixed_t = fixed_t,
-		context = context,
-	}
+	_store_context_cache(unit, fixed_t, perception_component, current_weapon_template_name, context)
 
 	return context
 end

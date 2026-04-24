@@ -35,6 +35,7 @@ local _last_grenade_charge_event_by_unit
 local _weapon_template_by_inventory_item_name
 local _projectile_template_by_inventory_item_name
 local _grenade_charge_query_failure_logged
+local _missing_los_method_warned
 
 -- Timing constants
 local WIELD_TIMEOUT_S = 2.0 -- Abort if slot hasn't changed; covers slowest standard wield (~1.5s)
@@ -45,6 +46,7 @@ local RETRY_COOLDOWN_S = 2.0 -- Shared cooldown after a throw attempt finishes o
 local SLOT_LOCK_RETRY_S = 0.35 -- Fast retry when another BetterBots sequence is holding a different slot
 local BALLISTIC_GRAVITY_EPSILON = 0.5 -- Gravity below this treated as non-ballistic (flat aim)
 local ACCEPTABLE_ACCURACY = 0.1 -- Trajectory solver convergence tolerance (radians)
+local ACTIVE_WEAPON_CHARGE_ACTION = "action_charge"
 
 -- Maps player-ability names → throw profile.
 -- Number value: throw_delay seconds, uses default aim_hold/aim_released/auto-unwield.
@@ -415,10 +417,7 @@ local function _should_use_assail_aimed_profile(context, rule_text)
 	end
 
 	local target_distance = context.target_enemy_distance or 0
-	if
-		target_distance >= 8
-		and (string.find(rule_text, "priority", 1, true) or string.find(rule_text, "ranged_pressure", 1, true))
-	then
+	if target_distance >= 8 and string.find(rule_text, "priority", 1, true) then
 		return true
 	end
 
@@ -486,10 +485,59 @@ local function _unit_alive_state(unit)
 	return false, "unknown"
 end
 
+local function _alive_label(alive)
+	return alive and "alive" or "dead"
+end
+
+local function _aim_target_log_suffix(unit, aim_unit)
+	local target_alive = nil
+	local target_alive_source = nil
+	if aim_unit then
+		target_alive, target_alive_source = _unit_alive_state(aim_unit)
+	end
+
+	local target_breed = aim_unit and _target_breed(aim_unit) or nil
+	local target_breed_name = target_breed and target_breed.name or "unknown"
+
+	return " (bot="
+		.. tostring(unit)
+		.. ", target="
+		.. tostring(aim_unit or "none")
+		.. ", target_alive="
+		.. (aim_unit and _alive_label(target_alive) or "none")
+		.. ", target_alive_source="
+		.. tostring(target_alive_source or "none")
+		.. ", target_breed="
+		.. tostring(target_breed_name)
+		.. ")"
+end
+
+local function _aim_target_log_key(base_key, unit, aim_unit)
+	return base_key .. ":" .. tostring(unit) .. ":" .. tostring(aim_unit or "none")
+end
+
 local function _unit_is_alive(unit)
 	local alive = _unit_alive_state(unit)
 
 	return alive
+end
+
+local function _aim_unit_has_line_of_sight(unit, aim_unit)
+	local target_perception_extension = ScriptUnit.has_extension(aim_unit, "perception_system")
+	if not target_perception_extension then
+		return true
+	end
+
+	if target_perception_extension.has_line_of_sight then
+		return target_perception_extension:has_line_of_sight(unit)
+	end
+
+	if not _missing_los_method_warned and _mod and _mod.warning then
+		_missing_los_method_warned = true
+		_mod:warning("BetterBots: perception_system missing has_line_of_sight method for grenade aiming")
+	end
+
+	return true
 end
 
 local function _prepare_grenade_context(unit, context, grenade_name)
@@ -521,6 +569,10 @@ local function _set_bot_aim(unit, aim_unit, grenade_name)
 
 	if not _unit_is_alive(aim_unit) then
 		return false, nil, "target_dead"
+	end
+
+	if not _aim_unit_has_line_of_sight(unit, aim_unit) then
+		return false, nil, "no_los"
 	end
 
 	if not POSITION_LOOKUP then
@@ -629,9 +681,12 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 				)
 			else
 				_debug_log(
-					"grenade_aim_no_target:" .. tostring(unit),
+					_aim_target_log_key("grenade_aim_no_target", unit, state.aim_unit),
 					fixed_t,
-					"grenade aim unavailable for " .. tostring(state.grenade_name) .. " (no target unit resolved)"
+					"grenade aim unavailable for "
+						.. tostring(state.grenade_name)
+						.. " (no target unit resolved)"
+						.. _aim_target_log_suffix(unit, state.aim_unit)
 				)
 			end
 		end
@@ -643,19 +698,22 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 		if _debug_enabled() then
 			if aim_mode == "ballistic" then
 				_debug_log(
-					"grenade_aim_ballistic:" .. tostring(unit),
+					_aim_target_log_key("grenade_aim_ballistic", unit, state.aim_unit),
 					fixed_t,
-					"grenade aim ballistic for " .. tostring(state.grenade_name)
+					"grenade aim ballistic for "
+						.. tostring(state.grenade_name)
+						.. _aim_target_log_suffix(unit, state.aim_unit)
 				)
 			else
 				_debug_log(
-					"grenade_aim_flat_fallback:" .. tostring(unit),
+					_aim_target_log_key("grenade_aim_flat_fallback", unit, state.aim_unit),
 					fixed_t,
 					"grenade aim flat fallback for "
 						.. tostring(state.grenade_name)
 						.. " ("
 						.. tostring(aim_reason)
 						.. ")"
+						.. _aim_target_log_suffix(unit, state.aim_unit)
 				)
 			end
 		end
@@ -664,9 +722,14 @@ local function _refresh_bot_aim(unit, state, context, fixed_t)
 
 	if _debug_enabled() then
 		_debug_log(
-			"grenade_aim_unavailable:" .. tostring(unit),
+			_aim_target_log_key("grenade_aim_unavailable", unit, state.aim_unit),
 			fixed_t,
-			"grenade aim unavailable for " .. tostring(state.grenade_name) .. " (" .. tostring(aim_reason) .. ")"
+			"grenade aim unavailable for "
+				.. tostring(state.grenade_name)
+				.. " ("
+				.. tostring(aim_reason)
+				.. ")"
+				.. _aim_target_log_suffix(unit, state.aim_unit)
 		)
 	end
 
@@ -736,6 +799,19 @@ local function _has_confirmed_charge(state, unit)
 	local release_t = state.release_t
 
 	return charge_t ~= nil and release_t ~= nil and charge_t >= release_t
+end
+
+local function _active_weapon_charge_blocks_grenade_start(unit_data_extension, wielded_slot)
+	if not unit_data_extension or wielded_slot == "slot_grenade_ability" then
+		return false
+	end
+
+	local weapon_action = unit_data_extension:read_component("weapon_action")
+	if not weapon_action or weapon_action.current_action_name ~= ACTIVE_WEAPON_CHARGE_ACTION then
+		return false
+	end
+
+	return true, weapon_action.template_name, weapon_action.current_action_name
 end
 
 local function _next_followup_delay(state)
@@ -1041,6 +1117,25 @@ local function try_queue(unit, blackboard)
 
 	local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory")
 	local wielded_slot = inventory_component and inventory_component.wielded_slot or "none"
+	if not state.stage then
+		local charge_active, template_name, action_name =
+			_active_weapon_charge_blocks_grenade_start(unit_data_extension, wielded_slot)
+		if charge_active then
+			if _debug_enabled() then
+				_debug_log(
+					"grenade_defer_weapon_charge:" .. tostring(unit),
+					fixed_t,
+					"grenade deferred during active weapon charge (weapon="
+						.. tostring(template_name)
+						.. ", action="
+						.. tostring(action_name)
+						.. ")"
+				)
+			end
+			return
+		end
+	end
+
 	local active_context
 	if state.stage and state.stage ~= "wait_unwield" then
 		active_context = _build_context(unit, blackboard)
@@ -1363,6 +1458,7 @@ local function try_queue(unit, blackboard)
 						.. " (dist_bucket="
 						.. _distance_bucket(state.aim_distance)
 						.. ")"
+						.. _aim_target_log_suffix(unit, state.aim_unit)
 				)
 			end
 		end
@@ -1766,6 +1862,22 @@ local function try_queue(unit, blackboard)
 		local aim_unit = _resolve_aim_unit(context, grenade_name)
 		if not aim_unit then
 			_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
+			return
+		end
+
+		if not _aim_unit_has_line_of_sight(unit, aim_unit) then
+			_finish_child_perf("grenade_fallback.profile_resolution", profile_t0)
+			if _debug_enabled() then
+				_debug_log(
+					_aim_target_log_key("grenade_aim_unavailable", unit, aim_unit),
+					fixed_t,
+					"grenade aim unavailable for "
+						.. tostring(grenade_name)
+						.. " (no_los)"
+						.. _aim_target_log_suffix(unit, aim_unit)
+				)
+			end
+			_emit_grenade_event("blocked", unit, grenade_name, state, fixed_t, { reason = "no_los" })
 			return
 		end
 
