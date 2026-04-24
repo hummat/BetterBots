@@ -236,6 +236,27 @@ local SPECIAL_WEAPON_POLICIES = {
 			sweep = true,
 		},
 	},
+	{
+		family = "powermaul",
+		prefixes = {
+			"powermaul_p1_",
+			"powermaul_p2_",
+			"powermaul_2h_",
+		},
+		action_kinds = {
+			activate_special = true,
+			sweep = true,
+		},
+	},
+	{
+		family = "ogryn_powermaul",
+		prefixes = {
+			"ogryn_powermaul_p1_",
+		},
+		action_kinds = {
+			activate_special = true,
+		},
+	},
 }
 
 local function _starts_with(value, prefix)
@@ -413,6 +434,10 @@ local function _is_ogryn_club_uppercut_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
 
+local function _is_powermaul_target(target_breed, target_armor)
+	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
+end
+
 local function _is_ogryn_latrine_shovel_heavy_target(target_breed, target_armor)
 	if _super_armor_type ~= nil and target_armor == _super_armor_type then
 		return true
@@ -452,6 +477,10 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 
 	if special_action_meta.family == "ogryn_club_uppercut" then
 		return _is_ogryn_club_uppercut_target(target_breed, target_armor)
+	end
+
+	if special_action_meta.family == "powermaul" or special_action_meta.family == "ogryn_powermaul" then
+		return _is_powermaul_target(target_breed, target_armor)
 	end
 
 	return false
