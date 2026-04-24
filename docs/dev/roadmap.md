@@ -233,7 +233,7 @@ Runway cuts are now mostly moot. The planned code/doc items for v1.0.0 are eithe
 | # | Issue | Blocker |
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
-| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Re-validation on next DH spawn. |
+| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Later 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no positive dormant-suppression evidence; the 2026-04-24 engagement is inconclusive until first-action `stage`/`aggro_state` is logged. |
 
 ## Design principles
 

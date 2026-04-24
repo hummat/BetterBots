@@ -1658,6 +1658,29 @@ Run ID: 2026-04-15-v0.11.0-small-grenade-confirmation
 Date (local): 2026-04-15
 Date (UTC): 2026-04-15
 Git commit: dev/v0.11.0 working tree after grenade-pickup success logging and sticky reservation fixes
+Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
+Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
+Map + difficulty: live combat session
+
+v0.11.0 evidence:
+- #89 grenade pickup heuristic: PASS
+  - policy log: yes
+  - standalone `small_grenade` success log: yes
+  - key lines / timestamps:
+    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:46:59.743 ... grenade pickup bound into ammo slot`
+    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
+    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
+    - `14:48:20.564 ... grenade pickup bound into ammo slot`
+    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
+  - supporting signals:
+    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
+    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+
+Conclusion:
+- #89 is closeable from this run.
+- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
+```
 
 ### Run 2026-04-15-v0.11.0-daemonhost-regression-03
 
@@ -1689,28 +1712,41 @@ Follow-up fix staged after this run:
 - restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
 - keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
 ```
-Log file: console-2026-04-15-14.44.35-da4b2a9a-48d4-4aa4-8c7a-4b6d71d03dd5.log
-Bot lineup / abilities: mixed live squad including adamant whistle, veteran krak grenade, zealot knives, ogryn frag
-Map + difficulty: live combat session
 
-v0.11.0 evidence:
-- #89 grenade pickup heuristic: PASS
-  - policy log: yes
-  - standalone `small_grenade` success log: yes
-  - key lines / timestamps:
-    - `14:46:59.743 ... grenade pickup permitted: all eligible humans above reserve`
-    - `14:46:59.743 ... grenade pickup bound into ammo slot`
-    - `14:47:02.024 ... grenade pickup success: small_grenade (bot=3, charges=0->3/3)`
-    - `14:48:20.564 ... grenade pickup permitted: all eligible humans above reserve`
-    - `14:48:20.564 ... grenade pickup bound into ammo slot`
-    - `14:48:23.146 ... grenade pickup success: small_grenade (bot=3, charges=1->3/3)`
-  - supporting signals:
-    - repeated `grenade pickup skipped: ability does not use grenade pickups` lines in the same run, confirming non-pickup blitz users were excluded from arbitration
-    - `bb-log summary`: `Error lines: 1`, but none of the grenade pickup evidence depends on that unrelated error
+### Run 2026-04-24-v1.0.0-daemonhost-observation-04
+
+```text
+Run ID: 2026-04-24-v1.0.0-daemonhost-observation-04
+Date (local): 2026-04-24
+Date (UTC): 2026-04-24
+Git commit: dev/v1.0.0 after charged-weapon/blitz targeting fixes
+Log file: console-2026-04-24-09.15.48-d7fdfcb1-dd40-4a14-b8cd-de990858a54b.log
+Bot lineup / abilities: mixed squad; first segment preserved external profiles, second segment used BetterBots profiles
+Map + difficulty: live combat session with daemonhost spawn
+
+#17 daemonhost avoidance: INCONCLUSIVE / NOT VALIDATED
+- daemonhost spawned:
+  - `09:20:00.674 ... Spawned monster chaos_daemonhost successfully`
+- bots later targeted and engaged it:
+  - `09:22:29.102 ... bot 5 pinged chaos_daemonhost (reason: target_enemy)`
+  - `09:22:29.315 ... bot weapon: ... stubrevolver_p1_m2 ... action=grenade_ability ... target_breed=chaos_daemonhost`
+  - `09:22:29.315 ... bot weapon: ... lasgun_p3_m3 ... action=zoom_shoot ... target_breed=chaos_daemonhost`
+  - `09:22:29.340 ... grenade aim ballistic for veteran_krak_grenade ... target_breed=chaos_daemonhost`
+  - `09:22:29.341 ... grenade aim flat fallback for psyker_smite ... target_breed=chaos_daemonhost`
+  - `09:22:30.487 ... grenade releasing toward ... target_breed=chaos_daemonhost`
+- no `dormant_daemonhost` suppression lines appeared in this encounter
+- supporting context only shows BetterBots treating the current target as non-dormant:
+  - `09:21:36.777 ... [target_is_dormant_daemonhost] = false`
+  - later context snapshots also print `target_is_dormant_daemonhost = false`
+- adjacent logs:
+  - `console-2026-04-23-16.43.14-de19ea9a-78df-4316-b878-c15036ee76cd.log` spawned daemonhosts at `16:46:06.543` and `16:52:21.380`; bots pinged/restored monster weight for one at `16:47:12-16:47:25`, with no suppression proof
+  - `console-2026-04-24-08.21.22-853d01c4-0e56-4784-a2fd-7afb169be015.log` spawned a daemonhost at `08:24:58.361`, with no BetterBots engagement/suppression proof
 
 Conclusion:
-- #89 is closeable from this run.
-- The previously missing standalone `small_grenade` world-pickup confirmation now exists twice in one live session.
+- this does not validate #17
+- if the daemonhost was already fully aggroed before `09:22:29`, bot commitment was expected
+- if it was still dormant or only waking, this is still a daemonhost-avoidance failure
+- the text log lacks the decisive first-action `target_daemonhost_stage` / `target_daemonhost_aggro_state` values, so the next validation pass needs those values logged when a daemonhost target/action is allowed or suppressed
 ```
 
 ### Run 2026-04-16-v0.11.0-target-type-hysteresis-closure
