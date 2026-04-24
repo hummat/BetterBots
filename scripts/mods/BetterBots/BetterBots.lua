@@ -689,6 +689,8 @@ RangedSpecialAction.init({
 	is_enabled = function()
 		return Settings.is_feature_enabled("ranged_improvements")
 	end,
+	rippergun_bayonet_distance = Settings.rippergun_bayonet_distance,
+	ranged_bash_distance = Settings.ranged_bash_distance,
 })
 
 SustainedFire.init({

@@ -121,6 +121,8 @@ BetterBots now covers the shipped Ogryn default special actions that matter most
 - `ogryn_combatblade_p1_m1/m2/m3`: queues the uppercut special before high-health or armored targets.
 - `ogryn_powermaul_p1_m1/m2/m3`: activates the power maul special before high-health or armored targets.
 - `ogryn_rippergun_p1_m1/m2/m3`: rewrites close-range fire into the bayonet `stab` input when the current target is inside the configured bayonet distance and worth a melee special.
+- `ogryn_heavystubber_p1_m1/m2/m3` and `ogryn_thumper_p1_m1`: rewrite close-range fire into the melee bash input when the current target is inside the configured ranged-bash distance and worth a melee special.
+- `ogryn_heavystubber_p2_m1/m2/m3`: deliberately ignored; the special is a flashlight toggle, not a combat action.
 
 These are all gated by the existing `melee_improvements` or `ranged_improvements` settings, not by new Ogryn-only toggles.
 

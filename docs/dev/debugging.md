@@ -86,6 +86,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `armed shotgun special for` | Supported shotgun special-shell loader rewrote a queued fire input into `special_action`; line includes template, current target breed, bot slot, and the original fire input |
 | `spent shotgun special for` | A previously armed supported shotgun later fired; line includes template, current spend-time target breed, bot slot, and fire input so wasted shells can be distinguished from good spends |
 | `queued rippergun bayonet for` | Supported rippergun fire was rewritten into the close-range `stab` input; line includes template, current target breed, bot slot, and original fire input |
+| `queued ranged bash for` | Supported Ogryn heavy-stubber/thumper fire was rewritten into a close-range weapon bash; line includes template, current target breed, bot slot, and original fire input |
 | `suppressed opposite-type switch ` | BT-side debounce suppressed an immediate melee↔ranged reswitch after `wrong_slot_for_target_type` fired (#90) |
 | `resolve_decision cache hit ` | Same-frame `Heuristics.resolve_decision(...)` reuse fired for a bot/template; direct runtime proof for the final `#82` BT↔fallback cache path |
 | `weakspot aim selected` | Bot entered `BtBotShootAction` with the head/spine weakspot aim table active while the `Weakspot aim` feature was enabled (#91) |

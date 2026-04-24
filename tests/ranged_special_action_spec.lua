@@ -69,6 +69,7 @@ local function reset(opts)
 			return true
 		end,
 		rippergun_bayonet_distance = opts.rippergun_bayonet_distance,
+		ranged_bash_distance = opts.ranged_bash_distance,
 	})
 end
 
@@ -288,6 +289,118 @@ describe("ranged_special_action", function()
 		RangedSpecialAction.observe_queued_weapon_action(bot_unit, "stab", "shoot_pressed")
 
 		assert.is_truthy(find_debug_log("queued rippergun bayonet for ogryn_rippergun_p1_m3 target=renegade_executor"))
+	end)
+
+	it("rewrites close heavy stubber fire into a weapon bash for armored elite targets", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_heavystubber_p1_m2", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input, raw_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot", nil)
+
+		assert.equals("stab", action_input)
+		assert.is_nil(raw_input)
+	end)
+
+	it("rewrites close thumper fire into a weapon bash for armored elite targets", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_thumper_p1_m1", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input, raw_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
+
+		assert.equals("bash", action_input)
+		assert.is_nil(raw_input)
+	end)
+
+	it("does not rewrite heavy stubber flashlight variants into ranged bashes", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_heavystubber_p2_m1", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot", nil)
+
+		assert.equals("shoot", action_input)
+	end)
+
+	it("honors the configured ranged bash distance", function()
+		reset({
+			ranged_bash_distance = function()
+				return 2
+			end,
+		})
+
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_heavystubber_p1_m2", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot", nil)
+
+		assert.equals("shoot", action_input)
+	end)
+
+	it("logs queued ranged bashes against the current target breed", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		mount_bot(bot_unit, "ogryn_heavystubber_p1_m3", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		RangedSpecialAction.observe_queued_weapon_action(bot_unit, "stab", "shoot")
+
+		assert.is_truthy(find_debug_log("queued ranged bash for ogryn_heavystubber_p1_m3 target=renegade_executor"))
 	end)
 
 	it("does not rewrite when the shotgun special is already active", function()

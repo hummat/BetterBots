@@ -944,6 +944,23 @@ describe("settings", function()
 				assert.equals(0, Settings.rippergun_bayonet_distance())
 			end)
 		end)
+
+		describe("ranged_bash_distance", function()
+			it("returns default 3 when mod returns nil", function()
+				Settings.init(mock_mod({}))
+				assert.equals(3, Settings.ranged_bash_distance())
+			end)
+
+			it("returns configured value", function()
+				Settings.init(mock_mod({ ranged_bash_distance = 4 }))
+				assert.equals(4, Settings.ranged_bash_distance())
+			end)
+
+			it("returns 0 when set to 0", function()
+				Settings.init(mock_mod({ ranged_bash_distance = 0 }))
+				assert.equals(0, Settings.ranged_bash_distance())
+			end)
+		end)
 	end)
 
 	describe("new feature gates", function()
