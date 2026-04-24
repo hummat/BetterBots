@@ -10,7 +10,7 @@ Thanks for your interest in contributing! This document covers development setup
 - [luacheck](https://github.com/mpeterv/luacheck)
 - [StyLua](https://github.com/JohnnyMorganz/StyLua)
 - [lua-language-server](https://github.com/LuaLS/lua-language-server)
-- Darktide with [DMF](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework), [SoloPlay](https://www.nexusmods.com/warhammer40kdarktide/mods/1), and [Tertium4Or5](https://www.nexusmods.com/warhammer40kdarktide/mods/24)
+- Darktide with [DMF](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework), [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176), and either [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) or [Tertium 6](https://www.nexusmods.com/warhammer40kdarktide/mods/725) for class-diverse bots
 
 ### Quick Start
 
@@ -39,9 +39,13 @@ tool paths and fallbacks the Make targets will use locally.
 | `make lsp-check` | Run lua-language-server diagnostics |
 | `make check` | Auto-format, then run lint + lsp + tests + doc checks |
 | `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
-| `make test` | Run busted tests (if tests/ exists) |
+| `make test` | Run busted tests |
+| `make doc-check` | Validate doc invariants |
+| `make patch-check` | Verify decompiled engine anchors against local checkout |
+| `make patch-check-refresh` | Pull decompiled source, then re-run patch-check |
+| `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make tool-info` | Show which tool binaries and fallbacks will run |
-| `make release` | Tag and push a release |
+| `make release VERSION=X.Y.Z` | Run patch-check-refresh + check + package + tag + push + upload ZIP |
 
 ### Tool Resolution
 
@@ -80,6 +84,11 @@ The commit-msg hook validates this locally; CI also checks on PRs.
 1. **Create an issue first** for non-trivial changes
 2. **Fork and branch** from `main`
 3. **Make your changes** following the style guide
-4. **Run `make check`** — all checks must pass
-5. **Test in-game** with SoloPlay + Tertium4Or5 if changing bot behavior
-6. **Submit PR** using the template
+4. **Add or update tests** under `tests/` — new features and fixes should ship with busted coverage
+5. **Run `make check`** — all checks must pass
+6. **Test in-game** with Solo Play + Tertium 5 or 6 if changing bot behavior
+7. **Submit PR** using the template
+
+## Project status
+
+The primary maintainer is stepping back after v1.0.0. Issues, PRs, and forks are welcome; review cadence is best-effort. See the [README](../README.md#project-status) for a current overview of open validation gaps and good entry points.

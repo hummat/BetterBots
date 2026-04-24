@@ -2,309 +2,191 @@
 
 [![CI](https://github.com/hummat/BetterBots/actions/workflows/ci.yml/badge.svg)](https://github.com/hummat/BetterBots/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
 [![Nexus Mods](https://img.shields.io/badge/Nexus-BetterBots-orange)](https://www.nexusmods.com/warhammer40kdarktide/mods/745)
 
-A [Darktide Mod Framework](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities in Solo Play. Aims to bring VT2-level bot ability usage to Darktide.
+A [DMF](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod that enables bot combat abilities, weapon specials, and resource management in Darktide Solo Play. User-facing overview lives on [Nexus](https://www.nexusmods.com/warhammer40kdarktide/mods/745); this README is for developers, contributors, and maintainers.
 
-Darktide has a complete bot ability system built into the behavior tree, but Fatshark hardcoded a whitelist that only allows two abilities. This mod removes that gate and injects missing metadata so the existing infrastructure handles the rest.
+> **Solo Play only.** Darktide uses dedicated servers. Gameplay mods only affect missions hosted locally through the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. Public matchmaking is unaffected.
 
-> **Solo Play only.** Darktide uses dedicated servers — mods cannot affect gameplay on Fatshark's servers. This mod only works when you host locally via the [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) mod. It does **not** work in public matchmaking or any other online mode.
+## Project status
 
-## Highlights
+- **v1.0.0 is the terminal 1.x release.** All 6 planned sprints are code-complete and shipped. See [`docs/dev/status.md`](docs/dev/status.md) for the detailed snapshot and [`docs/dev/roadmap.md`](docs/dev/roadmap.md) for the full history.
+- **Primary maintainer is stepping back.** The project is stable and feature-complete against its original scope. Issues, PRs, and forks are welcome; review cadence will be best-effort.
+- **Post-1.0 scope is open-ended.** Items in the "may never ship" bucket (utility scoring, user-authored profiles, Tier 3 revive cover, grenade tactical evaluator) are good entry points for new contributors who want to pick up significant work.
+- **Active validation gaps** (none block v1.0.0, but they remain open):
+  - [`#17`](https://github.com/hummat/BetterBots/issues/17) dormant daemonhost suppression — still needs a live log with a dormant daemonhost present before first bot action
+  - Hive Scum abilities and blitzes — implemented but DLC-blocked for the maintainer; relies on community reports
+  - Mission-end performance is currently above the documented v1.0 target of median ≤125 µs/bot/frame with no single run > 140. The `a24f078` diagnostic additions are the likely driver and a plausible first optimization target.
 
-- Bot-optimized class profiles with curated builds (weapons, talents, blessings, perks)
-- Pre-revive defensive abilities: bots pop dash / shout / stealth before reviving downed allies
-- Objective-aware activation: bots protect allies interacting with pickups, scriptures, grimoires
-- Team ability cooldown staggering to prevent simultaneous activations
-- Ammo awareness: bots defer ammo pickups when humans are low
-- Engagement leash: bots stay in combat longer using coherency-based ranges
-- Healing deferral: bots let humans heal first at health stations and med-crates
-- Communication-wheel response: battle cry briefly pushes aggression; ammo/health requests defer bot pickups
-- Talent-aware Sprint 2 MVP: Martyrdom bots stay wounded, Psykers preserve peril for Venting Shriek, Focus Target veterans can claim their own threat tags
-- Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
-- Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
-- Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
-- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
-- Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
-- 4 aggression presets (testing / aggressive / balanced / conservative)
-- Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, rippergun bayonet/direct ranged bash range, and warp-weapon max peril
-- Smart targeting, daemonhost avoidance, and poxburster safety toggles
-- Comprehensive busted test suite
+## Project orientation
 
-## What bots can do with this mod
+BetterBots removes a hardcoded whitelist in the Darktide bot behavior tree that only allowed two abilities, then fills in the missing metadata so the rest of the vanilla infrastructure handles everything else. Most of the code is in that "fill in missing metadata + add heuristics that decide when to fire" loop.
 
-**Stance abilities:**
-- Veteran: Executioner's Stance / Voice of Command
-- Psyker: Scrier's Gaze
-- Ogryn: Point-Blank Barrage
-- Arbites: Castigator's Stance
-- Hive Scum: Enhanced Desperado / Rampage (DLC-blocked for validation)
+A five-line mental model:
 
-**Dash / shout / stealth abilities:**
-- Veteran: Infiltrate (stealth)
-- Zealot: Fury of the Faithful (dash), Shroudfield (stealth)
-- Ogryn: Bull Rush (charge), Loyal Protector (taunt)
-- Psyker: Venting Shriek (shout)
-- Arbites: Break the Line (charge), Arbites Shout
+1. At mod load, [`meta_data.lua`](scripts/mods/BetterBots/meta_data.lua) + [`melee_meta_data.lua`](scripts/mods/BetterBots/melee_meta_data.lua) + [`ranged_meta_data.lua`](scripts/mods/BetterBots/ranged_meta_data.lua) inject `ability_meta_data` / `attack_meta_data` entries the engine expects.
+2. At runtime, [`condition_patch.lua`](scripts/mods/BetterBots/condition_patch.lua) patches the BT condition evaluators so ability nodes reach the bot instead of being short-circuited by the vanilla whitelist.
+3. When a BT condition fires, per-class heuristics in [`heuristics_*.lua`](scripts/mods/BetterBots/) decide whether this specific ability should trigger, given the current context (enemy count, threat, peril, allies, talents, etc.).
+4. If the BT can't handle it directly (Tier 3 items, grenades, shotgun specials), a state-machine fallback drives the engine-facing inputs: [`item_fallback.lua`](scripts/mods/BetterBots/item_fallback.lua), [`grenade_fallback.lua`](scripts/mods/BetterBots/grenade_fallback.lua), [`ranged_special_action.lua`](scripts/mods/BetterBots/ranged_special_action.lua).
+5. Cross-cutting policies (sprint, pinging, pickups, healing deferral, engagement leash, com-wheel response) hook BotBehaviorExtension through [`update_dispatcher.lua`](scripts/mods/BetterBots/update_dispatcher.lua).
 
-**Item-based abilities:**
-- Zealot: Bolstering Prayer (relic) — activates when allies need toughness
-- Psyker: Telekine Shield (all 3 variants) — deploys under sustained fire
-- Arbites: Nuncio-Aquila (drone) — launches when allies are hurt and enemies nearby
+For a full walkthrough, start with [`docs/dev/architecture.md`](docs/dev/architecture.md) and then [`docs/bot/behavior-tree.md`](docs/bot/behavior-tree.md). Both are kept up to date alongside the code.
 
-**Grenade / blitz support:**
-- Standard grenades: frag, krak, smoke, fire, shock, cluster, friend rock, flash, tox
-- Zealot: Throwing Knives
-- Arbites: Remote Detonation (whistle), Shock Mine
-- Psyker: Assail, Smite, Chain Lightning
-- Hive Scum: Missile Launcher (DLC-blocked for validation)
+## Quick start (development)
 
-**Smart trigger conditions:**
-Bots use 18 per-ability heuristic functions split across class-specific modules plus dedicated grenade/blitz evaluators — based on enemy count, threat level, health/toughness, distance, ally state, and more. Each ability has specific activate/block conditions tuned per preset.
+```bash
+git clone https://github.com/hummat/BetterBots.git
+cd BetterBots
+make deps          # install the commit-msg hook
+make check-ci      # non-mutating gate: format-check + lint + lsp + tests + doc checks
+```
 
-**Bot combat behavior:**
-- Sprint to catch up, rescue allies, and traverse
-- Daemonhost avoidance (combat + sprint suppression near dormant DH)
-- Elite/special pinging with LOS checks and tag hold logic
-- Arbites companion (dog) targeting via smart tags
-- Boss engagement self-defense exception
-- Poxburster safe targeting (close-range fire suppression)
-- Distant special melee chase penalty (prefer ranged)
-- Target-type hysteresis (reduces melee/ranged swap thrash on close scores)
-- Melee attack selection (lights into hordes, heavies into armor)
-- Smart blitz targeting from bot perception
-- Pre-revive defensive ability activation
-- Team ability cooldown staggering
-- Coherency-anchored engagement leash
+Typical inner loop:
 
-**Bot profiles and equipment:**
-- Per-slot class selection (veteran, zealot, psyker, ogryn)
-- Curated weapon/talent/blessing/perk builds per class
-- Weapon quality scaling (auto scales with difficulty, or manual override)
-- ADS fix for Tertium 5/6 bots
-- Warp charge venting for Psyker staves
-- VFX/SFX bleed suppression
+```bash
+# edit code, then:
+make check         # auto-formats, then runs lint + lsp + tests + doc checks
+make test          # tests only, faster
+```
 
-**In-game settings:**
-- Aggression preset: testing / aggressive / balanced / conservative
-- Ability category toggles: stances, charges, shouts, stealth, deployables, grenades
-- Sprint catch-up distance (slider, 0 = disable)
-- Special chase penalty range (slider, 0 = disable)
-- Player tag response strength (slider, 0 = ignore pings)
-- Melee horde light bias (slider, 0 = vanilla attack selection)
-- Warp weapon max peril before attack blocking
-- Melee improvements toggle (also covers supported melee weapon specials)
-- Ranged improvements toggle (also covers supported shotgun shells, bayonets, and direct ranged bashes/pistol whips)
-- Smart blitz targeting toggle
-- Daemonhost avoidance toggle
-- Poxburster safe targeting toggle
-- Bot ranged ammo threshold and human ammo reserve threshold
-- Human-likeness timing and pressure-leash profiles (auto / manual / custom)
-- Healing deferral mode + thresholds
-- Communication wheel response toggle
-- Bot grimoire pickup toggle
-- Bot profiles: class per slot, weapon quality
-- Diagnostics: info/debug/trace log levels, JSONL event log, `/bb_perf` timing
+The repo does not modify your shell `PATH`. `make tool-info` prints exactly which binaries will be used (luacheck, stylua, lua-language-server, busted).
 
-## Roadmap
+### Required tools
 
-See the [full roadmap](docs/dev/roadmap.md) for details and GitHub issue links.
+- Lua 5.1 / LuaJIT (or anything `busted` supports)
+- `luacheck` — lint (via the repo-local `bin/luacheck` wrapper for the Lua 5.5 mismatch)
+- `stylua` — format
+- `lua-language-server` — static diagnostics
+- `busted` (or `lua-busted`, or the Arch-packaged runner) — tests
 
-**Ability activation**
-- [x] Stance, dash, charge, shout, stealth abilities (all 6 classes)
-- [x] Item-based abilities (relic, force field, drone)
-- [x] Smart per-ability trigger heuristics (18 functions)
-- [x] Safety guards (revive protection, suppression, warp peril block)
-- [x] Grenade / blitz support (all templates)
-- [x] Settings surface (presets, category toggles, per-feature sliders)
-- [x] Pre-revive defensive ability activation
-- [x] Team ability cooldown staggering
-- [ ] Hive Scum validation (DLC-blocked)
+### Required for live validation
 
-**Bot combat behavior**
-- [x] Charge/dash to rescue disabled allies
-- [x] Bot sprinting (configurable distance)
-- [x] Daemonhost avoidance (togglable)
-- [x] Bot pinging of elites/specials
-- [x] Arbites companion (dog) targeting
-- [x] Boss engagement discipline
-- [x] Poxburster targeting
-- [x] Distant special chase penalty (configurable range)
-- [x] Coherency-anchored engagement leash
-- [x] Human-likeness timing and pressure-leash profiles
-- [x] Target-type hysteresis (reduces melee/ranged swap thrash)
-- [x] Smart blitz targeting (togglable)
-- [x] Objective-aware activation (protect interacting allies)
-- [x] Pre-revive defensive ability activation
-- [x] Arbites companion-command smart tag
-- [ ] Weapon/enemy-aware ADS vs hip-fire
+- Darktide + [Darktide Mod Loader](https://www.nexusmods.com/warhammer40kdarktide/mods/19) + [DMF](https://www.nexusmods.com/warhammer40kdarktide/mods/8)
+- [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176) — required to host missions locally
+- [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) or [Tertium 6](https://www.nexusmods.com/warhammer40kdarktide/mods/725) — recommended; without one, vanilla bots are all veterans
 
-**Bot equipment and profiles**
-- [x] Bot-optimized class profiles with curated builds
-- [x] ADS fix for Tertium 5/6 bots
-- [x] Ranged weapon fixes (plasma gun, staves)
-- [x] Bot warp charge venting
-- [x] Sustained fire support for held-fire ranged paths
-- [x] VFX/SFX bleed suppression
-- [x] Smart melee attack selection (armor-aware, configurable bias)
-- [x] Weakspot aim MVP for finesse firearms
-- [x] Ballistic aim for manual-physics grenade families
-- [x] Ammo awareness (bot + human thresholds)
-- [x] Grenade refill pickup heuristic
-- [x] Healing deferral
-- [x] Mule scripture/tome pickup (grimoires opt-in)
+### Installing from source
 
-**Planned for v1.0.0 (final release)**
-- [x] Navmesh validation for charge/dash abilities
-- [x] Per-breed weakspot aim override (Mauler spine, Bulwark exposed head, provisional Crusher rear-head proxy)
-- [x] Talent-aware bot behavior (Sprint 2 MVP: Zealot Martyrdom, Psyker Warp Siphon/Venting Shriek, Veteran Focus Target tag ownership)
-- [x] Close-range weapon-family classifier (Purgatus, flamer, shotgun, stubber)
-- [x] Melee activated specials (power sword, thunder hammer, force sword, chain weapons)
-- [x] Pocketable pickup primitive + medicae/stim/med-kit discipline
-- [x] Deployable crate carry and deploy (ammo + medical)
-- [ ] Tier 3 revive cover (Telekine Shield, Relic, Nuncio-Aquila drone)
-- [x] Communication wheel response (ForTheEmperor compat)
-- [x] Smart-tag item interaction bridge
-- [x] Unified non-book resource arbitration
+Clone into `Darktide/mods/BetterBots`, add `BetterBots` to `mods/mod_load_order.txt` below `dmf`, then re-patch mods (`toggle_darktide_mods.bat` on Windows, `handle_darktide_mods.sh` on Linux). Mods are disabled after every game update; re-patching is required each time.
 
-**Post-1.0 (may never ship)**
-- Utility-based ability scoring (architectural)
-- Built-in bot profile management (Tertium4Or5 replacement)
-- Grenade/blitz tactical evaluator
-- User-authored bot profiles
+Verify in-game: start a Solo Play mission and look for `BetterBots loaded` in chat, plus `BetterBots: injected meta_data for ...` lines.
 
-See [Status Snapshot](docs/dev/status.md) and [Validation Tracker](docs/dev/validation-tracker.md) for detailed evidence.
-
-## Requirements
-
-- [Darktide Mod Loader](https://www.nexusmods.com/warhammer40kdarktide/mods/19)
-- [Darktide Mod Framework](https://www.nexusmods.com/warhammer40kdarktide/mods/8)
-- [Solo Play](https://www.nexusmods.com/warhammer40kdarktide/mods/176)
-- [Tertium 5](https://www.nexusmods.com/warhammer40kdarktide/mods/183) or [Tertium 6](https://www.nexusmods.com/warhammer40kdarktide/mods/725) (recommended — for non-veteran bot classes)
-
-## Install
-
-**From Nexus (recommended):**
-1. Extract `BetterBots.zip` into your Darktide `mods/` folder.
-2. Add `BetterBots` in `mods/mod_load_order.txt` below `dmf`.
-3. Re-patch mods with `toggle_darktide_mods.bat` (Windows) or `handle_darktide_mods.sh` (Linux).
-
-**From source:**
-1. Clone or copy this repo into your Darktide `mods/` directory as `mods/BetterBots`.
-2. Add `BetterBots` in `mods/mod_load_order.txt` below `dmf`.
-3. Re-patch mods.
-
-Mods are disabled after each game update, so re-patching is required again.
-
-## Quick verification
-
-1. Launch Solo Play.
-2. Start a mission (`/solo`).
-3. Confirm in game chat:
-   - `BetterBots loaded`
-   - `BetterBots: injected meta_data for ...` (one line per injected template)
-
-## Companion mod compatibility
-
-BetterBots works standalone (vanilla bots are all veterans), but bot class diversity requires a Tertium mod.
-
-**Tertium 5** — the original. Some versions crash when encountering Arbites/Hive Scum archetypes it doesn't recognize.
-
-**Tertium 6 (temporary)** — a fork by KristopherPrime that supports all 6 classes and player + 5 bots. If Tertium 5's crash affects you, try Tertium 6 instead.
-
-Both are optional/recommended, not hard-required.
-
-## Developer tooling
-
-This repo is configured for local Lua lint/format/type diagnostics:
-
-- `luacheck` via `.luacheckrc`
-- `stylua` via `.stylua.toml`
-- `lua-language-server` diagnostics via `.luarc.json`
-- a repo-local `bin/luacheck` compatibility wrapper for the known Lua 5.5 mismatch
-
-The repo does not modify your shell `PATH`. Use `make tool-info` to see the
-exact tool paths and fallbacks the Make targets will use on this machine.
-
-Commands:
+## Make targets
 
 | Target | Description |
 |--------|-------------|
-| `make deps` | Install git hooks (conventional commits) |
-| `make lint` | Run luacheck |
-| `make format` | Format with StyLua |
-| `make format-check` | Check formatting (dry run) |
-| `make lsp-check` | Run lua-language-server diagnostics |
-| `make patch-check` | Verify decompiled Darktide engine anchors against the current local checkout |
-| `make patch-check-refresh` | `git pull --ff-only` the decompiled Darktide checkout, then verify engine anchors |
+| `make deps` | Install git hooks (Conventional Commits) |
 | `make check` | Auto-format, then run lint + lsp + tests + doc checks |
 | `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
 | `make test` | Run busted tests |
-| `make tool-info` | Show which tool binaries and fallbacks will run |
+| `make lint` | Run luacheck (via repo-local wrapper) |
+| `make format` | Format with StyLua |
+| `make format-check` | Dry-run format check |
+| `make lsp-check` | Run lua-language-server diagnostics |
+| `make doc-check` | Validate doc invariants (see `scripts/doc-check/`) |
+| `make patch-check` | Verify decompiled Darktide engine anchors against the current local checkout |
+| `make patch-check-refresh` | `git pull --ff-only` the decompiled checkout, then verify anchors |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
-| `make release VERSION=X.Y.Z` | Patch-check-refresh + check + package + tag + push + upload ZIP |
+| `make release VERSION=X.Y.Z` | patch-check-refresh + check + package + tag + push + upload ZIP |
+| `make tool-info` | Print which tool binaries and fallbacks will run |
 
-After cloning, run `make deps` to install the commit-msg hook.
+CI runs `make check-ci` on every push to `main` and every PR. Patch-day validation (`make patch-check-refresh`) is intentionally separate: it requires the decompiled source checkout to be present.
 
-`make lint` always uses the repo's `bin/luacheck` wrapper. `make test` tries, in
-order: `busted`, `lua-busted`, then Arch's `/usr/lib/luarocks/.../busted`
-runner.
+## Development workflow
 
-CI runs `make check-ci` on every push to `main` and on pull requests.
-Patch-day validation is separate on purpose: run `make patch-check-refresh` after updating `../Darktide-Source-Code`.
+### Editing code
 
-## Contributing
+- Lua 5.1 / LuaJIT target. Tabs for indentation (width 4). 120-char line limit. `snake_case` for locals and filenames. `PascalCase` for class/module names.
+- Run `make format` before committing (the hook does not auto-format). StyLua diffs are the #1 repeated review finding.
+- Follow Conventional Commits: `type(scope): description`. Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `chore`, `ci`. The commit-msg hook validates this locally; CI also checks on PRs.
 
-See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup, code style, and PR process.
+### Tests
 
-## Docs
+All new features and fixes should ship with busted coverage under `tests/`. The suite runs offline against stubbed engine globals; there is no Darktide runtime in CI.
 
-- [Architecture](docs/dev/architecture.md)
-- [Status Snapshot](docs/dev/status.md)
-- [Known Issues and Risks](docs/dev/known-issues.md)
-- [Debugging and Testing](docs/dev/debugging.md)
-- [Logging and Diagnostics](docs/dev/logging.md)
-- [Manual Test Plan](docs/dev/test-plan.md)
-- [Roadmap](docs/dev/roadmap.md)
-- [Validation Tracker](docs/dev/validation-tracker.md)
-- [Related Mods](docs/related-mods.md)
-- [Meta Builds Research](docs/classes/meta-builds-research.md)
+- `tests/test_helper.lua` and per-spec `before_each` hooks set up the fake engine. Before inventing new fields on existing stubs, cross-check the decompiled source — `docs/dev/mock-api-audit.md` tracks known mock/real drift.
+- Prefer one red-green cycle per behavior. The codebase has a strong TDD pattern; batching multiple changes before a green run hides bugs.
 
-### Bot system internals (from decompiled source)
+### Patch-day workflow
 
-- [Behavior Tree](docs/bot/behavior-tree.md) — full node hierarchy and conditions
-- [Combat Actions](docs/bot/combat-actions.md) — melee, shoot, ability activation
-- [Perception and Targeting](docs/bot/perception-targeting.md) — scoring, gestalt weights
-- [Navigation](docs/bot/navigation.md) — pathfinding, follow, teleport, formation
-- [Input System](docs/bot/input-system.md) — input routing, ActionInputParser
-- [Profiles and Spawning](docs/bot/profiles-spawning.md) — loadouts, weapon templates
+Darktide patches regularly break hook anchors. The repo keeps a manual link to a decompiled-source checkout (the maintainer uses `../Darktide-Source-Code`) and `make patch-check` validates that every anchor BetterBots hooks is still present with the expected surrounding context.
 
-### Class ability references
+When a patch lands:
 
-Per-class docs with internal template names, input actions, cooldowns, talent interactions, and bot implementation notes.
-Each class also has a tactics doc with community-sourced heuristics for when/how to use each ability:
+1. `make patch-check-refresh` — pulls the decompiled source and re-runs the anchor validator.
+2. If it fails, the failing anchor will tell you which hook needs updating and where.
+3. Update the hook, re-run `make check-ci`, then validate in-game before releasing.
 
-- [Veteran](docs/classes/veteran.md) | [Tactics](docs/classes/veteran-tactics.md)
-- [Zealot](docs/classes/zealot.md) | [Tactics](docs/classes/zealot-tactics.md)
-- [Psyker](docs/classes/psyker.md) | [Tactics](docs/classes/psyker-tactics.md)
-- [Ogryn](docs/classes/ogryn.md) | [Tactics](docs/classes/ogryn-tactics.md)
-- [Arbites](docs/classes/arbites.md) (DLC) | [Tactics](docs/classes/arbites-tactics.md)
-- [Hive Scum](docs/classes/hive-scum.md) (DLC) | [Tactics](docs/classes/hive-scum-tactics.md)
+### Live validation
+
+The mod ships with structured diagnostics for post-mission analysis:
+
+- **`bb-log`** (repo root) — CLI over `event_log.jsonl` and console logs. Use this first, not raw `grep`. Key commands: `./bb-log summary 0`, `./bb-log warnings 0`, `./bb-log raw <pattern> 0` where `0` is "most recent log".
+- **`/bb_state`, `/bb_decide`, `/bb_brain`** — in-game chat commands that dump bot decision state.
+- **`/bb_perf`** — per-hook runtime recorder. Mission-end totals are the documented benchmark metric.
+- **JSONL event log** — toggle in settings; authoritative for smite/assail/chain-grenade validation because bb-log's `consumes` view is profile-dependent.
+
+[`docs/dev/debugging.md`](docs/dev/debugging.md) and [`docs/dev/logging.md`](docs/dev/logging.md) have the full reference.
+
+### Per-bot logging discipline
+
+`_debug_log(key, ...)` deduplicates by key. Any log line that can fire per-bot **must** include the bot's unit in the key or multi-bot events will silently collapse to one. See grep results for existing patterns (`"foo:" .. tostring(_scratchpad_player_unit(scratchpad))`).
+
+## Release process
+
+Releases are cut from `main` after merging the sprint branch. `make release` automates most of it.
+
+### Pre-release checks
+
+1. `make check-ci` on the integration branch.
+2. Run one or more Solo Play missions and confirm `bb-log summary 0` shows no new errors or warnings.
+3. For features touching weapon behavior, explicitly validate both mod load orders (BetterBots-first and BetterBots-last in `mod_load_order.txt`). Some regressions only reproduce with a specific order.
+4. Run `make patch-check` if any Darktide patch landed since the last release.
+
+### Cutting the release
+
+```bash
+git checkout main
+git merge --no-ff dev/vX.Y.Z -m "Merge dev/vX.Y.Z into main for vX.Y.Z release"
+make release VERSION=X.Y.Z
+```
+
+`make release` runs `scripts/release.sh`, which in turn:
+
+1. Requires a clean working tree.
+2. Runs `make patch-check-refresh`.
+3. Runs `make check`.
+4. Fails if `make check` produced formatter diffs (commit them and re-run).
+5. Builds `BetterBots.zip` via `make package`.
+6. Tags `vX.Y.Z` locally and pushes the commit + tag.
+7. Waits for CI to publish the GitHub release and attach the ZIP.
+
+### Nexus upload
+
+`make release` stops at GitHub. Nexus is manual. Every release needs **all four** of these fields updated — this is a frequent miss:
+
+1. **Brief overview** (≤350 chars, plain text, shown in search results).
+2. **File description** (≤255 chars, plain text). Format: `vX.Y.Z: <feature1>, <feature2>, ...`.
+3. **Changelog** — use Nexus's "Separate text fields" form. Version column is `X.Y.Z` (no `v` prefix — Nexus natural-sorts). One change per row.
+4. **Mod page description** — [`docs/nexus-description.bbcode`](docs/nexus-description.bbcode). Update the "New in vX.Y.Z" section and the "What I want to fix next" list before each release; commit to `main`, then paste the file contents into Nexus's Description tab.
+
+### Hotfixes
+
+Same flow from a `dev/vX.Y.Z` patch branch. Tag bumps follow semver: feature additions are minor, fixes are patch, and user-visible behavior breaks are major.
 
 ## Repository layout
 
 ```text
 BetterBots.mod                    # DMF entry point
-bb-log                            # Log analysis CLI
+bb-log                            # Log analysis CLI (use first, not raw grep)
 scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
-  charge_tracker.lua              #   use_ability_charge dispatch: consumed events, team cooldown, fallback completion
+  charge_tracker.lua              #   use_ability_charge dispatch, team cooldown, fallback completion
   combat_ability_identity.lua     #   Semantic ability identity (shout vs stance, etc.)
   heuristics.lua                  #   Thin public API + dispatcher for split heuristic modules
-  heuristics_context.lua          #   Shared context builder + target/breed helper functions
+  heuristics_context.lua          #   Shared context builder + target/breed helpers
   heuristics_veteran.lua          #   Veteran ability heuristics
   heuristics_zealot.lua           #   Zealot ability heuristics
   heuristics_psyker.lua           #   Psyker ability heuristics
@@ -313,7 +195,7 @@ scripts/mods/BetterBots/          # Mod source
   heuristics_hive_scum.lua        #   Hive Scum ability heuristics
   heuristics_grenade.lua          #   Grenade/blitz tactical evaluators
   meta_data.lua                   #   ability_meta_data injection at load time
-  gestalt_injector.lua            #   Default bot_gestalts injection for ADS-capable bot profiles
+  gestalt_injector.lua            #   Default bot_gestalts injection for ADS-capable profiles
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua            #   Grenade throw state machine (wield/aim/throw/unwield)
   update_dispatcher.lua           #   BotBehaviorExtension.update dispatcher ordering and gating
@@ -323,12 +205,12 @@ scripts/mods/BetterBots/          # Mod source
   charge_nav_validation.lua       #   Shared navmesh launch validation for charge/dash abilities (#13)
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)
   target_selection.lua            #   Player tag boost, special chase penalty, boss engagement
-  target_type_hysteresis.lua      #   Perception-layer melee/ranged type stabilization
+  target_type_hysteresis.lua     #   Perception-layer melee/ranged type stabilization
   weakspot_aim.lua                #   Per-breed ranged aim-node override (#92)
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
-  weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix
+  weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix, voidblast anchor
   ranged_special_action.lua       #   Shotgun special-shell preload policy + arm/spend logging
   sustained_fire.lua              #   Held-input bridge for sustained-fire ranged weapons
   ping_system.lua                 #   Bot elite/special pinging
@@ -355,18 +237,75 @@ scripts/mods/BetterBots/          # Mod source
   shared_rules.lua                #   Shared rule tables (daemonhost breeds, rescue charges)
   BetterBots_data.lua             #   Mod options / widget definitions
   BetterBots_localization.lua     #   Display strings
-tests/                            # Unit tests (busted)
-scripts/hooks/                    # Git hooks (conventional commits)
-scripts/release.sh                # Release automation
-docs/                             # Architecture, class refs, status, roadmap
+tests/                            # Unit tests (busted) — offline, stubbed engine
+scripts/hooks/                    # Git hooks (Conventional Commits)
+scripts/release.sh                # Release automation (see "Release process")
+scripts/doc-check/                # Doc-invariant validator (make doc-check)
+docs/                             # Architecture, class refs, status, roadmap, validation tracker
 .github/
   workflows/                      # CI, release, label sync
   ISSUE_TEMPLATE/                 # Bug report, feature request
-  CONTRIBUTING.md                 # Dev setup + guidelines
+  CONTRIBUTING.md                 # Contributor-specific guidelines (this file covers setup)
   PULL_REQUEST_TEMPLATE.md
   labels.yml                      # Issue labels (auto-synced)
   dependabot.yml                  # GH Actions auto-updates
 ```
+
+## Key documents
+
+**Start here:**
+- [Architecture](docs/dev/architecture.md) — module boundaries, data flow, hook ordering
+- [Status Snapshot](docs/dev/status.md) — what's shipped, what's pending, per-issue state
+- [Roadmap](docs/dev/roadmap.md) — sprint history + post-1.0 backlog
+- [Known Issues and Risks](docs/dev/known-issues.md)
+
+**While working:**
+- [Debugging and Testing](docs/dev/debugging.md)
+- [Logging and Diagnostics](docs/dev/logging.md)
+- [Manual Test Plan](docs/dev/test-plan.md)
+- [Validation Tracker](docs/dev/validation-tracker.md) — per-issue live-log evidence
+- [Mock API Audit](docs/dev/mock-api-audit.md) — known drift between test stubs and decompiled source
+
+**Bot system internals (reverse-engineered from decompiled source):**
+- [Behavior Tree](docs/bot/behavior-tree.md) — full node hierarchy and conditions
+- [Combat Actions](docs/bot/combat-actions.md) — melee, shoot, ability activation
+- [Perception and Targeting](docs/bot/perception-targeting.md) — scoring, gestalt weights
+- [Navigation](docs/bot/navigation.md) — pathfinding, follow, teleport, formation
+- [Input System](docs/bot/input-system.md) — input routing, ActionInputParser
+- [Profiles and Spawning](docs/bot/profiles-spawning.md) — loadouts, weapon templates
+- [Vanilla Capabilities](docs/bot/vanilla-capabilities.md) — what stock bots can and can't do
+
+**Class references** (internal template names, input actions, cooldowns, talent interactions, per-class tactics):
+- [Veteran](docs/classes/veteran.md) · [Tactics](docs/classes/veteran-tactics.md)
+- [Zealot](docs/classes/zealot.md) · [Tactics](docs/classes/zealot-tactics.md)
+- [Psyker](docs/classes/psyker.md) · [Tactics](docs/classes/psyker-tactics.md)
+- [Ogryn](docs/classes/ogryn.md) · [Tactics](docs/classes/ogryn-tactics.md)
+- [Arbites](docs/classes/arbites.md) (DLC) · [Tactics](docs/classes/arbites-tactics.md)
+- [Hive Scum](docs/classes/hive-scum.md) (DLC) · [Tactics](docs/classes/hive-scum-tactics.md)
+
+## Gotchas
+
+- **Mods are disabled every patch.** Re-run the toggle/patch script after every Darktide update.
+- **Tertium 5 can crash** on Arbites/Hive Scum archetypes; Tertium 6 supports all six classes. Both are optional — without either, vanilla bots are all veterans.
+- **Decompiled source drift.** The decompiled-source checkout is the source of truth for engine anchors. `make patch-check-refresh` validates it; if you invent fields on existing stubs in tests, cross-check against the real source first (`docs/dev/mock-api-audit.md` tracks known drift).
+- **DMF hot-reload.** Anything installed via `mod:hook`/`mod:hook_require` must be idempotent. Use sentinel guards attached to the engine class, not module-local, so state survives hot-reload.
+- **`fassert` is a no-op.** Engine `fassert(...)` computes the error message then returns. Use `if <condition> then error(...) end` for actual runtime guards.
+- **Per-bot log keys.** `_debug_log(key, ...)` deduplicates by key. Any per-bot event must include the bot unit in the key or multi-bot events silently collapse.
+- **`grenade_fallback` parallels the BT.** BT condition wrappers do not cover the grenade/blitz fallback path. Guards must be duplicated when adding new gates.
+- **Mock/real drift in tests.** `tests/test_helper.lua` stubs the engine. Before inventing new fields on a stub, verify the field exists in the decompiled source — invented fields can hide dead features.
+
+## Contributing
+
+See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contributor-side process notes (PR flow, issue-first convention, review expectations). This README covers setup.
+
+**Good entry points for new contributors:**
+
+- Pick up a [post-1.0 issue](https://github.com/hummat/BetterBots/issues?q=is%3Aopen+label%3Apost-1.0) if you want significant work. The bucket is explicitly open-ended.
+- Validate [`#17`](https://github.com/hummat/BetterBots/issues/17) (dormant daemonhost suppression) with a Solo Play log showing a pre-aggro daemonhost.
+- Hive Scum validation — if you own the DLC, run a Solo Play session with a Hive Scum bot and report back.
+- Performance — the v1.0 target (median ≤125 µs/bot/frame, no single run > 140) is currently missed. `ability_queue` and `grenade_fallback` are the top costs.
+
+**Review cadence:** best-effort. Forks are fine. If activity resumes, it will show up in `docs/dev/status.md`.
 
 ## License
 
