@@ -237,6 +237,33 @@ local SPECIAL_WEAPON_POLICIES = {
 		},
 	},
 	{
+		family = "ogryn_club_fist",
+		prefixes = {
+			"ogryn_club_p2_",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
+		family = "ogryn_pickaxe",
+		prefixes = {
+			"ogryn_pickaxe_2h_",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
+		family = "ogryn_combatblade_uppercut",
+		prefixes = {
+			"ogryn_combatblade_p1_",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
 		family = "powermaul",
 		prefixes = {
 			"powermaul_p1_",
@@ -434,6 +461,10 @@ local function _is_ogryn_club_uppercut_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
 
+local function _is_ogryn_direct_special_target(target_breed, target_armor)
+	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
+end
+
 local function _is_powermaul_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
@@ -477,6 +508,14 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 
 	if special_action_meta.family == "ogryn_club_uppercut" then
 		return _is_ogryn_club_uppercut_target(target_breed, target_armor)
+	end
+
+	if
+		special_action_meta.family == "ogryn_club_fist"
+		or special_action_meta.family == "ogryn_pickaxe"
+		or special_action_meta.family == "ogryn_combatblade_uppercut"
+	then
+		return _is_ogryn_direct_special_target(target_breed, target_armor)
 	end
 
 	if special_action_meta.family == "powermaul" or special_action_meta.family == "ogryn_powermaul" then
