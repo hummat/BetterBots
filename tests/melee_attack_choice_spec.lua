@@ -2242,6 +2242,209 @@ describe("melee_attack_choice", function()
 		end
 	end)
 
+	it("resolves human direct melee specials during enter", function()
+		local cases = {
+			{
+				weapon_name = "combataxe_p1_m2",
+				action_name = "action_special_stab",
+				chain_time = 1,
+				family = "combat_axe_special",
+			},
+			{
+				weapon_name = "combataxe_p2_m1",
+				action_name = "action_special_down_right",
+				chain_time = 0.5,
+				family = "combat_axe_special",
+			},
+			{
+				weapon_name = "combatsword_p2_m1",
+				action_name = "action_attack_special",
+				chain_time = 0.8,
+				family = "combat_sword_special",
+			},
+			{
+				weapon_name = "combatknife_p1_m1",
+				action_name = "action_special_jab",
+				chain_time = 0.32,
+				family = "combat_knife_jab",
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local MeleeAttackChoice = load_module()
+			local enter_handler = install_enter_handler(MeleeAttackChoice)
+			local scratchpad = {
+				weapon_template = {
+					name = case.weapon_name,
+					actions = {
+						[case.action_name] = {
+							start_input = "special_action",
+							kind = "sweep",
+							allowed_chain_actions = {
+								start_attack = {
+									chain_time = case.chain_time,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			enter_handler(function() end, nil, "bot_unit", nil, nil, scratchpad, nil, 13)
+
+			assert.same({
+				action_input = "special_action",
+				action_name = case.action_name,
+				chain_time = case.chain_time,
+				family = case.family,
+			}, scratchpad.special_action_meta)
+		end
+	end)
+
+	it("does not resolve combat axe mode-switch variants as direct melee specials", function()
+		local MeleeAttackChoice = load_module()
+		local enter_handler = install_enter_handler(MeleeAttackChoice)
+		local scratchpad = {
+			weapon_template = {
+				name = "combataxe_p3_m2",
+				actions = {
+					action_special_activate = {
+						start_input = "special_action",
+						kind = "toggle_special",
+						allowed_chain_actions = {
+							start_attack = {
+								chain_time = 0.3,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		enter_handler(function() end, nil, "bot_unit", nil, nil, scratchpad, nil, 13)
+
+		assert.is_nil(scratchpad.special_action_meta)
+	end)
+
+	it("prepends human direct melee specials for armored targets", function()
+		local cases = {
+			{
+				weapon_name = "combataxe_p3_m1",
+				family = "combat_axe_special",
+			},
+			{
+				weapon_name = "combatsword_p2_m3",
+				family = "combat_sword_special",
+			},
+			{
+				weapon_name = "combatknife_p1_m2",
+				family = "combat_knife_jab",
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local MeleeAttackChoice = load_module()
+			local choose_attack_handler = install_choose_attack_handler(MeleeAttackChoice, ARMORED)
+			local heavy_attack = attack_meta({
+				arc = 2,
+				penetrating = true,
+				action_inputs = {
+					{ action_input = "start_attack", timing = 0 },
+					{ action_input = "heavy_attack", timing = 0 },
+				},
+			})
+			local scratchpad = {
+				num_enemies_in_proximity = 1,
+				weapon_template = {
+					name = case.weapon_name,
+					attack_meta_data = {
+						light_attack = attack_meta({ arc = 0, penetrating = false }),
+						heavy_attack = heavy_attack,
+					},
+				},
+				special_action_meta = {
+					action_input = "special_action",
+					chain_time = 0.5,
+					family = case.family,
+				},
+				inventory_slot_component = { special_active = false },
+				weapon_extension = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				},
+			}
+
+			local chosen = choose_attack_handler(function()
+				error("original _choose_attack should not run")
+			end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+			assert.equals("special_action", chosen.action_inputs[1].action_input)
+			assert.equals("start_attack", chosen.action_inputs[2].action_input)
+			assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
+		end
+	end)
+
+	it("does not prepend human direct melee specials for ordinary unarmored specialists", function()
+		local cases = {
+			{
+				weapon_name = "combataxe_p1_m1",
+				family = "combat_axe_special",
+			},
+			{
+				weapon_name = "combatsword_p2_m2",
+				family = "combat_sword_special",
+			},
+			{
+				weapon_name = "combatknife_p1_m1",
+				family = "combat_knife_jab",
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local MeleeAttackChoice = load_module()
+			local choose_attack_handler = install_choose_attack_handler(MeleeAttackChoice, 1)
+			local light_attack = attack_meta({ arc = 0, penetrating = false })
+			local scratchpad = {
+				num_enemies_in_proximity = 1,
+				weapon_template = {
+					name = case.weapon_name,
+					attack_meta_data = {
+						light_attack = light_attack,
+						heavy_attack = attack_meta({
+							arc = 2,
+							penetrating = true,
+							action_inputs = {
+								{ action_input = "start_attack", timing = 0 },
+								{ action_input = "heavy_attack", timing = 0 },
+							},
+						}),
+					},
+				},
+				special_action_meta = {
+					action_input = "special_action",
+					chain_time = 0.5,
+					family = case.family,
+				},
+				inventory_slot_component = { special_active = false },
+				weapon_extension = {
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				},
+			}
+
+			local chosen = choose_attack_handler(function()
+				error("original _choose_attack should not run")
+			end, nil, "target_unit", { name = "cultist_gunner", tags = { special = true } }, scratchpad)
+
+			assert.equals(light_attack, chosen)
+		end
+	end)
+
 	it("resolves human power maul special attacks during enter", function()
 		local MeleeAttackChoice = load_module()
 		local enter_handler

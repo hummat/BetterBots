@@ -218,6 +218,35 @@ local SPECIAL_WEAPON_POLICIES = {
 		},
 	},
 	{
+		family = "combat_axe_special",
+		prefixes = {
+			"combataxe_p1_",
+			"combataxe_p2_",
+			"combataxe_p3_m1",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
+		family = "combat_sword_special",
+		prefixes = {
+			"combatsword_p2_",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
+		family = "combat_knife_jab",
+		prefixes = {
+			"combatknife_p1_",
+		},
+		action_kinds = {
+			sweep = true,
+		},
+	},
+	{
 		family = "ogryn_latrine_shovel",
 		prefixes = {
 			"ogryn_club_p1_m2",
@@ -461,7 +490,7 @@ local function _is_ogryn_club_uppercut_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
 
-local function _is_ogryn_direct_special_target(target_breed, target_armor)
+local function _is_direct_melee_special_target(target_breed, target_armor)
 	return _is_high_health_target(target_breed) or _is_armored_bucket(target_armor, _armored_type, _super_armor_type)
 end
 
@@ -502,6 +531,14 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 		return _is_chain_special_target(target_breed, target_armor)
 	end
 
+	if
+		special_action_meta.family == "combat_axe_special"
+		or special_action_meta.family == "combat_sword_special"
+		or special_action_meta.family == "combat_knife_jab"
+	then
+		return _is_direct_melee_special_target(target_breed, target_armor)
+	end
+
 	if special_action_meta.family == "ogryn_latrine_shovel" then
 		return _is_ogryn_latrine_shovel_target(target_breed, target_armor)
 	end
@@ -515,7 +552,7 @@ local function _is_priority_special_target(special_action_meta, scratchpad, targ
 		or special_action_meta.family == "ogryn_pickaxe"
 		or special_action_meta.family == "ogryn_combatblade_uppercut"
 	then
-		return _is_ogryn_direct_special_target(target_breed, target_armor)
+		return _is_direct_melee_special_target(target_breed, target_armor)
 	end
 
 	if special_action_meta.family == "powermaul" or special_action_meta.family == "ogryn_powermaul" then

@@ -25,7 +25,7 @@ Darktide has a complete bot ability system built into the behavior tree, but Fat
 - Mule pickup: bots carry scriptures/tomes; grimoires are opt-in
 - Arbites Cyber-Mastiff smart-tag steers the dog onto priority targets
 - Sustained fire support for flamer, Purgatus, recon/autogun, bolter, autopistol, heavy stubber, and rippergun braced fire paths
-- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, and supported shotgun special shells
+- Family-specific weapon specials: power swords, force swords, thunder hammers, chain weapons, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, and supported shotgun special shells
 - Human-likeness timing and pressure-leash profiles (auto-scale with difficulty by default)
 - 4 aggression presets (testing / aggressive / balanced / conservative)
 - Slider controls for sprint distance, special chase penalty, player tag response, melee horde bias, rippergun bayonet range, and warp-weapon max peril
