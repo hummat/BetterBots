@@ -110,6 +110,18 @@ IF has(ogryn_special_ammo_movement) THEN allow slightly closer commits
 
 ---
 
+## Weapon Specials
+
+BetterBots now covers the shipped Ogryn default special actions that matter most for validation:
+
+- `ogryn_club_p1_m1`: queues the uppercut special before a melee attack only against high-health or armored targets.
+- `ogryn_club_p1_m2/m3`: folds the latrine shovel before high-health or armored targets, with heavy follow-up bias for the hardest targets.
+- `ogryn_rippergun_p1_m1/m2/m3`: rewrites close-range fire into the bayonet `stab` input when the current target is inside the configured bayonet distance and worth a melee special.
+
+These are all gated by the existing `melee_improvements` or `ranged_improvements` settings, not by new Ogryn-only toggles.
+
+---
+
 ## Sources
 
 - [Steam: When and what to Bull Rush?](https://steamcommunity.com/app/1361210/discussions/0/3829789016663229955/)

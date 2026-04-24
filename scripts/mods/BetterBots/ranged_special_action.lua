@@ -1,4 +1,4 @@
--- Shotgun special-shell prelude support for the verified ranged-load families.
+-- Ranged weapon-special support for verified shotgun loader and rippergun bayonet families.
 -- Keeps policy separate from weapon_action.lua so queue rewriting stays a seam.
 
 local _mod
@@ -11,9 +11,12 @@ local _bot_slot_for_unit
 local _armored_type
 local _super_armor_type
 local _is_enabled
+local _rippergun_bayonet_distance
 local _armor
 
 local _armed_state_by_unit = setmetatable({}, { __mode = "k" })
+
+local RIPPERGUN_BAYONET_MAX_DISTANCE = 3
 
 local SUPPORTED_SHOTGUN_TEMPLATES = {
 	shotgun_p1_m1 = true,
@@ -21,6 +24,12 @@ local SUPPORTED_SHOTGUN_TEMPLATES = {
 	shotgun_p1_m3 = true,
 	shotgun_p4_m1 = true,
 	shotgun_p4_m2 = true,
+}
+
+local SUPPORTED_RIPPERGUN_TEMPLATES = {
+	ogryn_rippergun_p1_m1 = true,
+	ogryn_rippergun_p1_m2 = true,
+	ogryn_rippergun_p1_m3 = true,
 }
 
 local FIRE_ACTION_INPUTS = {
@@ -92,6 +101,18 @@ local function _current_target_enemy(unit)
 	return perception and perception.target_enemy or nil
 end
 
+local function _current_target_distance(unit)
+	local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+	local perception = blackboard and blackboard.perception
+	local target_distance = perception and perception.target_enemy_distance or nil
+
+	if type(target_distance) == "number" then
+		return target_distance
+	end
+
+	return nil
+end
+
 local function _current_target_breed(unit)
 	local target_unit = _current_target_enemy(unit)
 	local unit_data_extension = target_unit and ScriptUnit.has_extension(target_unit, "unit_data_system")
@@ -135,6 +156,19 @@ local function _should_arm_special(target_breed, target_armor)
 	end
 
 	return _is_armored_bucket(target_armor)
+end
+
+local function _should_use_rippergun_bayonet(target_breed, target_armor, target_distance)
+	local max_distance = _rippergun_bayonet_distance and _rippergun_bayonet_distance() or RIPPERGUN_BAYONET_MAX_DISTANCE
+	if type(max_distance) ~= "number" or max_distance <= 0 then
+		return false
+	end
+
+	if type(target_distance) ~= "number" or target_distance > max_distance then
+		return false
+	end
+
+	return _should_arm_special(target_breed, target_armor)
 end
 
 local function _bot_slot(unit)
@@ -181,6 +215,26 @@ local function _log_spend(unit, template_name, target_breed_name, fire_input)
 	)
 end
 
+local function _log_bayonet(unit, template_name, target_breed_name, fire_input)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	_debug_log(
+		"rippergun_bayonet:" .. tostring(unit) .. ":" .. tostring(template_name),
+		_fixed_time(),
+		"queued rippergun bayonet for "
+			.. tostring(template_name)
+			.. " target="
+			.. tostring(target_breed_name)
+			.. " (bot="
+			.. tostring(_bot_slot(unit))
+			.. ", fire_input="
+			.. tostring(fire_input)
+			.. ")"
+	)
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
@@ -192,6 +246,7 @@ function M.init(deps)
 	_armored_type = deps.ARMOR_TYPE_ARMORED
 	_super_armor_type = deps.ARMOR_TYPE_SUPER_ARMOR
 	_is_enabled = deps.is_enabled
+	_rippergun_bayonet_distance = deps.rippergun_bayonet_distance
 	_armor = nil
 	_armed_state_by_unit = setmetatable({}, { __mode = "k" })
 end
@@ -202,27 +257,36 @@ function M.rewrite_weapon_action_input(unit, action_input, raw_input)
 	end
 
 	local template_name = _current_weapon_template_name(unit)
-	if not SUPPORTED_SHOTGUN_TEMPLATES[template_name] then
-		return action_input, raw_input
+	if SUPPORTED_SHOTGUN_TEMPLATES[template_name] then
+		local existing_state = _armed_state_by_unit[unit]
+		if existing_state and existing_state.template_name == template_name then
+			return action_input, raw_input
+		end
+
+		local inventory_slot_component = _current_wielded_slot_component(unit)
+		if inventory_slot_component and inventory_slot_component.special_active then
+			return action_input, raw_input
+		end
+
+		local target_breed = _current_target_breed(unit)
+		local target_armor = _current_target_armor(unit, target_breed)
+		if not _should_arm_special(target_breed, target_armor) then
+			return action_input, raw_input
+		end
+
+		return "special_action", raw_input
 	end
 
-	local existing_state = _armed_state_by_unit[unit]
-	if existing_state and existing_state.template_name == template_name then
-		return action_input, raw_input
+	if SUPPORTED_RIPPERGUN_TEMPLATES[template_name] then
+		local target_breed = _current_target_breed(unit)
+		local target_armor = _current_target_armor(unit, target_breed)
+		local target_distance = _current_target_distance(unit)
+		if _should_use_rippergun_bayonet(target_breed, target_armor, target_distance) then
+			return "stab", raw_input
+		end
 	end
 
-	local inventory_slot_component = _current_wielded_slot_component(unit)
-	if inventory_slot_component and inventory_slot_component.special_active then
-		return action_input, raw_input
-	end
-
-	local target_breed = _current_target_breed(unit)
-	local target_armor = _current_target_armor(unit, target_breed)
-	if not _should_arm_special(target_breed, target_armor) then
-		return action_input, raw_input
-	end
-
-	return "special_action", raw_input
+	return action_input, raw_input
 end
 
 function M.observe_queued_weapon_action(unit, action_input, original_action_input)
@@ -238,35 +302,45 @@ function M.observe_queued_weapon_action(unit, action_input, original_action_inpu
 		active_state = nil
 	end
 
-	if not SUPPORTED_SHOTGUN_TEMPLATES[template_name] then
+	if SUPPORTED_SHOTGUN_TEMPLATES[template_name] then
+		if action_input == "special_action" and FIRE_ACTION_INPUTS[original_action_input] then
+			local target_breed = _current_target_breed(unit)
+			local target_breed_name = target_breed and target_breed.name or "unknown"
+
+			_armed_state_by_unit[unit] = {
+				template_name = template_name,
+				target_breed_name = target_breed_name,
+				fire_input = original_action_input,
+			}
+			_log_arm(unit, template_name, target_breed_name, original_action_input)
+			return
+		end
+
+		if active_state and FIRE_ACTION_INPUTS[action_input] then
+			local target_breed = _current_target_breed(unit)
+			local target_breed_name = target_breed and target_breed.name or active_state.target_breed_name or "unknown"
+			local fire_input = action_input
+
+			_armed_state_by_unit[unit] = nil
+			_log_spend(unit, template_name, target_breed_name, fire_input)
+			return
+		end
+
+		if CLEAR_ACTION_INPUTS[action_input] then
+			_armed_state_by_unit[unit] = nil
+		end
 		return
 	end
 
-	if action_input == "special_action" and FIRE_ACTION_INPUTS[original_action_input] then
+	if
+		SUPPORTED_RIPPERGUN_TEMPLATES[template_name]
+		and action_input == "stab"
+		and FIRE_ACTION_INPUTS[original_action_input]
+	then
 		local target_breed = _current_target_breed(unit)
 		local target_breed_name = target_breed and target_breed.name or "unknown"
 
-		_armed_state_by_unit[unit] = {
-			template_name = template_name,
-			target_breed_name = target_breed_name,
-			fire_input = original_action_input,
-		}
-		_log_arm(unit, template_name, target_breed_name, original_action_input)
-		return
-	end
-
-	if active_state and FIRE_ACTION_INPUTS[action_input] then
-		local target_breed = _current_target_breed(unit)
-		local target_breed_name = target_breed and target_breed.name or active_state.target_breed_name or "unknown"
-		local fire_input = action_input
-
-		_armed_state_by_unit[unit] = nil
-		_log_spend(unit, template_name, target_breed_name, fire_input)
-		return
-	end
-
-	if CLEAR_ACTION_INPUTS[action_input] then
-		_armed_state_by_unit[unit] = nil
+		_log_bayonet(unit, template_name, target_breed_name, original_action_input)
 	end
 end
 

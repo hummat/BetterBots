@@ -1813,6 +1813,146 @@ describe("melee_attack_choice", function()
 		assert.equals(light_attack, chosen)
 	end)
 
+	it("resolves Ogryn club uppercut specials during enter", function()
+		local MeleeAttackChoice = load_module()
+		local enter_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "enter" then
+					enter_handler = handler
+				end
+			end,
+		}
+
+		_G.ScriptUnit = {
+			has_extension = function()
+				return {
+					read_component = function(_, component_name)
+						if component_name == "inventory" then
+							return { wielded_slot = "slot_primary" }
+						end
+						if component_name == "slot_primary" then
+							return { special_active = false }
+						end
+						return nil
+					end,
+				}
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local scratchpad = {
+			weapon_template = {
+				name = "ogryn_club_p1_m1",
+				actions = {
+					action_special_uppercut = {
+						start_input = "special_action",
+						kind = "sweep",
+						allowed_chain_actions = {
+							start_attack = {
+								chain_time = 0.45,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		enter_handler(function() end, nil, "bot_unit", nil, nil, scratchpad, nil, 13)
+
+		assert.same({
+			action_input = "special_action",
+			action_name = "action_special_uppercut",
+			chain_time = 0.45,
+			family = "ogryn_club_uppercut",
+		}, scratchpad.special_action_meta)
+	end)
+
+	it("prepends Ogryn club uppercut specials for armored targets", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 13
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "ogryn_club_p1_m1",
+				attack_meta_data = {
+					light_attack = attack_meta({ arc = 0, penetrating = false }),
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.45,
+				family = "ogryn_club_uppercut",
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+		assert.equals("special_action", chosen.action_inputs[1].action_input)
+		assert.equals("start_attack", chosen.action_inputs[2].action_input)
+		assert.equals("heavy_attack", chosen.action_inputs[3].action_input)
+	end)
+
 	it("does not prepend specials when special_action is currently invalid", function()
 		local MeleeAttackChoice = load_module()
 		local choose_attack_handler

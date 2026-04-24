@@ -927,6 +927,23 @@ describe("settings", function()
 				assert.equals(24, Settings.special_chase_penalty_range())
 			end)
 		end)
+
+		describe("rippergun_bayonet_distance", function()
+			it("returns default 3 when mod returns nil", function()
+				Settings.init(mock_mod({}))
+				assert.equals(3, Settings.rippergun_bayonet_distance())
+			end)
+
+			it("returns configured value", function()
+				Settings.init(mock_mod({ rippergun_bayonet_distance = 4 }))
+				assert.equals(4, Settings.rippergun_bayonet_distance())
+			end)
+
+			it("returns 0 when set to 0", function()
+				Settings.init(mock_mod({ rippergun_bayonet_distance = 0 }))
+				assert.equals(0, Settings.rippergun_bayonet_distance())
+			end)
+		end)
 	end)
 
 	describe("new feature gates", function()

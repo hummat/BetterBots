@@ -136,6 +136,7 @@ M.DEFAULTS = {
 	special_chase_penalty_range = 18,
 	player_tag_bonus = 3,
 	melee_horde_light_bias = 4,
+	rippergun_bayonet_distance = 3,
 	bot_ranged_ammo_threshold = 20,
 	bot_human_ammo_reserve_threshold = 80,
 	bot_human_grenade_reserve_threshold = 100,
@@ -458,6 +459,10 @@ end
 
 function M.melee_horde_light_bias()
 	return _read_numeric_setting("melee_horde_light_bias", 4, 0, 10)
+end
+
+function M.rippergun_bayonet_distance()
+	return _read_numeric_setting("rippergun_bayonet_distance", 3, 0, 6)
 end
 
 function M.sprint_follow_distance()

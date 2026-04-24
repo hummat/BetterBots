@@ -208,6 +208,7 @@ return {
 					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
 					make_numeric("player_tag_bonus", { 0, 10 }, 1),
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
+					make_numeric("rippergun_bayonet_distance", { 0, 6 }, 0.5),
 					{
 						setting_id = "enable_ammo_policy",
 						type = "checkbox",

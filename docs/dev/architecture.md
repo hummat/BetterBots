@@ -54,7 +54,7 @@ This mod targets bot ability activation in three paths:
     - resolves DMF settings for behavior profile (testing/aggressive/balanced/conservative) and category/feature gates
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
     - **Semantic combat-ability gate**: shared templates resolve through `combat_ability_identity.lua`; Veteran shout routes to `enable_shouts`, Veteran stance/base/unknown falls back to `enable_stances` for settings compatibility, while engine metadata/input validation remains keyed by template name
-    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. `melee_improvements` covers both armor/horde attack selection and supported melee weapon specials; `ranged_improvements` covers ADS/charged-fire improvements plus supported shotgun special-shell preloads. Disabling all gates + all categories reverts to vanilla bot behavior.
+    - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. `melee_improvements` covers both armor/horde attack selection and supported melee weapon specials; `ranged_improvements` covers ADS/charged-fire improvements plus supported shotgun special-shell preloads and rippergun bayonet rewrites. Disabling all gates + all categories reverts to vanilla bot behavior.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
@@ -141,7 +141,7 @@ This mod targets bot ability activation in three paths:
     - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference
     - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families
-    - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, 1H force swords stay targeted at elite/special/monster/super-armor value, 2H force swords instead require at least 10 stored special charges and an unarmored horde window, thunder hammers widen to armored/heavy elites plus captain/monster/boss, and chain-family `toggle_special` weapons stay armor/heavy biased
+    - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, 1H force swords stay targeted at elite/special/monster/super-armor value, 2H force swords instead require at least 10 stored special charges and an unarmored horde window, thunder hammers widen to armored/heavy elites plus captain/monster/boss, chain-family `toggle_special` weapons stay armor/heavy biased, Ogryn `ogryn_club_p1_m2/m3` latrine shovels fold for high-health or armored targets, and Ogryn `ogryn_club_p1_m1` uppercuts use the same high-value target gate
 27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
     - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
@@ -166,10 +166,12 @@ This mod targets bot ability activation in three paths:
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
     - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted finesse families (lasgun, autogun, bolter, stub revolver) when the template leaves `aim_at_node` unset (#91 MVP)
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
-29a. Shotgun special-shell prelude (#33 follow-up, via `ranged_special_action.lua` + `weapon_action.lua`):
+29a. Ranged weapon specials (#33 follow-up, via `ranged_special_action.lua` + `weapon_action.lua`):
     - rewrites queued `shoot_pressed` / `zoom_shoot` inputs into `special_action` for the verified `ranged_load_special` shotgun families only (`shotgun_p1_m1/m2/m3`, `shotgun_p4_m1/m2`)
-    - rewrite policy is target-value driven: visible elite/special/captain/monster/boss or armored/super-armor target required; ripperguns, `shotgun_p2_m1`, mauls, and bash/bayonet specials are out of scope
+    - rewrites queued close-range rippergun fire into `stab` for `ogryn_rippergun_p1_m1/m2/m3` when the current target is inside the configured bayonet distance and is elite/special/captain/monster/boss or armored/super-armor
+    - rewrite policy is target-value driven: visible elite/special/captain/monster/boss or armored/super-armor target required; `shotgun_p2_m1`, mauls, and generic bash/pistol-whip specials are still out of scope
     - state is tracked per bot unit so BetterBots can log both shell-arm and shell-spend with the current target breed name, which is the validation signal for “loaded and used on something worthwhile” versus “loaded and wasted on trash”
+    - rippergun bayonet support is single-step: successful queueing logs `queued rippergun bayonet ...` with template, target breed, bot slot, and original fire input
 30. Melee target selection distance penalty (#19, via `target_selection.lua`):
     - hook `BotTargetSelection.slot_weight` during melee scoring
     - penalizes melee score for distant special enemies (>18m) when bot has sufficient ranged ammo (>50%) so ranged engagement wins instead of a long chase (#19)

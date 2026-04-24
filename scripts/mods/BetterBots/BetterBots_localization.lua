@@ -348,6 +348,13 @@ return {
 		en = "Higher values make bots use more quick swings against unarmored hordes. "
 			.. "Set to 0 for vanilla melee choices.",
 	},
+	rippergun_bayonet_distance = {
+		en = "Rippergun bayonet range (m)",
+	},
+	rippergun_bayonet_distance_description = {
+		en = "Bots use the rippergun bayonet instead of firing only inside this distance, "
+			.. "and only against valuable targets. Set to 0 to disable bayonet rewrites.",
+	},
 	bot_ranged_ammo_threshold = {
 		en = "Bot ammo reserve (%%)",
 	},

@@ -35,7 +35,9 @@ teardown(function()
 	rawset(_G, "Armor", _saved_globals.Armor)
 end)
 
-local function reset()
+local function reset(opts)
+	opts = opts or {}
+
 	for unit in pairs(_extensions) do
 		_extensions[unit] = nil
 	end
@@ -66,6 +68,7 @@ local function reset()
 		is_enabled = function()
 			return true
 		end,
+		rippergun_bayonet_distance = opts.rippergun_bayonet_distance,
 	})
 end
 
@@ -95,10 +98,11 @@ local function mount_target(unit, breed)
 	}
 end
 
-local function set_target(bot_unit, target_unit)
+local function set_target(bot_unit, target_unit, target_distance)
 	_blackboards[bot_unit] = {
 		perception = {
 			target_enemy = target_unit,
+			target_enemy_distance = target_distance,
 		},
 	}
 end
@@ -153,7 +157,7 @@ describe("ranged_special_action", function()
 		assert.equals("shoot_pressed", action_input)
 	end)
 
-	it("does not rewrite rippergun fire into shotgun special_action", function()
+	it("does not rewrite rippergun fire without a close target distance", function()
 		local bot_unit = "bot_1"
 		local target_unit = "crusher_1"
 
@@ -173,6 +177,117 @@ describe("ranged_special_action", function()
 		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
 
 		assert.equals("shoot_pressed", action_input)
+	end)
+
+	it("does not rewrite close rippergun fire for low-value targets", function()
+		local bot_unit = "bot_1"
+		local target_unit = "poxwalker_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 1
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_rippergun_p1_m3", false)
+		mount_target(target_unit, {
+			name = "chaos_poxwalker",
+			tags = {},
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
+
+		assert.equals("shoot_pressed", action_input)
+	end)
+
+	it("rewrites close rippergun fire into a bayonet stab for armored elite targets", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_rippergun_p1_m3", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input, raw_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
+
+		assert.equals("stab", action_input)
+		assert.is_nil(raw_input)
+	end)
+
+	it("does not rewrite rippergun fire into bayonet stabs at range", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_rippergun_p1_m3", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 5.1)
+
+		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
+
+		assert.equals("shoot_pressed", action_input)
+	end)
+
+	it("honors the configured rippergun bayonet distance", function()
+		reset({
+			rippergun_bayonet_distance = function()
+				return 2
+			end,
+		})
+
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		rawset(_G, "Armor", {
+			armor_type = function()
+				return 2
+			end,
+		})
+
+		mount_bot(bot_unit, "ogryn_rippergun_p1_m3", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		local action_input = RangedSpecialAction.rewrite_weapon_action_input(bot_unit, "shoot_pressed", nil)
+
+		assert.equals("shoot_pressed", action_input)
+	end)
+
+	it("logs queued rippergun bayonet stabs against the current target breed", function()
+		local bot_unit = "bot_1"
+		local target_unit = "crusher_1"
+
+		mount_bot(bot_unit, "ogryn_rippergun_p1_m3", false)
+		mount_target(target_unit, {
+			name = "renegade_executor",
+			tags = { elite = true },
+		})
+		set_target(bot_unit, target_unit, 2.4)
+
+		RangedSpecialAction.observe_queued_weapon_action(bot_unit, "stab", "shoot_pressed")
+
+		assert.is_truthy(find_debug_log("queued rippergun bayonet for ogryn_rippergun_p1_m3 target=renegade_executor"))
 	end)
 
 	it("does not rewrite when the shotgun special is already active", function()
