@@ -16,18 +16,19 @@ The result: bots throw grenades, pop stances, charge into revives, ping specials
 [*]Bot profiles give you class-diverse loadouts instead of four copy-pasted veterans
 [/list]
 
-[size=3][b]New in v0.11 — Combat Execution[/b][/size]
+[size=3][b]New in v1.0.0 — Bot Identity[/b][/size]
 
-This one is mostly under-the-hood fixes that stop bots tripping over themselves mid-fight. v0.11.1 is a patch on top — same feature set, but the "steadier target switching" below now actually works. Turns out my first pass at the fix was patching a function the live game never called.
+The terminal 1.x release. Bots now adapt to the build you give them instead of running the same generic routine on every class.
 
 [list]
-[*][b]Grenade ballistics fixed:[/b] gravity-affected grenades arc like real projectiles again instead of flat-lobbing into the nearest wall
-[*][b]Held-fire weapons restored:[/b] flamer, Purgatus staff, heavy stubber, recon/autoguns, autopistols, bolter hipfire, and ripperguns drive the correct sustained-fire input path again (regression from v0.10)
-[*][b]Book mules:[/b] bots carry scriptures and tomes for the team. Grimoires stay opt-in — I don't want to decide for you whether the corruption is worth it.
-[*][b]Auto timing profiles:[/b] reaction time, ability jitter, and pressure leash auto-scale with difficulty. Manual sliders are still there if you don't trust me.
-[*][b]Steadier target switching:[/b] bots used to flip between melee and ranged priorities every few frames when scores were close. Now they commit.
-[*][b]Smarter pickups:[/b] bots defer ammo and grenade crates to humans below configurable thresholds. Full bots no longer chase an ammo box two rooms away.
-[*][b]Weakspot aim (MVP):[/b] ranged bots aim at heads on common specials. Per-breed map still in progress.
+[*][b]Keystone-aware heuristics:[/b] Scrier's Gaze, Point-Blank Barrage, Martyrdom, Shroudfield, Venting Shriek, and Focus Target now shift stance, peril, targeting, and self-heal behavior based on the actual talents equipped
+[*][b]Weakspot aim:[/b] ranged bots aim at heads on common specials, with Scab Mauler spine override and Bulwark exposed-head routing (Crusher uses a provisional rear-head proxy)
+[*][b]Weapon specials filled in:[/b] power mauls, thunder hammers, chain weapons, force swords, combat axes/swords/knives, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
+[*][b]Pocketable support:[/b] bots pick up and self-use medicae stations, combat stims, and corruption stims, and carry ammo/medical crates with conservative auto-deploy
+[*][b]Smart-tag and com-wheel bridges:[/b] ping tagged ammo/grenades/books/pocketables to route bots via pickup policy; com_cheer triggers an aggressive override, com_need_* defers to humans
+[*][b]Close-range family policy:[/b] flamer, Purgatus, shotgun, heavy stubber, autopistols, dual autopistols, and ripperguns take their true hipfire paths
+[*][b]Charge/dash nav validation:[/b] bots raycast the actual launch endpoint before committing, so charges no longer fire into walls
+[*][b]Resource arbitration rounded out:[/b] health stations now promote to any damaged non-Martyrdom bot once humans are above reserve
 [/list]
 
 [size=3][b]What bots can use[/b][/size]
@@ -121,10 +122,11 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]What I want to fix next[/b][/size]
 
 [list]
-[*]Weapon-aware ADS vs hip-fire routing (right now bots ADS more than they should)
-[*]Healing item management (medkits, stims)
+[*]Tier 3 revive cover (approach-phase architecture — the earlier enter-hook approach didn't survive engine state changes)
+[*]Broad give-to-ally / wound-cure pocketable distribution beyond the current self-use and crate-deploy policy
 [*]Remaining weapon special actions like shield specials, combat-sword parries, and hold/release ranged bashes
-[*]Per-breed weakspot routing (Mauler prefers spine; Bulwark headshots only when the shield is open or flanked; Crusher uses a documented provisional rear-head proxy for now)
+[*]Rig-verified Crusher weakspot routing to replace the current provisional rear-head proxy
+[*]User-authored bot profiles and a utility-score architecture for target selection
 [/list]
 
 [size=3][b]Source & feedback[/b][/size]
