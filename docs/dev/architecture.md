@@ -276,6 +276,55 @@ The sentinel string must live on the engine class table (`rawget(Target, SENTINE
 
 Regression coverage: `tests/startup_regressions_spec.lua` includes idempotency tests that simulate hot reload by loading the test harness twice with a shared extension table and assert zero new hook registrations on the second load.
 
+**Rule 3: wrap optional pre-hook logic in `pcall` when the original is essential.** When a hook injects optional behavior *before* a critical engine action (revive interaction entry, rescue charge, etc.), an exception in the injected code must not prevent the original from running. A nil-component or unexpected-return error in `try_pre_revive` would otherwise leave a downed ally never rescued. Pattern:
+
+```lua
+local ok, err = pcall(M.optional_enhancement, unit, args)
+if not ok and _debug_enabled and _debug_enabled() then
+    _debug_log("module_error:" .. tostring(unit), _fixed_time(), "error: " .. tostring(err))
+end
+return orig_function(self, unit, args)
+```
+
+This rule applies when the injected logic is *optional enhancement* and the original is *essential gameplay* (revive, rescue, revive-related interactions, perils-of-the-warp achievement guard). Hooks where the injected logic *is* the primary behavior (for example `condition_patch._can_activate_ability` replacing the whitelist) do not need this wrapper — there is no original to protect.
+
+## Where behavior gates belong: three parallel ability paths
+
+When adding a "don't fire X under condition Y" rule, identify which path the activation goes through before placing the gate. The three paths are mutually independent:
+
+| Path | Driven by | Condition layer for new gates |
+|---|---|---|
+| Template-based combat ability (Tier 1/2) | BT `activate_combat_ability` node → `bt_bot_conditions.can_activate_ability` | `condition_patch._can_activate_ability` (BT condition replacement) and `ability_queue.lua` (fallback) |
+| BT melee / ranged actions | `BtBotMeleeAction`, `BtBotShootAction` | BT condition wrappers (`conditions.bot_in_melee_range`, `conditions.has_target_and_ammo_greater_than`) |
+| Grenade / blitz (Tier 3b) | `grenade_fallback.lua` state machine, **bypasses BT ability node** | Per-template heuristic in `heuristics.lua` / `heuristics_grenade.lua` |
+
+A wrapper on `bt_bot_conditions.can_activate_ability` does **not** cover melee/ranged BT actions, and neither covers `grenade_fallback`. The 2026-04-11 daemonhost-suppression bug landed because the v0.6.0 fix wrapped melee/ranged BT conditions only — `psyker_smite` then fired on a dormant daemonhost via `grenade_fallback` → heuristic → approve, with zero suppression log lines in the entire session.
+
+Practical guidance:
+
+- A gate that should affect *all three paths* is cleanest in `build_context()` (or a helper read by every per-template heuristic). Heuristics are read by both BT ability activation and `grenade_fallback`, so a context flag covers Tier 1/2/3 in one place.
+- If a wrapper "isn't firing", grep the event logs for its dedicated dedup key first. Zero occurrences across a full session usually means the wrapper sits on the wrong path, not a throttle bug.
+- For grenade-only or blitz-only rules, keep them in `heuristics_grenade.lua` rather than `condition_patch.lua`.
+
+## Polymorphic change records: consumer-guard rule
+
+The metadata injectors (`ranged_meta_data.lua`, `melee_meta_data.lua`, `meta_data.lua`) record per-template changes as structured records with a `mode` field. Two modes exist today:
+
+- `"replace"` — the injector replaced the whole sub-table because it was empty/missing on first contact.
+- `"fields"` — the injector recorded original per-key values for selective restoration. `change.original_fields` is **only** populated for this mode.
+
+Any consumer function that reads mode-specific state (`change.original_fields[key]`, `change.replaced_value`, etc.) must early-return when the field is `nil` *or* when `change.mode` is the wrong mode. v0.11.0 crashed on startup (`ranged_meta_data.lua:342: attempt to index local 'original_fields' (a nil value)`) because `record_original_field` accessed `change.original_fields[key]` without that guard, on a load order where Tertium4Or5 had pre-set `attack_meta_data = {}` and the injector therefore took the replace path. Fixed in v0.11.2.
+
+Rule when adding a new mode or a new consumer: every reader of `change.*` must guard on either the field's presence or `change.mode`. Add a regression spec that injects twice on the same template and exercises both the fresh path and the "already present" path.
+
+## Grenade revalidation hysteresis (`opts.revalidation`)
+
+`grenade_fallback.try_queue` evaluates the grenade heuristic twice per attempt: once at idle to decide "wield a grenade" and once after the aim window to re-check before releasing the throw. Both calls share `_evaluate_grenade_heuristic`. Density-gated templates (`_grenade_horde`, frag/box/fire/adamant) hard-gate at `num_nearby >= N`; across a ~0.5–1s aim window, `num_nearby` fluctuates as enemies move in and out of the bot's 5m proximity radius, so a strict re-check loses every throw to a transient one-enemy dip.
+
+Mitigation: `_evaluate_grenade_heuristic` accepts `opts.revalidation = true`. When set, the dispatcher temporarily mutates `context.num_nearby = num_nearby + 1` for the duration of the call and restores the original value before returning. `grenade_fallback.lua` passes `{ revalidation = true }` only at the aim-window re-check. The relaxation is bounded to one enemy — `0 → 1` is still held, so "threw into empty space" is impossible.
+
+When tuning grenade density thresholds in `heuristics_grenade.lua`, remember the effective revalidation floor is `threshold - 1`, not `threshold`. If you lower frag from 6 to 5, the revalidation check accepts throws at 4 nearby. Raise the initial threshold rather than relaxing the delta if that becomes too permissive. Test coverage: `tests/heuristics_spec.lua` `describe "evaluate_grenade_heuristic"` pins both the relaxation and the empty-context floor.
+
 ## Why item fallback is needed
 
 Item-based abilities rely heavily on weapon `conditional_state_to_action_input` chains (for example wield -> channel/place).
