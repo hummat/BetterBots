@@ -17,7 +17,7 @@ This mod targets bot ability activation in three paths:
 
 ## Mod behavior
 
-`scripts/mods/BetterBots/BetterBots.lua` coordinates these module-level behaviors:
+`scripts/mods/BetterBots/BetterBots.lua` coordinates hook registration and runtime lifecycle; `bootstrap.lua` loads modules, initializes dependencies, and wires cross-module references.
 
 1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.

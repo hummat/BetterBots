@@ -181,6 +181,7 @@ BetterBots.mod                    # DMF entry point
 bb-log                            # Log analysis CLI (use first, not raw grep)
 scripts/mods/BetterBots/          # Mod source
   BetterBots.lua                  #   Orchestrator: init, module wiring, BT hooks
+  bootstrap.lua                   #   Module loading, initialization, and cross-module wiring
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
   charge_tracker.lua              #   use_ability_charge dispatch, team cooldown, fallback completion

@@ -42,6 +42,19 @@ local function read_file(path)
 	return source
 end
 
+local function read_bootstrap_surface()
+	return read_file("scripts/mods/BetterBots/BetterBots.lua")
+		.. "\n"
+		.. read_file("scripts/mods/BetterBots/bootstrap.lua")
+end
+
+local function assert_module_loaded(source, filename)
+	local direct = 'mod:io_dofile("BetterBots/scripts/mods/BetterBots/' .. filename .. '")'
+	local via_bootstrap = 'load_module(mod, "' .. filename .. '")'
+
+	assert.is_truthy(source:find(direct, 1, true) or source:find(via_bootstrap, 1, true))
+end
+
 local function find_named_call(calls, module_name)
 	for i = 1, #calls do
 		if calls[i].module == module_name then
@@ -286,6 +299,7 @@ local function make_bootstrap_harness(module_overrides)
 		end
 	end
 
+	modules.Bootstrap = dofile("scripts/mods/BetterBots/bootstrap.lua")
 	modules.SharedRules = {}
 	modules.BotTargeting = {}
 	modules.CombatAbilityIdentity = make_runtime_module("CombatAbilityIdentity", install_calls, {
@@ -623,6 +637,7 @@ local function make_bootstrap_harness(module_overrides)
 	end
 
 	local module_path_map = {
+		["BetterBots/scripts/mods/BetterBots/bootstrap"] = modules.Bootstrap,
 		["BetterBots/scripts/mods/BetterBots/log_levels"] = modules.LogLevels,
 		["BetterBots/scripts/mods/BetterBots/shared_rules"] = modules.SharedRules,
 		["BetterBots/scripts/mods/BetterBots/combat_ability_identity"] = modules.CombatAbilityIdentity,
@@ -934,108 +949,86 @@ describe("startup regressions", function()
 	end)
 
 	it("loads split heuristics modules through mod io", function()
-		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_context"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_veteran"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_zealot"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_psyker"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_ogryn"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_arbites"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_hive_scum"%)', 1))
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/heuristics_grenade"%)', 1))
+		assert_module_loaded(source, "heuristics_context")
+		assert_module_loaded(source, "heuristics_veteran")
+		assert_module_loaded(source, "heuristics_zealot")
+		assert_module_loaded(source, "heuristics_psyker")
+		assert_module_loaded(source, "heuristics_ogryn")
+		assert_module_loaded(source, "heuristics_arbites")
+		assert_module_loaded(source, "heuristics_hive_scum")
+		assert_module_loaded(source, "heuristics_grenade")
 	end)
 
 	it("loads smart_targeting through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/smart_targeting"%)', 1))
+		assert_module_loaded(source, "smart_targeting")
 	end)
 
 	it("loads animation_guard through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/animation_guard"%)', 1))
+		assert_module_loaded(source, "animation_guard")
 	end)
 
 	it("loads airlock_guard through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/airlock_guard"%)', 1))
+		assert_module_loaded(source, "airlock_guard")
 	end)
 
 	it("loads melee_attack_choice through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/melee_attack_choice"%)', 1))
+		assert_module_loaded(source, "melee_attack_choice")
 	end)
 
 	it("loads revive_ability through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/revive_ability"%)', 1))
+		assert_module_loaded(source, "revive_ability")
 	end)
 
 	it("loads sustained_fire through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/sustained_fire"%)', 1))
+		assert_module_loaded(source, "sustained_fire")
 	end)
 
 	it("loads mule_pickup through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/mule_pickup"%)', 1))
+		assert_module_loaded(source, "mule_pickup")
 	end)
 
 	it("loads pocketable_pickup through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/pocketable_pickup"%)', 1))
+		assert_module_loaded(source, "pocketable_pickup")
 	end)
 
 	it("loads com_wheel_response through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/com_wheel_response"%)', 1))
+		assert_module_loaded(source, "com_wheel_response")
 	end)
 
 	it("loads companion_tag through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/companion_tag"%)', 1))
+		assert_module_loaded(source, "companion_tag")
 	end)
 
 	it("loads charge_nav_validation through mod io", function()
-		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
-		local source = assert(handle:read("*a"))
-		handle:close()
+		local source = read_bootstrap_surface()
 
-		assert.is_truthy(source:find('mod:io_dofile%("BetterBots/scripts/mods/BetterBots/charge_nav_validation"%)', 1))
+		assert_module_loaded(source, "charge_nav_validation")
 	end)
 
 	it("initializes and registers extracted runtime modules", function()
-		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local source = read_bootstrap_surface()
 
 		assert.is_truthy(source:find("AnimationGuard%.init%(", 1))
 		assert.is_truthy(source:find("AnimationGuard%.register_hooks%(", 1))
@@ -1569,14 +1562,14 @@ describe("startup regressions", function()
 	end)
 
 	it("wires Perf into AbilityQueue initialization", function()
-		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local source = read_bootstrap_surface()
 		local init_block = assert(source:match("AbilityQueue%.init%(%{%s*(.-)%s*%}%)"))
 
 		assert.is_truthy(init_block:find("perf%s*=%s*Perf", 1))
 	end)
 
 	it("restores close-range daemonhost suppression for ability activation", function()
-		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+		local source = read_bootstrap_surface()
 		local condition_init_block = assert(source:match("ConditionPatch%.init%(%{%s*(.-)%s*%}%)"))
 
 		assert.is_truthy(source:find("Sprint%.is_near_daemonhost%(unit, Sprint%.DAEMONHOST_COMBAT_RANGE_SQ%)", 1))
