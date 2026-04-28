@@ -100,6 +100,9 @@ end
 
 -- Load the module
 local GrenadeFallback = dofile("scripts/mods/BetterBots/grenade_fallback.lua")
+local GrenadeProfiles = dofile("scripts/mods/BetterBots/grenade_profiles.lua")
+local GrenadeAim = dofile("scripts/mods/BetterBots/grenade_aim.lua")
+local GrenadeRuntime = dofile("scripts/mods/BetterBots/grenade_runtime.lua")
 
 setup(function()
 	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
@@ -261,6 +264,9 @@ local function reset()
 				}
 			end,
 		},
+		grenade_profiles = GrenadeProfiles,
+		grenade_aim = GrenadeAim,
+		grenade_runtime = GrenadeRuntime,
 	})
 
 	GrenadeFallback.wire({

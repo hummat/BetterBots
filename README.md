@@ -198,6 +198,9 @@ scripts/mods/BetterBots/          # Mod source
   gestalt_injector.lua            #   Default bot_gestalts injection for ADS-capable profiles
   item_fallback.lua               #   Tier 3 item wield/use/unwield state machine
   grenade_fallback.lua            #   Grenade throw state machine (wield/aim/throw/unwield)
+  grenade_profiles.lua            #   Grenade/blitz input profiles and Assail profile selection
+  grenade_aim.lua                 #   Grenade target resolution, LOS checks, and ballistic aim
+  grenade_runtime.lua             #   Grenade context, state reset, locks, queueing, and events
   update_dispatcher.lua           #   BotBehaviorExtension.update dispatcher ordering and gating
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profiles.lua                #   Bot-optimized class profiles per slot

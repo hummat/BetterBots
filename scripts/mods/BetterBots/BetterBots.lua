@@ -325,6 +325,15 @@ assert(AbilityQueue, "BetterBots: failed to load ability_queue module")
 local GrenadeFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_fallback")
 assert(GrenadeFallback, "BetterBots: failed to load grenade_fallback module")
 
+local GrenadeProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_profiles")
+assert(GrenadeProfiles, "BetterBots: failed to load grenade_profiles module")
+
+local GrenadeAim = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_aim")
+assert(GrenadeAim, "BetterBots: failed to load grenade_aim module")
+
+local GrenadeRuntime = mod:io_dofile("BetterBots/scripts/mods/BetterBots/grenade_runtime")
+assert(GrenadeRuntime, "BetterBots: failed to load grenade_runtime module")
+
 local PingSystem = mod:io_dofile("BetterBots/scripts/mods/BetterBots/ping_system")
 assert(PingSystem, "BetterBots: failed to load ping_system module")
 
@@ -767,6 +776,9 @@ GrenadeFallback.init({
 	last_grenade_charge_event_by_unit = _last_grenade_charge_event_by_unit,
 	perf = Perf,
 	warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
+	grenade_profiles = GrenadeProfiles,
+	grenade_aim = GrenadeAim,
+	grenade_runtime = GrenadeRuntime,
 })
 
 PingSystem.init({

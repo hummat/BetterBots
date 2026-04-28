@@ -88,7 +88,7 @@ This mod targets bot ability activation in three paths:
     - hook `SmartTargetingActionModule.fixed_update`
     - swaps bot perception's selected target into `smart_targeting_extension:targeting_data().unit` only for the duration of vanilla `fixed_update()`
     - preserves vanilla sticky-targeting, soft-sticky fallback, and precision-range checks while giving bot-only precision blitzes a real enemy target to aim at
-20. Grenade ballistic aim correction (#93, via `grenade_fallback.lua`):
+20. Grenade ballistic aim correction (#93, via `grenade_fallback.lua` + `grenade_aim.lua`):
     - replaces flat `set_aim_position` only for supported gravity-affected projectile families in the grenade fallback path
     - resolves projectile locomotion data from the equipped grenade weapon template at runtime, then mirrors vanilla `Trajectory.angle_to_hit_moving_target(...)` solving with target-velocity lead
     - uses `set_aim_rotation` for standard grenades, handleless grenades, Ogryn grenade throws, and zealot throwing knives; preserves flat fallback for near-flat, true-flight, and non-ballistic families
@@ -340,7 +340,7 @@ Result: item abilities need explicit queued inputs from the mod.
 | 1 | Whitelist bypass | Templates define usable `ability_meta_data` |
 | 2 | Runtime metadata injection | Includes template-specific `wait_action`/`end_condition` where needed |
 | 3a | Item-based combat fallback (experimental) | Driven via `weapon_action` sequence probing by action-input names |
-| 3b | Grenade/blitz fallback (experimental) | Driven via `grenade_fallback.lua` profiles and explicit grenade-ability input sequences |
+| 3b | Grenade/blitz fallback (experimental) | Driven by `grenade_fallback.lua` state flow, `grenade_profiles.lua` input profiles, `grenade_aim.lua` target/ballistic aim helpers, and `grenade_runtime.lua` runtime state/event helpers |
 
 ## Class ability references
 

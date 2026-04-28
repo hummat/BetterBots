@@ -510,6 +510,13 @@ local function make_bootstrap_harness(module_overrides)
 		record_charge_event = function() end,
 		try_queue = function() end,
 	})
+	modules.GrenadeProfiles = make_runtime_module("GrenadeProfiles", install_calls, {})
+	modules.GrenadeAim = make_runtime_module("GrenadeAim", install_calls, {
+		prime_weapon_templates = function(target)
+			record_install("GrenadeAim", "prime_weapon_templates", target)
+		end,
+	})
+	modules.GrenadeRuntime = make_runtime_module("GrenadeRuntime", install_calls, {})
 	modules.PingSystem = make_runtime_module("PingSystem", install_calls, {
 		update = function() end,
 	})
@@ -651,6 +658,9 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/condition_patch"] = modules.ConditionPatch,
 		["BetterBots/scripts/mods/BetterBots/ability_queue"] = modules.AbilityQueue,
 		["BetterBots/scripts/mods/BetterBots/grenade_fallback"] = modules.GrenadeFallback,
+		["BetterBots/scripts/mods/BetterBots/grenade_profiles"] = modules.GrenadeProfiles,
+		["BetterBots/scripts/mods/BetterBots/grenade_aim"] = modules.GrenadeAim,
+		["BetterBots/scripts/mods/BetterBots/grenade_runtime"] = modules.GrenadeRuntime,
 		["BetterBots/scripts/mods/BetterBots/ping_system"] = modules.PingSystem,
 		["BetterBots/scripts/mods/BetterBots/companion_tag"] = modules.CompanionTag,
 		["BetterBots/scripts/mods/BetterBots/healing_deferral"] = modules.HealingDeferral,
