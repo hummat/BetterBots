@@ -10,6 +10,9 @@ local _saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 local _saved_vector3 = rawget(_G, "Vector3")
 local _saved_quaternion = rawget(_G, "Quaternion")
 
+local WeaponActionLogging = dofile("scripts/mods/BetterBots/weapon_action_logging.lua")
+local WeaponActionShoot = dofile("scripts/mods/BetterBots/weapon_action_shoot.lua")
+local WeaponActionVoidblast = dofile("scripts/mods/BetterBots/weapon_action_voidblast.lua")
 local WeaponAction = dofile("scripts/mods/BetterBots/weapon_action.lua")
 
 local vec_mt = {}
@@ -199,6 +202,9 @@ local function reset(opts)
 		is_weakspot_aim_enabled = opts.is_weakspot_aim_enabled or function()
 			return true
 		end,
+		weapon_action_logging = WeaponActionLogging,
+		weapon_action_shoot = WeaponActionShoot,
+		weapon_action_voidblast = WeaponActionVoidblast,
 	})
 end
 

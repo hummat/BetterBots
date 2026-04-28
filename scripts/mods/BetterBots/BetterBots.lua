@@ -310,6 +310,15 @@ assert(AirlockGuard, "BetterBots: failed to load airlock_guard module")
 local VfxSuppression = mod:io_dofile("BetterBots/scripts/mods/BetterBots/vfx_suppression")
 assert(VfxSuppression, "BetterBots: failed to load vfx_suppression module")
 
+local WeaponActionLogging = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action_logging")
+assert(WeaponActionLogging, "BetterBots: failed to load weapon_action_logging module")
+
+local WeaponActionShoot = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action_shoot")
+assert(WeaponActionShoot, "BetterBots: failed to load weapon_action_shoot module")
+
+local WeaponActionVoidblast = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action_voidblast")
+assert(WeaponActionVoidblast, "BetterBots: failed to load weapon_action_voidblast module")
+
 local WeaponAction = mod:io_dofile("BetterBots/scripts/mods/BetterBots/weapon_action")
 assert(WeaponAction, "BetterBots: failed to load weapon_action module")
 
@@ -690,6 +699,9 @@ WeaponAction.init({
 	is_weakspot_aim_enabled = function()
 		return Settings.is_feature_enabled("weakspot_aim")
 	end,
+	weapon_action_logging = WeaponActionLogging,
+	weapon_action_shoot = WeaponActionShoot,
+	weapon_action_voidblast = WeaponActionVoidblast,
 })
 
 RangedSpecialAction.init({

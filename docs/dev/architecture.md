@@ -154,7 +154,7 @@ This mod targets bot ability activation in three paths:
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
     - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
 29. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
-    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to downstream observers rather than letting multiple modules hook the method independently
+    - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to downstream observers rather than letting multiple modules hook the method independently; `weapon_action_logging.lua` owns diagnostic queue context/logging used by that hook
     - `SustainedFire.observe_queued_weapon_action(...)` remains one observer, and `ranged_special_action.lua` now shares the same seam for shotgun special-shell preload tracking
     - the same hook also exposes a narrow rewrite seam before the queued input is forwarded, so `ranged_special_action.lua` can rewrite supported shotgun fire requests into `special_action` without owning the engine hook itself
     - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
@@ -187,8 +187,8 @@ This mod targets bot ability activation in three paths:
 31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
-    - the same `weapon_action.lua` hook stack also suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
-    - the shared stack now also carries the Voidblast (`forcestaff_p1_m1`) charged-shot fixes without stealing weakspot-owned hook slots:
+    - `weapon_action_shoot.lua` normalizes BT shoot scratchpads and suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
+    - `weapon_action_voidblast.lua` carries the Voidblast (`forcestaff_p1_m1`) charged-shot fixes without stealing weakspot-owned hook slots:
       - `_update_aim` provides scratchpad context plus temporary retarget freezing once a charge anchor exists and restores the forced target even if vanilla `_update_aim` throws
       - `_wanted_aim_rotation` replaces the live `action_charge` torso tracking with a locked target-root anchor plus a short flat-velocity lead while keeping vanilla's straight-look vertical aim
       - `_fire` forces the charged release through `trigger_explosion` when the p1 charge path would otherwise fall back to plain `shoot_pressed`

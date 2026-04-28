@@ -483,6 +483,9 @@ local function make_bootstrap_harness(module_overrides)
 			record_install("VfxSuppression", "install_ability_ext_hooks", target)
 		end,
 	})
+	modules.WeaponActionLogging = make_runtime_module("WeaponActionLogging", install_calls, {})
+	modules.WeaponActionShoot = make_runtime_module("WeaponActionShoot", install_calls, {})
+	modules.WeaponActionVoidblast = make_runtime_module("WeaponActionVoidblast", install_calls, {})
 	modules.WeaponAction = make_runtime_module("WeaponAction", install_calls)
 	modules.RangedSpecialAction = make_runtime_module("RangedSpecialAction", install_calls)
 	modules.SustainedFire = make_runtime_module("SustainedFire", install_calls, {
@@ -654,6 +657,9 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/animation_guard"] = modules.AnimationGuard,
 		["BetterBots/scripts/mods/BetterBots/airlock_guard"] = modules.AirlockGuard,
 		["BetterBots/scripts/mods/BetterBots/vfx_suppression"] = modules.VfxSuppression,
+		["BetterBots/scripts/mods/BetterBots/weapon_action_logging"] = modules.WeaponActionLogging,
+		["BetterBots/scripts/mods/BetterBots/weapon_action_shoot"] = modules.WeaponActionShoot,
+		["BetterBots/scripts/mods/BetterBots/weapon_action_voidblast"] = modules.WeaponActionVoidblast,
 		["BetterBots/scripts/mods/BetterBots/weapon_action"] = modules.WeaponAction,
 		["BetterBots/scripts/mods/BetterBots/ranged_special_action"] = modules.RangedSpecialAction,
 		["BetterBots/scripts/mods/BetterBots/sustained_fire"] = modules.SustainedFire,

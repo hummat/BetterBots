@@ -214,7 +214,10 @@ scripts/mods/BetterBots/          # Mod source
   melee_meta_data.lua             #   Armor-aware melee attack_meta_data injection
   melee_attack_choice.lua         #   Melee attack-choice: light bias into unarmored hordes
   ranged_meta_data.lua            #   Per-family ranged attack_meta_data injection
-  weapon_action.lua               #   Overheat bridge, vent translation, peril guard, ADS fix, voidblast anchor
+  weapon_action.lua               #   Weapon-action hook owner: overheat, vent, peril, ADS, queue rewrites
+  weapon_action_logging.lua       #   Weapon-action debug contexts and one-shot queue logging
+  weapon_action_shoot.lua         #   BT shoot scratchpad normalization and stale/plasma diagnostics
+  weapon_action_voidblast.lua     #   Voidblast charged-shot anchor and forced charged release helpers
   ranged_special_action.lua       #   Shotgun special-shell preload policy + arm/spend logging
   sustained_fire.lua              #   Held-input bridge for sustained-fire ranged weapons
   ping_system.lua                 #   Bot elite/special pinging
