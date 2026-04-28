@@ -162,7 +162,7 @@ Increases cooldown (flat reduction is negative = increase), but adds extra fines
 
 #### Related Talents
 - **Leaving stealth restores toughness** (`zealot_leaving_stealth_restores_toughness`): 50% toughness + 30% damage reduction for 8s on stealth end
-- **Stealth cooldown on kills** (`zealot_stealth_cooldown_regeneration`): monster kills restore 50%, ogryn 30%, other 15% cooldown
+- **Stealth cooldown on kills** (`zealot_stealth_cooldown_regeneration`, implemented via special rule `zealot_invisibility_refund_cooldown`): during Shroudfield, kills restore 50% cooldown for monsters, 30% for ogryns, 15% for other enemies
 - **Damage taken restores CD** (`zealot_restore_stealth_cd_on_damage`): 1% CD per damage taken (up to 25% max HP), +50% cooldown regen
 
 ---
