@@ -1747,6 +1747,7 @@ Conclusion:
 - if the daemonhost was already fully aggroed before `09:22:29`, bot commitment was expected
 - if it was still dormant or only waking, this is still a daemonhost-avoidance failure
 - the text log lacks the decisive first-action `target_daemonhost_stage` / `target_daemonhost_aggro_state` values, so the next validation pass needs those values logged when a daemonhost target/action is allowed or suppressed
+- follow-up 2026-04-28: text logging now includes `target=<breed> stage=<N> aggro_state=<state> dormant=<bool>` on dormant melee/ranged suppression and on allowed ability activations against daemonhost targets. The next daemonhost run should use the first `ability allowed against daemonhost` or `*_suppressed (... daemonhost ...)` line as the decisive classifier evidence.
 ```
 
 ### Run 2026-04-16-v0.11.0-target-type-hysteresis-closure

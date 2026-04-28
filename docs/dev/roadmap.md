@@ -227,7 +227,7 @@ Use this as the execution map, not as a replacement for issue acceptance criteri
 | Rank | Issue | Class | ROI call / next action |
 |---|---|---|---|
 | R1 | `#108` Human revive priority | Needs testing | Code-complete 2026-04-28: `revive_ability.lua` now assigns the nearest live bot to a knocked-down human at the pre-BT destination-verification seam, forces `revive_with_urgent_target`, and refreshes movement so vanilla ally-aid pathing outranks urgent/priority enemy pathing. Needs cold-boot Solo Play validation with debug logs. |
-| R2 | `#17` Daemonhost avoidance | Validate/fix | Rage-quit class failure. Add decisive first-action `stage`/`aggro_state` evidence, then either close or patch the remaining dormant-state classifier gap. |
+| R2 | `#17` Daemonhost avoidance | Validate/fix | Rage-quit class failure. Decisive first-action `stage`/`aggro_state` text logging was added on 2026-04-28; next daemonhost run should either close this or expose the remaining dormant-state classifier gap. |
 | R3 | `#106` Perf cap miss | Implement | Every future feature inherits this cost. Start with grenade fallback idle cadence, then context augmentation caching if needed. |
 | R4 | `#100` Scenario validation harness | Implement | High developer ROI. A narrow `/bb_scenario` MVP would turn daemonhost, revive, poxburster, grenade, and weakspot claims into repeatable checks. |
 | R5 | `#96` Smart-tag item bridge | Validate | User-visible command path; current blocker is positive live evidence, not architecture. Confirm `smart-tag pickup routed ...` after the liveness fix. |
@@ -252,7 +252,7 @@ Lower ROI for now: `#80` and `#22` are architectural and should wait for `#100`;
 | # | Issue | Blocker |
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
-| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Later 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no positive dormant-suppression evidence; the 2026-04-24 engagement is inconclusive until first-action `stage`/`aggro_state` is logged. |
+| 17 | Daemonhost avoidance | Code + tests shipped v0.6.0, but still validation-gated. First real DH spawn on 2026-04-11 exposed a grenade/blitz-path gap; heuristic carve-out staged in `03ce4fd`+`ffe7c6b`. A later 2026-04-15 log still showed bad pre-aggro behavior because BetterBots was only consulting `aggro_state`; the current branch now uses daemonhost `stage` when available and treats any non-aggroed stage as dormant across combat, ping, companion-tag, and player-tag-boost paths. Later 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no positive dormant-suppression evidence. Follow-up text logging now prints first-action `stage`/`aggro_state` on daemonhost suppress/allow paths; next run should be decisive. |
 
 ## Design principles
 

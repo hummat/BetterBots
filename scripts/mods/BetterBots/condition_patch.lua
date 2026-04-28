@@ -31,6 +31,7 @@ local CONDITIONS_PATCH_VERSION
 local NORMAL_RANGED_AMMO_THRESHOLD = 0.5
 local _bot_ranged_ammo_threshold
 local _is_non_aggroed_daemonhost
+local _daemonhost_state
 local _is_near_daemonhost
 
 local DAEMONHOST_BREED_NAMES = {
@@ -66,6 +67,84 @@ end
 local function _is_close_to_dormant_daemonhost(unit)
 	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
 	return dh_avoidance and _is_near_daemonhost and _is_near_daemonhost(unit) or false
+end
+
+local function _daemonhost_target_details(blackboard, context)
+	local target_enemy = context and context.target_enemy or nil
+	local breed_name = context and context.target_breed_name or nil
+
+	if not target_enemy then
+		local perception = blackboard and blackboard.perception
+		target_enemy = perception and perception.target_enemy or nil
+	end
+
+	if target_enemy and not breed_name then
+		local target_data_ext = ScriptUnit.has_extension(target_enemy, "unit_data_system")
+		local breed = target_data_ext and target_data_ext:breed()
+		breed_name = breed and breed.name or nil
+	end
+
+	if not (breed_name and DAEMONHOST_BREED_NAMES[breed_name]) then
+		return nil
+	end
+
+	local aggro_state = context and context.target_daemonhost_aggro_state or nil
+	local stage = context and context.target_daemonhost_stage or nil
+	if target_enemy and (aggro_state == nil or stage == nil) and _daemonhost_state then
+		local live_aggro_state, live_stage = _daemonhost_state(target_enemy)
+		aggro_state = aggro_state or live_aggro_state
+		stage = stage ~= nil and stage or live_stage
+	end
+
+	local dormant = context and context.target_is_dormant_daemonhost
+	if dormant == nil and target_enemy and _is_non_aggroed_daemonhost then
+		dormant = _is_non_aggroed_daemonhost(target_enemy)
+	end
+
+	return {
+		breed_name = breed_name,
+		aggro_state = aggro_state or "missing",
+		stage = stage,
+		dormant = dormant,
+	}
+end
+
+local function _format_daemonhost_target_details(details)
+	if not details then
+		return nil
+	end
+
+	return "target="
+		.. tostring(details.breed_name)
+		.. " stage="
+		.. tostring(details.stage ~= nil and details.stage or "missing")
+		.. " aggro_state="
+		.. tostring(details.aggro_state or "missing")
+		.. " dormant="
+		.. tostring(details.dormant)
+end
+
+local function _log_daemonhost_ability_allow(unit, fixed_t, ability_template_name, rule, context, blackboard)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local details = _format_daemonhost_target_details(_daemonhost_target_details(blackboard, context))
+	if not details then
+		return
+	end
+
+	_debug_log(
+		"dh_allow_ability:" .. tostring(unit) .. ":" .. tostring(ability_template_name),
+		fixed_t,
+		"ability allowed against daemonhost: "
+			.. tostring(ability_template_name)
+			.. " (rule="
+			.. tostring(rule)
+			.. ", "
+			.. details
+			.. ")"
+	)
 end
 
 local RESCUE_CHARGE_RULES = {
@@ -370,6 +449,10 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		end
 	end
 
+	if can_activate then
+		_log_daemonhost_ability_allow(unit, fixed_t, ability_template_name, rule, context, blackboard)
+	end
+
 	_Debug.log_ability_decision(ability_template_name, fixed_t, can_activate, rule, context)
 
 	if _EventLog.is_enabled() then
@@ -457,10 +540,11 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
+					local details = _format_daemonhost_target_details(_daemonhost_target_details(blackboard, nil))
 					_debug_log(
 						"dh_suppress_melee:" .. tostring(unit),
 						_fixed_time(),
-						"melee suppressed (target is dormant daemonhost)"
+						"melee suppressed (target is dormant daemonhost" .. (details and ", " .. details or "") .. ")"
 					)
 				end
 				return false
@@ -492,10 +576,11 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then
+					local details = _format_daemonhost_target_details(_daemonhost_target_details(blackboard, nil))
 					_debug_log(
 						"dh_suppress_ranged:" .. tostring(unit),
 						_fixed_time(),
-						"ranged suppressed (target is dormant daemonhost)"
+						"ranged suppressed (target is dormant daemonhost" .. (details and ", " .. details or "") .. ")"
 					)
 				end
 				return false
@@ -630,6 +715,7 @@ function M.init(deps)
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost
+	_daemonhost_state = shared_rules.daemonhost_state
 	_last_target_type_switch_by_unit = setmetatable({}, { __mode = "k" })
 	_ability_templates = nil
 	_ability_templates_injected = false

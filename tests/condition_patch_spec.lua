@@ -475,6 +475,34 @@ describe("condition_patch", function()
 			assert.is_false(orig_called) -- original never called
 		end)
 
+		it("logs daemonhost stage and aggro_state when suppressing dormant melee", function()
+			_debug_enabled_result = true
+			local target = "dh_stage_log"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "aggroed",
+				stage = 5,
+			})
+
+			local bb = make_blackboard(target)
+			local conditions = {
+				bot_in_melee_range = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_stage_log")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_false(result)
+			assert.is_truthy(find_debug_log("stage=5"))
+			assert.is_truthy(find_debug_log("aggro_state=aggroed"))
+			assert.is_truthy(find_debug_log("target=chaos_daemonhost"))
+		end)
+
 		it("allows melee against aggroed daemonhost target", function()
 			local target = "dh_aggro"
 			setup_breed(target, "chaos_daemonhost")
@@ -1086,6 +1114,107 @@ describe("condition_patch", function()
 
 			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
 			assert.is_false(result)
+		end)
+
+		it("logs daemonhost stage and aggro_state when allowing ability activation", function()
+			_debug_enabled_result = true
+			local unit = "bot1"
+			local daemonhost = "dh_allowed"
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_daemonhost_state(daemonhost, {
+				aggro_state = "aggroed",
+				stage = 6,
+			})
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "ogryn_taunt_shout" },
+				}),
+				ability_system = test_helper.make_player_ability_extension({
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								ogryn_taunt_shout = {
+									shout_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				}),
+			}
+
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true,
+							"ogryn_taunt_monster_fight",
+							{
+								target_enemy = daemonhost,
+								target_breed_name = "chaos_daemonhost",
+								target_is_monster = true,
+								target_is_dormant_daemonhost = false,
+								target_daemonhost_aggro_state = "aggroed",
+								target_daemonhost_stage = 6,
+							}
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+
+			local ability_templates = {
+				ogryn_taunt_shout = {
+					ability_meta_data = {
+						activation = {
+							action_input = "shout_pressed",
+						},
+					},
+				},
+			}
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				{ behavior = {}, perception = { target_enemy = daemonhost } },
+				{},
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_true(result)
+			assert.is_truthy(find_debug_log("ability allowed against daemonhost"))
+			assert.is_truthy(find_debug_log("rule=ogryn_taunt_monster_fight"))
+			assert.is_truthy(find_debug_log("stage=6"))
+			assert.is_truthy(find_debug_log("aggro_state=aggroed"))
 		end)
 
 		it("passes the veteran shout semantic key into the team cooldown lookup", function()

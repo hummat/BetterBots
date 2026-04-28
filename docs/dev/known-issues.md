@@ -2,7 +2,7 @@
 
 ## Current post-release validation gates
 
-1. `#17` daemonhost avoidance still lacks positive live validation after the 2026-04-15 stage-aware dormant-daemonhost fix. The 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no `dormant_daemonhost` suppression lines. The strongest later evidence is `console-2026-04-24-09.15.48-d7fdfcb1-dd40-4a14-b8cd-de990858a54b.log`: daemonhost spawned at `09:20:00.674`, bots tagged and attacked it starting at `09:22:29.102`, and BetterBots logged the target as `target_is_dormant_daemonhost = false`. That is not a pass; from text logs alone it is still ambiguous whether the daemonhost was already legitimately aggroed or whether dormant-state detection misclassified it. Next validation needs the daemonhost `stage` and `aggro_state` at first bot target/action.
+1. `#17` daemonhost avoidance still lacks positive live validation after the 2026-04-15 stage-aware dormant-daemonhost fix. The 2026-04-23 and 2026-04-24 logs contain real daemonhost spawns, but no `dormant_daemonhost` suppression lines. The strongest later evidence is `console-2026-04-24-09.15.48-d7fdfcb1-dd40-4a14-b8cd-de990858a54b.log`: daemonhost spawned at `09:20:00.674`, bots tagged and attacked it starting at `09:22:29.102`, and BetterBots logged the target as `target_is_dormant_daemonhost = false`. That is not a pass; from text logs alone it is still ambiguous whether the daemonhost was already legitimately aggroed or whether dormant-state detection misclassified it. Follow-up instrumentation now prints daemonhost `stage` and `aggro_state` on target suppression and allowed ability activations, so the next validation run should use the first daemonhost action/suppression line as decisive evidence.
 
 ## High severity
 
