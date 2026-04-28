@@ -1,3 +1,5 @@
+-- Diagnostic helpers for weapon_action.lua queue hooks:
+-- weapon input traces, sustained-fire confirmations, weakspot aim logs, and ammo gate logs.
 local M = {}
 
 local _mod

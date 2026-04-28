@@ -1,3 +1,5 @@
+-- Item ability sequence profiles and selector logic.
+-- item_fallback.lua owns queueing; this module only chooses the sequence shape.
 local M = {}
 
 local LOCK_WEAPON_SWITCH_WHILE_ACTIVE_ABILITY = {

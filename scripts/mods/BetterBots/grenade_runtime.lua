@@ -1,3 +1,5 @@
+-- Runtime helpers for the grenade/blitz state machine:
+-- context augmentation, confirmation tracking, event emission, and stage advancement.
 local M = {}
 
 local _debug_log

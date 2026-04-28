@@ -1,3 +1,5 @@
+-- Loads BetterBots modules and wires the cross-module dependency graph.
+-- BetterBots.lua stays responsible for DMF entrypoints; this owns startup order.
 local M = {}
 
 local MODULE_ROOT = "BetterBots/scripts/mods/BetterBots/"

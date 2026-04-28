@@ -1,3 +1,5 @@
+-- Voidblast-specific BtBotShootAction helpers.
+-- Maintains force-staff charge anchors and charged-fire input correction.
 local M = {}
 
 local _debug_log

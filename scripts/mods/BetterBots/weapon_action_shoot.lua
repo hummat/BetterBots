@@ -1,3 +1,5 @@
+-- BtBotShootAction helpers for scratchpad normalization, stale ADS suppression,
+-- plasma may-fire diagnostics, and shared shoot scratchpad unit resolution.
 local M = {}
 
 local _debug_log

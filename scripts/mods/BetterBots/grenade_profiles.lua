@@ -1,3 +1,5 @@
+-- Data-driven grenade/blitz sequence profiles.
+-- The fallback state machine consumes these profiles; this module has no queue side effects.
 local M = {}
 
 local _warp_weapon_peril_threshold

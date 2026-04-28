@@ -1,3 +1,5 @@
+-- Grenade/blitz aim helpers: target retention, projectile metadata lookup,
+-- ballistic trajectory solving, and BotUnitInput aim writes.
 local M = {}
 
 local _equipped_grenade_ability

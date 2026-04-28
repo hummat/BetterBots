@@ -1,3 +1,5 @@
+-- Authored bot loadout and talent templates.
+-- Runtime item resolution and profile overwrite hooks live in bot_profiles.lua.
 local M = {}
 
 -- Verified via 2026-04-22 live /curio_dump in Mourningstar: the current
