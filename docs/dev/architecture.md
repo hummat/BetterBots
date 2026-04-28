@@ -58,6 +58,9 @@ This mod targets bot ability activation in three paths:
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
+11a. Bot profile replacement (#45, via `bot_profiles.lua` + `bot_profile_templates.lua`):
+    - `bot_profile_templates.lua` owns the authored class loadout/talent tables
+    - `bot_profiles.lua` owns runtime item resolution, spawn-slot selection, reset state, and profile-overwrite protection hooks
 12. Structured JSONL event logging (`event_log.lua`):
     - opt-in via mod setting (`enable_event_log`)
     - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`

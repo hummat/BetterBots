@@ -579,6 +579,9 @@ local function make_bootstrap_harness(module_overrides)
 		patch_pickups = function() end,
 	})
 	modules.SmartTagOrders = make_runtime_module("SmartTagOrders", install_calls)
+	modules.BotProfileTemplates = make_runtime_module("BotProfileTemplates", install_calls, {
+		DEFAULT_PROFILE_TEMPLATES = {},
+	})
 	modules.BotProfiles = make_runtime_module("BotProfiles", install_calls, {
 		reset = function() end,
 		register_hooks = function()
@@ -692,6 +695,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/mule_pickup"] = modules.MulePickup,
 		["BetterBots/scripts/mods/BetterBots/pocketable_pickup"] = modules.PocketablePickup,
 		["BetterBots/scripts/mods/BetterBots/smart_tag_orders"] = modules.SmartTagOrders,
+		["BetterBots/scripts/mods/BetterBots/bot_profile_templates"] = modules.BotProfileTemplates,
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,

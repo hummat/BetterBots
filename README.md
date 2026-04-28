@@ -205,6 +205,7 @@ scripts/mods/BetterBots/          # Mod source
   grenade_runtime.lua             #   Grenade context, state reset, locks, queueing, and events
   update_dispatcher.lua           #   BotBehaviorExtension.update dispatcher ordering and gating
   settings.lua                    #   Presets, category/feature gates, slider readers
+  bot_profile_templates.lua       #   Authored bot class loadout/talent templates
   bot_profiles.lua                #   Bot-optimized class profiles per slot
   bot_targeting.lua               #   Shared perception target resolver + helpers
   charge_nav_validation.lua       #   Shared navmesh launch validation for charge/dash abilities (#13)

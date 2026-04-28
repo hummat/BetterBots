@@ -30,6 +30,7 @@ local mock_mod = {
 }
 
 local BotProfiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+local BotProfileTemplates = dofile("scripts/mods/BetterBots/bot_profile_templates.lua")
 local Localization = dofile("scripts/mods/BetterBots/BetterBots_localization.lua")
 
 BotProfiles.init({
@@ -46,6 +47,7 @@ BotProfiles.init({
 	debug_enabled = function()
 		return _debug_enabled_result
 	end,
+	profile_templates = BotProfileTemplates,
 })
 
 local VANILLA_PROFILE = {
@@ -659,6 +661,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.reset()
 
@@ -816,6 +819,7 @@ describe("bot_profiles", function()
 						debug_enabled = function()
 							return false
 						end,
+						profile_templates = BotProfileTemplates,
 					})
 					Profiles.reset()
 
@@ -952,6 +956,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.reset()
 
@@ -1058,6 +1063,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.reset()
 
@@ -1164,6 +1170,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.reset()
 
@@ -1234,6 +1241,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.register_hooks()
 
@@ -1283,6 +1291,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return true
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.register_hooks()
 				assert.is_not_nil(set_profile_handler, "handler must be captured")
@@ -1349,6 +1358,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.register_hooks()
 				assert.is_not_nil(set_profile_handler, "handler must be captured")
@@ -1401,6 +1411,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return true
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.register_hooks()
 
@@ -1442,6 +1453,7 @@ describe("bot_profiles", function()
 					debug_enabled = function()
 						return false
 					end,
+					profile_templates = BotProfileTemplates,
 				})
 				Profiles.register_hooks()
 

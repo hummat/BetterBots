@@ -68,6 +68,7 @@ function M.load_and_init(ctx)
 	modules.MulePickup = load_module(mod, "mule_pickup")
 	modules.PocketablePickup = load_module(mod, "pocketable_pickup")
 	modules.SmartTagOrders = load_module(mod, "smart_tag_orders")
+	modules.BotProfileTemplates = load_module(mod, "bot_profile_templates")
 	modules.BotProfiles = load_module(mod, "bot_profiles")
 	modules.HumanLikeness = load_module(mod, "human_likeness")
 	modules.TargetTypeHysteresis = load_module(mod, "target_type_hysteresis")
@@ -129,6 +130,7 @@ function M.load_and_init(ctx)
 	local MulePickup = modules.MulePickup
 	local PocketablePickup = modules.PocketablePickup
 	local SmartTagOrders = modules.SmartTagOrders
+	local BotProfileTemplates = modules.BotProfileTemplates
 	local BotProfiles = modules.BotProfiles
 	local HumanLikeness = modules.HumanLikeness
 	local TargetTypeHysteresis = modules.TargetTypeHysteresis
@@ -152,6 +154,7 @@ function M.load_and_init(ctx)
 		mod = mod,
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
+		profile_templates = BotProfileTemplates,
 	})
 
 	HumanLikeness.init({
