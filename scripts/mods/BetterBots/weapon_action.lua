@@ -81,6 +81,8 @@ function M.init(deps)
 		debug_log = _debug_log,
 		debug_enabled = _debug_enabled,
 		fixed_time = _fixed_time,
+		scratchpad_player_unit = _weapon_action_shoot.scratchpad_player_unit,
+		current_weapon_action_template_name = _weapon_action_shoot.current_weapon_action_template_name,
 	})
 	_missing_shoot_extension_warned = {}
 	_missing_bt_bot_shoot_action_warned = false

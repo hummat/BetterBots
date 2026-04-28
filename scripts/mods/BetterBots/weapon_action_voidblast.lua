@@ -3,6 +3,8 @@ local M = {}
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _scratchpad_player_unit
+local _current_weapon_action_template_name
 
 local VOIDBLAST_TEMPLATE_NAME = "forcestaff_p1_m1"
 local VOIDBLAST_CHARGE_ACTION_NAME = "action_charge"
@@ -14,17 +16,7 @@ local _voidblast_anchor_logged_scratchpads = setmetatable({}, { __mode = "k" })
 local _voidblast_fallback_logged_scratchpads = setmetatable({}, { __mode = "k" })
 
 function M.scratchpad_player_unit(scratchpad)
-	local action_input_extension = scratchpad and scratchpad.action_input_extension or nil
-	local unit = action_input_extension and action_input_extension._betterbots_player_unit or nil
-
-	return unit or scratchpad and scratchpad.__bb_weakspot_self_unit or nil
-end
-
-local function current_weapon_action_template_name(unit)
-	local unit_data_extension = unit and ScriptUnit.has_extension(unit, "unit_data_system")
-	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action") or nil
-
-	return weapon_action_component and weapon_action_component.template_name or nil
+	return _scratchpad_player_unit(scratchpad)
 end
 
 local function current_weapon_action_name(unit)
@@ -37,7 +29,7 @@ end
 function M.is_voidblast_staff(scratchpad)
 	local unit = M.scratchpad_player_unit(scratchpad)
 
-	return current_weapon_action_template_name(unit) == VOIDBLAST_TEMPLATE_NAME
+	return _current_weapon_action_template_name(unit) == VOIDBLAST_TEMPLATE_NAME
 end
 
 function M.is_charge_active(scratchpad)
@@ -287,6 +279,13 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
+	_scratchpad_player_unit = deps.scratchpad_player_unit
+	assert(_scratchpad_player_unit, "BetterBots: weapon_action_voidblast requires scratchpad_player_unit")
+	_current_weapon_action_template_name = deps.current_weapon_action_template_name
+	assert(
+		_current_weapon_action_template_name,
+		"BetterBots: weapon_action_voidblast requires current_weapon_action_template_name"
+	)
 	_voidblast_anchor_logged_scratchpads = setmetatable({}, { __mode = "k" })
 	_voidblast_fallback_logged_scratchpads = setmetatable({}, { __mode = "k" })
 end

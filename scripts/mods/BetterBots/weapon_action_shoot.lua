@@ -279,8 +279,9 @@ function M.log_stale_shoot_action(scratchpad, phase, action_input, template_name
 	end
 	logged_phases[phase] = true
 
+	local unit = M.scratchpad_player_unit(scratchpad)
 	_debug_log(
-		"stale_shoot_action:" .. tostring(phase) .. ":" .. tostring(template_name or "unknown"),
+		"stale_shoot_action:" .. tostring(phase) .. ":" .. tostring(template_name or "unknown") .. ":" .. tostring(unit),
 		_fixed_time(),
 		"suppressed stale shoot "
 			.. tostring(phase)
@@ -288,6 +289,9 @@ function M.log_stale_shoot_action(scratchpad, phase, action_input, template_name
 			.. tostring(action_input)
 			.. " for "
 			.. tostring(template_name or "unknown")
+			.. " (bot="
+			.. tostring(unit)
+			.. ")"
 	)
 end
 

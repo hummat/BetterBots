@@ -826,7 +826,6 @@ return {
 			mod = _mod,
 			debug_log = _debug_log,
 			debug_enabled = _debug_enabled,
-			fixed_time = _fixed_time,
 			grenade_profiles = _grenade_profiles,
 		})
 		_grenade_runtime = deps.grenade_runtime
