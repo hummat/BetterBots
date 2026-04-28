@@ -320,6 +320,12 @@ return {
 	enable_com_wheel_responses_description = {
 		en = "Battle-cry and need-ammo/health calls temporarily bias bot behavior toward the player's request.",
 	},
+	enable_human_revive_priority = {
+		en = "Prioritize player revives",
+	},
+	enable_human_revive_priority_description = {
+		en = "When a human player is down, the nearest bot treats the revive as urgent even if enemies are drawing aggro.",
+	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
 	},

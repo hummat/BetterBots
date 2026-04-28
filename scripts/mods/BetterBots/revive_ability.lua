@@ -10,6 +10,7 @@ local _is_suppressed
 local _equipped_combat_ability_name
 local _fallback_state_by_unit
 local _perf
+local _is_feature_enabled
 
 local _MetaData
 local _EventLog
@@ -19,6 +20,7 @@ local _action_input_is_bot_queueable
 local _combat_ability_identity
 
 local INTERACT_ACTION_PATCH_SENTINEL = "__bb_revive_ability_installed"
+local _human_revive_priority_by_bot = setmetatable({}, { __mode = "k" })
 
 local RESCUE_INTERACTION_TYPES = {
 	revive = true,
@@ -46,6 +48,7 @@ function M.init(deps)
 	_equipped_combat_ability_name = deps.equipped_combat_ability_name
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_perf = deps.perf
+	_is_feature_enabled = deps.is_feature_enabled
 	local shared_rules = deps.shared_rules or {}
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_combat_ability_identity = deps.combat_ability_identity
@@ -80,6 +83,179 @@ local function _format_bot_id(unit)
 		return "bot=" .. tostring(slot)
 	end
 	return "unit=" .. tostring(unit)
+end
+
+local function _human_revive_priority_enabled()
+	return not _is_feature_enabled or _is_feature_enabled("human_revive_priority")
+end
+
+local function _unit_alive(unit)
+	if rawget(_G, "HEALTH_ALIVE") then
+		return HEALTH_ALIVE[unit] == true
+	end
+	if rawget(_G, "ALIVE") then
+		return ALIVE[unit] == true
+	end
+
+	return unit ~= nil
+end
+
+local function _unit_position(unit)
+	local positions = rawget(_G, "POSITION_LOOKUP")
+	return positions and positions[unit] or nil
+end
+
+local function _distance(a, b)
+	if not a or not b then
+		return math.huge
+	end
+	if rawget(_G, "Vector3") and Vector3.distance then
+		return Vector3.distance(a, b)
+	end
+
+	local ax, ay, az = a.x or a[1] or 0, a.y or a[2] or 0, a.z or a[3] or 0
+	local bx, by, bz = b.x or b[1] or 0, b.y or b[2] or 0, b.z or b[3] or 0
+	local dx, dy, dz = ax - bx, ay - by, az - bz
+
+	return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+local function _character_state(unit)
+	local unit_data_extension = ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "unit_data_system")
+	return unit_data_extension
+		and unit_data_extension.read_component
+		and unit_data_extension:read_component("character_state")
+end
+
+local function _is_knocked_down(unit)
+	local character_state_component = _character_state(unit)
+	return character_state_component and character_state_component.state_name == "knocked_down"
+end
+
+local function _select_downed_human(side, self_position)
+	local human_units = side and side.valid_human_units
+	if not human_units then
+		return nil, math.huge, 0
+	end
+
+	local best_unit, best_distance = nil, math.huge
+	local human_count = #human_units
+
+	for i = 1, human_count do
+		local human_unit = human_units[i]
+		if _unit_alive(human_unit) and _is_knocked_down(human_unit) then
+			local distance = _distance(self_position, _unit_position(human_unit))
+			if distance < best_distance then
+				best_unit, best_distance = human_unit, distance
+			end
+		end
+	end
+
+	return best_unit, best_distance, human_count
+end
+
+local function _nearest_bot_to(target_unit, bot_group, fallback_unit)
+	local target_position = _unit_position(target_unit)
+	local best_unit, best_distance = fallback_unit, math.huge
+	local data = bot_group and bot_group.data and bot_group:data()
+
+	if data then
+		for bot_unit, _ in pairs(data) do
+			if _unit_alive(bot_unit) then
+				local distance = _distance(_unit_position(bot_unit), target_position)
+				if distance < best_distance then
+					best_unit, best_distance = bot_unit, distance
+				end
+			end
+		end
+	else
+		best_distance = _distance(_unit_position(fallback_unit), target_position)
+	end
+
+	return best_unit, best_distance
+end
+
+local function _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	local previous_target = _human_revive_priority_by_bot[unit]
+	if not previous_target then
+		return false
+	end
+
+	_human_revive_priority_by_bot[unit] = nil
+	if behavior_component then
+		behavior_component.revive_with_urgent_target = false
+	end
+	if perception_component and perception_component.target_ally == previous_target then
+		perception_component.target_ally = nil
+		perception_component.target_ally_distance = math.huge
+		perception_component.target_ally_needs_aid = false
+		perception_component.target_ally_need_type = "n/a"
+	end
+	if follow_component then
+		follow_component.needs_destination_refresh = true
+	end
+
+	return true
+end
+
+function M.apply_human_revive_priority(self, unit)
+	local behavior_component = self and self._behavior_component
+	local perception_component = self and self._perception_component
+	local follow_component = self and self._follow_component
+	if not unit or not behavior_component or not perception_component then
+		return false
+	end
+
+	if not _human_revive_priority_enabled() then
+		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	end
+
+	local self_position = _unit_position(unit)
+	local target_human, distance, human_count = _select_downed_human(self and self._side, self_position)
+	if not target_human then
+		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	end
+
+	local nearest_bot = _nearest_bot_to(target_human, self and self._bot_group, unit)
+	if nearest_bot ~= unit then
+		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	end
+
+	perception_component.target_ally = target_human
+	perception_component.target_ally_distance = distance
+	perception_component.target_ally_needs_aid = true
+	perception_component.target_ally_need_type = "knocked_down"
+	behavior_component.revive_with_urgent_target = true
+	if follow_component then
+		follow_component.needs_destination_refresh = true
+	end
+
+	local bot_group = self and self._bot_group
+	if bot_group and bot_group.register_ally_needs_aid_priority then
+		bot_group:register_ally_needs_aid_priority(unit, target_human)
+	end
+
+	_human_revive_priority_by_bot[unit] = target_human
+
+	if _debug_enabled and _debug_enabled() then
+		local reason = human_count == 1 and "mission_critical" or "human_priority"
+		_debug_log(
+			"human_revive_priority:" .. tostring(unit) .. ":" .. tostring(target_human),
+			_fixed_time(),
+			"["
+				.. _format_bot_id(unit)
+				.. "] human revive priority assigned: target="
+				.. tostring(target_human)
+				.. " reason="
+				.. reason
+				.. " distance="
+				.. tostring(distance)
+		)
+	end
+
+	return true
 end
 
 function M.log_revive_candidate(unit, behavior_component, perception_component)

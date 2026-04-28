@@ -129,6 +129,11 @@ return {
 						default_value = DEFAULTS.enable_com_wheel_responses,
 					},
 					{
+						setting_id = "enable_human_revive_priority",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_human_revive_priority,
+					},
+					{
 						setting_id = "enable_weakspot_aim",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_weakspot_aim,

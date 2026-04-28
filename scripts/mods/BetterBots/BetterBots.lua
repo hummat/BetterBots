@@ -755,6 +755,12 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 	if not ok then
 		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
 	end
+	mod:hook_safe(BotBehaviorExtension, "_verify_target_ally_aid_destination", function(self, unit)
+		local h_ok, h_err = pcall(ReviveAbility.apply_human_revive_priority, self, unit)
+		if not h_ok then
+			mod:echo("BetterBots: human revive priority dispatch failed: " .. tostring(h_err))
+		end
+	end)
 	-- Consolidated _refresh_destination hook. DMF dedupes hook registrations by
 	-- (mod, obj, method) and silently discards duplicates, so each feature's
 	-- handler is dispatched from a single hook_safe here.

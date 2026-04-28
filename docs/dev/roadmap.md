@@ -226,7 +226,7 @@ Use this as the execution map, not as a replacement for issue acceptance criteri
 
 | Rank | Issue | Class | ROI call / next action |
 |---|---|---|---|
-| R1 | `#108` Human revive priority | Implement | Highest player ROI: when the only human is down, combat polish no longer matters. Work at the perception/destination arbitration seam; reuse existing revive-cover pieces instead of reordering BT nodes. |
+| R1 | `#108` Human revive priority | Needs testing | Code-complete 2026-04-28: `revive_ability.lua` now assigns the nearest live bot to a knocked-down human at the pre-BT destination-verification seam, forces `revive_with_urgent_target`, and refreshes movement so vanilla ally-aid pathing outranks urgent/priority enemy pathing. Needs cold-boot Solo Play validation with debug logs. |
 | R2 | `#17` Daemonhost avoidance | Validate/fix | Rage-quit class failure. Add decisive first-action `stage`/`aggro_state` evidence, then either close or patch the remaining dormant-state classifier gap. |
 | R3 | `#106` Perf cap miss | Implement | Every future feature inherits this cost. Start with grenade fallback idle cadence, then context augmentation caching if needed. |
 | R4 | `#100` Scenario validation harness | Implement | High developer ROI. A narrow `/bb_scenario` MVP would turn daemonhost, revive, poxburster, grenade, and weakspot claims into repeatable checks. |

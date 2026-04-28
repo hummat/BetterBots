@@ -528,6 +528,7 @@ function M.load_and_init(ctx)
 		perf = Perf,
 		shared_rules = SharedRules,
 		combat_ability_identity = CombatAbilityIdentity,
+		is_feature_enabled = Settings.is_feature_enabled,
 	})
 
 	GrenadeFallback.init({

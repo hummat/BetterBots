@@ -235,7 +235,7 @@ scripts/mods/BetterBots/          # Mod source
   pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
   smart_tag_orders.lua            #   Explicit smart-tag pickup-order bridge
   team_cooldown.lua               #   Team-level ability cooldown staggering
-  revive_ability.lua              #   Pre-revive defensive ability activation
+  revive_ability.lua              #   Pre-revive defensive ability activation + human-revive priority
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
   animation_guard.lua             #   Animation crash guard for bot-only item paths
   airlock_guard.lua               #   Airlock teleport crash guard

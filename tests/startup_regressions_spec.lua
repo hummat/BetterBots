@@ -1440,6 +1440,7 @@ describe("startup regressions", function()
 			_init_blackboard_components = function(_self, _blackboard, _physics_world, gestalts_or_nil)
 				return gestalts_or_nil
 			end,
+			_verify_target_ally_aid_destination = function() end,
 			_refresh_destination = function() end,
 		}
 
@@ -1447,6 +1448,10 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
 
 		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(
+			1,
+			count_hooks(harness.hook_registrations, behavior_ext, "_verify_target_ally_aid_destination", "hook_safe")
+		)
 		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
 		assert.equals(1, count_hooks(harness.hook_registrations, behavior_ext, "update", "hook_safe"))
 
@@ -1509,6 +1514,7 @@ describe("startup regressions", function()
 	it("is idempotent on _refresh_destination install across hot-reload (file re-execution)", function()
 		local behavior_ext = {
 			_refresh_destination = function() end,
+			_verify_target_ally_aid_destination = function() end,
 			_init_blackboard_components = function() end,
 			update = function() end,
 		}
@@ -1522,6 +1528,10 @@ describe("startup regressions", function()
 		harness2:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
 
 		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(
+			0,
+			count_hooks(harness2.hook_registrations, behavior_ext, "_verify_target_ally_aid_destination", "hook_safe")
+		)
 		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
 		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
 	end)

@@ -69,6 +69,11 @@ This mod targets bot ability activation in three paths:
 13. Revive/interaction protection (#20):
     - blocks ability activation when `blackboard.behavior.current_interaction_unit ~= nil`
     - applied in both BT condition hook and fallback path (after in-progress state machines)
+13a. Human revive priority (#108, via `revive_ability.lua`):
+    - hook `BotBehaviorExtension._verify_target_ally_aid_destination` (post-process): before BT evaluation and movement refresh, detects knocked-down human units on the bot side and assigns the nearest live bot as the urgent reviver
+    - writes the vanilla revive seam instead of replacing the BT node: `perception.target_ally`, `target_ally_needs_aid`, `target_ally_need_type = "knocked_down"`, `behavior.revive_with_urgent_target = true`, and `follow.needs_destination_refresh = true`
+    - lets vanilla `_refresh_destination()` compute `target_ally_aid_destination` and `can_revive` perform the final interaction check; stale assignments clear when the human stands up, dies, or the setting is disabled
+    - exposed through `enable_human_revive_priority` and logs `human_revive_priority:<bot>:<human>` when debug logging is enabled
 14. Ability suppression / impulse control (#11):
     - `_is_suppressed(unit)` checks dodging, falling, lunging, jumping, ladder states, moving platform
     - guards placed after "keep running" fast paths so in-progress abilities (charge mid-lunge) complete normally
@@ -261,6 +266,7 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 | Engine method | Features dispatched | Dispatcher location |
 |---|---|---|
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
+| `BotBehaviorExtension._verify_target_ally_aid_destination` | `ReviveAbility` human-revive priority | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
 | `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
 | `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
 

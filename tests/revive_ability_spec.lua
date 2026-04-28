@@ -31,6 +31,8 @@ local ReviveAbility = dofile("scripts/mods/BetterBots/revive_ability.lua")
 setup(function()
 	_saved_globals.ScriptUnit = rawget(_G, "ScriptUnit")
 	_saved_globals.ALIVE = rawget(_G, "ALIVE")
+	_saved_globals.HEALTH_ALIVE = rawget(_G, "HEALTH_ALIVE")
+	_saved_globals.POSITION_LOOKUP = rawget(_G, "POSITION_LOOKUP")
 	_saved_globals.Managers = rawget(_G, "Managers")
 	_saved_globals.require = rawget(_G, "require")
 
@@ -56,6 +58,16 @@ setup(function()
 			end,
 		})
 	)
+	rawset(
+		_G,
+		"HEALTH_ALIVE",
+		setmetatable({}, {
+			__index = function()
+				return true
+			end,
+		})
+	)
+	rawset(_G, "POSITION_LOOKUP", {})
 	rawset(_G, "Managers", {
 		state = {
 			extension = {
@@ -71,6 +83,8 @@ end)
 teardown(function()
 	rawset(_G, "require", _saved_globals.require)
 	rawset(_G, "Managers", _saved_globals.Managers)
+	rawset(_G, "POSITION_LOOKUP", _saved_globals.POSITION_LOOKUP)
+	rawset(_G, "HEALTH_ALIVE", _saved_globals.HEALTH_ALIVE)
 	rawset(_G, "ALIVE", _saved_globals.ALIVE)
 	rawset(_G, "ScriptUnit", _saved_globals.ScriptUnit)
 end)
@@ -115,10 +129,17 @@ local function make_ability_ext(can_use, charges, opts)
 	})
 end
 
-local function make_unit_data_ext(template_name)
+local function make_unit_data_ext(template_name, state_name)
 	return test_helper.make_player_unit_data_extension({
 		combat_ability_action = { template_name = template_name or "none" },
+		character_state = { state_name = state_name or "walking" },
 	})
+end
+
+local function setup_human_unit(unit, state_name)
+	_extensions[unit] = {
+		unit_data_system = make_unit_data_ext("none", state_name),
+	}
 end
 
 local _perception_enemy_count = 3
@@ -153,7 +174,7 @@ end
 local _fallback_state = {}
 local _event_log_events = {}
 
-local function init_module()
+local function init_module(opts)
 	_fallback_state = {}
 	_event_log_events = {}
 	_debug_logs = {}
@@ -187,6 +208,12 @@ local function init_module()
 		perf = nil,
 		shared_rules = SharedRules,
 		combat_ability_identity = CombatAbilityIdentity,
+		is_feature_enabled = function(feature_name)
+			if opts and opts.disabled_features and opts.disabled_features[feature_name] then
+				return false
+			end
+			return true
+		end,
 	})
 
 	local mock_meta_data = {
@@ -535,6 +562,171 @@ describe("revive_ability", function()
 			})
 
 			assert.equals(0, #_debug_logs)
+		end)
+	end)
+
+	describe("human revive priority", function()
+		local function vec(x, y, z)
+			return { x = x, y = y or 0, z = z or 0 }
+		end
+
+		local function make_priority_self(bot_unit, side, bot_data)
+			local registered
+			local self = {
+				_unit = bot_unit,
+				_side = side,
+				_behavior_component = {
+					revive_with_urgent_target = false,
+				},
+				_perception_component = {
+					target_enemy = "priority_enemy",
+					priority_target_enemy = "priority_enemy",
+					target_ally = nil,
+					target_ally_distance = math.huge,
+					target_ally_needs_aid = false,
+					target_ally_need_type = "n/a",
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_bot_group = {
+					data = function()
+						return bot_data or { [bot_unit] = {} }
+					end,
+					register_ally_needs_aid_priority = function(_, unit, target)
+						registered = { unit = unit, target = target }
+					end,
+				},
+			}
+
+			return self, function()
+				return registered
+			end
+		end
+
+		before_each(function()
+			init_module()
+			for unit in pairs(_G.POSITION_LOOKUP) do
+				_G.POSITION_LOOKUP[unit] = nil
+			end
+		end)
+
+		it("assigns the nearest bot to a downed solo human and forces ally-aid path refresh", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+
+			local self, registered = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.equals(human, self._perception_component.target_ally)
+			assert.equals("knocked_down", self._perception_component.target_ally_need_type)
+			assert.is_true(self._perception_component.target_ally_needs_aid)
+			assert.is_true(self._behavior_component.revive_with_urgent_target)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.equals(bot, registered().unit)
+			assert.equals(human, registered().target)
+		end)
+
+		it("leaves non-nearest bots unassigned when multiple bots can reach the downed human", function()
+			local far_bot = make_unit("bot_far")
+			local near_bot = make_unit("bot_near")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[far_bot] = vec(0)
+			_G.POSITION_LOOKUP[near_bot] = vec(8)
+			_G.POSITION_LOOKUP[human] = vec(10)
+
+			local self = make_priority_self(far_bot, { valid_human_units = { human } }, {
+				[far_bot] = {},
+				[near_bot] = {},
+			})
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, far_bot)
+
+			assert.is_false(applied)
+			assert.is_nil(self._perception_component.target_ally)
+			assert.is_false(self._behavior_component.revive_with_urgent_target)
+		end)
+
+		it("still prioritizes a downed human over bot or enemy targets when another human is active", function()
+			local bot = make_unit("bot_1")
+			local downed_human = make_unit("human_downed")
+			local active_human = make_unit("human_active")
+			setup_human_unit(downed_human, "knocked_down")
+			setup_human_unit(active_human, "walking")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[downed_human] = vec(5)
+			_G.POSITION_LOOKUP[active_human] = vec(1)
+
+			local self = make_priority_self(bot, { valid_human_units = { active_human, downed_human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.equals(downed_human, self._perception_component.target_ally)
+			assert.is_true(self._behavior_component.revive_with_urgent_target)
+		end)
+
+		it("logs priority assignments with bot and human discriminators", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+			_debug_on = true
+
+			local self = make_priority_self(bot, { valid_human_units = { human } })
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+
+			assert.equals(1, #_debug_logs)
+			assert.equals("human_revive_priority:" .. tostring(bot) .. ":" .. tostring(human), _debug_logs[1].key)
+			assert.truthy(string.find(_debug_logs[1].message, "[bot=1]", 1, true))
+			assert.truthy(string.find(_debug_logs[1].message, "target=" .. tostring(human), 1, true))
+		end)
+
+		it("cleans up its forced target when the human is no longer knocked down", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+
+			local self = make_priority_self(bot, { valid_human_units = { human } })
+			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+
+			setup_human_unit(human, "walking")
+			local cleared = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(cleared)
+			assert.is_nil(self._perception_component.target_ally)
+			assert.equals("n/a", self._perception_component.target_ally_need_type)
+			assert.is_false(self._perception_component.target_ally_needs_aid)
+			assert.is_false(self._behavior_component.revive_with_urgent_target)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("cleans up its forced target when the setting is disabled", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+
+			local self = make_priority_self(bot, { valid_human_units = { human } })
+			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+
+			init_module({ disabled_features = { human_revive_priority = true } })
+			local cleared = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(cleared)
+			assert.is_nil(self._perception_component.target_ally)
+			assert.is_false(self._behavior_component.revive_with_urgent_target)
 		end)
 	end)
 
