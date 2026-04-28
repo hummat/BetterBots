@@ -1142,6 +1142,22 @@ describe("startup regressions", function()
 		assert.equals(harness.modules.CombatAbilityIdentity, charge_init.deps.combat_ability_identity)
 		assert.equals(harness.modules.EventLog, charge_init.deps.event_log)
 
+		local bot_profiles_init = find_named_call(harness.init_calls, "BotProfiles")
+		assert.equals(harness.modules.BotProfileTemplates, bot_profiles_init.deps.profile_templates)
+
+		local item_fallback_init = find_named_call(harness.init_calls, "ItemFallback")
+		assert.equals(harness.modules.ItemProfiles, item_fallback_init.deps.item_profiles)
+
+		local weapon_action_init = find_named_call(harness.init_calls, "WeaponAction")
+		assert.equals(harness.modules.WeaponActionLogging, weapon_action_init.deps.weapon_action_logging)
+		assert.equals(harness.modules.WeaponActionShoot, weapon_action_init.deps.weapon_action_shoot)
+		assert.equals(harness.modules.WeaponActionVoidblast, weapon_action_init.deps.weapon_action_voidblast)
+
+		local grenade_fallback_init = find_named_call(harness.init_calls, "GrenadeFallback")
+		assert.equals(harness.modules.GrenadeProfiles, grenade_fallback_init.deps.grenade_profiles)
+		assert.equals(harness.modules.GrenadeAim, grenade_fallback_init.deps.grenade_aim)
+		assert.equals(harness.modules.GrenadeRuntime, grenade_fallback_init.deps.grenade_runtime)
+
 		local gestalt_init = find_named_call(harness.init_calls, "GestaltInjector")
 		assert.equals("killshot", gestalt_init.deps.default_ranged_gestalt)
 		assert.equals("linesman", gestalt_init.deps.default_melee_gestalt)

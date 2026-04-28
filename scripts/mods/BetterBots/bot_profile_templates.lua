@@ -426,7 +426,4 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 	},
 }
 
--- Resolved profiles cache: built on first use by resolving item strings to objects.
--- Keyed by class name. Reset on GameplayStateRun enter (item catalog may change).
-
 return M

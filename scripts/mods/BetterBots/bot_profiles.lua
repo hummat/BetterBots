@@ -647,6 +647,7 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_profile_templates = deps.profile_templates
+		assert(_profile_templates, "BetterBots: bot_profiles requires profile_templates")
 	end,
 	register_hooks = register_hooks,
 	reset = reset,
