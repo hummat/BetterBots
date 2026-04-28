@@ -220,6 +220,25 @@ Runway cuts are now mostly moot. The planned code/doc items for v1.0.0 are eithe
 | 84 | User-authored bot profiles | Integration with hadrons-blessing for user-defined bot builds. Design-heavy, no concrete scope yet. |
 | 86 | Tier 3 revive cover | Moved 2026-04-17 after Sprint 1 timing investigation confirmed `BtBotInteractAction.enter` is unusable (engine interrupt on interacting state entry). Viable architecture: approach-phase hook in `revive_ability.on_refresh_destination` + gate `bt_bot_conditions.can_revive` while item sequence mid-flight. Ships instant-variant shield + drone; relic stays excluded (5.6s unwield + slot lock). Full plan on the issue. |
 
+#### Post-1.0 ROI triage (2026-04-28)
+
+Use this as the execution map, not as a replacement for issue acceptance criteria. ROI means player-visible impact plus risk reduction divided by implementation and validation cost. `needs-testing` on GitHub means code/support is present but live proof is missing.
+
+| Rank | Issue | Class | ROI call / next action |
+|---|---|---|---|
+| R1 | `#108` Human revive priority | Implement | Highest player ROI: when the only human is down, combat polish no longer matters. Work at the perception/destination arbitration seam; reuse existing revive-cover pieces instead of reordering BT nodes. |
+| R2 | `#17` Daemonhost avoidance | Validate/fix | Rage-quit class failure. Add decisive first-action `stage`/`aggro_state` evidence, then either close or patch the remaining dormant-state classifier gap. |
+| R3 | `#106` Perf cap miss | Implement | Every future feature inherits this cost. Start with grenade fallback idle cadence, then context augmentation caching if needed. |
+| R4 | `#100` Scenario validation harness | Implement | High developer ROI. A narrow `/bb_scenario` MVP would turn daemonhost, revive, poxburster, grenade, and weakspot claims into repeatable checks. |
+| R5 | `#96` Smart-tag item bridge | Validate | User-visible command path; current blocker is positive live evidence, not architecture. Confirm `smart-tag pickup routed ...` after the liveness fix. |
+| R6 | `#43` Voidblast p1 charged fire | Validate/fix | Narrow Psyker build payoff. Close only after `voidblast anchor locked` plus `voidblast charged fire override` or real `trigger_explosion` evidence. |
+| R7 | `#92` Per-breed weakspot aim | Validate/limit | Validate Mauler spine first. Keep Crusher/Bulwark expansion deferred until rig/node evidence is real. |
+| R8 | `#33` Remaining weapon specials | Implement slices | Continue only high-value families: Ogryn specials, mauls, rippergun/bayonet/bash where they change survival or damage. Leave flashlight/parry theater alone until evidence says otherwise. |
+| R9 | `#41` Weapon/enemy-aware ranged behavior | Implement slices | High potential but broad. Keep family-scoped after perf/harness; avoid a general fire-control rewrite. |
+| R10 | `#107` Barrel avoidance | Validate first | Likely vanilla already handles triggered-barrel AoE threats. Instrument and patch only a proven gap. |
+
+Lower ROI for now: `#80` and `#22` are architectural and should wait for `#100`; `#86` is cool but less important than `#108`; broad `#24`, `#28`, and `#84` carry support and UX burden; `#8` is DLC-gated.
+
 **Broad-scope cuts (scope-exit, captured under parent issues):**
 
 - Broad `#24`: complex healing-item ping negotiation beyond F2 primitive + medicae + basic distribution
