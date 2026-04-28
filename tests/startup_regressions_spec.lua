@@ -373,6 +373,7 @@ local function make_bootstrap_harness(module_overrides)
 	modules.HeuristicsArbites = make_runtime_module("HeuristicsArbites", install_calls)
 	modules.HeuristicsHiveScum = make_runtime_module("HeuristicsHiveScum", install_calls)
 	modules.HeuristicsGrenade = make_runtime_module("HeuristicsGrenade", install_calls)
+	modules.ItemProfiles = make_runtime_module("ItemProfiles", install_calls, {})
 	modules.ItemFallback = make_runtime_module("ItemFallback", install_calls, {
 		should_lock_weapon_switch = function()
 			return false
@@ -635,6 +636,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/heuristics_hive_scum"] = modules.HeuristicsHiveScum,
 		["BetterBots/scripts/mods/BetterBots/heuristics_grenade"] = modules.HeuristicsGrenade,
 		["BetterBots/scripts/mods/BetterBots/heuristics"] = modules.Heuristics,
+		["BetterBots/scripts/mods/BetterBots/item_profiles"] = modules.ItemProfiles,
 		["BetterBots/scripts/mods/BetterBots/item_fallback"] = modules.ItemFallback,
 		["BetterBots/scripts/mods/BetterBots/charge_tracker"] = modules.ChargeTracker,
 		["BetterBots/scripts/mods/BetterBots/gestalt_injector"] = modules.GestaltInjector,

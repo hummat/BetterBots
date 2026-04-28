@@ -339,7 +339,7 @@ Result: item abilities need explicit queued inputs from the mod.
 |---|---|---|
 | 1 | Whitelist bypass | Templates define usable `ability_meta_data` |
 | 2 | Runtime metadata injection | Includes template-specific `wait_action`/`end_condition` where needed |
-| 3a | Item-based combat fallback (experimental) | Driven via `weapon_action` sequence probing by action-input names |
+| 3a | Item-based combat fallback (experimental) | Driven via `item_fallback.lua` state flow and `item_profiles.lua` sequence probing by action-input names |
 | 3b | Grenade/blitz fallback (experimental) | Driven by `grenade_fallback.lua` state flow, `grenade_profiles.lua` input profiles, `grenade_aim.lua` target/ballistic aim helpers, and `grenade_runtime.lua` runtime state/event helpers |
 
 ## Class ability references

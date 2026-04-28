@@ -1,5 +1,6 @@
 local test_helper = require("tests.test_helper")
 
+local ItemProfiles = dofile("scripts/mods/BetterBots/item_profiles.lua")
 local ItemFallback = dofile("scripts/mods/BetterBots/item_fallback.lua")
 
 local _mock_time = 10
@@ -155,6 +156,7 @@ local function reset()
 		bot_slot_for_unit = function()
 			return 5
 		end,
+		item_profiles = ItemProfiles,
 	})
 
 	ItemFallback.wire({

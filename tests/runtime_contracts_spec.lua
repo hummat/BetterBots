@@ -1,6 +1,7 @@
 local test_helper = require("tests.test_helper")
 
 local ChargeTracker = dofile("scripts/mods/BetterBots/charge_tracker.lua")
+local ItemProfiles = dofile("scripts/mods/BetterBots/item_profiles.lua")
 local ItemFallback = dofile("scripts/mods/BetterBots/item_fallback.lua")
 
 describe("runtime contracts", function()
@@ -103,6 +104,7 @@ describe("runtime contracts", function()
 			bot_slot_for_unit = function()
 				return 1
 			end,
+			item_profiles = ItemProfiles,
 		})
 
 		ItemFallback.schedule_retry = function(unit, fixed_t, retry_delay_s)

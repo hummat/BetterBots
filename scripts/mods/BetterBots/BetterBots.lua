@@ -256,6 +256,9 @@ assert(HeuristicsGrenade, "BetterBots: failed to load heuristics_grenade module"
 local Heuristics = mod:io_dofile("BetterBots/scripts/mods/BetterBots/heuristics")
 assert(Heuristics, "BetterBots: failed to load heuristics module")
 
+local ItemProfiles = mod:io_dofile("BetterBots/scripts/mods/BetterBots/item_profiles")
+assert(ItemProfiles, "BetterBots: failed to load item_profiles module")
+
 local ItemFallback = mod:io_dofile("BetterBots/scripts/mods/BetterBots/item_fallback")
 assert(ItemFallback, "BetterBots: failed to load item_fallback module")
 
@@ -500,6 +503,7 @@ ItemFallback.init({
 	ITEM_DEFAULT_START_DELAY_S = 0.2,
 	event_log = EventLog,
 	bot_slot_for_unit = Debug.bot_slot_for_unit,
+	item_profiles = ItemProfiles,
 })
 
 Debug.init({
