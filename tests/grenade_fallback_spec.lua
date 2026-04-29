@@ -18,6 +18,8 @@ local _aim_calls = {}
 local _grenade_state_by_unit = {}
 local _last_grenade_charge_event_by_unit = {}
 local _perf_calls = {}
+local _build_context_calls = 0
+local _heuristic_calls = 0
 local unit
 local _saved_globals = {}
 
@@ -163,6 +165,8 @@ local function reset()
 	_grenade_state_by_unit = {}
 	_last_grenade_charge_event_by_unit = {}
 	_perf_calls = {}
+	_build_context_calls = 0
+	_heuristic_calls = 0
 	_component_state_by_name = {}
 	_component_state_by_name.weapon_action = {
 		template_name = "autogun_p1_m1",
@@ -271,9 +275,11 @@ local function reset()
 
 	GrenadeFallback.wire({
 		build_context = function()
+			_build_context_calls = _build_context_calls + 1
 			return { num_nearby = 3, target_enemy = "enemy_1" }
 		end,
 		evaluate_grenade_heuristic = function(_name, _ctx)
+			_heuristic_calls = _heuristic_calls + 1
 			return _heuristic_result, _heuristic_rule
 		end,
 		equipped_grenade_ability = function(_u)
@@ -348,6 +354,24 @@ describe("grenade_fallback", function()
 	end)
 
 	describe("perf breakdowns", function()
+		it("throttles repeated idle heuristic misses without delaying the retry window", function()
+			_heuristic_result = false
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(1, _build_context_calls)
+			assert.equals(1, _heuristic_calls)
+			assert.equals(1, #_event_decisions)
+
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(2, _build_context_calls)
+			assert.equals(2, _heuristic_calls)
+			assert.equals(2, #_event_decisions)
+		end)
+
 		it("records idle-path profile resolution and launch buckets", function()
 			GrenadeFallback.try_queue(unit, blackboard)
 

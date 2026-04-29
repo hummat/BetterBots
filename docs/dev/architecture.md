@@ -389,6 +389,7 @@ For v1.0.0 release decisions, BetterBots now treats perf as a mission-end benchm
 | Heuristic evaluation | ~20 arithmetic comparisons | Pure comparisons on pre-built context table, no allocations, no engine calls |
 | `_can_activate_ability` (BT condition) | 1 `require` (cached) + `build_context` + heuristic | Only fires when BT priority selector reaches the ability node — usually short-circuited by higher-priority nodes |
 | `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, `can_use_ability("combat_ability") == false`, or state guard) |
+| `grenade_fallback.try_queue` idle path | Grenade/blitz availability + context + heuristic | Negative idle decisions are cadence-limited to 0.15s per bot so "no throw now" does not rebuild context every fixed frame; active throw stages still update every tick. |
 | Event logging (`emit`) | 1 table append per event | Buffered; flush to disk every 15s or 500 events. Off by default. |
 | Debug logging (`_debug_log`) | 1 string concat for key + 1 table lookup | Message body only built when debug enabled, but key argument is always evaluated |
 

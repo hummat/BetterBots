@@ -35,6 +35,7 @@ local DEFAULT_THROW_DELAY_S = 0.3 -- Default hold after aim_hold before releasin
 local UNWIELD_TIMEOUT_S = 3.0 -- Wait for auto-unwield after throw; force if exceeded
 local RETRY_COOLDOWN_S = 2.0 -- Shared cooldown after a throw attempt finishes or aborts
 local SLOT_LOCK_RETRY_S = 0.35 -- Fast retry when another BetterBots sequence is holding a different slot
+local IDLE_DECISION_INTERVAL_S = 0.15 -- Coarse idle cadence for negative grenade/blitz decisions (~4-5 fixed frames)
 local ACTIVE_WEAPON_CHARGE_ACTION = "action_charge"
 
 local function try_queue(unit, blackboard)
@@ -92,6 +93,10 @@ local function try_queue(unit, blackboard)
 						.. ")"
 				)
 			end
+			return
+		end
+
+		if state.next_idle_eval_t and fixed_t < state.next_idle_eval_t then
 			return
 		end
 	end
@@ -554,6 +559,7 @@ local function try_queue(unit, blackboard)
 	end
 	_grenade_runtime.emit_decision(unit, grenade_name, should_throw, rule, context, fixed_t)
 	if not should_throw then
+		state.next_idle_eval_t = fixed_t + IDLE_DECISION_INTERVAL_S
 		-- Gate filters zero-signal holds. Non-psyker bots always have
 		-- peril_pct == 0 because the engine zero-initializes the
 		-- warp_charge component on every player unit (see
@@ -585,6 +591,7 @@ local function try_queue(unit, blackboard)
 		end
 		return
 	end
+	state.next_idle_eval_t = nil
 
 	local profile_t0 = _perf and _perf.begin() or nil
 	local template_entry = _grenade_profiles.resolve_template_entry(grenade_name, context, rule)
