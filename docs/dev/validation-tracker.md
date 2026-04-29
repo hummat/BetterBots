@@ -62,6 +62,53 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-04-29-mauler-weakspot-scenario-01
+
+```text
+Run ID: 2026-04-29-mauler-weakspot-scenario-01
+Date (local): 2026-04-29
+Date (UTC): 2026-04-29
+Git commit: 833e140
+Log file: console-2026-04-29-19.11.14-595beab0-65b3-4115-9dcd-9a8514037073.log
+Bot lineup / abilities: validation roster with bolter, heavy stubber, krak grenade, Ogryn frag, and Zealot throwing knives present
+Map + difficulty: `/bb_scenario mauler_weakspot 22 10` targeted scenario smoke
+
+Regression checks:
+- fresh launch / startup load: UNKNOWN
+- duplicate startup spam: no evidence in summary
+- BetterBots warnings: no (`./bb-log summary` = `BB warnings: 0`)
+- Lua errors: no (`./bb-log summary` = `Error lines: 0`)
+
+Scenario harness / #100 evidence:
+- Scenario command distance/count: PASS
+  - key lines / timestamps: three `mauler_weakspot` runs spawned 10 `renegade_executor` units at distance 22 (`mauler_weakspot:49788`, `mauler_weakspot:82096`, `mauler_weakspot:112923`)
+
+Sprint 1 / #92 evidence:
+- Mauler anti-armor ranged target type: PASS
+  - key lines / timestamps: `anti-armor ranged family kept ranged target type (family=bolter, breed=renegade_executor, distance=24.94)` and `family=heavystubber ... distance=24.19` at 19:13:29, with repeated keep-ranged markers above the 12m minimum
+- Close hard-armor melee fallback: PASS
+  - key lines / timestamps: `anti-armor ranged target skipped (reason=distance_below_min, weapon=bolter_p1_m1, ... distance=12.00, min_distance=12.00, chosen=melee)` plus `bot 5 switch_melee entered` at 19:13:37; equivalent heavy-stubber skip/switch at 19:13:37 and 19:14:40
+- Heavy-stubber ranged bash loop regression: PASS
+  - key lines / timestamps: no `queued ranged bash` marker found in the checked raw log
+- Mauler weakspot override: PARTIAL PASS
+  - key lines / timestamps: `weakspot override applied (breed=renegade_executor, node=j_spine)` at 19:13:29 and 19:14:05
+  - remaining gap: no `weakspot aim selected` marker in this run; Mauler spine override is not enough to close generic weakspot validation
+
+Grenade / blitz evidence:
+- Zealot knives blocked against Maulers: PASS
+  - key lines / timestamps: repeated `grenade held zealot_throwing_knives (rule=grenade_knives_block_hard_armor, ... breed=renegade_executor, ...)`
+  - negative evidence: no `grenade queued wield for zealot_throwing_knives`, `ability blitz activated zealot_throwing_knives`, `bot weapon ... zealot_throwing_knives`, or release line found
+- Veteran krak against Maulers: PASS
+  - key lines / timestamps: 7 `veteran_krak_grenade` consumes in `./bb-log summary`, with repeated `grenade releasing toward ... target_breed=renegade_executor`
+- Ogryn frag against Mauler packs: PASS
+  - key lines / timestamps: 1 `ogryn_grenade_frag` consume in `./bb-log summary`, with `grenade releasing toward ... target_breed=renegade_executor` at 19:13:34
+
+Conclusion:
+- The anti-armor target-type regression and heavy-stubber bash-loop regression look fixed in this scenario.
+- Knife hard-armor blocking is behaving correctly in the log; visual knife-like behavior was not backed by a BetterBots knife queue/release marker.
+- Keep `#92` open for a non-Mauler weakspot target that should produce `weakspot aim selected`.
+```
+
 ### Run 2026-04-22-v1-0-0-followup-02
 
 ```text
