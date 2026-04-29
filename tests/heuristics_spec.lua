@@ -3113,6 +3113,26 @@ describe("heuristics", function()
 			assert.matches("super_armor", rule)
 		end)
 
+		it("holds zealot throwing knives against hard-armored elite breeds without super armor metadata", function()
+			for _, breed_name in ipairs({
+				"renegade_executor",
+				"chaos_ogryn_bulwark",
+				"chaos_ogryn_executor",
+			}) do
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"zealot_throwing_knives",
+					helper.make_context({
+						target_enemy = breed_name,
+						target_breed_name = breed_name,
+						target_is_elite_special = true,
+						target_enemy_distance = 20,
+					})
+				)
+				assert.is_false(result, breed_name)
+				assert.matches("hard_armor", rule)
+			end
+		end)
+
 		it("holds zealot throwing knives against monsters", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"zealot_throwing_knives",

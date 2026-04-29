@@ -374,6 +374,7 @@ end
 local function _observe_queued_weapon_action(unit, action_input, original_action_input)
 	SustainedFire.observe_queued_weapon_action(unit, action_input)
 	RangedSpecialAction.observe_queued_weapon_action(unit, action_input, original_action_input)
+	MeleeAttackChoice.observe_queued_weapon_action(unit, action_input)
 end
 
 -- Register hooks for extracted modules

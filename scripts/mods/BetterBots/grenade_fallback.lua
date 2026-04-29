@@ -38,6 +38,33 @@ local SLOT_LOCK_RETRY_S = 0.35 -- Fast retry when another BetterBots sequence is
 local IDLE_DECISION_INTERVAL_S = 0.15 -- Coarse idle cadence for negative grenade/blitz decisions (~4-5 fixed frames)
 local ACTIVE_WEAPON_CHARGE_ACTION = "action_charge"
 
+local function _context_debug_summary(context)
+	if not context then
+		return "nearby=0, distance=none, challenge=0, elites=0, specials=0, monsters=0, breed=none, peril=nil"
+	end
+
+	return "nearby="
+		.. tostring(context.num_nearby or 0)
+		.. ", distance="
+		.. tostring(context.target_enemy_distance or "none")
+		.. ", challenge="
+		.. tostring(context.challenge_rating_sum or 0)
+		.. ", elites="
+		.. tostring(context.elite_count or 0)
+		.. ", specials="
+		.. tostring(context.special_count or 0)
+		.. ", monsters="
+		.. tostring(context.monster_count or 0)
+		.. ", breed="
+		.. tostring(context.target_breed_name or "none")
+		.. ", peril="
+		.. tostring(context.peril_pct)
+end
+
+local function _is_soft_revalidation_hold(rule)
+	return type(rule) == "string" and string.find(rule, "_hold", 1, true) ~= nil
+end
+
 local function try_queue(unit, blackboard)
 	local fixed_t = _fixed_time()
 
@@ -242,12 +269,16 @@ local function try_queue(unit, blackboard)
 			-- frag attempt from losing the race when num_nearby dips
 			-- across the aim window (see evaluate_grenade_heuristic).
 			local should_throw, rule = _evaluate_grenade_heuristic(state.grenade_name, context, { revalidation = true })
-			if not should_throw then
+			if not should_throw and not _is_soft_revalidation_hold(rule) then
 				if _debug_enabled() then
 					_debug_log(
 						"grenade_revalidate_block:" .. tostring(unit),
 						fixed_t,
-						"grenade aim aborted after revalidation (rule=" .. tostring(rule) .. ")"
+						"grenade aim aborted after revalidation (rule="
+							.. tostring(rule)
+							.. ", "
+							.. _context_debug_summary(context)
+							.. ")"
 					)
 				end
 				_grenade_runtime.emit_event(
@@ -260,6 +291,16 @@ local function try_queue(unit, blackboard)
 				)
 				_grenade_runtime.reset_state(unit, state, fixed_t + RETRY_COOLDOWN_S)
 				return
+			elseif not should_throw and _debug_enabled() then
+				_debug_log(
+					"grenade_revalidate_soft_hold:" .. tostring(unit),
+					fixed_t,
+					"grenade soft-hold ignored after commit (rule="
+						.. tostring(rule)
+						.. ", "
+						.. _context_debug_summary(context)
+						.. ")"
+				)
 			end
 
 			local aim = state.aim_input or "aim_hold"
@@ -582,10 +623,8 @@ local function try_queue(unit, blackboard)
 					.. grenade_name
 					.. " (rule="
 					.. tostring(rule)
-					.. ", nearby="
-					.. tostring(context and context.num_nearby or 0)
-					.. ", peril="
-					.. tostring(context and context.peril_pct)
+					.. ", "
+					.. _context_debug_summary(context)
 					.. ")"
 			)
 		end

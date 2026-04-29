@@ -831,6 +831,36 @@ describe("grenade_fallback", function()
 		_heuristic_result = false
 		_heuristic_rule = "grenade_smoke_hold"
 		_debug_enabled_result = true
+		GrenadeFallback.wire({
+			build_context = function()
+				return {
+					num_nearby = 6,
+					challenge_rating_sum = 4.5,
+					elite_count = 2,
+					special_count = 1,
+					monster_count = 0,
+					target_enemy = "enemy_1",
+					target_enemy_distance = 11,
+					target_breed_name = "renegade_executor",
+					peril_pct = 0,
+				}
+			end,
+			evaluate_grenade_heuristic = function()
+				return _heuristic_result, _heuristic_rule
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "veteran_frag_grenade" }
+			end,
+			is_combat_ability_active = function()
+				return _combat_ability_active
+			end,
+			is_grenade_enabled = function()
+				return _grenades_enabled_result
+			end,
+			query_weapon_switch_lock = function(unit_arg)
+				return _query_weapon_switch_lock(unit_arg)
+			end,
+		})
 
 		GrenadeFallback.try_queue(unit, blackboard)
 
@@ -842,6 +872,12 @@ describe("grenade_fallback", function()
 		assert.equals("grenade", _event_decisions[1].source)
 		assert.equals("grenade_smoke_hold", _event_decisions[1].rule)
 		assert.truthy(find_debug_log("grenade held veteran_frag_grenade"))
+		assert.truthy(find_debug_log("distance=11"))
+		assert.truthy(find_debug_log("challenge=4.5"))
+		assert.truthy(find_debug_log("elites=2"))
+		assert.truthy(find_debug_log("specials=1"))
+		assert.truthy(find_debug_log("monsters=0"))
+		assert.truthy(find_debug_log("breed=renegade_executor"))
 	end)
 
 	it("logs non-explosive reuse pacing holds with the blocking rule", function()
@@ -1568,7 +1604,7 @@ describe("grenade_fallback", function()
 		_recorded_inputs = {}
 		_aim_calls = {}
 		_heuristic_result = false
-		_heuristic_rule = "grenade_hold"
+		_heuristic_rule = "grenade_block_melee_range"
 
 		_mock_time = _mock_time + 0.5
 		GrenadeFallback.try_queue(unit, blackboard)
@@ -1577,6 +1613,23 @@ describe("grenade_fallback", function()
 		assert.equals(0, #_recorded_inputs)
 		assert.equals("set_aiming", _aim_calls[#_aim_calls].method)
 		assert.is_false(_aim_calls[#_aim_calls].aiming)
+	end)
+
+	it("continues an already-aimed grenade when revalidation soft-holds", function()
+		_debug_enabled_result = true
+		advance_to_stage("wait_aim")
+		_recorded_inputs = {}
+		_aim_calls = {}
+		_heuristic_result = false
+		_heuristic_rule = "grenade_ogryn_frag_hold"
+
+		_mock_time = _mock_time + 0.5
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.equals("wait_throw", _grenade_state_by_unit[unit].stage)
+		assert.equals(1, #_recorded_inputs)
+		assert.equals("aim_hold", _recorded_inputs[1].input)
+		assert.truthy(find_debug_log("grenade soft-hold ignored after commit"))
 	end)
 
 	it("aborts when target despawns mid-sequence (position disappears)", function()

@@ -109,23 +109,80 @@ local function _secondary_weapon_template(unit)
 	local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
 	local visual_loadout_api = visual_loadout_extension and _visual_loadout_api() or nil
 
-	return visual_loadout_api
-		and visual_loadout_api.weapon_template_from_slot
-		and visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, "slot_secondary")
+	if not visual_loadout_extension then
+		return nil, "missing_visual_loadout_extension"
+	end
+
+	if visual_loadout_extension.weapon_template_from_slot then
+		local weapon_template = visual_loadout_extension:weapon_template_from_slot("slot_secondary")
+
+		return weapon_template, weapon_template and "resolved_extension" or "slot_secondary_template_nil"
+	end
+
+	if not visual_loadout_api then
+		return nil, "missing_visual_loadout_api"
+	end
+
+	if not visual_loadout_api.weapon_template_from_slot then
+		return nil, "missing_weapon_template_from_slot"
+	end
+
+	local weapon_template = visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, "slot_secondary")
+
+	return weapon_template, weapon_template and "resolved" or "slot_secondary_template_nil"
 end
 
-local function _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template)
+local function _weapon_template_name(weapon_template)
+	return type(weapon_template) == "table" and weapon_template.name or nil
+end
+
+local function _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template, secondary_status)
 	local breed_name = target_breed and target_breed.name
-	if ANTI_ARMOR_RANGED_TARGET_BREEDS[breed_name] ~= true or target_distance_sq == nil then
+	if ANTI_ARMOR_RANGED_TARGET_BREEDS[breed_name] ~= true then
 		return nil
+	end
+
+	local diagnostic = {
+		breed = breed_name,
+		reason = nil,
+		secondary_status = secondary_status or "unknown",
+		weapon = _weapon_template_name(weapon_template) or "none",
+	}
+
+	if target_distance_sq == nil then
+		diagnostic.reason = "missing_distance"
+		return nil, diagnostic
+	end
+
+	diagnostic.distance = math.sqrt(target_distance_sq)
+
+	if not _anti_armor_ranged_policy then
+		diagnostic.reason = "missing_policy_resolver"
+		return nil, diagnostic
+	end
+
+	if not weapon_template then
+		diagnostic.reason = diagnostic.secondary_status
+		return nil, diagnostic
 	end
 
 	local policy = _anti_armor_ranged_policy and _anti_armor_ranged_policy(weapon_template) or nil
 	if not (policy and policy.min_target_distance_sq) then
-		return nil
+		diagnostic.reason = policy and "missing_policy_min_distance" or "unsupported_secondary"
+		return nil, diagnostic
 	end
 
-	return target_distance_sq >= policy.min_target_distance_sq and policy or nil
+	diagnostic.family = policy.family
+	diagnostic.min_distance = math.sqrt(policy.min_target_distance_sq)
+
+	if target_distance_sq < policy.min_target_distance_sq then
+		diagnostic.reason = "distance_below_min"
+		return nil, diagnostic
+	end
+
+	diagnostic.reason = "policy_active"
+
+	return policy, diagnostic
 end
 
 local function _calculate_score(
@@ -149,15 +206,22 @@ local function _calculate_score(
 
 	local policy = nil
 	local weapon_template
+	local secondary_status
 	if (_close_range_ranged_policy or _anti_armor_ranged_policy) and target_distance_sq ~= nil then
-		weapon_template = _secondary_weapon_template(unit)
+		weapon_template, secondary_status = _secondary_weapon_template(unit)
 	end
+
+	local anti_armor_policy, anti_armor_diagnostic =
+		_anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template, secondary_status)
+	local hard_armor_without_active_ranged_policy = anti_armor_diagnostic
+		and anti_armor_diagnostic.reason ~= "policy_active"
 
 	if _close_range_ranged_policy and target_distance_sq ~= nil then
 		local close_range_policy = weapon_template and _close_range_ranged_policy(weapon_template) or nil
 
 		if
 			close_range_policy
+			and not hard_armor_without_active_ranged_policy
 			and close_range_policy.hold_ranged_target_distance_sq
 			and target_distance_sq <= close_range_policy.hold_ranged_target_distance_sq
 			and ranged_score <= melee_score
@@ -169,7 +233,6 @@ local function _calculate_score(
 		end
 	end
 
-	local anti_armor_policy = _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template)
 	if anti_armor_policy then
 		if ranged_score <= melee_score then
 			local scale = _max3(_abs(melee_score), _abs(ranged_score), 1)
@@ -181,7 +244,7 @@ local function _calculate_score(
 		policy.anti_armor_ranged_family = anti_armor_policy.family
 	end
 
-	return melee_score, ranged_score, policy
+	return melee_score, ranged_score, policy, anti_armor_diagnostic
 end
 
 local function _is_valid_target(target_unit, target_breed, aggroed_minion_target_units)
@@ -216,6 +279,7 @@ local function _collect_stabilized_choice(
 	local best_melee_score, best_melee_target, best_melee_target_distance_sq = -math.huge, nil, math.huge
 	local best_ranged_score, best_ranged_target, best_ranged_target_distance_sq = -math.huge, nil, math.huge
 	local best_ranged_policy = nil
+	local best_ranged_anti_armor_diagnostic = nil
 
 	local should_fully_reevaluate = not current_target_enemy or t > perception_component.target_enemy_reevaluation_t
 
@@ -238,7 +302,7 @@ local function _collect_stabilized_choice(
 				end
 
 				local target_distance_sq = vector3_distance_squared(unit_position, target_position)
-				local melee_score, ranged_score, ranged_policy = _calculate_score(
+				local melee_score, ranged_score, ranged_policy, anti_armor_diagnostic = _calculate_score(
 					unit,
 					target_unit,
 					target_breed,
@@ -261,6 +325,7 @@ local function _collect_stabilized_choice(
 					best_ranged_score, best_ranged_target, best_ranged_target_distance_sq =
 						ranged_score, target_unit, target_distance_sq
 					best_ranged_policy = ranged_policy
+					best_ranged_anti_armor_diagnostic = anti_armor_diagnostic
 				end
 			end
 
@@ -284,6 +349,7 @@ local function _collect_stabilized_choice(
 				suppressed_raw_flip = analysis.suppressed_raw_flip,
 				melee_score = best_melee_score,
 				ranged_score = best_ranged_score,
+				anti_armor_ranged_diagnostic = best_ranged_anti_armor_diagnostic,
 			}
 		end
 
@@ -298,6 +364,7 @@ local function _collect_stabilized_choice(
 			close_range_ranged_family = best_ranged_policy and best_ranged_policy.close_range_ranged_family or nil,
 			anti_armor_ranged_breed = best_ranged_policy and best_ranged_policy.anti_armor_ranged_breed or nil,
 			anti_armor_ranged_family = best_ranged_policy and best_ranged_policy.anti_armor_ranged_family or nil,
+			anti_armor_ranged_diagnostic = best_ranged_anti_armor_diagnostic,
 		}
 	end
 
@@ -317,7 +384,7 @@ local function _collect_stabilized_choice(
 
 		local target_breed = target_unit_data_extension:breed()
 		local target_distance_sq = vector3_distance_squared(unit_position, target_position)
-		local melee_score, ranged_score, ranged_policy = _calculate_score(
+		local melee_score, ranged_score, ranged_policy, anti_armor_diagnostic = _calculate_score(
 			unit,
 			target_unit,
 			target_breed,
@@ -344,6 +411,7 @@ local function _collect_stabilized_choice(
 			close_range_ranged_family = ranged_policy and ranged_policy.close_range_ranged_family or nil,
 			anti_armor_ranged_breed = ranged_policy and ranged_policy.anti_armor_ranged_breed or nil,
 			anti_armor_ranged_family = ranged_policy and ranged_policy.anti_armor_ranged_family or nil,
+			anti_armor_ranged_diagnostic = anti_armor_diagnostic,
 		}
 	end
 
@@ -407,6 +475,54 @@ end
 
 function M.choose_target_type(current_type, melee_score, ranged_score)
 	return M.analyze_target_type_choice(current_type, melee_score, ranged_score).chosen_type
+end
+
+local function _format_distance(value)
+	return value and string.format("%.2f", value) or "none"
+end
+
+local function _log_anti_armor_ranged_skip(unit, stabilized, t)
+	local diagnostic = stabilized and stabilized.anti_armor_ranged_diagnostic
+	if
+		not diagnostic
+		or diagnostic.reason == "policy_active"
+		or not (_debug_enabled and _debug_enabled() and _debug_log)
+	then
+		return
+	end
+
+	_debug_log(
+		"anti_armor_ranged_skip:"
+			.. tostring(unit)
+			.. ":"
+			.. tostring(diagnostic.breed)
+			.. ":"
+			.. tostring(diagnostic.weapon)
+			.. ":"
+			.. tostring(diagnostic.reason),
+		_fixed_time and _fixed_time() or t or 0,
+		"anti-armor ranged target skipped (reason="
+			.. tostring(diagnostic.reason)
+			.. ", weapon="
+			.. tostring(diagnostic.weapon)
+			.. ", secondary_status="
+			.. tostring(diagnostic.secondary_status)
+			.. ", breed="
+			.. tostring(diagnostic.breed)
+			.. ", distance="
+			.. _format_distance(diagnostic.distance)
+			.. ", min_distance="
+			.. _format_distance(diagnostic.min_distance)
+			.. ", chosen="
+			.. tostring(stabilized.target_enemy_type)
+			.. ", melee="
+			.. string.format("%.2f", stabilized.melee_score or 0)
+			.. ", ranged="
+			.. string.format("%.2f", stabilized.ranged_score or 0)
+			.. ")",
+		nil,
+		"debug"
+	)
 end
 
 -- Kept for unit tests: installs a standalone hook that calls post_update_target_enemy.
@@ -603,6 +719,8 @@ function M.post_update_target_enemy(
 				"debug"
 			)
 		end
+
+		_log_anti_armor_ranged_skip(self_unit, stabilized, t)
 
 		if previous_target_enemy == nil or t > previous_reevaluation_t then
 			perception_component.target_enemy_reevaluation_t = t + REEVALUATION_INTERVAL_S

@@ -44,7 +44,7 @@ local NONEXPLOSIVE_GRENADE_REUSE_DELAY_S = {
 	conservative = 10,
 }
 
-local KRAK_HIGH_ARMOR_BREEDS = {
+local HIGH_ARMOR_BREEDS = {
 	chaos_ogryn_bulwark = true,
 	chaos_ogryn_executor = true,
 	renegade_executor = true,
@@ -222,7 +222,7 @@ local function _grenade_krak(context, preset)
 	end
 
 	local breed_name = context.target_breed_name
-	local high_armor_breed = breed_name ~= nil and KRAK_HIGH_ARMOR_BREEDS[breed_name] == true
+	local high_armor_breed = breed_name ~= nil and HIGH_ARMOR_BREEDS[breed_name] == true
 	hard_target_context.target_is_elite_special = context.target_is_super_armor == true or high_armor_breed
 	hard_target_context.priority_target_enemy = nil
 	hard_target_context.opportunity_target_enemy = nil
@@ -248,6 +248,10 @@ local function _grenade_zealot_knives(context)
 	end
 	if context.target_is_super_armor then
 		return false, "grenade_knives_block_super_armor"
+	end
+	local breed_name = context.target_breed_name
+	if breed_name ~= nil and HIGH_ARMOR_BREEDS[breed_name] == true then
+		return false, "grenade_knives_block_hard_armor"
 	end
 	if not context.target_is_elite_special then
 		return false, "grenade_knives_hold"

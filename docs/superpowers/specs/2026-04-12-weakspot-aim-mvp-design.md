@@ -39,16 +39,20 @@ No breed-specific overrides, no runtime shoot hook, no ADS changes, and no attem
 
 ## Weapon Scope
 
-Initial allowlist is exactly:
+Initial MVP allowlist was exactly:
 
 - lasguns
 - autoguns
 - stub revolvers
 - bolters
 
+This was expanded on 2026-04-29 to align weakspot eligibility with the later
+anti-armor ranged policy: plasma guns, bolt pistols, and heavy stubbers now
+join the original finesse set.
+
 This should be identified from weapon template family signals already present on the template, primarily keywords. The design goal is family-level targeting without hardcoding every individual mark.
 
-Explicitly out of scope:
+Explicitly out of scope for the initial MVP:
 
 - staffs
 - autopistols

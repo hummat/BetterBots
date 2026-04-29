@@ -13,10 +13,15 @@ local _is_enabled
 local _logged_choice_keys = {}
 local _logged_missing_special_action_meta = {}
 local _logged_defend_suppression_keys = {}
+local _logged_special_pace_keys = {}
+local _last_direct_special_t_by_unit = setmetatable({}, { __mode = "k" })
+local _direct_special_meta = setmetatable({}, { __mode = "k" })
+local _direct_special_template_names = {}
 local _melee_horde_light_bias
 local MELEE_HOOK_PATCH_SENTINEL = "__bb_melee_attack_choice_installed"
 
 local DEFAULT_MAXIMAL_MELEE_RANGE = 2.5
+local DIRECT_SPECIAL_REUSE_DELAY_S = 6
 local FORCE_SWORD_2H_MIN_CHARGES = 10
 local FORCE_SWORD_2H_MIN_ENEMIES = 4
 local HIGH_HEALTH_BREEDS = {
@@ -321,9 +326,7 @@ local function _starts_with(value, prefix)
 	return type(value) == "string" and string.sub(value, 1, #prefix) == prefix
 end
 
-local function _resolve_special_weapon_policy(weapon_template)
-	local weapon_name = weapon_template and weapon_template.name or nil
-
+local function _resolve_special_weapon_policy_by_name(weapon_name)
 	for i = 1, #SPECIAL_WEAPON_POLICIES do
 		local policy = SPECIAL_WEAPON_POLICIES[i]
 
@@ -337,6 +340,10 @@ local function _resolve_special_weapon_policy(weapon_template)
 	return nil
 end
 
+local function _resolve_special_weapon_policy(weapon_template)
+	return _resolve_special_weapon_policy_by_name(weapon_template and weapon_template.name or nil)
+end
+
 local function _resolve_special_action_meta(weapon_template)
 	local policy = _resolve_special_weapon_policy(weapon_template)
 
@@ -347,13 +354,18 @@ local function _resolve_special_action_meta(weapon_template)
 	for action_name, action in pairs(weapon_template.actions or {}) do
 		if action.start_input == "special_action" and policy.action_kinds[action.kind] then
 			local start_attack = (action.allowed_chain_actions or {}).start_attack
-
-			return {
+			local meta = {
 				action_input = "special_action",
 				action_name = action_name,
 				chain_time = start_attack and start_attack.chain_time or action.activation_time or 0,
 				family = policy.family,
 			}
+
+			if action.kind == "sweep" then
+				_direct_special_meta[meta] = true
+			end
+
+			return meta
 		end
 	end
 
@@ -583,6 +595,56 @@ local function _can_activate_special(scratchpad)
 	return weapon_extension:action_input_is_currently_valid("weapon_action", "special_action", nil, _fixed_time())
 end
 
+local function _is_direct_special_meta(special_action_meta)
+	return special_action_meta
+		and (_direct_special_meta[special_action_meta] or special_action_meta.is_direct_attack) == true
+end
+
+local function _mark_direct_special_template(scratchpad, special_action_meta)
+	if not _is_direct_special_meta(special_action_meta) then
+		return
+	end
+
+	local weapon_template = scratchpad and scratchpad.weapon_template or nil
+	if weapon_template and weapon_template.name then
+		_direct_special_template_names[weapon_template.name] = true
+	end
+end
+
+local function _direct_special_on_cooldown(scratchpad, special_action_meta)
+	local unit = scratchpad and scratchpad.bb_unit or nil
+	local family = special_action_meta and special_action_meta.family or nil
+	if not (unit and family and _is_direct_special_meta(special_action_meta)) then
+		return false
+	end
+
+	local last_t = _last_direct_special_t_by_unit[unit]
+	local fixed_t = _fixed_time and _fixed_time() or 0
+	if not last_t or fixed_t - last_t >= DIRECT_SPECIAL_REUSE_DELAY_S then
+		return false
+	end
+
+	if _debug_log and _debug_enabled and _debug_enabled() then
+		local key = tostring(unit) .. ":" .. tostring(family)
+		if not _logged_special_pace_keys[key] then
+			_logged_special_pace_keys[key] = true
+			_debug_log(
+				"melee_special_paced:" .. key,
+				fixed_t,
+				"melee direct special paced (family="
+					.. tostring(family)
+					.. ", elapsed="
+					.. tostring(fixed_t - last_t)
+					.. ", cooldown="
+					.. tostring(DIRECT_SPECIAL_REUSE_DELAY_S)
+					.. ")"
+			)
+		end
+	end
+
+	return true
+end
+
 local function _prepend_special_action(chosen_attack_meta_data, special_action_meta)
 	local action_inputs = chosen_attack_meta_data and chosen_attack_meta_data.action_inputs or nil
 
@@ -635,10 +697,13 @@ local function _maybe_wrap_special_attack(target_breed, target_armor, scratchpad
 		or not inventory_slot_component
 		or inventory_slot_component.special_active
 		or not _is_priority_special_target(special_action_meta, scratchpad, target_breed, target_armor)
+		or _direct_special_on_cooldown(scratchpad, special_action_meta)
 		or not _can_activate_special(scratchpad)
 	then
 		return chosen_attack_meta_data, false
 	end
+
+	_mark_direct_special_template(scratchpad, special_action_meta)
 
 	return _prepend_special_action(chosen_attack_meta_data, special_action_meta), true
 end
@@ -810,8 +875,10 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		local inventory_component = unit_data_extension and unit_data_extension:read_component("inventory") or nil
 		local wielded_slot = inventory_component and inventory_component.wielded_slot or nil
 
+		scratchpad.bb_unit = unit
 		scratchpad.inventory_slot_component = wielded_slot and unit_data_extension:read_component(wielded_slot) or nil
 		scratchpad.special_action_meta = _resolve_special_action_meta(scratchpad.weapon_template)
+		_mark_direct_special_template(scratchpad, scratchpad.special_action_meta)
 	end)
 
 	_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
@@ -910,6 +977,23 @@ function M.install_melee_hooks(BtBotMeleeAction)
 end
 
 function M.register_hooks() end
+
+function M.observe_queued_weapon_action(unit, action_input)
+	if action_input ~= "special_action" then
+		return
+	end
+
+	local unit_data_extension = unit
+		and ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "unit_data_system")
+	local weapon_action_component = unit_data_extension and unit_data_extension:read_component("weapon_action") or nil
+	local template_name = weapon_action_component and weapon_action_component.template_name or nil
+
+	if _direct_special_template_names[template_name] then
+		_last_direct_special_t_by_unit[unit] = _fixed_time and _fixed_time() or 0
+	end
+end
 
 M.choose_attack_meta_data = choose_attack_meta_data
 M.DEFAULT_ATTACK_META_DATA = DEFAULT_ATTACK_META_DATA

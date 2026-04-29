@@ -278,6 +278,45 @@ describe("ranged_meta_data", function()
 		end)
 	end)
 
+	describe("supports_weakspot_aim", function()
+		it("covers the original finesse families plus anti-armor ranged families", function()
+			local supported = {
+				{ name = "lasgun_p1_m1", keywords = { "ranged", "lasgun", "p1" } },
+				{ name = "autogun_p1_m1", keywords = { "ranged", "autogun", "p1" } },
+				{ name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } },
+				{ name = "stubrevolver_p1_m2", keywords = { "ranged", "stub_pistol", "p1" } },
+				{ name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+				{ name = "boltpistol_p1_m1", keywords = { "ranged", "boltpistol", "p1" } },
+				{ name = "ogryn_heavystubber_p1_m1", keywords = { "ranged", "heavystubber", "p1" } },
+				{ name = "ogryn_heavystubber_p2_m2", keywords = { "ranged", "heavystubber", "p2" } },
+			}
+
+			for i = 1, #supported do
+				assert.is_true(
+					RangedMetaData.supports_weakspot_aim(supported[i]),
+					supported[i].name .. " should support weakspot aim"
+				)
+			end
+		end)
+
+		it("still excludes close-range spray and blast families", function()
+			local excluded = {
+				{ name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+				{ name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				{ name = "flamer_p1_m1", keywords = { "ranged", "flamer", "p1" } },
+				{ name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+				{ name = "ogryn_thumper_p1_m1", keywords = { "ranged", "grenade_launcher", "p1" } },
+			}
+
+			for i = 1, #excluded do
+				assert.is_false(
+					RangedMetaData.supports_weakspot_aim(excluded[i]),
+					excluded[i].name .. " should not support weakspot aim"
+				)
+			end
+		end)
+	end)
+
 	describe("find_fire_input", function()
 		it("finds single action_one_pressed input", function()
 			local t = make_ranged_template({
@@ -697,6 +736,8 @@ describe("ranged_meta_data", function()
 		it("sets fire_action_input but keeps fire_action_name default when action_shoot exists", function()
 			local templates = {
 				plasma = make_ranged_template({
+					name = "plasmagun_p1_m1",
+					keywords = { "ranged", "plasmagun", "p1" },
 					action_inputs = {
 						shoot_charge = {
 							input_sequence = {
@@ -716,6 +757,7 @@ describe("ranged_meta_data", function()
 			local meta = templates.plasma.attack_meta_data
 			assert.is_table(meta)
 			assert.equals("shoot_charge", meta.fire_action_input)
+			assert.same({ "j_head", "j_spine" }, meta.aim_at_node)
 			assert.is_nil(meta.fire_action_name)
 		end)
 

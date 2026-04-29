@@ -146,15 +146,16 @@ local function run_hooked_selection(opts)
 		end
 
 		if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
-			return {
-				weapon_template_from_slot = function(_visual_loadout_extension, slot_name)
-					if slot_name == "slot_secondary" then
-						return opts.bot_secondary_weapon_template
-					end
+			return opts.visual_loadout_api
+				or {
+					weapon_template_from_slot = function(_visual_loadout_extension, slot_name)
+						if slot_name == "slot_secondary" then
+							return opts.bot_secondary_weapon_template
+						end
 
-					return nil
-				end,
-			}
+						return nil
+					end,
+				}
 		end
 
 		return saved_require(path)
@@ -169,7 +170,7 @@ local function run_hooked_selection(opts)
 			end
 
 			if unit == "bot_1" and system_name == "visual_loadout_system" then
-				return { unit = unit }
+				return opts.visual_loadout_extension or { unit = unit }
 			end
 
 			if unit == "target_1" and system_name == "unit_data_system" then
@@ -660,9 +661,51 @@ describe("target_type_hysteresis", function()
 		end
 	end)
 
+	it("resolves anti-armor secondary from the real visual-loadout extension API", function()
+		local result = run_hooked_selection({
+			t = 1,
+			debug_enabled = true,
+			previous_target_type = "melee",
+			target_distance_sq = 144,
+			target_breed = { name = "renegade_executor", not_bot_target = false, tags = { elite = true } },
+			visual_loadout_api = {},
+			visual_loadout_extension = {
+				weapon_template_from_slot = function(_self, slot_name)
+					if slot_name == "slot_secondary" then
+						return { name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } }
+					end
+
+					return nil
+				end,
+			},
+			anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+			bot_selection = {
+				gestalt_weight = function(gestalt, breed)
+					if gestalt == "killshot" and breed.name == "renegade_executor" then
+						return -5
+					end
+
+					return 5
+				end,
+				ranged_distance_weight = function()
+					return 1
+				end,
+				line_of_sight_weight = function()
+					return 1
+				end,
+			},
+		})
+
+		assert.equals("ranged", result.perception_component.target_enemy_type)
+		assert.is_truthy(
+			find_debug_log(result.debug_logs, "anti-armor ranged family kept ranged target type (family=bolter")
+		)
+	end)
+
 	it("does not force far Maulers to ranged for generic weakspot-capable guns", function()
 		local result = run_hooked_selection({
 			t = 1,
+			debug_enabled = true,
 			previous_target_type = "melee",
 			target_distance_sq = 625,
 			target_breed = {
@@ -693,11 +736,21 @@ describe("target_type_hysteresis", function()
 		})
 
 		assert.equals("melee", result.perception_component.target_enemy_type)
+		local log = find_debug_log(result.debug_logs, "anti-armor ranged target skipped")
+		assert.is_truthy(log)
+		assert.matches("reason=unsupported_secondary", log.message, 1, true)
+		assert.matches("weapon=lasgun_p3_m1", log.message, 1, true)
+		assert.matches("breed=renegade_executor", log.message, 1, true)
+		assert.matches("distance=25.00", log.message, 1, true)
+		assert.matches("chosen=melee", log.message, 1, true)
+		assert.matches("melee=", log.message, 1, true)
+		assert.matches("ranged=", log.message, 1, true)
 	end)
 
 	it("does not force close Maulers to ranged for anti-armor ranged weapons", function()
 		local result = run_hooked_selection({
 			t = 1,
+			debug_enabled = true,
 			previous_target_type = "melee",
 			target_distance_sq = 121,
 			target_breed = {
@@ -728,6 +781,98 @@ describe("target_type_hysteresis", function()
 		})
 
 		assert.equals("melee", result.perception_component.target_enemy_type)
+		local log = find_debug_log(result.debug_logs, "anti-armor ranged target skipped")
+		assert.is_truthy(log)
+		assert.matches("reason=distance_below_min", log.message, 1, true)
+		assert.matches("weapon=bolter_p1_m2", log.message, 1, true)
+		assert.matches("breed=renegade_executor", log.message, 1, true)
+		assert.matches("distance=11.00", log.message, 1, true)
+		assert.matches("min_distance=12.00", log.message, 1, true)
+		assert.matches("chosen=melee", log.message, 1, true)
+	end)
+
+	it("does not let the close-range heavy stubber rule override close hard-armored melee targets", function()
+		local result = run_hooked_selection({
+			t = 1,
+			debug_enabled = true,
+			previous_target_type = "ranged",
+			target_distance_sq = 9,
+			target_breed = {
+				name = "renegade_executor",
+				not_bot_target = false,
+				tags = { elite = true },
+			},
+			bot_secondary_weapon_template = {
+				name = "ogryn_heavystubber_p1_m1",
+				keywords = { "ranged", "heavystubber", "p1" },
+			},
+			anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+			close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+			bot_selection = {
+				slot_weight = function()
+					return 10
+				end,
+				melee_distance_weight = function()
+					return 8
+				end,
+				ranged_distance_weight = function()
+					return 0
+				end,
+				line_of_sight_weight = function()
+					return 0
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
+		assert.is_nil(find_debug_log(result.debug_logs, "close-range ranged family kept ranged target type"))
+		local log = find_debug_log(result.debug_logs, "anti-armor ranged target skipped")
+		assert.is_truthy(log)
+		assert.matches("reason=distance_below_min", log.message, 1, true)
+		assert.matches("weapon=ogryn_heavystubber_p1_m1", log.message, 1, true)
+		assert.matches("chosen=melee", log.message, 1, true)
+	end)
+
+	it("does not let the close-range rippergun rule override close hard-armored melee targets", function()
+		local result = run_hooked_selection({
+			t = 1,
+			debug_enabled = true,
+			previous_target_type = "ranged",
+			target_distance_sq = 9,
+			target_breed = {
+				name = "renegade_executor",
+				not_bot_target = false,
+				tags = { elite = true },
+			},
+			bot_secondary_weapon_template = {
+				name = "ogryn_rippergun_p1_m1",
+				keywords = { "ranged", "rippergun", "p1" },
+			},
+			anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+			close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+			bot_selection = {
+				slot_weight = function()
+					return 10
+				end,
+				melee_distance_weight = function()
+					return 8
+				end,
+				ranged_distance_weight = function()
+					return 0
+				end,
+				line_of_sight_weight = function()
+					return 0
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
+		assert.is_nil(find_debug_log(result.debug_logs, "close-range ranged family kept ranged target type"))
+		local log = find_debug_log(result.debug_logs, "anti-armor ranged target skipped")
+		assert.is_truthy(log)
+		assert.matches("reason=unsupported_secondary", log.message, 1, true)
+		assert.matches("weapon=ogryn_rippergun_p1_m1", log.message, 1, true)
+		assert.matches("chosen=melee", log.message, 1, true)
 	end)
 
 	it("drops ranged targeting for each close-range family once distance exceeds its window", function()

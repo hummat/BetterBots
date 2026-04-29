@@ -443,12 +443,16 @@ local function has_any_keyword(weapon_template, keywords)
 end
 
 local function should_inject_weakspot_aim(weapon_template)
-	return has_any_keyword(weapon_template, {
-		"lasgun",
-		"autogun",
-		"bolter",
-		"stub_pistol",
-	})
+	-- Start with the original finesse set, then include the explicit
+	-- anti-armor ranged families so the weakspot and Mauler-range policies
+	-- stay aligned when new hard-target guns are added.
+	return anti_armor_ranged_policy(weapon_template) ~= nil
+		or has_any_keyword(weapon_template, {
+			"lasgun",
+			"autogun",
+			"bolter",
+			"stub_pistol",
+		})
 end
 
 local function build_meta_data(weapon_template)
