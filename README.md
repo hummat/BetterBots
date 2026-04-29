@@ -204,6 +204,7 @@ scripts/mods/BetterBots/          # Mod source
   grenade_aim.lua                 #   Grenade target resolution, LOS checks, and ballistic aim
   grenade_runtime.lua             #   Grenade context, state reset, locks, queueing, and events
   update_dispatcher.lua           #   BotBehaviorExtension.update dispatcher ordering and gating
+  scenario_harness.lua            #   /bb_scenario scripted validation spawns + JSONL markers
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profile_templates.lua       #   Authored bot class loadout/talent templates
   bot_profiles.lua                #   Bot-optimized class profiles per slot

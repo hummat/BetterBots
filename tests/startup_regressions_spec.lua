@@ -440,6 +440,14 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 		emit = function() end,
 	})
+	modules.ScenarioHarness = make_runtime_module("ScenarioHarness", install_calls, {
+		register_commands = function()
+			install_calls.register_calls[#install_calls.register_calls + 1] = {
+				module = "ScenarioHarness",
+				args = {},
+			}
+		end,
+	})
 	modules.Perf = make_runtime_module("Perf", install_calls, {
 		begin = function()
 			return 0
@@ -664,6 +672,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/update_dispatcher"] = modules.UpdateDispatcher,
 		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
 		["BetterBots/scripts/mods/BetterBots/event_log"] = modules.EventLog,
+		["BetterBots/scripts/mods/BetterBots/scenario_harness"] = modules.ScenarioHarness,
 		["BetterBots/scripts/mods/BetterBots/perf"] = modules.Perf,
 		["BetterBots/scripts/mods/BetterBots/sprint"] = modules.Sprint,
 		["BetterBots/scripts/mods/BetterBots/melee_meta_data"] = modules.MeleeMetaData,
@@ -1176,6 +1185,9 @@ describe("startup regressions", function()
 		assert.equals("table", type(dispatcher_init.deps.session_start_state))
 		assert.equals("number", type(dispatcher_init.deps.snapshot_interval_s))
 
+		local scenario_init = find_named_call(harness.init_calls, "ScenarioHarness")
+		assert.equals(harness.modules.EventLog, scenario_init.deps.event_log)
+
 		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
 		assert.is_function(weapon_register.args[1].should_block_wield_input)
@@ -1184,6 +1196,9 @@ describe("startup regressions", function()
 
 		local ranged_special_init = find_named_call(harness.init_calls, "RangedSpecialAction")
 		assert.equals(harness.modules.Debug.bot_slot_for_unit, ranged_special_init.deps.bot_slot_for_unit)
+
+		local scenario_register = find_named_call(harness.register_calls, "ScenarioHarness")
+		assert.is_truthy(scenario_register)
 
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
 			attack = function() end,

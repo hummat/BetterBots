@@ -39,6 +39,7 @@ function M.load_and_init(ctx)
 	modules.UpdateDispatcher = load_module(mod, "update_dispatcher")
 	modules.Debug = load_module(mod, "debug")
 	modules.EventLog = load_module(mod, "event_log")
+	modules.ScenarioHarness = load_module(mod, "scenario_harness")
 	modules.Perf = load_module(mod, "perf")
 	modules.Sprint = load_module(mod, "sprint")
 	modules.MeleeMetaData = load_module(mod, "melee_meta_data")
@@ -101,6 +102,7 @@ function M.load_and_init(ctx)
 	local UpdateDispatcher = modules.UpdateDispatcher
 	local Debug = modules.Debug
 	local EventLog = modules.EventLog
+	local ScenarioHarness = modules.ScenarioHarness
 	local Perf = modules.Perf
 	local Sprint = modules.Sprint
 	local MeleeMetaData = modules.MeleeMetaData
@@ -278,6 +280,12 @@ function M.load_and_init(ctx)
 	EventLog.init({
 		mod = mod,
 		context_snapshot = Debug.context_snapshot,
+	})
+
+	ScenarioHarness.init({
+		mod = mod,
+		event_log = EventLog,
+		fixed_time = ctx.fixed_time,
 	})
 
 	ChargeTracker.init({

@@ -147,6 +147,7 @@ bb-log events rules   # JSONL: true/false decision counts by ability+rule
 bb-log events trace N # JSONL: timeline for bot slot N
 bb-log events holds   # JSONL: false decision distribution
 bb-log events items   # JSONL: item stage transitions + blocks
+bb-log events scenarios  # JSONL: /bb_scenario start/spawn/result rows
 bb-log events raw 'jq-filter'  # JSONL: raw jq passthrough
 ```
 
@@ -209,6 +210,11 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
+6. `/bb_scenarios`, `/bb_scenario <name>`, and `/bb_scenario_clear`
+   - Lists and runs scripted validation spawns for live Solo Play testing.
+   - Built-in scenarios: `poxburster_push`, `crusher_pack`, `mauler_weakspot`.
+   - `/bb_scenario_clear` despawns units created by the scenario harness via `MinionSpawnManager:despawn_minion`.
+   - Scenario start/spawn/result rows go to JSONL and are summarized by `bb-log events scenarios`.
 
 ### Practical debug workflow
 

@@ -274,6 +274,7 @@ Sprint = Modules.Sprint
 local MetaData, Heuristics, ItemFallback = Modules.MetaData, Modules.Heuristics, Modules.ItemFallback
 local ChargeTracker, GestaltInjector = Modules.ChargeTracker, Modules.GestaltInjector
 local UpdateDispatcher, Debug, EventLog, Perf = Modules.UpdateDispatcher, Modules.Debug, Modules.EventLog, Modules.Perf
+local ScenarioHarness = Modules.ScenarioHarness
 local MeleeMetaData, MeleeAttackChoice = Modules.MeleeMetaData, Modules.MeleeAttackChoice
 local RangedMetaData, TargetSelection, Poxburster = Modules.RangedMetaData, Modules.TargetSelection, Modules.Poxburster
 local SmartTargeting, AnimationGuard, AirlockGuard =
@@ -968,6 +969,7 @@ function mod.on_setting_changed(setting_id)
 end
 
 Debug.register_commands()
+ScenarioHarness.register_commands()
 _refresh_debug_log_level()
 
 -- Re-enable EventLog after hot-reload if we're mid-session.
