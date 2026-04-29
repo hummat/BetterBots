@@ -231,6 +231,7 @@ local function run_hooked_selection(opts)
 				perf_tags[#perf_tags + 1] = { tag = tag, token = token }
 			end,
 		},
+		anti_armor_ranged_policy = opts.anti_armor_ranged_policy,
 		close_range_ranged_policy = opts.close_range_ranged_policy or function(weapon_template)
 			local keywords = weapon_template and weapon_template.keywords or {}
 			for i = 1, #keywords do
@@ -570,6 +571,163 @@ describe("target_type_hysteresis", function()
 				)
 			)
 		end
+	end)
+
+	it("prefers ranged target type for hard-armored targets when the secondary has anti-armor ranged policy", function()
+		local cases = {
+			{
+				family = "plasmagun",
+				template = { name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+				target_breed = { name = "renegade_executor", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 100,
+			},
+			{
+				family = "bolter",
+				template = { name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } },
+				target_breed = { name = "chaos_ogryn_executor", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 144,
+			},
+			{
+				family = "boltpistol",
+				template = { name = "boltpistol_p1_m1", keywords = { "ranged", "boltpistol", "p1" } },
+				target_breed = { name = "chaos_ogryn_bulwark", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 100,
+			},
+			{
+				family = "lasgun_p2",
+				template = { name = "lasgun_p2_m1", keywords = { "ranged", "lasgun", "p2" } },
+				target_breed = { name = "renegade_executor", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 144,
+			},
+			{
+				family = "stubrevolver",
+				template = { name = "stubrevolver_p1_m2", keywords = { "ranged", "stub_pistol", "p1" } },
+				target_breed = { name = "renegade_executor", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 144,
+			},
+			{
+				family = "heavystubber",
+				template = {
+					name = "ogryn_heavystubber_p2_m2",
+					keywords = { "ranged", "heavystubber", "p2" },
+				},
+				target_breed = { name = "renegade_executor", not_bot_target = false, tags = { elite = true } },
+				target_distance_sq = 144,
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local result = run_hooked_selection({
+				t = 1,
+				debug_enabled = true,
+				previous_target_type = "melee",
+				target_distance_sq = case.target_distance_sq,
+				target_breed = case.target_breed,
+				bot_secondary_weapon_template = case.template,
+				anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+				bot_selection = {
+					gestalt_weight = function(gestalt, breed)
+						if gestalt == "killshot" and breed.name == case.target_breed.name then
+							return -5
+						end
+
+						return 5
+					end,
+					slot_weight = function()
+						return 0
+					end,
+					melee_distance_weight = function()
+						return 0
+					end,
+					ranged_distance_weight = function()
+						return 1
+					end,
+					line_of_sight_weight = function()
+						return 1
+					end,
+				},
+			})
+
+			assert.equals("target_1", result.perception_component.target_enemy)
+			assert.equals("ranged", result.perception_component.target_enemy_type)
+			assert.is_truthy(
+				find_debug_log(
+					result.debug_logs,
+					"anti-armor ranged family kept ranged target type (family=" .. case.family
+				)
+			)
+		end
+	end)
+
+	it("does not force far Maulers to ranged for generic weakspot-capable guns", function()
+		local result = run_hooked_selection({
+			t = 1,
+			previous_target_type = "melee",
+			target_distance_sq = 625,
+			target_breed = {
+				name = "renegade_executor",
+				not_bot_target = false,
+				tags = { elite = true },
+			},
+			bot_secondary_weapon_template = {
+				name = "lasgun_p3_m1",
+				keywords = { "ranged", "lasgun", "p3" },
+			},
+			anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+			bot_selection = {
+				gestalt_weight = function(gestalt, breed)
+					if gestalt == "killshot" and breed.name == "renegade_executor" then
+						return -5
+					end
+
+					return 5
+				end,
+				ranged_distance_weight = function()
+					return 1
+				end,
+				line_of_sight_weight = function()
+					return 1
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
+	end)
+
+	it("does not force close Maulers to ranged for anti-armor ranged weapons", function()
+		local result = run_hooked_selection({
+			t = 1,
+			previous_target_type = "melee",
+			target_distance_sq = 121,
+			target_breed = {
+				name = "renegade_executor",
+				not_bot_target = false,
+				tags = { elite = true },
+			},
+			bot_secondary_weapon_template = {
+				name = "bolter_p1_m2",
+				keywords = { "ranged", "bolter", "p1" },
+			},
+			anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+			bot_selection = {
+				gestalt_weight = function(gestalt, breed)
+					if gestalt == "killshot" and breed.name == "renegade_executor" then
+						return -5
+					end
+
+					return 5
+				end,
+				ranged_distance_weight = function()
+					return 1
+				end,
+				line_of_sight_weight = function()
+					return 1
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
 	end)
 
 	it("drops ranged targeting for each close-range family once distance exceeds its window", function()

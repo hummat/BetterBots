@@ -332,6 +332,33 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 	},
 }
 
+local ANTI_ARMOR_RANGED_POLICIES = {
+	plasmagun = {
+		family = "plasmagun",
+		min_target_distance_sq = meters_sq(10),
+	},
+	bolter = {
+		family = "bolter",
+		min_target_distance_sq = meters_sq(12),
+	},
+	boltpistol = {
+		family = "boltpistol",
+		min_target_distance_sq = meters_sq(10),
+	},
+	lasgun_p2 = {
+		family = "lasgun_p2",
+		min_target_distance_sq = meters_sq(12),
+	},
+	stubrevolver = {
+		family = "stubrevolver",
+		min_target_distance_sq = meters_sq(12),
+	},
+	heavystubber = {
+		family = "heavystubber",
+		min_target_distance_sq = meters_sq(12),
+	},
+}
+
 local function close_range_ranged_policy(weapon_template)
 	if type(weapon_template) ~= "table" then
 		return nil
@@ -363,6 +390,38 @@ local function close_range_ranged_policy(weapon_template)
 
 	if has_keyword(weapon_template, "rippergun") then
 		return CLOSE_RANGE_RANGED_POLICIES.rippergun
+	end
+
+	return nil
+end
+
+local function anti_armor_ranged_policy(weapon_template)
+	if type(weapon_template) ~= "table" then
+		return nil
+	end
+
+	if has_keyword(weapon_template, "plasmagun") then
+		return ANTI_ARMOR_RANGED_POLICIES.plasmagun
+	end
+
+	if has_keyword(weapon_template, "bolter") then
+		return ANTI_ARMOR_RANGED_POLICIES.bolter
+	end
+
+	if has_keyword(weapon_template, "boltpistol") then
+		return ANTI_ARMOR_RANGED_POLICIES.boltpistol
+	end
+
+	if weapon_template.name and weapon_template.name:find("^lasgun_p2_", 1, false) then
+		return ANTI_ARMOR_RANGED_POLICIES.lasgun_p2
+	end
+
+	if weapon_template.name and weapon_template.name:find("^stubrevolver_", 1, false) then
+		return ANTI_ARMOR_RANGED_POLICIES.stubrevolver
+	end
+
+	if has_keyword(weapon_template, "heavystubber") then
+		return ANTI_ARMOR_RANGED_POLICIES.heavystubber
 	end
 
 	return nil
@@ -645,5 +704,7 @@ return {
 	_find_aim_fire_input = find_aim_fire_input,
 	_find_aim_action_for_fire = find_aim_action_for_fire,
 	close_range_ranged_policy = close_range_ranged_policy,
+	anti_armor_ranged_policy = anti_armor_ranged_policy,
+	supports_weakspot_aim = should_inject_weakspot_aim,
 	_should_inject_weakspot_aim = should_inject_weakspot_aim,
 }

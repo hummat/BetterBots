@@ -156,6 +156,8 @@ Set in `BotBehaviorExtension._init_blackboard_components` from `extension_init_d
 
 `BotTargetSelection.allowed_ranged_target` checks if the ranged gestalt weight for a breed is `-math.huge`. If so, the target is completely disallowed for ranged engagement. This is a hard filter applied by the shoot action.
 
+BetterBots `target_type_hysteresis.lua` adds one narrow override after vanilla scoring: when the bot's secondary weapon is in an explicit anti-armor ranged family (plasma, bolter/bolt pistol, helbore, stub revolver, heavy stubber), and the target is a Mauler/Bulwark/Crusher at that family's policy distance, the ranged score is lifted above melee. This exists because vanilla `killshot` gives those armored melee elites `-5` ranged weight, which otherwise keeps Maulers melee-classified even at 20-30m despite weapons such as plasma and bolters being effective into armored targets.
+
 ---
 
 ## 4. Threat Assessment

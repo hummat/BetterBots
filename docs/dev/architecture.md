@@ -191,7 +191,9 @@ This mod targets bot ability activation in three paths:
     - hooks `BotPerceptionExtension._update_target_enemy` after vanilla target selection writes `perception_component`, leaving BT and weapon actions untouched
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
+    - when the bot has an explicit anti-armor secondary family (plasma, bolter/bolt pistol, helbore, stub revolver, heavy stubber), lifts the ranged score above melee for Mauler/Bulwark/Crusher targets at that family's policy distance so vanilla `killshot`'s `-5` armored-elite ranged weight does not force a long melee chase
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
+    - logs `anti-armor ranged family kept ranged target type ...` when the anti-armor target-type lift fires
 31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module

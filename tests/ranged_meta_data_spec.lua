@@ -215,6 +215,69 @@ describe("ranged_meta_data", function()
 		end)
 	end)
 
+	describe("anti_armor_ranged_policy", function()
+		it("covers ranged families with local anti-armor evidence", function()
+			local cases = {
+				{
+					family = "plasmagun",
+					template = { name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+					min_distance_sq = 100,
+				},
+				{
+					family = "bolter",
+					template = { name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "boltpistol",
+					template = { name = "boltpistol_p1_m1", keywords = { "ranged", "boltpistol", "p1" } },
+					min_distance_sq = 100,
+				},
+				{
+					family = "lasgun_p2",
+					template = { name = "lasgun_p2_m1", keywords = { "ranged", "lasgun", "p2" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "stubrevolver",
+					template = { name = "stubrevolver_p1_m2", keywords = { "ranged", "stub_pistol", "p1" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "heavystubber",
+					template = {
+						name = "ogryn_heavystubber_p2_m2",
+						keywords = { "ranged", "heavystubber", "p2" },
+					},
+					min_distance_sq = 144,
+				},
+			}
+
+			for i = 1, #cases do
+				local case = cases[i]
+				local policy = RangedMetaData.anti_armor_ranged_policy(case.template)
+
+				assert.equals(case.family, policy.family)
+				assert.equals(case.min_distance_sq, policy.min_target_distance_sq)
+			end
+		end)
+
+		it("does not treat generic weakspot-capable guns as anti-armor ranged families", function()
+			local excluded = {
+				{ name = "lasgun_p1_m1", keywords = { "ranged", "lasgun", "p1" } },
+				{ name = "lasgun_p3_m1", keywords = { "ranged", "lasgun", "p3" } },
+				{ name = "autogun_p1_m1", keywords = { "ranged", "autogun", "p1" } },
+				{ name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+				{ name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				{ name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+			}
+
+			for i = 1, #excluded do
+				assert.is_nil(RangedMetaData.anti_armor_ranged_policy(excluded[i]))
+			end
+		end)
+	end)
+
 	describe("find_fire_input", function()
 		it("finds single action_one_pressed input", function()
 			local t = make_ranged_template({

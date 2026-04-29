@@ -3,6 +3,11 @@ local M = {}
 local MARGIN_FACTOR = 0.10 -- Score difference must exceed this fraction of max to flip type
 local MOMENTUM_FACTOR = 0.05 -- Bonus added to current type's score to resist flipping
 local REEVALUATION_INTERVAL_S = 0.3 -- Matches vanilla target reevaluation period
+local ANTI_ARMOR_RANGED_TARGET_BREEDS = {
+	chaos_ogryn_bulwark = true,
+	chaos_ogryn_executor = true,
+	renegade_executor = true,
+}
 
 local _mod
 local _debug_log
@@ -14,6 +19,7 @@ local _bot_slot_for_unit
 local _bot_target_selection
 local _breed
 local _player_unit_visual_loadout
+local _anti_armor_ranged_policy
 local _close_range_ranged_policy
 local _warned_errors = {}
 local BOT_PERCEPTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
@@ -99,6 +105,29 @@ local function _calculate_ranged_score(
 	return score
 end
 
+local function _secondary_weapon_template(unit)
+	local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
+	local visual_loadout_api = visual_loadout_extension and _visual_loadout_api() or nil
+
+	return visual_loadout_api
+		and visual_loadout_api.weapon_template_from_slot
+		and visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, "slot_secondary")
+end
+
+local function _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template)
+	local breed_name = target_breed and target_breed.name
+	if ANTI_ARMOR_RANGED_TARGET_BREEDS[breed_name] ~= true or target_distance_sq == nil then
+		return nil
+	end
+
+	local policy = _anti_armor_ranged_policy and _anti_armor_ranged_policy(weapon_template) or nil
+	if not (policy and policy.min_target_distance_sq) then
+		return nil
+	end
+
+	return target_distance_sq >= policy.min_target_distance_sq and policy or nil
+end
+
 local function _calculate_score(
 	unit,
 	target_unit,
@@ -118,25 +147,38 @@ local function _calculate_score(
 	local ranged_score = common_score
 		+ _calculate_ranged_score(unit, target_unit, ranged_gestalt, target_breed, target_distance_sq, threat_units)
 
-	local policy
-	if _close_range_ranged_policy and target_distance_sq ~= nil then
-		local visual_loadout_extension = ScriptUnit.has_extension(unit, "visual_loadout_system")
-		local visual_loadout_api = visual_loadout_extension and _visual_loadout_api() or nil
-		local weapon_template = visual_loadout_api
-			and visual_loadout_api.weapon_template_from_slot
-			and visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, "slot_secondary")
+	local policy = nil
+	local weapon_template
+	if (_close_range_ranged_policy or _anti_armor_ranged_policy) and target_distance_sq ~= nil then
+		weapon_template = _secondary_weapon_template(unit)
+	end
 
-		policy = weapon_template and _close_range_ranged_policy(weapon_template) or nil
+	if _close_range_ranged_policy and target_distance_sq ~= nil then
+		local close_range_policy = weapon_template and _close_range_ranged_policy(weapon_template) or nil
 
 		if
-			policy
-			and policy.hold_ranged_target_distance_sq
-			and target_distance_sq <= policy.hold_ranged_target_distance_sq
+			close_range_policy
+			and close_range_policy.hold_ranged_target_distance_sq
+			and target_distance_sq <= close_range_policy.hold_ranged_target_distance_sq
 			and ranged_score <= melee_score
 		then
 			local scale = _max3(_abs(melee_score), _abs(ranged_score), 1)
 			ranged_score = melee_score + scale * 0.25 + 1
+			policy = policy or {}
+			policy.close_range_ranged_family = close_range_policy.family
 		end
+	end
+
+	local anti_armor_policy = _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template)
+	if anti_armor_policy then
+		if ranged_score <= melee_score then
+			local scale = _max3(_abs(melee_score), _abs(ranged_score), 1)
+			ranged_score = melee_score + scale * 0.25 + 1
+		end
+
+		policy = policy or {}
+		policy.anti_armor_ranged_breed = target_breed.name
+		policy.anti_armor_ranged_family = anti_armor_policy.family
 	end
 
 	return melee_score, ranged_score, policy
@@ -253,7 +295,9 @@ local function _collect_stabilized_choice(
 			suppressed_raw_flip = analysis.suppressed_raw_flip,
 			melee_score = best_melee_score,
 			ranged_score = best_ranged_score,
-			close_range_ranged_family = best_ranged_policy and best_ranged_policy.family or nil,
+			close_range_ranged_family = best_ranged_policy and best_ranged_policy.close_range_ranged_family or nil,
+			anti_armor_ranged_breed = best_ranged_policy and best_ranged_policy.anti_armor_ranged_breed or nil,
+			anti_armor_ranged_family = best_ranged_policy and best_ranged_policy.anti_armor_ranged_family or nil,
 		}
 	end
 
@@ -297,7 +341,9 @@ local function _collect_stabilized_choice(
 			suppressed_raw_flip = analysis.suppressed_raw_flip,
 			melee_score = melee_score,
 			ranged_score = ranged_score,
-			close_range_ranged_family = ranged_policy and ranged_policy.family or nil,
+			close_range_ranged_family = ranged_policy and ranged_policy.close_range_ranged_family or nil,
+			anti_armor_ranged_breed = ranged_policy and ranged_policy.anti_armor_ranged_breed or nil,
+			anti_armor_ranged_family = ranged_policy and ranged_policy.anti_armor_ranged_family or nil,
 		}
 	end
 
@@ -313,6 +359,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_close_range_ranged_policy = deps.close_range_ranged_policy
+	_anti_armor_ranged_policy = deps.anti_armor_ranged_policy
 end
 
 function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
@@ -528,6 +575,27 @@ function M.post_update_target_enemy(
 				_fixed_time and _fixed_time() or t or 0,
 				"close-range ranged family kept ranged target type (family="
 					.. tostring(stabilized.close_range_ranged_family)
+					.. ", distance="
+					.. string.format("%.2f", stabilized.target_enemy_distance or 0)
+					.. ")",
+				nil,
+				"debug"
+			)
+		end
+
+		if
+			stabilized.anti_armor_ranged_breed
+			and stabilized.target_enemy_type == "ranged"
+			and _debug_enabled
+			and _debug_enabled()
+		then
+			_debug_log(
+				"anti_armor_ranged_target:" .. tostring(self_unit),
+				_fixed_time and _fixed_time() or t or 0,
+				"anti-armor ranged family kept ranged target type (family="
+					.. tostring(stabilized.anti_armor_ranged_family)
+					.. ", breed="
+					.. tostring(stabilized.anti_armor_ranged_breed)
 					.. ", distance="
 					.. string.format("%.2f", stabilized.target_enemy_distance or 0)
 					.. ")",
