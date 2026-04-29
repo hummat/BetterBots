@@ -180,3 +180,10 @@ Planning artifacts for `#80`:
 - Plan: `docs/superpowers/plans/2026-04-08-grenade-blitz-tactical-evaluator.md`
 
 See `docs/dev/roadmap.md` for full batch details.
+
+## Post-v1.0 Continuation (2026-04-29)
+
+- `#108` remains the top validation target: cold-boot Solo Play proof should show `human_revive_priority:<bot>:<human>` quickly after a human knockdown, followed by the assigned bot pathing into vanilla revive range.
+- `#17` still needs a daemonhost first-action line with `stage=<N> aggro_state=<state> dormant=<bool>` to decide whether the current branch closes the issue or needs another dormant-classifier fix.
+- `#106` first perf slice is code-complete in `0e8390a`: grenade/blitz idle fallback misses are cadence-limited to 0.15s. Next proof is a mission-end `bb-perf:auto:` comparison.
+- `#100` first harness slice is code-complete in `7d16686`: `/bb_scenario` can spawn `poxburster_push`, `crusher_pack`, and `mauler_weakspot`, emit JSONL scenario rows, and clear tracked spawned units. Next proof is a live Solo Play spawn/clear smoke test.

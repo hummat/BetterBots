@@ -228,8 +228,8 @@ Use this as the execution map, not as a replacement for issue acceptance criteri
 |---|---|---|---|
 | R1 | `#108` Human revive priority | Needs testing | Code-complete 2026-04-28: `revive_ability.lua` now assigns the nearest live bot to a knocked-down human at the pre-BT destination-verification seam, forces `revive_with_urgent_target`, and refreshes movement so vanilla ally-aid pathing outranks urgent/priority enemy pathing. Needs cold-boot Solo Play validation with debug logs. |
 | R2 | `#17` Daemonhost avoidance | Validate/fix | Rage-quit class failure. Decisive first-action `stage`/`aggro_state` text logging was added on 2026-04-28; next daemonhost run should either close this or expose the remaining dormant-state classifier gap. |
-| R3 | `#106` Perf cap miss | Implement | Every future feature inherits this cost. Start with grenade fallback idle cadence, then context augmentation caching if needed. |
-| R4 | `#100` Scenario validation harness | Implement | High developer ROI. A narrow `/bb_scenario` MVP would turn daemonhost, revive, poxburster, grenade, and weakspot claims into repeatable checks. |
+| R3 | `#106` Perf cap miss | Needs testing | First slice landed 2026-04-29: grenade/blitz idle fallback misses are cadence-limited to 0.15s so repeated no-op heuristic/context work stops dominating quiet frames, while active throw stages remain immediate. Needs a live mission-end `bb-perf:auto:` comparison; if still over cap, inspect context augmentation caching next. |
+| R4 | `#100` Scenario validation harness | Needs testing | First `/bb_scenario` MVP landed 2026-04-29 with `poxburster_push`, `crusher_pack`, and `mauler_weakspot`, JSONL `scenario_*` events, `bb-log events scenarios`, and `/bb_scenario_clear` tracked-unit cleanup. Needs live Solo Play spawn/clear proof before using it as validation infrastructure. |
 | R5 | `#96` Smart-tag item bridge | Validate | User-visible command path; current blocker is positive live evidence, not architecture. Confirm `smart-tag pickup routed ...` after the liveness fix. |
 | R6 | `#43` Voidblast p1 charged fire | Validate/fix | Narrow Psyker build payoff. Close only after `voidblast anchor locked` plus `voidblast charged fire override` or real `trigger_explosion` evidence. |
 | R7 | `#92` Per-breed weakspot aim | Validate/limit | Validate Mauler spine first. Keep Crusher/Bulwark expansion deferred until rig/node evidence is real. |
@@ -237,7 +237,7 @@ Use this as the execution map, not as a replacement for issue acceptance criteri
 | R9 | `#41` Weapon/enemy-aware ranged behavior | Implement slices | High potential but broad. Keep family-scoped after perf/harness; avoid a general fire-control rewrite. |
 | R10 | `#107` Barrel avoidance | Validate first | Likely vanilla already handles triggered-barrel AoE threats. Instrument and patch only a proven gap. |
 
-Lower ROI for now: `#80` and `#22` are architectural and should wait for `#100`; `#86` is cool but less important than `#108`; broad `#24`, `#28`, and `#84` carry support and UX burden; `#8` is DLC-gated.
+Lower ROI for now: `#80` and `#22` are architectural and should wait until the `#100` harness is live-proven; `#86` is cool but less important than `#108`; broad `#24`, `#28`, and `#84` carry support and UX burden; `#8` is DLC-gated.
 
 **Broad-scope cuts (scope-exit, captured under parent issues):**
 
