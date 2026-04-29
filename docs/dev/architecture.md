@@ -70,7 +70,7 @@ This mod targets bot ability activation in three paths:
     - blocks ability activation when `blackboard.behavior.current_interaction_unit ~= nil`
     - applied in both BT condition hook and fallback path (after in-progress state machines)
 13a. Human revive priority (#108, via `revive_ability.lua`):
-    - hook `BotBehaviorExtension._verify_target_ally_aid_destination` (post-process): before BT evaluation and movement refresh, detects knocked-down human units on the bot side and assigns the nearest live bot as the urgent reviver
+    - hook `BotBehaviorExtension._verify_target_ally_aid_destination` (post-process): before BT evaluation and movement refresh, detects knocked-down human units on the bot side and assigns the nearest live bot as the urgent reviver, with a short per-human owner lease so close bots do not churn the assignment every frame
     - writes the vanilla revive seam instead of replacing the BT node: `perception.target_ally`, `target_ally_needs_aid`, `target_ally_need_type = "knocked_down"`, `behavior.revive_with_urgent_target = true`, and `follow.needs_destination_refresh = true`
     - lets vanilla `_refresh_destination()` compute `target_ally_aid_destination` and `can_revive` perform the final interaction check; stale assignments clear when the human stands up, dies, or the setting is disabled
     - exposed through `enable_human_revive_priority` and logs `human_revive_priority:<bot>:<human>` when debug logging is enabled

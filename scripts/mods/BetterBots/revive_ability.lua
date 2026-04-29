@@ -21,6 +21,7 @@ local _combat_ability_identity
 
 local INTERACT_ACTION_PATCH_SENTINEL = "__bb_revive_ability_installed"
 local _human_revive_priority_by_bot = setmetatable({}, { __mode = "k" })
+local _human_revive_owner_by_target = setmetatable({}, { __mode = "k" })
 
 local RESCUE_INTERACTION_TYPES = {
 	revive = true,
@@ -35,6 +36,8 @@ local RESCUE_NEED_TYPES = {
 	ledge = true,
 	hogtied = true,
 }
+
+local HUMAN_REVIVE_OWNER_LEASE = 3
 
 local M = {}
 
@@ -120,6 +123,10 @@ local function _distance(a, b)
 	return math.sqrt(dx * dx + dy * dy + dz * dz)
 end
 
+local function _now()
+	return _fixed_time and _fixed_time() or 0
+end
+
 local function _character_state(unit)
 	local unit_data_extension = ScriptUnit
 		and ScriptUnit.has_extension
@@ -184,6 +191,10 @@ local function _clear_human_revive_priority(unit, behavior_component, perception
 	end
 
 	_human_revive_priority_by_bot[unit] = nil
+	local lease = _human_revive_owner_by_target[previous_target]
+	if lease and lease.unit == unit then
+		_human_revive_owner_by_target[previous_target] = nil
+	end
 	if behavior_component then
 		behavior_component.revive_with_urgent_target = false
 	end
@@ -198,6 +209,37 @@ local function _clear_human_revive_priority(unit, behavior_component, perception
 	end
 
 	return true
+end
+
+local function _active_human_revive_owner(target_human)
+	local lease = _human_revive_owner_by_target[target_human]
+	if not lease then
+		return nil
+	end
+
+	if not (_unit_alive(target_human) and _is_knocked_down(target_human)) then
+		_human_revive_owner_by_target[target_human] = nil
+		return nil
+	end
+
+	if not _unit_alive(lease.unit) then
+		_human_revive_owner_by_target[target_human] = nil
+		return nil
+	end
+
+	if _now() > lease.expires_at then
+		_human_revive_owner_by_target[target_human] = nil
+		return nil
+	end
+
+	return lease.unit
+end
+
+local function _claim_human_revive_owner(unit, target_human)
+	_human_revive_owner_by_target[target_human] = {
+		unit = unit,
+		expires_at = _now() + HUMAN_REVIVE_OWNER_LEASE,
+	}
 end
 
 function M.apply_human_revive_priority(self, unit)
@@ -218,9 +260,16 @@ function M.apply_human_revive_priority(self, unit)
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	end
 
-	local nearest_bot = _nearest_bot_to(target_human, self and self._bot_group, unit)
-	if nearest_bot ~= unit then
+	local owner = _active_human_revive_owner(target_human)
+	if owner and owner ~= unit then
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	end
+
+	if not owner then
+		local nearest_bot = _nearest_bot_to(target_human, self and self._bot_group, unit)
+		if nearest_bot ~= unit then
+			return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+		end
 	end
 
 	perception_component.target_ally = target_human
@@ -238,6 +287,7 @@ function M.apply_human_revive_priority(self, unit)
 	end
 
 	_human_revive_priority_by_bot[unit] = target_human
+	_claim_human_revive_owner(unit, target_human)
 
 	if _debug_enabled and _debug_enabled() then
 		local reason = human_count == 1 and "mission_critical" or "human_priority"
