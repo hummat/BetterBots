@@ -135,7 +135,7 @@ case "$cmd" in
 						;;
 					scenarios)
 						echo "=== Scenario events ==="
-						jq -r 'select(.event | startswith("scenario_")) | "\(.t) \(.event) scenario=\(.scenario // "-") status=\(.status // "-") breed=\(.breed // "-") reason=\(.reason // "-") run=\(.run_id // "-")"' "$events_file"
+						jq -r 'select(.event | startswith("scenario_")) | "\(.t) \(.event) scenario=\(.scenario // "-") status=\(.status // "-") breed=\(.breed // "-") reason=\(.reason // "-") distance=\(.requested_distance // .forward_distance // "-") count=\(.requested_count // .repeat_count // "-") repeat=\(.repeat_index // "-") run=\(.run_id // "-")"' "$events_file"
 						;;
 					*)
 						echo "Unknown events subcommand: $events_cmd"

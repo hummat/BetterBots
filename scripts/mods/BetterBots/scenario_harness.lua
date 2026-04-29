@@ -4,15 +4,16 @@ local M = {}
 local _mod
 local _event_log
 local _fixed_time
+local _debug
 local _spawned_units = {}
 
 local ENEMY_SIDE_ID = 2
 
 local SCENARIOS = {
 	poxburster_push = {
-		description = "spawn one aggroed poxburster 8m ahead",
+		description = "spawn one aggroed poxburster near a bot",
 		spawns = {
-			{ breed = "chaos_poxwalker_bomber", forward = 8 },
+			{ breed = "chaos_poxwalker_bomber", forward = 3, anchor = "bot" },
 		},
 		expect = {
 			"pushing poxburster",
@@ -66,19 +67,79 @@ local function _now()
 	return _fixed_time and _fixed_time() or 0
 end
 
-local function _first_arg(...)
+local function _parse_command_args(...)
 	local count = select("#", ...)
 	if count == 0 then
-		return nil
+		return nil, {}
 	end
 
 	local raw = select(1, ...)
 	if raw == nil then
+		return nil, {}
+	end
+
+	local tokens = {}
+	for i = 1, count do
+		raw = select(i, ...)
+		if raw ~= nil then
+			for token in tostring(raw):gmatch("%S+") do
+				tokens[#tokens + 1] = token
+			end
+		end
+	end
+
+	return tokens[1], {
+		distance = tonumber(tokens[2]),
+		count = tonumber(tokens[3]),
+	}
+end
+
+local function _clamp_number(value, default, min_value, max_value)
+	local number = tonumber(value)
+	if not number then
+		return default
+	end
+	if number < min_value then
+		return min_value
+	end
+	if number > max_value then
+		return max_value
+	end
+
+	return number
+end
+
+local function _spawn_repeat_count(options)
+	return math.floor(_clamp_number(options and options.count, 1, 1, 12))
+end
+
+local function _spawn_forward(spawn, options)
+	return _clamp_number(options and options.distance, spawn.forward, 2, 80)
+end
+
+local function _spawn_right(spawn, repeat_index, repeat_count)
+	local base_right = spawn.right or 0
+	if repeat_count <= 1 then
+		return base_right
+	end
+
+	return base_right + (repeat_index - (repeat_count + 1) / 2) * 2
+end
+
+local function _alive_bot_unit()
+	local bots = _debug and _debug.collect_alive_bots and _debug.collect_alive_bots() or nil
+	if not bots then
 		return nil
 	end
 
-	local text = tostring(raw)
-	return text:match("^%s*(%S+)")
+	for i = 1, #bots do
+		local unit = bots[i] and bots[i].unit
+		if unit and Unit and Unit.alive and Unit.alive(unit) then
+			return unit
+		end
+	end
+
+	return nil
 end
 
 local function _is_server()
@@ -128,10 +189,10 @@ local function _relative_position(origin, rotation, forward_distance, right_dist
 	)
 end
 
-local function _spawn_params(player_unit, spawn)
+local function _spawn_params(target_unit, spawn)
 	return {
 		optional_aggro_state = spawn.aggro_state or "aggroed",
-		optional_target_unit = player_unit,
+		optional_target_unit = target_unit,
 		optional_health_modifier = spawn.health_modifier,
 	}
 end
@@ -165,7 +226,7 @@ local function _clear_spawned(reason)
 	return true
 end
 
-local function _run_scenario(name)
+local function _run_scenario(name, options)
 	local scenario = SCENARIOS[name]
 	if not scenario then
 		_echo("BetterBots: unknown scenario '" .. tostring(name) .. "'")
@@ -194,6 +255,7 @@ local function _run_scenario(name)
 	local fixed_t = _now()
 	local run_id = name .. ":" .. tostring(math.floor(fixed_t * 1000))
 	local spawned_count = 0
+	local repeat_count = _spawn_repeat_count(options)
 
 	_emit({
 		t = fixed_t,
@@ -201,20 +263,29 @@ local function _run_scenario(name)
 		scenario = name,
 		run_id = run_id,
 		expect = scenario.expect,
+		requested_distance = options and options.distance,
+		requested_count = options and options.count,
+		repeat_count = repeat_count,
 	})
 
 	for i = 1, #scenario.spawns do
 		local spawn = scenario.spawns[i]
 		local breed_name = spawn.breed
-		do
-			local position = _relative_position(origin, player_rotation, spawn.forward, spawn.right)
-			local rotation = Quaternion.identity and Quaternion.identity() or player_rotation
+		local anchor_unit = spawn.anchor == "bot" and _alive_bot_unit() or player_unit
+		local target_unit = anchor_unit or player_unit
+		local spawn_origin = target_unit ~= player_unit and Unit.local_position(target_unit, 1) or origin
+		local spawn_rotation = target_unit ~= player_unit and Unit.local_rotation(target_unit, 1) or player_rotation
+		local forward_distance = _spawn_forward(spawn, options)
+		for repeat_i = 1, repeat_count do
+			local right_distance = _spawn_right(spawn, repeat_i, repeat_count)
+			local position = _relative_position(spawn_origin, spawn_rotation, forward_distance, right_distance)
+			local rotation = Quaternion.identity and Quaternion.identity() or spawn_rotation
 			local unit = minion_spawner:spawn_minion(
 				breed_name,
 				position,
 				rotation,
 				spawn.side_id or ENEMY_SIDE_ID,
-				_spawn_params(player_unit, spawn)
+				_spawn_params(target_unit, spawn)
 			)
 			if unit then
 				spawned_count = spawned_count + 1
@@ -228,6 +299,12 @@ local function _run_scenario(name)
 					unit = tostring(unit),
 					side_id = spawn.side_id or ENEMY_SIDE_ID,
 					index = i,
+					repeat_index = repeat_i,
+					repeat_count = repeat_count,
+					forward_distance = forward_distance,
+					right_distance = right_distance,
+					anchor = spawn.anchor,
+					target_unit = tostring(target_unit),
 				})
 			else
 				_emit({
@@ -249,6 +326,7 @@ local function _run_scenario(name)
 		run_id = run_id,
 		status = spawned_count > 0 and "spawned" or "failed",
 		spawned = spawned_count,
+		repeat_count = repeat_count,
 	})
 	_echo("BetterBots: scenario " .. name .. " spawned " .. tostring(spawned_count) .. " unit(s)")
 
@@ -269,6 +347,7 @@ function M.init(deps)
 	_mod = deps.mod
 	_event_log = deps.event_log
 	_fixed_time = deps.fixed_time
+	_debug = deps.debug
 	_spawned_units = {}
 end
 
@@ -279,19 +358,25 @@ function M.register_commands()
 	_mod:command("bb_scenario_clear", "Despawn units spawned by BetterBots validation scenarios", function()
 		_clear_spawned("manual")
 	end)
-	_mod:command("bb_scenario", "Run a BetterBots validation scenario: /bb_scenario <name>", function(...)
-		local name = _first_arg(...)
-		if not name then
-			_echo("BetterBots: usage: /bb_scenario <" .. table.concat(SCENARIO_ORDER, "|") .. ">")
-			return
-		end
+	_mod:command(
+		"bb_scenario",
+		"Run a BetterBots validation scenario: /bb_scenario <name> [distance] [count]",
+		function(...)
+			local name, options = _parse_command_args(...)
+			if not name then
+				_echo(
+					"BetterBots: usage: /bb_scenario <" .. table.concat(SCENARIO_ORDER, "|") .. "> [distance] [count]"
+				)
+				return
+			end
 
-		_run_scenario(name)
-	end)
+			_run_scenario(name, options)
+		end
+	)
 end
 
-function M.run(name)
-	return _run_scenario(name)
+function M.run(name, options)
+	return _run_scenario(name, options)
 end
 
 function M.clear()

@@ -373,9 +373,9 @@ Analysis via `bb-log events [summary|rules|holds|items|scenarios|trace|raw]`. Se
 
 ## Scripted validation scenarios
 
-`scenario_harness.lua` registers `/bb_scenarios`, `/bb_scenario <name>`, and `/bb_scenario_clear` for controlled live validation runs. The harness is only available while the local client is the server and `Managers.state.minion_spawn` is ready.
+`scenario_harness.lua` registers `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear` for controlled live validation runs. The harness is only available while the local client is the server and `Managers.state.minion_spawn` is ready.
 
-It uses the same raw spawn path as Creature Spawner: `Managers.state.minion_spawn:spawn_minion(breed_name, position, rotation, side_id, spawn_params)`, with `optional_aggro_state = "aggroed"` and `optional_target_unit` set to the local player unit. The MVP scenarios are `poxburster_push`, `crusher_pack`, and `mauler_weakspot`.
+It uses the same raw spawn path as Creature Spawner: `Managers.state.minion_spawn:spawn_minion(breed_name, position, rotation, side_id, spawn_params)`, with `optional_aggro_state = "aggroed"` and `optional_target_unit` set to the scenario anchor. Most scenarios anchor on the local player; `poxburster_push` anchors on the first live bot when available so the burster targets a bot rather than the player.
 
 Each run emits `scenario_start`, `scenario_spawn`, `scenario_spawn_failed`, `scenario_result`, and `scenario_clear` JSONL events. Inspect them with `bb-log events scenarios`.
 

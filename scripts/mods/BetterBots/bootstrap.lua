@@ -286,6 +286,7 @@ function M.load_and_init(ctx)
 		mod = mod,
 		event_log = EventLog,
 		fixed_time = ctx.fixed_time,
+		debug = Debug,
 	})
 
 	ChargeTracker.init({

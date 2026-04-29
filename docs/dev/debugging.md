@@ -210,11 +210,13 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
-6. `/bb_scenarios`, `/bb_scenario <name>`, and `/bb_scenario_clear`
+6. `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear`
    - Lists and runs scripted validation spawns for live Solo Play testing.
    - Built-in scenarios: `poxburster_push`, `crusher_pack`, `mauler_weakspot`.
+   - Optional `distance` overrides the forward spawn distance in meters; optional `count` repeats each scenario spawn and spreads copies sideways.
+   - `poxburster_push` spawns near the first live bot and targets that bot when possible; if no live bot can be resolved, it falls back to the local player.
    - `/bb_scenario_clear` despawns units created by the scenario harness via `MinionSpawnManager:despawn_minion`.
-   - Scenario start/spawn/result rows go to JSONL and are summarized by `bb-log events scenarios`.
+   - Scenario start/spawn/result rows go to JSONL with requested and resolved distance/count fields and are summarized by `bb-log events scenarios`.
 
 ### Practical debug workflow
 

@@ -9,6 +9,8 @@ local _events
 local _spawns
 local _despawns
 local _mock_time
+local _bot_unit
+local _bot_alive
 
 local function vec(x, y, z)
 	return { x = x, y = y, z = z }
@@ -27,6 +29,8 @@ local function reset()
 	_spawns = {}
 	_despawns = {}
 	_mock_time = 12.5
+	_bot_unit = "bot_unit"
+	_bot_alive = true
 
 	_G.Breeds = {
 		chaos_poxwalker_bomber = true,
@@ -71,17 +75,20 @@ local function reset()
 	}
 	_G.Unit = {
 		local_position = function(unit, node)
-			assert.equals("player_unit", unit)
 			assert.equals(1, node)
+			if unit == _bot_unit then
+				return vec(14, 20, 3)
+			end
+			assert.equals("player_unit", unit)
 			return vec(10, 20, 3)
 		end,
 		local_rotation = function(unit, node)
-			assert.equals("player_unit", unit)
 			assert.equals(1, node)
+			assert.is_true(unit == "player_unit" or unit == _bot_unit)
 			return "player_rotation"
 		end,
 		alive = function(unit)
-			return unit == "player_unit" or unit:find("^spawned_") ~= nil
+			return unit == "player_unit" or (unit == _bot_unit and _bot_alive) or unit:find("^spawned_") ~= nil
 		end,
 	}
 	_G.Quaternion = {
@@ -118,6 +125,13 @@ local function reset()
 		fixed_time = function()
 			return _mock_time
 		end,
+		debug = {
+			collect_alive_bots = function()
+				return {
+					{ unit = _bot_unit },
+				}
+			end,
+		},
 	})
 end
 
@@ -163,8 +177,8 @@ describe("scenario_harness", function()
 		assert.equals("chaos_poxwalker_bomber", _spawns[1].breed_name)
 		assert.equals(2, _spawns[1].side_id)
 		assert.equals("aggroed", _spawns[1].spawn_params.optional_aggro_state)
-		assert.equals("player_unit", _spawns[1].spawn_params.optional_target_unit)
-		assert_vec(vec(18, 20, 3), _spawns[1].position)
+		assert.equals(_bot_unit, _spawns[1].spawn_params.optional_target_unit)
+		assert_vec(vec(17, 20, 3), _spawns[1].position)
 
 		assert.equals("scenario_start", _events[1].event)
 		assert.equals("poxburster_push", _events[1].scenario)
@@ -173,6 +187,98 @@ describe("scenario_harness", function()
 		assert.equals("chaos_poxwalker_bomber", _events[2].breed)
 		assert.equals("BetterBots: scenario poxburster_push spawned 1 unit(s)", _echoes[#_echoes])
 	end)
+
+	it("falls back to the local player for poxburster spawns when no live bot is available", function()
+		_bot_alive = false
+
+		ScenarioHarness.run("poxburster_push")
+
+		assert.equals("player_unit", _spawns[1].spawn_params.optional_target_unit)
+		assert_vec(vec(13, 20, 3), _spawns[1].position)
+	end)
+
+	it("can repeat mauler weakspot spawns at a caller-selected distance", function()
+		ScenarioHarness.run("mauler_weakspot", { distance = 24, count = 3 })
+
+		assert.equals(3, #_spawns)
+		for i = 1, 3 do
+			assert.equals("renegade_executor", _spawns[i].breed_name)
+			assert.equals(34, _spawns[i].position.x)
+			assert.equals(3, _spawns[i].position.z)
+		end
+		assert.equals(18, _spawns[1].position.y)
+		assert.equals(20, _spawns[2].position.y)
+		assert.equals(22, _spawns[3].position.y)
+		assert.equals(3, _events[#_events].spawned)
+		assert.equals(3, _events[#_events].repeat_count)
+		assert.equals("BetterBots: scenario mauler_weakspot spawned 3 unit(s)", _echoes[#_echoes])
+	end)
+
+	it("parses bb_scenario distance and count arguments", function()
+		ScenarioHarness.register_commands()
+
+		_commands.bb_scenario.callback("mauler_weakspot 18 2")
+
+		assert.equals(2, #_spawns)
+		assert.equals(28, _spawns[1].position.x)
+		assert.equals(19, _spawns[1].position.y)
+		assert.equals(21, _spawns[2].position.y)
+	end)
+
+	it("parses bb_scenario distance and count when DMF passes arguments separately", function()
+		ScenarioHarness.register_commands()
+
+		_commands.bb_scenario.callback("mauler_weakspot", "30", "4")
+
+		assert.equals(4, #_spawns)
+		assert.equals(40, _spawns[1].position.x)
+		assert.equals(17, _spawns[1].position.y)
+		assert.equals(23, _spawns[4].position.y)
+		assert.equals(30, _events[1].requested_distance)
+		assert.equals(4, _events[1].requested_count)
+		assert.equals(4, _events[1].repeat_count)
+		assert.equals(30, _events[2].forward_distance)
+		assert.equals(4, _events[2].repeat_count)
+	end)
+
+	for _, case in ipairs({
+		{
+			name = "poxburster_push",
+			spawn_count = 2,
+			first_breed = "chaos_poxwalker_bomber",
+			first_x = 22,
+		},
+		{
+			name = "crusher_pack",
+			spawn_count = 6,
+			first_breed = "chaos_ogryn_executor",
+			first_x = 18,
+		},
+		{
+			name = "mauler_weakspot",
+			spawn_count = 2,
+			first_breed = "renegade_executor",
+			first_x = 18,
+		},
+	}) do
+		it("applies split distance and count arguments to " .. case.name, function()
+			ScenarioHarness.register_commands()
+
+			_commands.bb_scenario.callback(case.name, "8", "2")
+
+			assert.equals(case.spawn_count, #_spawns)
+			assert.equals(case.first_breed, _spawns[1].breed_name)
+			assert.equals(case.first_x, _spawns[1].position.x)
+			assert.equals(8, _events[1].requested_distance)
+			assert.equals(2, _events[1].requested_count)
+			assert.equals(2, _events[1].repeat_count)
+			assert.equals("scenario_spawn", _events[2].event)
+			assert.equals(8, _events[2].forward_distance)
+			assert.equals(2, _events[2].repeat_count)
+			assert.equals(case.spawn_count, _events[#_events].spawned)
+			assert.equals(2, _events[#_events].repeat_count)
+		end)
+	end
 
 	it("clears spawned scenario units and records teardown", function()
 		ScenarioHarness.run("poxburster_push")

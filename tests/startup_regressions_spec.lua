@@ -1187,6 +1187,7 @@ describe("startup regressions", function()
 
 		local scenario_init = find_named_call(harness.init_calls, "ScenarioHarness")
 		assert.equals(harness.modules.EventLog, scenario_init.deps.event_log)
+		assert.equals(harness.modules.Debug, scenario_init.deps.debug)
 
 		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
