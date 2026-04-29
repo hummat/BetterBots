@@ -3075,12 +3075,55 @@ describe("heuristics", function()
 				helper.make_context({
 					num_nearby = 4,
 					target_enemy = "gunner",
+					target_breed_name = "cultist_gunner",
 					target_is_elite_special = true,
 					target_enemy_distance = 7,
 				})
 			)
 			assert.is_true(result)
 			assert.matches("priority", rule)
+		end)
+
+		it("allows zealot throwing knives against berserker specials", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "netgunner",
+					target_breed_name = "renegade_netgunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds zealot throwing knives against super armor targets", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "mauler",
+					target_breed_name = "renegade_executor",
+					target_is_elite_special = true,
+					target_is_super_armor = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("super_armor", rule)
+		end)
+
+		it("holds zealot throwing knives against monsters", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "chaos_spawn",
+					target_is_monster = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("monster", rule)
 		end)
 
 		it("uses Smite on priority targets at safe peril", function()
@@ -4129,14 +4172,15 @@ describe("heuristics", function()
 	describe("dormant daemonhost carve-out (#17)", function()
 		-- Every template that uses the _grenade_priority_target dispatch or
 		-- the _grenade_assail monster fast-path. Each must refuse the decision
-		-- when target_is_dormant_daemonhost is true, and resume normal
-		-- self-defense when the DH has aggroed on this bot (flag=false).
+		-- when target_is_dormant_daemonhost is true. Most resume normal
+		-- self-defense when the DH has aggroed on this bot (flag=false);
+		-- Zealot knives still hold because their own policy blocks monsters.
 		describe("priority-target grenades/blitzes", function()
 			local priority_grenades = {
 				{ template = "psyker_smite", distance = 12, peril_pct = 0.30 },
 				{ template = "psyker_throwing_knives", distance = 10, peril_pct = 0.30 },
 				{ template = "veteran_krak_grenade", distance = 10 },
-				{ template = "zealot_throwing_knives", distance = 10 },
+				{ template = "zealot_throwing_knives", distance = 10, blocks_aggroed_monster = true },
 				{ template = "ogryn_grenade_friend_rock", distance = 12 },
 				{ template = "broker_missile_launcher", distance = 14 },
 			}
@@ -4171,6 +4215,11 @@ describe("heuristics", function()
 							peril_pct = grenade.peril_pct,
 						})
 					)
+					if grenade.blocks_aggroed_monster then
+						assert.is_false(result)
+						assert.matches("monster", rule)
+						return
+					end
 					assert.is_true(result)
 					if grenade.template == "psyker_smite" then
 						assert.matches("monster", rule)
