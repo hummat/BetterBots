@@ -43,12 +43,54 @@ local SCENARIOS = {
 			"weakspot override applied",
 		},
 	},
+	mixed_horde_pressure = {
+		description = "spawn mixed trash, melee, elite, ranged, and special pressure",
+		max_repeat = 2,
+		spawns = {
+			{ breed = "chaos_poxwalker", count = 10, forward = 11, right = -3 },
+			{ breed = "renegade_melee", count = 6, forward = 13, right = 3 },
+			{ breed = "renegade_executor", count = 2, forward = 16, right = 0 },
+			{ breed = "renegade_gunner", forward = 20, right = -4 },
+			{ breed = "renegade_grenadier", forward = 22, right = 4 },
+		},
+		expect = {
+			"fallback queued",
+			"grenade releasing toward",
+			"melee special prelude queued",
+			"type hold",
+		},
+	},
+	daemonhost_passive_near = {
+		description = "spawn one passive daemonhost without a forced target",
+		spawns = {
+			{ breed = "chaos_daemonhost", forward = 12, aggro_state = false, target = false },
+		},
+		expect = {
+			"skipped ping for chaos_daemonhost (reason: dormant_daemonhost)",
+			"melee suppressed (target is dormant daemonhost",
+			"ranged suppressed (target is dormant daemonhost",
+		},
+	},
+	daemonhost_aggroed_control = {
+		description = "spawn one aggroed daemonhost targeting the player",
+		spawns = {
+			{ breed = "chaos_daemonhost", forward = 18, aggro_state = "aggroed", target = "player" },
+		},
+		expect = {
+			"ability allowed against daemonhost",
+			"target=chaos_daemonhost",
+			"dormant=false",
+		},
+	},
 }
 
 local SCENARIO_ORDER = {
 	"poxburster_push",
 	"crusher_pack",
 	"mauler_weakspot",
+	"mixed_horde_pressure",
+	"daemonhost_passive_near",
+	"daemonhost_aggroed_control",
 }
 
 local function _echo(message)
@@ -109,8 +151,9 @@ local function _clamp_number(value, default, min_value, max_value)
 	return number
 end
 
-local function _spawn_repeat_count(options)
-	return math.floor(_clamp_number(options and options.count, 1, 1, 12))
+local function _spawn_repeat_count(options, scenario)
+	local max_repeat = scenario and scenario.max_repeat or 12
+	return math.floor(_clamp_number(options and options.count, 1, 1, max_repeat))
 end
 
 local function _spawn_forward(spawn, options)
@@ -190,11 +233,32 @@ local function _relative_position(origin, rotation, forward_distance, right_dist
 end
 
 local function _spawn_params(target_unit, spawn)
-	return {
-		optional_aggro_state = spawn.aggro_state or "aggroed",
-		optional_target_unit = target_unit,
+	local params = {
 		optional_health_modifier = spawn.health_modifier,
 	}
+	if spawn.aggro_state ~= false then
+		params.optional_aggro_state = spawn.aggro_state or "aggroed"
+	end
+	if spawn.target ~= false then
+		params.optional_target_unit = target_unit
+	end
+
+	return params
+end
+
+local function _spawn_count(spawn, repeat_count)
+	return math.floor(_clamp_number(spawn and spawn.count, 1, 1, 24)) * repeat_count
+end
+
+local function _spawn_anchor_unit(spawn, player_unit)
+	if spawn.target == false then
+		return nil
+	end
+	if spawn.anchor == "bot" then
+		return _alive_bot_unit() or player_unit
+	end
+
+	return player_unit
 end
 
 local function _clear_spawned(reason)
@@ -255,7 +319,7 @@ local function _run_scenario(name, options)
 	local fixed_t = _now()
 	local run_id = name .. ":" .. tostring(math.floor(fixed_t * 1000))
 	local spawned_count = 0
-	local repeat_count = _spawn_repeat_count(options)
+	local repeat_count = _spawn_repeat_count(options, scenario)
 
 	_emit({
 		t = fixed_t,
@@ -271,13 +335,16 @@ local function _run_scenario(name, options)
 	for i = 1, #scenario.spawns do
 		local spawn = scenario.spawns[i]
 		local breed_name = spawn.breed
-		local anchor_unit = spawn.anchor == "bot" and _alive_bot_unit() or player_unit
-		local target_unit = anchor_unit or player_unit
-		local spawn_origin = target_unit ~= player_unit and Unit.local_position(target_unit, 1) or origin
-		local spawn_rotation = target_unit ~= player_unit and Unit.local_rotation(target_unit, 1) or player_rotation
+		local anchor_unit = _spawn_anchor_unit(spawn, player_unit)
+		local target_unit = anchor_unit
+		local placement_unit = anchor_unit or player_unit
+		local spawn_origin = placement_unit ~= player_unit and Unit.local_position(placement_unit, 1) or origin
+		local spawn_rotation = placement_unit ~= player_unit and Unit.local_rotation(placement_unit, 1)
+			or player_rotation
 		local forward_distance = _spawn_forward(spawn, options)
-		for repeat_i = 1, repeat_count do
-			local right_distance = _spawn_right(spawn, repeat_i, repeat_count)
+		local per_spawn_count = _spawn_count(spawn, repeat_count)
+		for repeat_i = 1, per_spawn_count do
+			local right_distance = _spawn_right(spawn, repeat_i, per_spawn_count)
 			local position = _relative_position(spawn_origin, spawn_rotation, forward_distance, right_distance)
 			local rotation = Quaternion.identity and Quaternion.identity() or spawn_rotation
 			local unit = minion_spawner:spawn_minion(
@@ -300,7 +367,7 @@ local function _run_scenario(name, options)
 					side_id = spawn.side_id or ENEMY_SIDE_ID,
 					index = i,
 					repeat_index = repeat_i,
-					repeat_count = repeat_count,
+					repeat_count = per_spawn_count,
 					forward_distance = forward_distance,
 					right_distance = right_distance,
 					anchor = spawn.anchor,

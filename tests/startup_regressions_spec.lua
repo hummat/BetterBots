@@ -448,6 +448,15 @@ local function make_bootstrap_harness(module_overrides)
 			}
 		end,
 	})
+	modules.HazardAvoidance = make_runtime_module("HazardAvoidance", install_calls, {
+		install_hazard_prop_hooks = function(target)
+			record_install("HazardAvoidance", "install_hazard_prop_hooks", target)
+		end,
+		install_bot_group_hooks = function(target)
+			record_install("HazardAvoidance", "install_bot_group_hooks", target)
+		end,
+		on_bot_input_movement_updated = function() end,
+	})
 	modules.Perf = make_runtime_module("Perf", install_calls, {
 		begin = function()
 			return 0
@@ -673,6 +682,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
 		["BetterBots/scripts/mods/BetterBots/event_log"] = modules.EventLog,
 		["BetterBots/scripts/mods/BetterBots/scenario_harness"] = modules.ScenarioHarness,
+		["BetterBots/scripts/mods/BetterBots/hazard_avoidance"] = modules.HazardAvoidance,
 		["BetterBots/scripts/mods/BetterBots/perf"] = modules.Perf,
 		["BetterBots/scripts/mods/BetterBots/sprint"] = modules.Sprint,
 		["BetterBots/scripts/mods/BetterBots/melee_meta_data"] = modules.MeleeMetaData,
@@ -1058,6 +1068,10 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("SustainedFire%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find("Sprint%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/group/bot_group"', 1))
+		assert.is_truthy(source:find("HazardAvoidance%.install_bot_group_hooks%(", 1))
+		assert.is_truthy(
+			source:find('mod:hook_require%("scripts/extension_systems/hazard_prop/hazard_prop_extension"', 1)
+		)
 		assert.is_truthy(source:find("HealingDeferral%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
@@ -1210,6 +1224,7 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", {})
 		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
 		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
+		harness:invoke_hook_require("scripts/extension_systems/hazard_prop/hazard_prop_extension", {})
 		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
 
 		assert.is_truthy(find_install_call(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
@@ -1219,6 +1234,8 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "Sprint", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HazardAvoidance", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HazardAvoidance", "install_hazard_prop_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Debug", "install_combat_utility_diagnostics"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
@@ -1236,6 +1253,7 @@ describe("startup regressions", function()
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
 			"scripts/extension_systems/behavior/nodes/bt_random_utility_node",
 			"scripts/extension_systems/group/bot_group",
+			"scripts/extension_systems/hazard_prop/hazard_prop_extension",
 			"scripts/extension_systems/input/bot_unit_input",
 			"scripts/extension_systems/perception/bot_perception_extension",
 			"scripts/settings/ability/ability_templates/ability_templates",

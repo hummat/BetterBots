@@ -35,7 +35,12 @@ local function reset()
 	_G.Breeds = {
 		chaos_poxwalker_bomber = true,
 		chaos_ogryn_executor = true,
+		chaos_daemonhost = true,
+		chaos_poxwalker = true,
 		renegade_executor = true,
+		renegade_melee = true,
+		renegade_gunner = true,
+		renegade_grenadier = true,
 	}
 	_G.Managers = {
 		player = {
@@ -168,6 +173,9 @@ describe("scenario_harness", function()
 		assert.is_truthy(_echoes[1]:find("poxburster_push", 1, true))
 		assert.is_truthy(_echoes[1]:find("crusher_pack", 1, true))
 		assert.is_truthy(_echoes[1]:find("mauler_weakspot", 1, true))
+		assert.is_truthy(_echoes[1]:find("mixed_horde_pressure", 1, true))
+		assert.is_truthy(_echoes[1]:find("daemonhost_passive_near", 1, true))
+		assert.is_truthy(_echoes[1]:find("daemonhost_aggroed_control", 1, true))
 	end)
 
 	it("spawns the named scenario ahead of the local player and emits scenario events", function()
@@ -212,6 +220,54 @@ describe("scenario_harness", function()
 		assert.equals(3, _events[#_events].spawned)
 		assert.equals(3, _events[#_events].repeat_count)
 		assert.equals("BetterBots: scenario mauler_weakspot spawned 3 unit(s)", _echoes[#_echoes])
+	end)
+
+	it("spawns passive daemonhost without forcing a target or aggro state", function()
+		ScenarioHarness.run("daemonhost_passive_near")
+
+		assert.equals(1, #_spawns)
+		assert.equals("chaos_daemonhost", _spawns[1].breed_name)
+		assert.is_nil(_spawns[1].spawn_params.optional_aggro_state)
+		assert.is_nil(_spawns[1].spawn_params.optional_target_unit)
+		assert_vec(vec(22, 20, 3), _spawns[1].position)
+		assert.equals("daemonhost_passive_near", _events[1].scenario)
+		assert.equals("spawned_1", _events[2].unit)
+	end)
+
+	it("spawns aggroed daemonhost control against the local player", function()
+		ScenarioHarness.run("daemonhost_aggroed_control")
+
+		assert.equals(1, #_spawns)
+		assert.equals("chaos_daemonhost", _spawns[1].breed_name)
+		assert.equals("aggroed", _spawns[1].spawn_params.optional_aggro_state)
+		assert.equals("player_unit", _spawns[1].spawn_params.optional_target_unit)
+	end)
+
+	it("spawns mixed horde composition using per-spawn counts", function()
+		ScenarioHarness.run("mixed_horde_pressure")
+
+		assert.equals(20, #_spawns)
+
+		local counts = {}
+		for i = 1, #_spawns do
+			local breed = _spawns[i].breed_name
+			counts[breed] = (counts[breed] or 0) + 1
+		end
+
+		assert.equals(10, counts.chaos_poxwalker)
+		assert.equals(6, counts.renegade_melee)
+		assert.equals(2, counts.renegade_executor)
+		assert.equals(1, counts.renegade_gunner)
+		assert.equals(1, counts.renegade_grenadier)
+		assert.equals(20, _events[#_events].spawned)
+	end)
+
+	it("caps mixed horde repeat count to avoid accidental stress spawns", function()
+		ScenarioHarness.run("mixed_horde_pressure", { count = 12 })
+
+		assert.equals(40, #_spawns)
+		assert.equals(2, _events[1].repeat_count)
+		assert.equals(40, _events[#_events].spawned)
 	end)
 
 	it("parses bb_scenario distance and count arguments", function()

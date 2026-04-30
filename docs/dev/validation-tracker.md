@@ -62,6 +62,62 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-04-29-post-v1-validation-rollup
+
+```text
+Run ID: 2026-04-29-post-v1-validation-rollup
+Date (local): 2026-04-29
+Date (UTC): 2026-04-29
+Git commit: dev/post-v1.0 April 29 validation branch
+Log files:
+- console-2026-04-29-16.32.07-a435de8b-052f-4722-89b6-60c12c07c3a9.log
+- console-2026-04-29-16.58.08-db4d37bd-80f0-4296-91c1-d15b5c5a0e50.log
+- console-2026-04-29-17.10.48-79271f1d-b285-428d-82a3-5f42e970f3b9.log
+- console-2026-04-29-17.58.08-8271338f-2e3d-413f-9bda-b7f2fa277afd.log
+- console-2026-04-29-18.20.42-2637bc0d-fa9c-4ef1-81ac-948f5e33f7bb.log
+- console-2026-04-29-18.46.59-5cba60d0-4e7b-472c-9070-8ea2d4fa4159.log
+- console-2026-04-29-19.11.14-595beab0-65b3-4115-9dcd-9a8514037073.log
+
+Regression checks:
+- BetterBots warnings: no in latest checked run (`./bb-log warnings` = none)
+- Lua errors: no in latest checked run (`./bb-log errors` = none)
+
+#108 human revive priority:
+- PASS
+  - key lines / timestamps: `17:14:31.929 ... [bot=2] human revive priority assigned ... reason=mission_critical distance=4.1089`
+  - follow-up pathing/interaction: `17:14:32.034 ... sprint START (ally_rescue)`, `17:14:33.178 ... shield (revive) dist=10.9`, and `17:14:33.289 ... grenade blocked: interacting with [Unit '#ID[f888cbd0f5a35360]']`
+  - repeat evidence: second revive-pressure window at `17:18:55.294` assignment, `17:18:55.338` ally-rescue sprint, `17:18:55.565` shield, and `17:18:55.790` interacting block on the same human unit
+  - note: the log does not print a literal vanilla `do_revive` marker, but the assignment -> ally-rescue sprint -> shield/interacting sequence validates the BetterBots seam and shows vanilla interaction ownership took over
+
+#106 perf cap:
+- PASS
+  - mission-end `bb-perf:auto` totals across April 29: `116.5`, `79.3`, `98.1`, `90.2`, `90.1`, `102.2`, `95.7 us/bot/frame`
+  - median: `95.7 us/bot/frame`
+  - worst run: `116.5 us/bot/frame`
+  - `ability_queue + grenade_fallback` stayed below 50% in the checked runs; worst checked share was the 18:46 run at `(3161 + 422) / 7715 = 46.4%`
+
+#100 scenario harness:
+- PASS for MVP live spawn/logging
+  - key lines / timestamps: `bb-log events scenarios` showed three `mauler_weakspot` runs (`mauler_weakspot:49788`, `:82096`, `:112923`), each with 10 `scenario_spawn` rows for `renegade_executor` at distance 22 and `scenario_result status=spawned`
+  - follow-up: do not hold the MVP issue open for scenario-library quality; track useful new scenarios separately
+
+#17 daemonhost avoidance:
+- NOT VALIDATED
+  - April 29 logs only show context dumps with `target_is_dormant_daemonhost = false`
+  - no decisive first-action `ability allowed against daemonhost ... stage=<N> aggro_state=<state> dormant=<bool>` or `melee/ranged suppressed (... daemonhost ...)` marker was found
+  - next useful action is a targeted daemonhost scenario if spawning one is reliable, not more random log review
+
+#92 per-breed weakspot:
+- DEPRIORITIZED
+  - Mauler scenario validated the important behavior: anti-armor ranged target type above 12m, melee fallback below 12m, no heavy-stubber bash loop, and hard-armor knife blocks
+  - remaining generic `weakspot aim selected` proof is too niche to chase manually
+
+Conclusion:
+- Close `#108`, `#106`, and `#100`.
+- Keep `#17` open until a targeted daemonhost scenario or future live spawn produces the decisive first-action state line.
+- Do not spend more manual validation time on `#92` unless the scenario harness makes it cheap.
+```
+
 ### Run 2026-04-29-mauler-weakspot-scenario-01
 
 ```text

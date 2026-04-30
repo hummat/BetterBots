@@ -40,6 +40,7 @@ function M.load_and_init(ctx)
 	modules.Debug = load_module(mod, "debug")
 	modules.EventLog = load_module(mod, "event_log")
 	modules.ScenarioHarness = load_module(mod, "scenario_harness")
+	modules.HazardAvoidance = load_module(mod, "hazard_avoidance")
 	modules.Perf = load_module(mod, "perf")
 	modules.Sprint = load_module(mod, "sprint")
 	modules.MeleeMetaData = load_module(mod, "melee_meta_data")
@@ -103,6 +104,7 @@ function M.load_and_init(ctx)
 	local Debug = modules.Debug
 	local EventLog = modules.EventLog
 	local ScenarioHarness = modules.ScenarioHarness
+	local HazardAvoidance = modules.HazardAvoidance
 	local Perf = modules.Perf
 	local Sprint = modules.Sprint
 	local MeleeMetaData = modules.MeleeMetaData
@@ -290,6 +292,14 @@ function M.load_and_init(ctx)
 		debug = Debug,
 	})
 
+	HazardAvoidance.init({
+		mod = mod,
+		debug_log = ctx.debug_log,
+		debug_enabled = ctx.debug_enabled,
+		fixed_time = ctx.fixed_time,
+		bot_slot_for_unit = Debug.bot_slot_for_unit,
+	})
+
 	ChargeTracker.init({
 		fixed_time = ctx.fixed_time,
 		debug_log = ctx.debug_log,
@@ -345,6 +355,7 @@ function M.load_and_init(ctx)
 		perf = Perf,
 		shared_rules = SharedRules,
 		sprint_follow_distance = Settings.sprint_follow_distance,
+		hazard_avoidance = HazardAvoidance,
 		is_daemonhost_avoidance_enabled = function()
 			return Settings.is_feature_enabled("daemonhost_avoidance")
 		end,

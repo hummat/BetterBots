@@ -124,6 +124,9 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `queued pocketable wield` / `queued pocketable input` | Carried pocketable state machine advanced into wield/use |
 | `pocketable use completed` / `pocketable ended without confirmation` / `pocketable timed out waiting for consume|wield` | Pocketable follow-through either finished, ended ambiguously, or stalled |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
+| `hazard_prop triggered` | A fused hazard prop entered vanilla's triggered state; line compares the vanilla AoE threat origin (`POSITION_LOOKUP`) against the broadphase and `c_explosion` positions, plus radius/timer (#107) |
+| `aoe_threat accepted` / `aoe_threat skipped` / `aoe_threat missed` | Vanilla `BotGroup.aoe_threat_created` result per bot. `accepted` means an escape direction was stored, `skipped` means an existing later threat won, and `missed` means vanilla did not store a usable escape direction (#107) |
+| `aoe_threat consumed` | `BotUnitInput._update_movement` actually consumed a stored AoE threat and wrote the movement vector; use this to separate threat creation from movement execution (#107) |
 | `skipped ping for <target> (reason: recent_companion_tag)` | Generic pinging backed off because an Arbites bot had just issued a mastiff smart-tag on the same target; use this when checking remaining tag-spam reports |
 | `melee suppressed (daemonhost nearby)` / `ranged suppressed (daemonhost nearby)` | Close-range daemonhost safety gate fired; bot was inside the tight daemonhost combat radius and refused the attack (`#17`) |
 | `melee suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` / `ranged suppressed (...)` | Non-aggroed daemonhost target suppression fired outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state` (`#17`) |
@@ -216,9 +219,12 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
 6. `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear`
    - Lists and runs scripted validation spawns for live Solo Play testing.
-   - Built-in scenarios: `poxburster_push`, `crusher_pack`, `mauler_weakspot`.
-   - Optional `distance` overrides the forward spawn distance in meters; optional `count` repeats each scenario spawn and spreads copies sideways.
+   - Built-in scenarios: `poxburster_push`, `crusher_pack`, `mauler_weakspot`, `mixed_horde_pressure`, `daemonhost_passive_near`, `daemonhost_aggroed_control`.
+   - Optional `distance` overrides the forward spawn distance in meters; optional `count` repeats each scenario spawn and spreads copies sideways. `mixed_horde_pressure` caps repeat count at 2 because its base composition is already 20 spawned units.
    - `poxburster_push` spawns near the first live bot and targets that bot when possible; if no live bot can be resolved, it falls back to the local player.
+   - `mixed_horde_pressure` spawns trash, melee, Maulers, a gunner, and a grenadier to exercise ability triggers, grenade/blitz targeting, melee specials, target-type hysteresis, and perf under realistic clutter.
+   - `daemonhost_passive_near` spawns `chaos_daemonhost` without a forced target or aggro state; use it for `#17` dormant-classifier validation. Decisive pass/fail markers are `skipped ping for chaos_daemonhost (reason: dormant_daemonhost)`, `melee/ranged suppressed (... daemonhost ... dormant=true)`, or an unexpected `ability allowed against daemonhost ... dormant=false`.
+   - `daemonhost_aggroed_control` spawns an aggroed daemonhost targeting the player; use it as the control case proving BetterBots still allows legitimate daemonhost combat once aggro is real.
    - `/bb_scenario_clear` despawns units created by the scenario harness via `MinionSpawnManager:despawn_minion`.
    - Scenario start/spawn/result rows go to JSONL with requested and resolved distance/count fields and are summarized by `bb-log events scenarios`.
 

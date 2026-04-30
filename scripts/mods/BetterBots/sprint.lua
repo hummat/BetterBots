@@ -6,6 +6,7 @@ local _perf
 local _sprint_follow_distance
 local _is_daemonhost_avoidance_enabled
 local _is_non_aggroed_daemonhost
+local _hazard_avoidance
 local _logged_sprint_disabled = false
 local _logged_dh_avoidance_off = false
 
@@ -253,6 +254,10 @@ local function on_update_movement(func, self, unit, input, dt, t)
 	local perf_t0 = _perf and _perf.begin()
 	func(self, unit, input, dt, t)
 
+	if _hazard_avoidance and _hazard_avoidance.on_bot_input_movement_updated then
+		_hazard_avoidance.on_bot_input_movement_updated(self, unit)
+	end
+
 	local follow_dist = _sprint_follow_distance and _sprint_follow_distance() or DEFAULT_SPRINT_FOLLOW_DISTANCE
 	if follow_dist <= 0 then
 		if _debug_enabled() and not _logged_sprint_disabled then
@@ -313,6 +318,7 @@ Sprint.init = function(deps)
 	_perf = deps.perf
 	_sprint_follow_distance = deps.sprint_follow_distance
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
+	_hazard_avoidance = deps.hazard_avoidance
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost

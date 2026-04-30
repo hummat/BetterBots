@@ -552,7 +552,8 @@ end)
 
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
 -- same mod on the same path silently clobber each other. Install all BotGroup
--- hooks through one callback so healing deferral and mule pickup both survive.
+-- hooks through one callback so healing deferral, mule pickup, and hazard
+-- diagnostics all survive.
 local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
 mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
@@ -562,6 +563,11 @@ mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = true
 	HealingDeferral.install_bot_group_hooks(BotGroup)
 	MulePickup.install_bot_group_hooks(BotGroup)
+	Modules.HazardAvoidance.install_bot_group_hooks(BotGroup)
+end)
+
+mod:hook_require("scripts/extension_systems/hazard_prop/hazard_prop_extension", function(HazardPropExtension)
+	Modules.HazardAvoidance.install_hazard_prop_hooks(HazardPropExtension)
 end)
 
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
