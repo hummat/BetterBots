@@ -10,10 +10,10 @@ A [DMF](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod th
 
 ## Project status
 
-- **v1.0.0 is the terminal 1.x release.** All 6 planned sprints are code-complete and shipped. See [`docs/dev/status.md`](docs/dev/status.md) for the detailed snapshot and [`docs/dev/roadmap.md`](docs/dev/roadmap.md) for the full history.
+- **v1.1.0 is the post-1.0 hardening release.** It keeps the v1.0 bot-identity scope and adds the validation/hardening batch around daemonhost avoidance, hazard movement safety, pickup follow-through, healing priority, scenarios, and regression checks. See [`docs/dev/status.md`](docs/dev/status.md) for the detailed snapshot and [`docs/dev/roadmap.md`](docs/dev/roadmap.md) for the full history.
 - **Primary maintainer is stepping back.** The project is stable and feature-complete against its original scope. Issues, PRs, and forks are welcome; review cadence will be best-effort.
 - **Post-1.0 scope is open-ended.** Items in the "may never ship" bucket (utility scoring, user-authored profiles, Tier 3 revive cover, grenade tactical evaluator) are good entry points for new contributors who want to pick up significant work.
-- **Active validation gaps** (none block v1.0.0, but they remain open):
+- **Active validation gaps** (none block v1.1.0, but they remain open):
   - Hive Scum abilities and blitzes — implemented but DLC-blocked for the maintainer; relies on community reports
   - Some broad post-1.0 follow-ups remain open by design. The core post-v1 validation items for daemonhost avoidance, scripted scenarios, hazard avoidance, revive priority, and the perf cap have live evidence and are closed.
 

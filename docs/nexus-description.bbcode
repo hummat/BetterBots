@@ -16,19 +16,17 @@ The result: bots throw grenades, pop stances, charge into revives, ping specials
 [*]Bot profiles give you class-diverse loadouts instead of four copy-pasted veterans
 [/list]
 
-[size=3][b]New in v1.0.0 — Bot Identity[/b][/size]
+[size=3][b]New in v1.1.0 — Release Soak Fixes[/b][/size]
 
-The terminal 1.x release. Bots now adapt to the build you give them instead of running the same generic routine on every class.
+This one is mostly hardening from live Solo Play testing. Less glamorous than v1.0.0, but important: the mod now spends a lot less time being clever in places where bots should just avoid ruining your run.
 
 [list]
-[*][b]Keystone-aware heuristics:[/b] Scrier's Gaze, Point-Blank Barrage, Martyrdom, Shroudfield, Venting Shriek, and Focus Target now shift stance, peril, targeting, and self-heal behavior based on the actual talents equipped
-[*][b]Weakspot aim:[/b] ranged bots aim at heads on common specials, with Scab Mauler spine override and Bulwark exposed-head routing (Crusher uses a provisional rear-head proxy)
-[*][b]Weapon specials filled in:[/b] power mauls, thunder hammers, chain weapons, force swords, combat axes/swords/knives, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
-[*][b]Pocketable support:[/b] bots pick up and self-use medicae stations, combat stims, and corruption stims, and carry ammo/medical crates with conservative auto-deploy
-[*][b]Smart-tag and com-wheel bridges:[/b] ping tagged ammo/grenades/books/pocketables to route bots via pickup policy; com_cheer triggers an aggressive override, com_need_* defers to humans
-[*][b]Close-range family policy:[/b] flamer, Purgatus, shotgun, heavy stubber, autopistols, dual autopistols, and ripperguns take their true hipfire paths
-[*][b]Charge/dash nav validation:[/b] bots raycast the actual launch endpoint before committing, so charges no longer fire into walls
-[*][b]Resource arbitration rounded out:[/b] health stations now promote to any damaged non-Martyrdom bot once humans are above reserve
+[*][b]Daemonhost avoidance hardened:[/b] bots now detect passive and waking daemonhosts more reliably, suppress ranged fire, grenades, blitzes, combat abilities, sprinting, and dash/charge launches near them, and steer away without blocking narrow stairs as aggressively
+[*][b]Barrel and hazard movement safety:[/b] fused barrels now emit buffered bot AoE threats from the explosion node when vanilla's origin is misleading, and ledge checks no longer block ordinary stairs/downhill movement
+[*][b]Pickup follow-through fixed:[/b] explicit smart-tag pickup orders now become real bot pickup state, stale pickup refs are cleared before vanilla update, and books/stims/ammo crates no longer get stuck behind stale orders
+[*][b]Healing priority fixed:[/b] scarce medicae charges now prefer the ally that needs the heal most, while still preserving Martyrdom Zealot wound stacks
+[*][b]Scenario harness expanded:[/b] added mixed horde and daemonhost scenarios for repeatable validation instead of waiting for mission RNG
+[*][b]Regression checklist added:[/b] the repo now has a release-soak checklist for abilities, blitzes, melee specials, ADS/hipfire, pickups, hazards, and performance
 [/list]
 
 [size=3][b]What bots can use[/b][/size]
@@ -114,7 +112,6 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]Known issues[/b][/size]
 
 [list]
-[*]Daemonhost edge cases (dormant → aggro transitions, close-range suppression, keepout movement) still shake out. If a bot does something dumb near a DH, file an issue.
 [*]Mods get disabled after every Darktide patch — re-run the toggle/patch script to re-enable.
 [*]Hive Scum abilities and blitzes are implemented but unvalidated in-game. I don't own the DLC, so I rely on reports.
 [*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after a Darktide patch until the path is updated.
@@ -123,6 +120,7 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]What I want to fix next[/b][/size]
 
 [list]
+[*]Voidblast p1 live release proof / repair if the charged-release override still misses
 [*]Tier 3 revive cover (approach-phase architecture — the earlier enter-hook approach didn't survive engine state changes)
 [*]Broad give-to-ally / wound-cure pocketable distribution beyond the current self-use and crate-deploy policy
 [*]Remaining weapon special actions like shield specials, combat-sword parries, and hold/release ranged bashes

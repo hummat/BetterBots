@@ -1,6 +1,13 @@
-# Status Snapshot (April 13, 2026)
+# Status Snapshot (May 2, 2026)
 
 ## What's shipped
+
+### v1.1.0 (2026-05-02)
+- **Post-1.0 hardening**: daemonhost avoidance now detects passive and awake-but-not-aggroed daemonhosts through side lists plus the minion-spawn fallback, suppresses ranged/grenade/blitz/ability paths near them, and uses softer keepout steering so narrow passages remain usable.
+- **Hazard movement safety**: fused barrels emit buffered AoE threats, AoE threat consumption is logged, and ledge safety blocks only dodge endpoints instead of ordinary stair/downhill movement.
+- **Pickup and healing repairs**: explicit smart-tag pickup orders are materialized into mule pickup state, stale pickup refs are cleared before vanilla update, and scarce healing stations prefer the bot/human that actually needs the charge most while preserving Martyrdom wounds.
+- **Release regression surface**: scenario library expansion, core regression checklist, and log cleanup for repeated daemonhost/charge-path diagnostics.
+- **Validation**: latest release-candidate log `console-2026-05-02-16.44.02...` has zero BetterBots warnings/errors and shows daemonhost detection, soft/medium steering, ranged/grenade/ability suppression while passive, and normal combat only after aggro.
 
 ### v0.1.0 (2026-03-05)
 - Tier 1 + Tier 2 ability activation for all 6 classes
