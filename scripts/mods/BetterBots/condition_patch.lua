@@ -277,6 +277,18 @@ end
 local function _can_activate_ability(conditions, unit, blackboard, scratchpad, condition_args, action_data, is_running)
 	local perf_t0 = _perf and _perf.begin()
 	local ability_component_name = action_data.ability_component_name
+	local suppressed, suppress_reason = _is_suppressed(unit)
+
+	if suppressed and suppress_reason == "daemonhost_nearby" then
+		if _debug_enabled() then
+			_debug_log(
+				"suppress:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
+				_fixed_time(),
+				"ability suppressed (" .. tostring(suppress_reason) .. ")"
+			)
+		end
+		return _return_with_perf(perf_t0, false)
+	end
 
 	-- Fast path: keep running ability nodes alive (e.g. charge mid-lunge)
 	if ability_component_name == scratchpad.ability_component_name then
@@ -289,7 +301,6 @@ local function _can_activate_ability(conditions, unit, blackboard, scratchpad, c
 		return _return_with_perf(perf_t0, false)
 	end
 
-	local suppressed, suppress_reason = _is_suppressed(unit)
 	if suppressed then
 		if _debug_enabled() then
 			_debug_log(

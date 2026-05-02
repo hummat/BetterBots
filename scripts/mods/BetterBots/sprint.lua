@@ -220,6 +220,12 @@ local function _normalized_flat(x, y)
 	return x / length, y / length
 end
 
+local function _smootherstep(t)
+	t = math.max(0, math.min(t, 1))
+
+	return t * t * t * (t * (t * 6 - 15) + 10)
+end
+
 local function _add_non_aggroed_daemonhost_units(source, units, seen)
 	_log_daemonhost_scan_source(source, units)
 	if not units then
@@ -397,8 +403,9 @@ local function _daemonhost_steer_strength(dist_sq)
 	end
 
 	local blend_width = math.max(steer_distance - DAEMONHOST_HARD_STEER_DISTANCE, 0.001)
-	local strength = (steer_distance - distance) / blend_width
-	strength = math.max(strength, DAEMONHOST_MIN_STEER_STRENGTH)
+	local t = (steer_distance - distance) / blend_width
+	local strength = DAEMONHOST_MIN_STEER_STRENGTH
+		+ (DAEMONHOST_MAX_STEER_STRENGTH - DAEMONHOST_MIN_STEER_STRENGTH) * _smootherstep(t)
 
 	return math.min(strength, DAEMONHOST_MAX_STEER_STRENGTH)
 end

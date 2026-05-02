@@ -844,6 +844,48 @@ describe("condition_patch", function()
 			assert.is_false(result)
 		end)
 
+		it("daemonhost suppression interrupts a running combat ability BT node", function()
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				is_near_daemonhost = function()
+					return true
+				end,
+				is_suppressed = function()
+					return true, "daemonhost_nearby"
+				end,
+				equipped_combat_ability_name = function()
+					return "veteran_combat_ability_shout"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+			})
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				"bot1",
+				{ behavior = {}, perception = {} },
+				{ ability_component_name = "combat_ability_action" },
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				true
+			)
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_false(result)
+		end)
+
 		it("logs when BetterBots overrides the vanilla ranged ammo threshold", function()
 			_debug_enabled_result = true
 			local target = "gunner1"

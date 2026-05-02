@@ -63,6 +63,22 @@ local function _finish_child_perf(tag, start_clock)
 	end
 end
 
+local function _clear_active_state(state)
+	state.active = nil
+	state.hold_until = nil
+	state.wait_action_input = nil
+	state.wait_sent = nil
+end
+
+local function _clear_combat_ability_queue(action_input_extension, ability_component_name)
+	if action_input_extension and action_input_extension.bot_queue_clear_requests then
+		action_input_extension:bot_queue_clear_requests(ability_component_name)
+	end
+	if action_input_extension and action_input_extension.clear_input_queue_and_sequences then
+		action_input_extension:clear_input_queue_and_sequences(ability_component_name)
+	end
+end
+
 local function _fallback_try_queue_combat_ability(unit, blackboard)
 	local ability_component_name = "combat_ability_action"
 	local fixed_t = _fixed_time()
@@ -190,6 +206,23 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	_finish_child_perf("ability_queue.template_setup", setup_t0)
 
 	if state.active then
+		local suppressed, suppress_reason = _is_suppressed(unit)
+		if suppressed and suppress_reason == "daemonhost_nearby" then
+			local action_input_extension = state.action_input_extension
+				or ScriptUnit.extension(unit, "action_input_system")
+			_clear_combat_ability_queue(action_input_extension, ability_component_name)
+			_clear_active_state(state)
+			state.next_try_t = fixed_t + 1.5
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_suppress:" .. tostring(suppress_reason) .. ":" .. tostring(unit),
+					fixed_t,
+					"fallback ability suppressed (" .. tostring(suppress_reason) .. ")"
+				)
+			end
+			return
+		end
+
 		if fixed_t >= state.hold_until then
 			if state.wait_action_input and not state.wait_sent then
 				local action_input_extension = state.action_input_extension
@@ -198,10 +231,7 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 				state.wait_sent = true
 			end
 
-			state.active = nil
-			state.hold_until = nil
-			state.wait_action_input = nil
-			state.wait_sent = nil
+			_clear_active_state(state)
 			state.next_try_t = fixed_t + 1.5
 		end
 

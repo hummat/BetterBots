@@ -434,6 +434,95 @@ describe("ability_queue", function()
 			assert.same({}, emitted_events)
 		end)
 
+		it("cancels an active fallback hold instead of releasing during daemonhost suppression", function()
+			saved_script_unit = _G.ScriptUnit
+			saved_require = require
+
+			local queued_inputs = 0
+			local state_by_unit = {
+				bot_unit = {
+					active = true,
+					hold_until = 10,
+					wait_action_input = "combat_ability_released",
+					wait_sent = false,
+				},
+			}
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				bot_queue_action_input = function()
+					queued_inputs = queued_inputs + 1
+				end,
+			})
+			state_by_unit.bot_unit.action_input_extension = action_input_extension
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "veteran_combat_ability" },
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(_, system_name)
+					if system_name == "unit_data_system" then
+						return unit_data_extension
+					end
+					return nil
+				end,
+				extension = function(_, system_name)
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+			}
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return {
+						veteran_combat_ability = {
+							ability_meta_data = {
+								activation = { action_input = "combat_ability_pressed" },
+								wait_action = { action_input = "combat_ability_released" },
+							},
+						},
+					}
+				end
+				return saved_require(path)
+			end)
+
+			AbilityQueue.init({
+				mod = { echo = function() end, dump = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				equipped_combat_ability = function()
+					return nil, { name = "veteran_combat_ability_shout" }
+				end,
+				equipped_combat_ability_name = function()
+					return "veteran_combat_ability_shout"
+				end,
+				is_suppressed = function()
+					return true, "daemonhost_nearby"
+				end,
+				fallback_state_by_unit = state_by_unit,
+				fallback_queue_dumped_by_key = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20,
+				shared_rules = SharedRules,
+			})
+			AbilityQueue.wire({
+				MetaData = { inject = function() end },
+				ItemFallback = {
+					try_queue_item = function() end,
+					reset_item_sequence_state = function() end,
+				},
+			})
+
+			AbilityQueue.try_queue("bot_unit", {})
+
+			assert.equals(0, queued_inputs)
+			assert.is_nil(state_by_unit.bot_unit.active)
+			assert.is_nil(state_by_unit.bot_unit.wait_action_input)
+		end)
+
 		it("logs the first movement-ability nav block but suppresses cached repeats", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require

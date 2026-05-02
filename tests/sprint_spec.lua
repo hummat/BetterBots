@@ -1136,6 +1136,7 @@ describe("sprint", function()
 
 			assert.equals(0, self_obj._move.x)
 			assert.is_true(self_obj._move.y < 1)
+			assert.is_true(self_obj._move.y > 0.8)
 			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
 		end)
 
