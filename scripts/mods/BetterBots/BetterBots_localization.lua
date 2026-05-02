@@ -150,6 +150,12 @@ return {
 	enable_daemonhost_avoidance_description = {
 		en = "Bots stop fighting and sprinting near a sleeping daemonhost. Turn this off for vanilla behavior.",
 	},
+	enable_hazard_movement_avoidance = {
+		en = "Avoid hazards and ledges",
+	},
+	enable_hazard_movement_avoidance_description = {
+		en = "Bots add extra movement safety around fused barrels, sleeping daemonhosts, and unsafe dodge endpoints.",
+	},
 	enable_target_type_hysteresis = {
 		en = "Reduce weapon swap thrashing",
 	},
@@ -333,6 +339,19 @@ return {
 		en = "Bots sprint when they fall this far behind the leader. "
 			.. "This also covers traversal and rescue sprints. Set to 0 to disable bot sprinting.",
 	},
+	daemonhost_keepout_distance = {
+		en = "Daemonhost keepout distance (m)",
+	},
+	daemonhost_keepout_distance_description = {
+		en = "Bots suppress risky actions inside this distance from a sleeping daemonhost. "
+			.. "Movement is softly biased away at closer range.",
+	},
+	hazard_avoidance_buffer = {
+		en = "Hazard avoidance buffer (m)",
+	},
+	hazard_avoidance_buffer_description = {
+		en = "Extra distance added around fused barrel explosion radii before bots dodge away.",
+	},
 	special_chase_penalty_range = {
 		en = "Stop chasing specials into melee at (m)",
 	},
@@ -466,13 +485,13 @@ return {
 		en = "Veteran - Plasma Gun + Power Sword",
 	},
 	bot_profile_zealot = {
-		en = "Zealot - Boltgun + Heavy Eviscerator",
+		en = "Zealot - Boltgun + Thunder Hammer",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Voidblast Staff + Duelling Sword",
+		en = "Psyker - Recon Lasgun + Force Greatsword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Ripper Gun + Latrine Shovel",
+		en = "Ogryn - Kickback + Latrine Shovel",
 	},
 	bot_weapon_quality = {
 		en = "Bot weapon quality",

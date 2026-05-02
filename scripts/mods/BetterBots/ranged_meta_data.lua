@@ -294,9 +294,9 @@ end
 -- These windows are conservative "keep using the ranged plan" thresholds, not
 -- literal weapon max-range models. They are split by family/template so the
 -- bot's close-pressure carve-outs at least line up with broad weapon identity:
--- autopistols sit around 10 m near-range starts, shotguns/ripperguns start
--- stronger closer in, flamer/Purgatus are explicit close-pressure tools, and
--- the p3 electro staff is narrower than Purgatus' crowd-control profile.
+-- autopistols sit around 10 m near-range starts, shotguns/thumpers/ripperguns
+-- start stronger closer in, flamer/Purgatus are explicit close-pressure tools,
+-- and the p3 electro staff is narrower than Purgatus' crowd-control profile.
 local CLOSE_RANGE_RANGED_POLICIES = {
 	flamer = {
 		family = "flamer",
@@ -305,6 +305,11 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 	},
 	shotgun = {
 		family = "shotgun",
+		hold_ranged_target_distance_sq = meters_sq(8),
+		hipfire_distance_sq = meters_sq(8),
+	},
+	shotgun_grenade = {
+		family = "shotgun_grenade",
 		hold_ranged_target_distance_sq = meters_sq(8),
 		hipfire_distance_sq = meters_sq(8),
 	},
@@ -332,6 +337,33 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 	},
 }
 
+local ANTI_ARMOR_RANGED_POLICIES = {
+	plasmagun = {
+		family = "plasmagun",
+		min_target_distance_sq = meters_sq(10),
+	},
+	bolter = {
+		family = "bolter",
+		min_target_distance_sq = meters_sq(12),
+	},
+	boltpistol = {
+		family = "boltpistol",
+		min_target_distance_sq = meters_sq(10),
+	},
+	lasgun_p2 = {
+		family = "lasgun_p2",
+		min_target_distance_sq = meters_sq(12),
+	},
+	stubrevolver = {
+		family = "stubrevolver",
+		min_target_distance_sq = meters_sq(12),
+	},
+	heavystubber = {
+		family = "heavystubber",
+		min_target_distance_sq = meters_sq(12),
+	},
+}
+
 local function close_range_ranged_policy(weapon_template)
 	if type(weapon_template) ~= "table" then
 		return nil
@@ -353,6 +385,10 @@ local function close_range_ranged_policy(weapon_template)
 		return CLOSE_RANGE_RANGED_POLICIES.shotgun
 	end
 
+	if has_keyword(weapon_template, "shotgun_grenade") then
+		return CLOSE_RANGE_RANGED_POLICIES.shotgun_grenade
+	end
+
 	if has_keyword(weapon_template, "heavystubber") then
 		return CLOSE_RANGE_RANGED_POLICIES.heavystubber
 	end
@@ -363,6 +399,38 @@ local function close_range_ranged_policy(weapon_template)
 
 	if has_keyword(weapon_template, "rippergun") then
 		return CLOSE_RANGE_RANGED_POLICIES.rippergun
+	end
+
+	return nil
+end
+
+local function anti_armor_ranged_policy(weapon_template)
+	if type(weapon_template) ~= "table" then
+		return nil
+	end
+
+	if has_keyword(weapon_template, "plasmagun") then
+		return ANTI_ARMOR_RANGED_POLICIES.plasmagun
+	end
+
+	if has_keyword(weapon_template, "bolter") then
+		return ANTI_ARMOR_RANGED_POLICIES.bolter
+	end
+
+	if has_keyword(weapon_template, "boltpistol") then
+		return ANTI_ARMOR_RANGED_POLICIES.boltpistol
+	end
+
+	if weapon_template.name and weapon_template.name:find("^lasgun_p2_", 1, false) then
+		return ANTI_ARMOR_RANGED_POLICIES.lasgun_p2
+	end
+
+	if weapon_template.name and weapon_template.name:find("^stubrevolver_", 1, false) then
+		return ANTI_ARMOR_RANGED_POLICIES.stubrevolver
+	end
+
+	if has_keyword(weapon_template, "heavystubber") then
+		return ANTI_ARMOR_RANGED_POLICIES.heavystubber
 	end
 
 	return nil
@@ -384,12 +452,16 @@ local function has_any_keyword(weapon_template, keywords)
 end
 
 local function should_inject_weakspot_aim(weapon_template)
-	return has_any_keyword(weapon_template, {
-		"lasgun",
-		"autogun",
-		"bolter",
-		"stub_pistol",
-	})
+	-- Start with the original finesse set, then include the explicit
+	-- anti-armor ranged families so the weakspot and Mauler-range policies
+	-- stay aligned when new hard-target guns are added.
+	return anti_armor_ranged_policy(weapon_template) ~= nil
+		or has_any_keyword(weapon_template, {
+			"lasgun",
+			"autogun",
+			"bolter",
+			"stub_pistol",
+		})
 end
 
 local function build_meta_data(weapon_template)
@@ -645,5 +717,7 @@ return {
 	_find_aim_fire_input = find_aim_fire_input,
 	_find_aim_action_for_fire = find_aim_action_for_fire,
 	close_range_ranged_policy = close_range_ranged_policy,
+	anti_armor_ranged_policy = anti_armor_ranged_policy,
+	supports_weakspot_aim = should_inject_weakspot_aim,
 	_should_inject_weakspot_aim = should_inject_weakspot_aim,
 }

@@ -193,7 +193,7 @@ local function _is_suppressed(unit)
 	-- they are crowding the sleeping daemonhost.
 	if
 		Settings.is_feature_enabled("daemonhost_avoidance")
-		and Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+		and Sprint.is_near_daemonhost(unit, Sprint.daemonhost_keepout_range_sq())
 	then
 		return remember(true, "daemonhost_nearby")
 	end
@@ -274,6 +274,7 @@ Sprint = Modules.Sprint
 local MetaData, Heuristics, ItemFallback = Modules.MetaData, Modules.Heuristics, Modules.ItemFallback
 local ChargeTracker, GestaltInjector = Modules.ChargeTracker, Modules.GestaltInjector
 local UpdateDispatcher, Debug, EventLog, Perf = Modules.UpdateDispatcher, Modules.Debug, Modules.EventLog, Modules.Perf
+local ScenarioHarness = Modules.ScenarioHarness
 local MeleeMetaData, MeleeAttackChoice = Modules.MeleeMetaData, Modules.MeleeAttackChoice
 local RangedMetaData, TargetSelection, Poxburster = Modules.RangedMetaData, Modules.TargetSelection, Modules.Poxburster
 local SmartTargeting, AnimationGuard, AirlockGuard =
@@ -362,7 +363,82 @@ local function _should_block_wield_input(unit)
 	return GrenadeFallback.should_block_wield_input(unit)
 end
 
+local DAEMONHOST_SAFE_WEAPON_ACTION_INPUTS = {
+	reload = true,
+	unwield_to_previous = true,
+	unzoom = true,
+	vent = true,
+	wield = true,
+	zoom_release = true,
+}
+
+local function _daemonhost_weapon_action_block_details(breed_name, aggro_state, stage)
+	return "target="
+		.. tostring(breed_name)
+		.. " stage="
+		.. tostring(stage ~= nil and stage or "missing")
+		.. " aggro_state="
+		.. tostring(aggro_state or "missing")
+		.. " dormant=true"
+end
+
+local function _target_breed_name(target_unit)
+	local script_unit = rawget(_G, "ScriptUnit")
+	local target_data_ext = target_unit
+		and script_unit
+		and script_unit.has_extension
+		and script_unit.has_extension(target_unit, "unit_data_system")
+	local breed = target_data_ext and target_data_ext.breed and target_data_ext:breed()
+	return breed and breed.name or nil
+end
+
+local function _should_block_daemonhost_weapon_action_input(unit, action_input)
+	if
+		DAEMONHOST_SAFE_WEAPON_ACTION_INPUTS[action_input]
+		or not (Settings and Settings.is_feature_enabled and Settings.is_feature_enabled("daemonhost_avoidance"))
+	then
+		return false
+	end
+
+	local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+	local perception = blackboard and blackboard.perception
+	local target_enemy = perception and perception.target_enemy
+	if not target_enemy then
+		return false
+	end
+
+	local breed_name = _target_breed_name(target_enemy)
+	local daemonhost_breeds = SharedRules.DAEMONHOST_BREED_NAMES
+	if not (breed_name and daemonhost_breeds and daemonhost_breeds[breed_name]) then
+		return false
+	end
+
+	local dormant, aggro_state, stage
+	if SharedRules.is_non_aggroed_daemonhost then
+		dormant, aggro_state, stage = SharedRules.is_non_aggroed_daemonhost(target_enemy)
+	elseif SharedRules.daemonhost_state then
+		aggro_state, stage = SharedRules.daemonhost_state(target_enemy)
+		dormant = stage ~= SharedRules.DAEMONHOST_STAGE_AGGROED and aggro_state ~= "aggroed"
+	else
+		local target_blackboard = BLACKBOARDS and BLACKBOARDS[target_enemy]
+		local target_perception = target_blackboard and target_blackboard.perception
+		aggro_state = target_perception and target_perception.aggro_state or nil
+		dormant = aggro_state ~= "aggroed"
+	end
+
+	if not dormant then
+		return false
+	end
+
+	return true, "daemonhost_avoidance", _daemonhost_weapon_action_block_details(breed_name, aggro_state, stage)
+end
+
 local function _should_block_weapon_action_input(unit, action_input)
+	local should_block, ability_name, block_reason = _should_block_daemonhost_weapon_action_input(unit, action_input)
+	if should_block then
+		return should_block, ability_name, block_reason
+	end
+
 	return GrenadeFallback.should_block_weapon_action_input(unit, action_input)
 end
 
@@ -373,6 +449,7 @@ end
 local function _observe_queued_weapon_action(unit, action_input, original_action_input)
 	SustainedFire.observe_queued_weapon_action(unit, action_input)
 	RangedSpecialAction.observe_queued_weapon_action(unit, action_input, original_action_input)
+	MeleeAttackChoice.observe_queued_weapon_action(unit, action_input)
 end
 
 -- Register hooks for extracted modules
@@ -550,7 +627,8 @@ end)
 
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
 -- same mod on the same path silently clobber each other. Install all BotGroup
--- hooks through one callback so healing deferral and mule pickup both survive.
+-- hooks through one callback so healing deferral, mule pickup, and hazard
+-- diagnostics all survive.
 local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
 mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
@@ -560,6 +638,11 @@ mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = true
 	HealingDeferral.install_bot_group_hooks(BotGroup)
 	MulePickup.install_bot_group_hooks(BotGroup)
+	Modules.HazardAvoidance.install_bot_group_hooks(BotGroup)
+end)
+
+mod:hook_require("scripts/extension_systems/hazard_prop/hazard_prop_extension", function(HazardPropExtension)
+	Modules.HazardAvoidance.install_hazard_prop_hooks(HazardPropExtension)
 end)
 
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
@@ -623,7 +706,9 @@ mod:hook_require(
 							target_position = rescue_ally_position,
 						})
 						if not nav_ok then
-							if EventLog.is_enabled() then
+							local should_emit_block_event = not ChargeNavValidation.should_emit_block_event
+								or ChargeNavValidation.should_emit_block_event(nav_reason)
+							if should_emit_block_event and EventLog.is_enabled() then
 								EventLog.emit({
 									t = _fixed_time(),
 									event = "blocked",
@@ -968,6 +1053,7 @@ function mod.on_setting_changed(setting_id)
 end
 
 Debug.register_commands()
+ScenarioHarness.register_commands()
 _refresh_debug_log_level()
 
 -- Re-enable EventLog after hot-reload if we're mid-session.

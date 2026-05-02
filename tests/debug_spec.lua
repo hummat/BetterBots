@@ -85,10 +85,12 @@ describe("debug", function()
 	it("includes daemonhost dormancy diagnostics in context snapshots", function()
 		local snapshot = Debug.context_snapshot({
 			target_is_dormant_daemonhost = true,
+			target_is_near_dormant_daemonhost = true,
 			target_daemonhost_aggro_state = "passive",
 		})
 
 		assert.is_true(snapshot.target_is_dormant_daemonhost)
+		assert.is_true(snapshot.target_is_near_dormant_daemonhost)
 		assert.equals("passive", snapshot.target_daemonhost_aggro_state)
 	end)
 

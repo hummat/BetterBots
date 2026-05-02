@@ -6,9 +6,12 @@ local _resolve_preset
 local _debug_log
 local _debug_enabled
 local _daemonhost_breed_names
+local _daemonhost_stage_aggroed
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_state
+local _is_position_near_daemonhost
 local _overlapping_liquids = {}
+local _logged_target_daemonhost_ranges = {}
 local SHIELD_INTERACTION_TYPES = {
 	scanning = true,
 	setup_decoding = true,
@@ -265,6 +268,73 @@ local function _copy_context(context)
 	return copy
 end
 
+local function _daemonhost_range_bucket(dist_sq)
+	if not dist_sq or dist_sq == math.huge then
+		return nil
+	end
+
+	local distance = math.sqrt(dist_sq)
+	if distance <= 7.5 then
+		return "inner"
+	elseif distance <= 12 then
+		return "alert"
+	elseif distance <= 14 then
+		return "keepout"
+	elseif distance <= 20 then
+		return "near"
+	end
+
+	return "far"
+end
+
+local function _format_distance(value)
+	return value and string.format("%.1f", value) or "unknown"
+end
+
+local function _log_target_daemonhost_range(unit, context, daemonhost_unit, target_daemonhost_dist_sq)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+	if not (context and context.target_enemy and daemonhost_unit) then
+		return
+	end
+
+	local bucket = _daemonhost_range_bucket(target_daemonhost_dist_sq)
+	if not bucket then
+		return
+	end
+
+	local key = table.concat({
+		tostring(unit),
+		tostring(context.target_enemy),
+		tostring(daemonhost_unit),
+		bucket,
+	}, ":")
+	if _logged_target_daemonhost_ranges[key] then
+		return
+	end
+	_logged_target_daemonhost_ranges[key] = true
+
+	_debug_log(
+		"target_daemonhost_range:" .. key,
+		_fixed_time(),
+		"target near daemonhost scan target="
+			.. tostring(context.target_breed_name or "unknown")
+			.. " target_unit="
+			.. tostring(context.target_enemy)
+			.. " daemonhost="
+			.. tostring(daemonhost_unit)
+			.. " bucket="
+			.. bucket
+			.. " target_dh_dist="
+			.. _format_distance(math.sqrt(target_daemonhost_dist_sq))
+			.. " bot_target_dist="
+			.. _format_distance(context.target_enemy_distance),
+		0,
+		"debug"
+	)
+end
+
 local function _perception_cache_matches(entry, fixed_t, perception_component, current_weapon_template_name)
 	if not entry or entry.fixed_t ~= fixed_t then
 		return false
@@ -278,6 +348,7 @@ local function _perception_cache_matches(entry, fixed_t, perception_component, c
 		and entry.opportunity_target_enemy == (perception_component and perception_component.opportunity_target_enemy or nil)
 		and entry.urgent_target_enemy == (perception_component and perception_component.urgent_target_enemy or nil)
 		and entry.target_ally_needs_aid == (perception_component and perception_component.target_ally_needs_aid or nil)
+		and entry.target_ally_need_type == (perception_component and perception_component.target_ally_need_type or nil)
 		and entry.target_ally_distance == (perception_component and perception_component.target_ally_distance or nil)
 		and entry.target_ally == (perception_component and perception_component.target_ally or nil)
 end
@@ -294,6 +365,7 @@ local function _store_context_cache(unit, fixed_t, perception_component, current
 		opportunity_target_enemy = perception_component and perception_component.opportunity_target_enemy or nil,
 		urgent_target_enemy = perception_component and perception_component.urgent_target_enemy or nil,
 		target_ally_needs_aid = perception_component and perception_component.target_ally_needs_aid or nil,
+		target_ally_need_type = perception_component and perception_component.target_ally_need_type or nil,
 		target_ally_distance = perception_component and perception_component.target_ally_distance or nil,
 		target_ally = perception_component and perception_component.target_ally or nil,
 	}
@@ -359,7 +431,7 @@ local function normalize_grenade_context(unit, context, target_unit)
 			aggro_state = target_perception and target_perception.aggro_state or nil
 		end
 		aggro_state = aggro_state or "missing"
-		local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
+		local is_aggroed = stage ~= nil and stage == _daemonhost_stage_aggroed or aggro_state == "aggroed"
 		normalized.target_is_dormant_daemonhost = not is_aggroed
 		normalized.target_daemonhost_aggro_state = aggro_state
 		normalized.target_daemonhost_stage = stage
@@ -399,6 +471,7 @@ local function build_context(unit, blackboard)
 		companion_unit = nil,
 		companion_position = nil,
 		target_ally_needs_aid = false,
+		target_ally_need_type = nil,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
 		target_is_elite = false,
@@ -407,6 +480,7 @@ local function build_context(unit, blackboard)
 		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
+		target_is_near_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
 		target_daemonhost_stage = nil,
 		target_is_super_armor = false,
@@ -454,6 +528,7 @@ local function build_context(unit, blackboard)
 		context.opportunity_target_enemy = _live_enemy_unit(perception_component.opportunity_target_enemy)
 		context.urgent_target_enemy = _live_enemy_unit(perception_component.urgent_target_enemy)
 		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
+		context.target_ally_need_type = perception_component.target_ally_need_type
 		context.target_ally_distance = perception_component.target_ally_distance
 		context.target_ally_unit = perception_component.target_ally
 	end
@@ -583,10 +658,21 @@ local function build_context(unit, blackboard)
 					aggro_state = target_perception and target_perception.aggro_state or nil
 				end
 				aggro_state = aggro_state or "missing"
-				local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
+				local is_aggroed = stage ~= nil and stage == _daemonhost_stage_aggroed or aggro_state == "aggroed"
 				context.target_is_dormant_daemonhost = not is_aggroed
 				context.target_daemonhost_aggro_state = aggro_state
 				context.target_daemonhost_stage = stage
+			end
+			if
+				context.target_enemy_position
+				and _is_daemonhost_avoidance_enabled
+				and _is_daemonhost_avoidance_enabled()
+				and _is_position_near_daemonhost
+			then
+				local target_near_daemonhost, daemonhost_unit, target_daemonhost_dist_sq =
+					_is_position_near_daemonhost(unit, context.target_enemy_position)
+				context.target_is_near_dormant_daemonhost = target_near_daemonhost
+				_log_target_daemonhost_range(unit, context, daemonhost_unit, target_daemonhost_dist_sq)
 			end
 		end
 	end
@@ -676,13 +762,16 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
+		_daemonhost_stage_aggroed = deps.shared_rules and deps.shared_rules.DAEMONHOST_STAGE_AGGROED
 		_daemonhost_state = deps.shared_rules and deps.shared_rules.daemonhost_state
+		_is_position_near_daemonhost = deps.is_position_near_daemonhost
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
 			return true
 		end
 
 		_interacting_cache_t = nil
 		_interacting_cache_side = nil
+		_logged_target_daemonhost_ranges = {}
 		for i = #_interacting_units, 1, -1 do
 			_interacting_units[i] = nil
 			_interacting_profiles[i] = nil

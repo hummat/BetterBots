@@ -39,6 +39,8 @@ function M.load_and_init(ctx)
 	modules.UpdateDispatcher = load_module(mod, "update_dispatcher")
 	modules.Debug = load_module(mod, "debug")
 	modules.EventLog = load_module(mod, "event_log")
+	modules.ScenarioHarness = load_module(mod, "scenario_harness")
+	modules.HazardAvoidance = load_module(mod, "hazard_avoidance")
 	modules.Perf = load_module(mod, "perf")
 	modules.Sprint = load_module(mod, "sprint")
 	modules.MeleeMetaData = load_module(mod, "melee_meta_data")
@@ -101,6 +103,8 @@ function M.load_and_init(ctx)
 	local UpdateDispatcher = modules.UpdateDispatcher
 	local Debug = modules.Debug
 	local EventLog = modules.EventLog
+	local ScenarioHarness = modules.ScenarioHarness
+	local HazardAvoidance = modules.HazardAvoidance
 	local Perf = modules.Perf
 	local Sprint = modules.Sprint
 	local MeleeMetaData = modules.MeleeMetaData
@@ -174,6 +178,7 @@ function M.load_and_init(ctx)
 		fixed_time = ctx.fixed_time,
 		bot_slot_for_unit = Debug.bot_slot_for_unit,
 		close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+		anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
 		is_enabled = function()
 			return Settings.is_feature_enabled("target_type_hysteresis")
 		end,
@@ -196,6 +201,9 @@ function M.load_and_init(ctx)
 		bot_targeting = BotTargeting,
 		is_enabled = function()
 			return Settings.is_feature_enabled("charge_nav_validation")
+		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
 		end,
 	})
 
@@ -235,6 +243,9 @@ function M.load_and_init(ctx)
 		shared_rules = SharedRules,
 		is_daemonhost_avoidance_enabled = function()
 			return Settings.is_feature_enabled("daemonhost_avoidance")
+		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
 		end,
 		warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 		context_module = HeuristicsContext,
@@ -278,6 +289,25 @@ function M.load_and_init(ctx)
 	EventLog.init({
 		mod = mod,
 		context_snapshot = Debug.context_snapshot,
+	})
+
+	ScenarioHarness.init({
+		mod = mod,
+		event_log = EventLog,
+		fixed_time = ctx.fixed_time,
+		debug = Debug,
+	})
+
+	HazardAvoidance.init({
+		mod = mod,
+		debug_log = ctx.debug_log,
+		debug_enabled = ctx.debug_enabled,
+		fixed_time = ctx.fixed_time,
+		bot_slot_for_unit = Debug.bot_slot_for_unit,
+		is_hazard_movement_avoidance_enabled = function()
+			return Settings.is_feature_enabled("hazard_movement_avoidance")
+		end,
+		hazard_avoidance_buffer = Settings.hazard_avoidance_buffer,
 	})
 
 	ChargeTracker.init({
@@ -335,6 +365,8 @@ function M.load_and_init(ctx)
 		perf = Perf,
 		shared_rules = SharedRules,
 		sprint_follow_distance = Settings.sprint_follow_distance,
+		daemonhost_keepout_distance = Settings.daemonhost_keepout_distance,
+		hazard_avoidance = HazardAvoidance,
 		is_daemonhost_avoidance_enabled = function()
 			return Settings.is_feature_enabled("daemonhost_avoidance")
 		end,
@@ -499,6 +531,9 @@ function M.load_and_init(ctx)
 		end,
 		is_near_daemonhost = function(unit)
 			return Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
 		end,
 	})
 

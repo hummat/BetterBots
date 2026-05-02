@@ -69,6 +69,45 @@ local VANILLA_PROFILE = {
 
 local EXPECTED_CURIO_NAME = "Blessed Bullet (Reliquary)"
 local EXPECTED_CURIO_MASTER_ITEM_ID = "content/items/gadgets/defensive_gadget_11"
+local EXPECTED_CURIOS_BY_CLASS = {
+	veteran = {
+		{ name = EXPECTED_CURIO_NAME, master_item_id = EXPECTED_CURIO_MASTER_ITEM_ID },
+		{ name = EXPECTED_CURIO_NAME, master_item_id = EXPECTED_CURIO_MASTER_ITEM_ID },
+		{ name = EXPECTED_CURIO_NAME, master_item_id = EXPECTED_CURIO_MASTER_ITEM_ID },
+	},
+	zealot = {
+		{ name = "Redeemer's Gilded Hand (Caged)", master_item_id = "content/items/gadgets/defensive_gadget_6" },
+		{ name = "Laurel of the Just (Reliquary)", master_item_id = "content/items/gadgets/defensive_gadget_16" },
+		{ name = "Guardian Gloriana (Casket)", master_item_id = "content/items/gadgets/defensive_gadget_22" },
+	},
+	psyker = {
+		{ name = "Herald's Seal (Reliquary)", master_item_id = "content/items/gadgets/defensive_gadget_14" },
+		{ name = "Mechanicus Icon Illustrious (Casket)", master_item_id = "content/items/gadgets/defensive_gadget_18" },
+		{ name = "Guardian of the Lost (Casket)", master_item_id = "content/items/gadgets/defensive_gadget_19" },
+	},
+	ogryn = {
+		{ name = "Laurel of the Righteous (Reliquary)", master_item_id = "content/items/gadgets/defensive_gadget_15" },
+		{ name = "Laurel of the Just (Reliquary)", master_item_id = "content/items/gadgets/defensive_gadget_16" },
+		{ name = "Herald's Seal (Reliquary)", master_item_id = "content/items/gadgets/defensive_gadget_14" },
+	},
+}
+
+local function all_expected_curio_defs(extra)
+	local defs = extra or {}
+
+	for _, curios in pairs(EXPECTED_CURIOS_BY_CLASS) do
+		for _, curio in ipairs(curios) do
+			defs[curio.master_item_id] = defs[curio.master_item_id]
+				or {
+					id = curio.master_item_id,
+					name = curio.master_item_id,
+					item_type = "GADGET",
+				}
+		end
+	end
+
+	return defs
+end
 
 describe("bot_profiles", function()
 	before_each(function()
@@ -100,43 +139,155 @@ describe("bot_profiles", function()
 			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
 
 			assert.equals(
-				"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+				"content/items/weapons/player/melee/thunderhammer_2h_p1_m1",
 				profiles.zealot.loadout.slot_primary
 			)
-			assert.equals("content/items/weapons/player/ranged/bolter_p1_m2", profiles.zealot.loadout.slot_secondary)
-			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
-			assert.is_not_nil(profiles.zealot.talents.zealot_fanatic_rage)
+			assert.equals("content/items/weapons/player/ranged/bolter_p1_m1", profiles.zealot.loadout.slot_secondary)
+			assert.is_not_nil(profiles.zealot.talents.zealot_martyrdom)
+			assert.is_not_nil(profiles.zealot.talents.zealot_fotf_refund_cooldown)
 
-			assert.equals("content/items/weapons/player/melee/combatsword_p3_m2", profiles.psyker.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/forcestaff_p1_m1",
-				profiles.psyker.loadout.slot_secondary
+				"content/items/weapons/player/melee/forcesword_2h_p1_m1",
+				profiles.psyker.loadout.slot_primary
 			)
-			assert.is_not_nil(profiles.psyker.talents.psyker_shout_vent_warp_charge)
-			assert.is_not_nil(profiles.psyker.talents.psyker_grenade_throwing_knives)
+			assert.equals("content/items/weapons/player/ranged/lasgun_p3_m3", profiles.psyker.loadout.slot_secondary)
+			assert.is_not_nil(profiles.psyker.talents.psyker_combat_ability_stance)
+			assert.is_not_nil(profiles.psyker.talents.psyker_new_mark_passive)
 
-			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m1", profiles.ogryn.loadout.slot_primary)
+			assert.equals("content/items/weapons/player/melee/ogryn_club_p1_m3", profiles.ogryn.loadout.slot_primary)
 			assert.equals(
-				"content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
+				"content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
 				profiles.ogryn.loadout.slot_secondary
 			)
-			assert.is_not_nil(profiles.ogryn.talents.ogryn_longer_charge)
-			assert.is_not_nil(profiles.ogryn.talents.ogryn_grenade_friend_rock)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_taunt_shout)
+			assert.is_not_nil(profiles.ogryn.talents.ogryn_grenade_frag)
 		end)
 
 		it("locks in the requested meta pivots for the shipped lineup", function()
 			local profiles = BotProfiles._get_profiles()
 
-			assert.is_not_nil(profiles.zealot.talents.zealot_bolstering_prayer)
+			assert.is_not_nil(profiles.zealot.talents.zealot_martyrdom)
 			assert.is_not_nil(profiles.psyker.talents.psyker_elite_kills_add_warpfire)
 			assert.is_not_nil(profiles.veteran.talents.veteran_dodging_grants_crit)
 		end)
 
+		it("keeps the non-veteran profiles aligned with the latest build dumps", function()
+			local profiles = BotProfiles._get_profiles()
+			local expected_talents = {
+				zealot = {
+					"zealot_resist_death",
+					"zealot_multi_hits_increase_damage",
+					"zealot_increased_damage_vs_resilient",
+					"zealot_hits_grant_stacking_damage",
+					"zealot_flame_grenade",
+					"zealot_crits_reduce_toughness_damage",
+					"zealot_toughness_on_dodge",
+					"base_melee_damage_node_buff_medium_1",
+					"zealot_toughness_on_heavy_kills",
+					"base_toughness_damage_reduction_node_buff_medium_1",
+					"zealot_toughness_damage_reduction_coherency_improved",
+					"zealot_increased_crit_and_weakspot_damage_after_dodge",
+					"zealot_attack_speed_post_ability",
+					"base_melee_damage_node_buff_medium_4",
+					"zealot_additional_charge_of_ability",
+					"base_toughness_node_buff_medium_2",
+					"zealot_reduced_damage_after_dodge",
+					"zealot_attack_speed",
+					"zealot_restore_stealth_cd_on_damage",
+					"zealot_additional_wounds",
+					"zealot_martyrdom",
+					"zealot_martyrdom_grants_toughness",
+					"zealot_martyrdom_grants_attack_speed",
+					"zealot_resist_death_healing",
+					"zealot_fotf_refund_cooldown",
+					"zealot_uninterruptible_no_slow_heavies",
+					"zealot_martyrdom_toughness_modifier",
+					"zealot_revive_speed",
+					"zealot_damage_vs_elites",
+					"zealot_offensive_vs_many",
+				},
+				psyker = {
+					"psyker_toughness_on_vent",
+					"psyker_toughness_on_melee",
+					"psyker_crits_regen_toughness_movement_speed",
+					"psyker_elite_kills_add_warpfire",
+					"psyker_crits_empower_next_attack",
+					"psyker_smite_on_hit",
+					"psyker_brain_burst_improved",
+					"psyker_combat_ability_stance",
+					"psyker_overcharge_weakspot_kill_bonuses",
+					"psyker_overcharge_increased_movement_speed",
+					"psyker_aura_crit_chance_aura",
+					"psyker_2_tier_3_name_2",
+					"psyker_warp_charge_reduces_toughness_damage_taken",
+					"psyker_improved_dodge",
+					"psyker_damage_based_on_warp_charge",
+					"psyker_block_costs_warp_charge",
+					"base_toughness_node_buff_medium_5",
+					"base_melee_damage_node_buff_medium_4",
+					"psyker_new_mark_passive",
+					"psyker_mark_increased_max_stacks",
+					"psyker_mark_weakspot_kills",
+					"base_stamina_node_buff_low_1",
+					"base_movement_speed_node_buff_low_1",
+					"base_toughness_node_buff_medium_4",
+					"base_toughness_damage_reduction_node_buff_medium_1",
+					"psyker_melee_attack_speed",
+					"psyker_cleave_from_peril",
+					"psyker_damage_vs_ogryns_and_monsters",
+					"psyker_stat_mix",
+					"base_crit_chance_node_buff_low_1",
+				},
+				ogryn = {
+					"ogryn_multi_heavy_toughness",
+					"ogryn_single_heavy_toughness",
+					"ogryn_ogryn_killer",
+					"base_toughness_node_buff_medium_2",
+					"ogryn_melee_damage_coherency_improved",
+					"ogryn_melee_stagger",
+					"ogryn_targets_recieve_damage_taken_increase_debuff",
+					"ogryn_grenade_frag",
+					"base_armor_pen_node_buff_low_1",
+					"ogryn_fully_charged_attacks_gain_damage_and_stagger",
+					"ogryn_heavy_bleeds",
+					"ogryn_nearby_bleeds_reduce_damage_taken",
+					"ogryn_passive_heavy_hitter",
+					"base_toughness_damage_reduction_node_buff_medium_1",
+					"base_toughness_node_buff_medium_1",
+					"ogryn_windup_reduces_damage_taken",
+					"ogryn_windup_is_uninterruptible",
+					"base_melee_damage_node_buff_medium_2",
+					"ogryn_revenge_damage",
+					"ogryn_taunt_shout",
+					"ogryn_taunt_damage_taken_increase",
+					"ogryn_taunt_restore_toughness",
+					"base_toughness_damage_reduction_node_buff_low_5",
+					"ogryn_damage_reduction_on_high_stamina",
+					"ogryn_melee_damage_after_heavy",
+					"ogryn_heavy_hitter_tdr",
+					"ogryn_heavy_hitter_stagger",
+					"ogryn_heavy_hitter_max_stacks_improves_attack_speed",
+					"ogryn_ally_elite_kills_grant_cooldown",
+					"ogryn_weakspot_damage",
+				},
+			}
+
+			for class_name, expected in pairs(expected_talents) do
+				local actual = {}
+				for talent_name, _ in pairs(profiles[class_name].talents) do
+					actual[#actual + 1] = talent_name
+				end
+				table.sort(actual)
+				table.sort(expected)
+				assert.same(expected, actual, class_name .. " talents must match latest /build_dump")
+			end
+		end)
+
 		it("keeps the shipped profile labels aligned with the authored lineup", function()
 			assert.equals("Veteran - Plasma Gun + Power Sword", Localization.bot_profile_veteran.en)
-			assert.equals("Zealot - Boltgun + Heavy Eviscerator", Localization.bot_profile_zealot.en)
-			assert.equals("Psyker - Voidblast Staff + Duelling Sword", Localization.bot_profile_psyker.en)
-			assert.equals("Ogryn - Ripper Gun + Latrine Shovel", Localization.bot_profile_ogryn.en)
+			assert.equals("Zealot - Boltgun + Thunder Hammer", Localization.bot_profile_zealot.en)
+			assert.equals("Psyker - Recon Lasgun + Force Greatsword", Localization.bot_profile_psyker.en)
+			assert.equals("Ogryn - Kickback + Latrine Shovel", Localization.bot_profile_ogryn.en)
 		end)
 
 		it("every template has required fields", function()
@@ -232,27 +383,37 @@ describe("bot_profiles", function()
 			local profiles = BotProfiles._get_profiles()
 
 			for class_name, profile in pairs(profiles) do
+				local expected_curios = EXPECTED_CURIOS_BY_CLASS[class_name]
 				assert.is_table(profile.curios, class_name .. " missing curios metadata")
 				assert.equals(3, #profile.curios, class_name .. " should declare exactly 3 curios")
+				assert.is_table(expected_curios, class_name .. " missing test curio expectations")
 
 				for index, curio in ipairs(profile.curios) do
-					assert.equals(EXPECTED_CURIO_NAME, curio.name, class_name .. " curio " .. index .. " name")
+					local expected = expected_curios[index]
+					assert.equals(expected.name, curio.name, class_name .. " curio " .. index .. " name")
 					assert.equals(
-						EXPECTED_CURIO_MASTER_ITEM_ID,
+						expected.master_item_id,
 						curio.master_item_id,
 						class_name .. " curio " .. index .. " master item id"
 					)
 					assert.is_table(curio.traits, class_name .. " curio " .. index .. " missing traits")
-					assert.equals(4, #curio.traits, class_name .. " curio " .. index .. " should declare 4 traits")
-					assert.equals("gadget_innate_toughness_increase", curio.traits[1].id)
-					assert.equals("gadget_cooldown_reduction", curio.traits[2].id)
-					assert.equals("gadget_damage_reduction_vs_gunners", curio.traits[3].id)
-					assert.equals("gadget_stamina_regeneration", curio.traits[4].id)
+					assert.is_true(#curio.traits > 0, class_name .. " curio " .. index .. " traits empty")
 					for trait_index, trait in ipairs(curio.traits) do
-						assert.equals(
-							4,
+						assert.is_not_nil(
+							trait.id,
+							class_name .. " curio " .. index .. " trait " .. trait_index .. " id"
+						)
+						assert.is_not_nil(
 							trait.rarity,
 							class_name .. " curio " .. index .. " trait " .. trait_index .. " rarity"
+						)
+					end
+					for perk_index, perk in ipairs(curio.perks or {}) do
+						assert.is_not_nil(perk.id, class_name .. " curio " .. index .. " perk " .. perk_index .. " id")
+						assert.equals(
+							4,
+							perk.rarity,
+							class_name .. " curio " .. index .. " perk " .. perk_index .. " rarity"
 						)
 					end
 				end
@@ -458,13 +619,13 @@ describe("bot_profiles", function()
 				}
 
 				local fake_weapon_templates = {
-					chainsword_2h_p1_m1 = {
+					thunderhammer_2h_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							finesse_stat = {},
 						},
 					},
-					bolter_p1_m2 = {
+					bolter_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							charge_stat = {},
@@ -570,7 +731,7 @@ describe("bot_profiles", function()
 			local ok, err = pcall(function()
 				local fake_master_items = {
 					get_cached = function()
-						return {
+						return all_expected_curio_defs({
 							zealot_primary = {
 								id = "zealot_primary",
 								name = "zealot_primary",
@@ -581,12 +742,7 @@ describe("bot_profiles", function()
 								name = "zealot_secondary",
 								item_type = "WEAPON_RANGED",
 							},
-							[EXPECTED_CURIO_MASTER_ITEM_ID] = {
-								id = EXPECTED_CURIO_MASTER_ITEM_ID,
-								name = EXPECTED_CURIO_MASTER_ITEM_ID,
-								item_type = "GADGET",
-							},
-						}
+						})
 					end,
 					get_item_or_fallback = function(item_id)
 						return {
@@ -617,14 +773,14 @@ describe("bot_profiles", function()
 				}
 
 				local fake_weapon_templates = {
-					chainsword_2h_p1_m1 = {
+					thunderhammer_2h_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							cleave_stat = {},
 							finesse_stat = {},
 						},
 					},
-					bolter_p1_m2 = {
+					bolter_p1_m1 = {
 						base_stats = {
 							damage_stat = {},
 							finesse_stat = {},
@@ -693,11 +849,11 @@ describe("bot_profiles", function()
 				assert.equals("instance", resolved.loadout.slot_attachment_2.source)
 				assert.equals("instance", resolved.loadout.slot_attachment_3.source)
 				assert.equals(
-					"content/items/weapons/player/melee/chainsword_2h_p1_m1",
+					"content/items/weapons/player/melee/thunderhammer_2h_p1_m1",
 					seen_gears.slot_primary.masterDataInstance.id
 				)
 				assert.equals(
-					"content/items/weapons/player/ranged/bolter_p1_m2",
+					"content/items/weapons/player/ranged/bolter_p1_m1",
 					seen_gears.slot_secondary.masterDataInstance.id
 				)
 				assert.is_table(seen_gears.slot_primary.masterDataInstance.overrides.base_stats)
@@ -709,16 +865,30 @@ describe("bot_profiles", function()
 				assert.is_table(seen_gears.slot_secondary.masterDataInstance.overrides.base_stats)
 				assert.is_true(#seen_gears.slot_secondary.masterDataInstance.overrides.base_stats > 0)
 				assert.is_table(seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
-				assert.equals(4, #seen_gears.slot_attachment_1.masterDataInstance.overrides.traits)
-				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_1.masterDataInstance.id)
-				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_2.masterDataInstance.id)
-				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, seen_gears.slot_attachment_3.masterDataInstance.id)
-				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.visual_loadout.slot_attachment_1.name)
 				assert.equals(
-					EXPECTED_CURIO_MASTER_ITEM_ID .. "slot_attachment_1",
+					EXPECTED_CURIOS_BY_CLASS.zealot[1].master_item_id,
+					seen_gears.slot_attachment_1.masterDataInstance.id
+				)
+				assert.equals(
+					EXPECTED_CURIOS_BY_CLASS.zealot[2].master_item_id,
+					seen_gears.slot_attachment_2.masterDataInstance.id
+				)
+				assert.equals(
+					EXPECTED_CURIOS_BY_CLASS.zealot[3].master_item_id,
+					seen_gears.slot_attachment_3.masterDataInstance.id
+				)
+				assert.equals(
+					EXPECTED_CURIOS_BY_CLASS.zealot[1].master_item_id,
+					resolved.visual_loadout.slot_attachment_1.name
+				)
+				assert.equals(
+					EXPECTED_CURIOS_BY_CLASS.zealot[1].master_item_id .. "slot_attachment_1",
 					resolved.loadout_item_ids.slot_attachment_1
 				)
-				assert.equals(EXPECTED_CURIO_MASTER_ITEM_ID, resolved.loadout_item_data.slot_attachment_1.id)
+				assert.equals(
+					EXPECTED_CURIOS_BY_CLASS.zealot[1].master_item_id,
+					resolved.loadout_item_data.slot_attachment_1.id
+				)
 			end)
 
 			rawset(_G, "require", saved_require)
@@ -739,22 +909,22 @@ describe("bot_profiles", function()
 					secondary_template = "plasmagun_p1_m1",
 				},
 				zealot = {
-					primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
-					secondary = "content/items/weapons/player/ranged/bolter_p1_m2",
-					primary_template = "chainsword_2h_p1_m1",
-					secondary_template = "bolter_p1_m2",
+					primary = "content/items/weapons/player/melee/thunderhammer_2h_p1_m1",
+					secondary = "content/items/weapons/player/ranged/bolter_p1_m1",
+					primary_template = "thunderhammer_2h_p1_m1",
+					secondary_template = "bolter_p1_m1",
 				},
 				psyker = {
-					primary = "content/items/weapons/player/melee/combatsword_p3_m2",
-					secondary = "content/items/weapons/player/ranged/forcestaff_p1_m1",
-					primary_template = "combatsword_p3_m2",
-					secondary_template = "forcestaff_p1_m1",
+					primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
+					secondary = "content/items/weapons/player/ranged/lasgun_p3_m3",
+					primary_template = "forcesword_2h_p1_m1",
+					secondary_template = "lasgun_p3_m3",
 				},
 				ogryn = {
-					primary = "content/items/weapons/player/melee/ogryn_club_p1_m1",
-					secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
-					primary_template = "ogryn_club_p1_m1",
-					secondary_template = "ogryn_rippergun_p1_m3",
+					primary = "content/items/weapons/player/melee/ogryn_club_p1_m3",
+					secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
+					primary_template = "ogryn_club_p1_m3",
+					secondary_template = "ogryn_thumper_p1_m1",
 				},
 			}
 
@@ -765,7 +935,7 @@ describe("bot_profiles", function()
 				local ok, err = pcall(function()
 					local fake_master_items = {
 						get_cached = function()
-							return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+							return all_expected_curio_defs()
 						end,
 						get_item_or_fallback = function(item_id)
 							return { name = item_id, source = "fallback" }
@@ -900,7 +1070,7 @@ describe("bot_profiles", function()
 			local ok, err = pcall(function()
 				local fake_master_items = {
 					get_cached = function()
-						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+						return all_expected_curio_defs()
 					end,
 					get_item_or_fallback = function(item_id)
 						return { name = item_id, source = "fallback" }
@@ -933,8 +1103,8 @@ describe("bot_profiles", function()
 					end
 					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
 						return {
-							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
-							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
+							thunderhammer_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m1 = { base_stats = { damage_stat = {} } },
 						}
 					end
 					return saved_require(modname)
@@ -1014,7 +1184,7 @@ describe("bot_profiles", function()
 				local seen_gears = {}
 				local fake_master_items = {
 					get_cached = function()
-						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+						return all_expected_curio_defs()
 					end,
 					get_item_or_fallback = function(item_id)
 						return { name = item_id, source = "fallback" }
@@ -1118,7 +1288,7 @@ describe("bot_profiles", function()
 				local seen_gears = {}
 				local fake_master_items = {
 					get_cached = function()
-						return { [EXPECTED_CURIO_MASTER_ITEM_ID] = { name = EXPECTED_CURIO_MASTER_ITEM_ID } }
+						return all_expected_curio_defs()
 					end,
 					get_item_or_fallback = function(item_id)
 						return { name = item_id, source = "fallback" }
@@ -1147,8 +1317,8 @@ describe("bot_profiles", function()
 					end
 					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
 						return {
-							chainsword_2h_p1_m1 = { base_stats = { damage_stat = {} } },
-							bolter_p1_m2 = { base_stats = { damage_stat = {} } },
+							thunderhammer_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m1 = { base_stats = { damage_stat = {} } },
 						}
 					end
 					return saved_require(modname)

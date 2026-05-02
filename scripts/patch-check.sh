@@ -144,6 +144,18 @@ check_anchor \
 	"BotUnitInput.set_aiming = function" \
 	"bot input aiming toggle"
 check_anchor \
+	"scripts/extension_systems/input/bot_unit_input.lua" \
+	"BotUnitInput._update_movement = function" \
+	"bot input movement hook"
+check_anchor \
+	"scripts/extension_systems/group/bot_group.lua" \
+	"BotGroup.aoe_threat_created = function" \
+	"bot group AoE threat hook"
+check_anchor \
+	"scripts/extension_systems/hazard_prop/hazard_prop_extension.lua" \
+	"HazardPropExtension.set_current_state = function" \
+	"hazard prop state hook"
+check_anchor \
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua" \
 	"BtBotShootAction._set_new_aim_target = function" \
 	"bot shoot aim-target hook (#92)"

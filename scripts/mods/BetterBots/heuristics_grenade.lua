@@ -44,7 +44,7 @@ local NONEXPLOSIVE_GRENADE_REUSE_DELAY_S = {
 	conservative = 10,
 }
 
-local KRAK_HIGH_ARMOR_BREEDS = {
+local HIGH_ARMOR_BREEDS = {
 	chaos_ogryn_bulwark = true,
 	chaos_ogryn_executor = true,
 	renegade_executor = true,
@@ -187,6 +187,9 @@ local function _grenade_priority_target(context, rule_prefix, opts, preset)
 	if opts.block_super_armor and context.target_is_super_armor then
 		return false, rule_prefix .. "_block_super_armor"
 	end
+	if opts.block_monster and context.target_is_monster then
+		return false, rule_prefix .. "_block_monster"
+	end
 
 	local target_distance = context.target_enemy_distance or 0
 	local t = GRENADE_PRIORITY_PRESETS[preset] or GRENADE_PRIORITY_PRESETS.balanced
@@ -219,7 +222,7 @@ local function _grenade_krak(context, preset)
 	end
 
 	local breed_name = context.target_breed_name
-	local high_armor_breed = breed_name ~= nil and KRAK_HIGH_ARMOR_BREEDS[breed_name] == true
+	local high_armor_breed = breed_name ~= nil and HIGH_ARMOR_BREEDS[breed_name] == true
 	hard_target_context.target_is_elite_special = context.target_is_super_armor == true or high_armor_breed
 	hard_target_context.priority_target_enemy = nil
 	hard_target_context.opportunity_target_enemy = nil
@@ -230,6 +233,35 @@ local function _grenade_krak(context, preset)
 	end
 
 	return _grenade_priority_target(hard_target_context, "grenade_krak", { min_distance = 4 }, preset)
+end
+
+local function _grenade_zealot_knives(context)
+	if
+		context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "grenade_knives_block_dormant_daemonhost"
+	end
+	if context.target_is_monster then
+		return false, "grenade_knives_block_monster"
+	end
+	if context.target_is_super_armor then
+		return false, "grenade_knives_block_super_armor"
+	end
+	local breed_name = context.target_breed_name
+	if breed_name ~= nil and HIGH_ARMOR_BREEDS[breed_name] == true then
+		return false, "grenade_knives_block_hard_armor"
+	end
+	if not context.target_is_elite_special then
+		return false, "grenade_knives_hold"
+	end
+
+	return _grenade_priority_target(context, "grenade_knives", {
+		min_distance = 5,
+		skip_melee_engagement_block = true,
+		skip_priority_melee_pressure_block = true,
+	}, context.preset)
 end
 
 local function _charged_staff_should_own_pack(context)
@@ -686,11 +718,7 @@ local GRENADE_HEURISTICS = {
 		}, context.preset)
 	end,
 	zealot_throwing_knives = function(context)
-		return _grenade_priority_target(context, "grenade_knives", {
-			min_distance = 5,
-			skip_melee_engagement_block = true,
-			skip_priority_melee_pressure_block = true,
-		}, context.preset)
+		return _grenade_zealot_knives(context)
 	end,
 	ogryn_grenade_box = function(context)
 		return _grenade_ogryn_box(context, context.preset)

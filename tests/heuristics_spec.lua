@@ -145,6 +145,20 @@ describe("heuristics", function()
 			assert.matches("elite_special_gap", rule)
 		end)
 
+		it("blocks dashes into enemies standing near a dormant daemonhost", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 10,
+					target_is_elite_special = true,
+					target_is_near_dormant_daemonhost = true,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("daemonhost_nearby_target", rule)
+		end)
+
 		it("activates on combat gap close with multiple enemies", function()
 			local ok, rule = evaluate(
 				T,
@@ -179,11 +193,27 @@ describe("heuristics", function()
 					target_enemy = "unit",
 					target_enemy_distance = 8,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("holds soft ally aid at range", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
@@ -673,11 +703,25 @@ describe("heuristics", function()
 				T,
 				ctx({
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("does not charge for soft ally aid during a lull", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("no_target", rule)
 		end)
 
 		it("blocks when ally too close for charge", function()
@@ -1097,11 +1141,26 @@ describe("heuristics", function()
 				ctx({
 					target_enemy_distance = 6,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("does not charge for soft ally aid during a lull", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy_distance = 6,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("no_pressure", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
@@ -1268,11 +1327,45 @@ describe("heuristics", function()
 				assert.matches("voc_critical_toughness", rule)
 			end)
 
-			it("activates for ally aid", function()
+			it("activates for ally aid with pressure", function()
 				local ok, rule = evaluate(
 					T,
 					ctx({
+						num_nearby = 1,
 						target_ally_needs_aid = true,
+						target_ally_need_type = "in_need_of_heal",
+						target_ally_distance = 8,
+					}),
+					voc_opts()
+				)
+				assert.is_true(ok)
+				assert.matches("voc_ally_aid", rule)
+			end)
+
+			it("holds soft ally aid during a lull", function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 0,
+						toughness_pct = 0.90,
+						target_ally_needs_aid = true,
+						target_ally_need_type = "in_need_of_heal",
+						target_ally_distance = 8,
+					}),
+					voc_opts()
+				)
+				assert.is_false(ok)
+				assert.matches("voc_block_safe_state", rule)
+			end)
+
+			it("activates for knocked-down ally aid during a lull", function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 0,
+						toughness_pct = 0.90,
+						target_ally_needs_aid = true,
+						target_ally_need_type = "knocked_down",
 						target_ally_distance = 8,
 					}),
 					voc_opts()
@@ -1546,6 +1639,35 @@ describe("heuristics", function()
 				ctx({
 					num_nearby = 1,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("holds soft ally aid with only light pressure", function()
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 1,
+					toughness_pct = 0.95,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("safe", rule)
+		end)
+
+		it("activates soft ally aid with real pressure", function()
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.95,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
 				})
 			)
 			assert.is_true(ok)
@@ -1598,6 +1720,7 @@ describe("heuristics", function()
 					num_nearby = 1,
 					toughness_pct = 0.95,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 				})
 			)
 			assert.is_true(ok)
@@ -1983,6 +2106,7 @@ describe("heuristics", function()
 						target_enemy = "enemy",
 						target_enemy_distance = 10,
 						target_ally_needs_aid = true,
+						target_ally_need_type = "knocked_down",
 						target_ally_distance = 10,
 					})
 				)
@@ -2167,6 +2291,48 @@ describe("heuristics", function()
 			)
 			assert.is_true(result)
 			assert.matches("priority", rule)
+		end)
+
+		it("blocks grenades and blitzes against targets standing inside dormant daemonhost keepout", function()
+			local cases = {
+				{
+					template = "veteran_krak_grenade",
+					context = {
+						target_enemy = "mauler",
+						target_breed_name = "renegade_executor",
+						target_is_elite_special = true,
+						target_enemy_distance = 9,
+					},
+				},
+				{
+					template = "ogryn_grenade_frag",
+					context = {
+						target_enemy = "plague_ogryn",
+						target_is_monster = true,
+						monster_count = 1,
+						target_enemy_distance = 10,
+					},
+				},
+				{
+					template = "psyker_smite",
+					context = {
+						target_enemy = "crusher",
+						target_is_super_armor = true,
+						target_enemy_distance = 9,
+						peril_pct = 0.2,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				local local_ctx = helper.make_context(case.context)
+				local_ctx.target_is_near_dormant_daemonhost = true
+				local_ctx.target_is_dormant_daemonhost = false
+
+				local result, rule = Heuristics.evaluate_grenade_heuristic(case.template, local_ctx)
+				assert.is_false(result, case.template)
+				assert.matches("daemonhost_nearby_target", rule)
+			end
 		end)
 
 		it("holds krak grenades against non-armored specials so plasma can handle them", function()
@@ -3075,12 +3241,75 @@ describe("heuristics", function()
 				helper.make_context({
 					num_nearby = 4,
 					target_enemy = "gunner",
+					target_breed_name = "cultist_gunner",
 					target_is_elite_special = true,
 					target_enemy_distance = 7,
 				})
 			)
 			assert.is_true(result)
 			assert.matches("priority", rule)
+		end)
+
+		it("allows zealot throwing knives against berserker specials", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "netgunner",
+					target_breed_name = "renegade_netgunner",
+					target_is_elite_special = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_true(result)
+			assert.matches("priority", rule)
+		end)
+
+		it("holds zealot throwing knives against super armor targets", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "mauler",
+					target_breed_name = "renegade_executor",
+					target_is_elite_special = true,
+					target_is_super_armor = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("super_armor", rule)
+		end)
+
+		it("holds zealot throwing knives against hard-armored elite breeds without super armor metadata", function()
+			for _, breed_name in ipairs({
+				"renegade_executor",
+				"chaos_ogryn_bulwark",
+				"chaos_ogryn_executor",
+			}) do
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"zealot_throwing_knives",
+					helper.make_context({
+						target_enemy = breed_name,
+						target_breed_name = breed_name,
+						target_is_elite_special = true,
+						target_enemy_distance = 20,
+					})
+				)
+				assert.is_false(result, breed_name)
+				assert.matches("hard_armor", rule)
+			end
+		end)
+
+		it("holds zealot throwing knives against monsters", function()
+			local result, rule = Heuristics.evaluate_grenade_heuristic(
+				"zealot_throwing_knives",
+				helper.make_context({
+					target_enemy = "chaos_spawn",
+					target_is_monster = true,
+					target_enemy_distance = 20,
+				})
+			)
+			assert.is_false(result)
+			assert.matches("monster", rule)
 		end)
 
 		it("uses Smite on priority targets at safe peril", function()
@@ -3514,6 +3743,21 @@ describe("heuristics", function()
 			assert.is_true(context.in_hazard)
 		end)
 
+		it("copies target ally need type from perception", function()
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 7,
+					target_ally = "ally_unit",
+				},
+			})
+
+			assert.is_true(context.target_ally_needs_aid)
+			assert.equals("in_need_of_heal", context.target_ally_need_type)
+			assert.equals(7, context.target_ally_distance)
+		end)
+
 		it("reuses the liquid overlap buffer across frames", function()
 			local first_context = Heuristics.build_context("hazard_bot", nil)
 			current_fixed_t = 43
@@ -3606,6 +3850,113 @@ describe("heuristics", function()
 			})
 
 			assert.is_true(context.target_is_dormant_daemonhost)
+		end)
+
+		it("uses the shared daemonhost aggro stage marker", function()
+			_G.ALIVE.target_enemy = true
+			script_unit_extensions = {
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_daemonhost",
+						tags = { monster = true },
+					}),
+				},
+			}
+
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+				combat_ability_identity = CombatAbilityIdentity,
+				shared_rules = {
+					DAEMONHOST_BREED_NAMES = {
+						chaos_daemonhost = true,
+					},
+					DAEMONHOST_STAGE_AGGROED = 42,
+					daemonhost_state = function(unit)
+						assert.equals("target_enemy", unit)
+						return "alerted", 42
+					end,
+				},
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+			})
+
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.is_false(context.target_is_dormant_daemonhost)
+			assert.equals(42, context.target_daemonhost_stage)
+		end)
+
+		it("logs current target distance to a known non-aggroed daemonhost once per range bucket", function()
+			local debug_logs = {}
+			_G.ALIVE.target_enemy = true
+			script_unit_extensions = {
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "renegade_executor",
+						tags = { elite = true },
+					}),
+				},
+			}
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_enabled = function()
+					return true
+				end,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				is_position_near_daemonhost = function(unit, position)
+					assert.equals("hazard_bot", unit)
+					assert.equals("target_pos", position)
+					return false, "daemonhost_unit", 16 * 16
+				end,
+			})
+
+			Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+			current_fixed_t = 43
+			Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.equals(1, #debug_logs)
+			assert.equals("target_daemonhost_range:hazard_bot:target_enemy:daemonhost_unit:near", debug_logs[1].key)
+			assert.matches("target near daemonhost scan target=renegade_executor", debug_logs[1].message)
+			assert.matches("target_unit=target_enemy", debug_logs[1].message)
+			assert.matches("daemonhost=daemonhost_unit", debug_logs[1].message)
+			assert.matches("bucket=near", debug_logs[1].message)
+			assert.matches("target_dh_dist=16.0", debug_logs[1].message)
 		end)
 
 		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()
@@ -4129,14 +4480,15 @@ describe("heuristics", function()
 	describe("dormant daemonhost carve-out (#17)", function()
 		-- Every template that uses the _grenade_priority_target dispatch or
 		-- the _grenade_assail monster fast-path. Each must refuse the decision
-		-- when target_is_dormant_daemonhost is true, and resume normal
-		-- self-defense when the DH has aggroed on this bot (flag=false).
+		-- when target_is_dormant_daemonhost is true. Most resume normal
+		-- self-defense when the DH has aggroed on this bot (flag=false);
+		-- Zealot knives still hold because their own policy blocks monsters.
 		describe("priority-target grenades/blitzes", function()
 			local priority_grenades = {
 				{ template = "psyker_smite", distance = 12, peril_pct = 0.30 },
 				{ template = "psyker_throwing_knives", distance = 10, peril_pct = 0.30 },
 				{ template = "veteran_krak_grenade", distance = 10 },
-				{ template = "zealot_throwing_knives", distance = 10 },
+				{ template = "zealot_throwing_knives", distance = 10, blocks_aggroed_monster = true },
 				{ template = "ogryn_grenade_friend_rock", distance = 12 },
 				{ template = "broker_missile_launcher", distance = 14 },
 			}
@@ -4171,6 +4523,11 @@ describe("heuristics", function()
 							peril_pct = grenade.peril_pct,
 						})
 					)
+					if grenade.blocks_aggroed_monster then
+						assert.is_false(result)
+						assert.matches("monster", rule)
+						return
+					end
 					assert.is_true(result)
 					if grenade.template == "psyker_smite" then
 						assert.matches("monster", rule)
@@ -4179,6 +4536,21 @@ describe("heuristics", function()
 					end
 				end)
 			end
+
+			it("refuses krak grenades into enemies standing near a dormant daemonhost", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"veteran_krak_grenade",
+					helper.make_context({
+						target_enemy = "executor_unit",
+						target_breed_name = "renegade_executor",
+						target_is_elite_special = true,
+						target_is_near_dormant_daemonhost = true,
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(result)
+				assert.matches("daemonhost_nearby_target", rule)
+			end)
 		end)
 
 		describe("adamant_stance monster_pressure", function()

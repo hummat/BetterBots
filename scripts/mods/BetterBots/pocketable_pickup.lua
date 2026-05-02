@@ -196,11 +196,19 @@ end
 local function _carried_template_for_slot(unit, slot_name)
 	local visual_loadout_extension = _script_unit_has_extension
 		and _script_unit_has_extension(unit, "visual_loadout_system")
-	if not (visual_loadout_extension and _visual_loadout_api and _visual_loadout_api.weapon_template_from_slot) then
+	if not visual_loadout_extension then
 		return nil
 	end
 
-	return _visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, slot_name)
+	if visual_loadout_extension.weapon_template_from_slot then
+		return visual_loadout_extension:weapon_template_from_slot(slot_name)
+	end
+
+	if _visual_loadout_api and _visual_loadout_api.weapon_template_from_slot then
+		return _visual_loadout_api.weapon_template_from_slot(visual_loadout_extension, slot_name)
+	end
+
+	return nil
 end
 
 local function _supported_carried_pickup(unit)

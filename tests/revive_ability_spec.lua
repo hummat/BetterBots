@@ -173,6 +173,7 @@ end
 
 local _fallback_state = {}
 local _event_log_events = {}
+local _fixed_t = 100
 
 local function init_module(opts)
 	_fallback_state = {}
@@ -182,6 +183,7 @@ local function init_module(opts)
 	_suppressed = false
 	_suppressed_reason = nil
 	_combat_template_enabled = true
+	_fixed_t = 100
 
 	ReviveAbility.init({
 		mod = {
@@ -196,7 +198,7 @@ local function init_module(opts)
 			return _debug_on
 		end,
 		fixed_time = function()
-			return 100
+			return _fixed_t
 		end,
 		is_suppressed = function()
 			return _suppressed, _suppressed_reason
@@ -651,6 +653,62 @@ describe("revive_ability", function()
 			assert.is_false(applied)
 			assert.is_nil(self._perception_component.target_ally)
 			assert.is_false(self._behavior_component.revive_with_urgent_target)
+		end)
+
+		it("keeps the first assigned bot briefly even when another bot becomes slightly closer", function()
+			local first_bot = make_unit("bot_first")
+			local second_bot = make_unit("bot_second")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[first_bot] = vec(0)
+			_G.POSITION_LOOKUP[second_bot] = vec(4)
+			_G.POSITION_LOOKUP[human] = vec(1)
+
+			local bot_data = {
+				[first_bot] = {},
+				[second_bot] = {},
+			}
+			local first_self = make_priority_self(first_bot, { valid_human_units = { human } }, bot_data)
+			local second_self = make_priority_self(second_bot, { valid_human_units = { human } }, bot_data)
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+
+			_fixed_t = 101
+			_G.POSITION_LOOKUP[first_bot] = vec(1.3)
+			_G.POSITION_LOOKUP[second_bot] = vec(0.8)
+
+			assert.is_false(ReviveAbility.apply_human_revive_priority(second_self, second_bot))
+			assert.is_nil(second_self._perception_component.target_ally)
+			assert.is_false(second_self._behavior_component.revive_with_urgent_target)
+			assert.is_true(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+			assert.equals(human, first_self._perception_component.target_ally)
+		end)
+
+		it("allows a closer bot to take over after the revive owner lease expires", function()
+			local first_bot = make_unit("bot_first")
+			local second_bot = make_unit("bot_second")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[first_bot] = vec(0)
+			_G.POSITION_LOOKUP[second_bot] = vec(4)
+			_G.POSITION_LOOKUP[human] = vec(1)
+
+			local bot_data = {
+				[first_bot] = {},
+				[second_bot] = {},
+			}
+			local first_self = make_priority_self(first_bot, { valid_human_units = { human } }, bot_data)
+			local second_self = make_priority_self(second_bot, { valid_human_units = { human } }, bot_data)
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+
+			_fixed_t = 105
+			_G.POSITION_LOOKUP[first_bot] = vec(5)
+			_G.POSITION_LOOKUP[second_bot] = vec(1.2)
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(second_self, second_bot))
+			assert.equals(human, second_self._perception_component.target_ally)
+			assert.is_true(second_self._behavior_component.revive_with_urgent_target)
 		end)
 
 		it("still prioritizes a downed human over bot or enemy targets when another human is active", function()

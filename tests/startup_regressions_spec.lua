@@ -440,6 +440,23 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 		emit = function() end,
 	})
+	modules.ScenarioHarness = make_runtime_module("ScenarioHarness", install_calls, {
+		register_commands = function()
+			install_calls.register_calls[#install_calls.register_calls + 1] = {
+				module = "ScenarioHarness",
+				args = {},
+			}
+		end,
+	})
+	modules.HazardAvoidance = make_runtime_module("HazardAvoidance", install_calls, {
+		install_hazard_prop_hooks = function(target)
+			record_install("HazardAvoidance", "install_hazard_prop_hooks", target)
+		end,
+		install_bot_group_hooks = function(target)
+			record_install("HazardAvoidance", "install_bot_group_hooks", target)
+		end,
+		on_bot_input_movement_updated = function() end,
+	})
 	modules.Perf = make_runtime_module("Perf", install_calls, {
 		begin = function()
 			return 0
@@ -664,6 +681,8 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/update_dispatcher"] = modules.UpdateDispatcher,
 		["BetterBots/scripts/mods/BetterBots/debug"] = modules.Debug,
 		["BetterBots/scripts/mods/BetterBots/event_log"] = modules.EventLog,
+		["BetterBots/scripts/mods/BetterBots/scenario_harness"] = modules.ScenarioHarness,
+		["BetterBots/scripts/mods/BetterBots/hazard_avoidance"] = modules.HazardAvoidance,
 		["BetterBots/scripts/mods/BetterBots/perf"] = modules.Perf,
 		["BetterBots/scripts/mods/BetterBots/sprint"] = modules.Sprint,
 		["BetterBots/scripts/mods/BetterBots/melee_meta_data"] = modules.MeleeMetaData,
@@ -1049,6 +1068,10 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("SustainedFire%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find("Sprint%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/group/bot_group"', 1))
+		assert.is_truthy(source:find("HazardAvoidance%.install_bot_group_hooks%(", 1))
+		assert.is_truthy(
+			source:find('mod:hook_require%("scripts/extension_systems/hazard_prop/hazard_prop_extension"', 1)
+		)
 		assert.is_truthy(source:find("HealingDeferral%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.init%(", 1))
@@ -1176,6 +1199,10 @@ describe("startup regressions", function()
 		assert.equals("table", type(dispatcher_init.deps.session_start_state))
 		assert.equals("number", type(dispatcher_init.deps.snapshot_interval_s))
 
+		local scenario_init = find_named_call(harness.init_calls, "ScenarioHarness")
+		assert.equals(harness.modules.EventLog, scenario_init.deps.event_log)
+		assert.equals(harness.modules.Debug, scenario_init.deps.debug)
+
 		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
 		assert.is_function(weapon_register.args[1].should_lock_weapon_switch)
 		assert.is_function(weapon_register.args[1].should_block_wield_input)
@@ -1184,6 +1211,9 @@ describe("startup regressions", function()
 
 		local ranged_special_init = find_named_call(harness.init_calls, "RangedSpecialAction")
 		assert.equals(harness.modules.Debug.bot_slot_for_unit, ranged_special_init.deps.bot_slot_for_unit)
+
+		local scenario_register = find_named_call(harness.register_calls, "ScenarioHarness")
+		assert.is_truthy(scenario_register)
 
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", {
 			attack = function() end,
@@ -1194,6 +1224,7 @@ describe("startup regressions", function()
 		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_node", {})
 		harness:invoke_hook_require("scripts/extension_systems/input/bot_unit_input", {})
 		harness:invoke_hook_require("scripts/extension_systems/group/bot_group", {})
+		harness:invoke_hook_require("scripts/extension_systems/hazard_prop/hazard_prop_extension", {})
 		harness:invoke_hook_require("scripts/settings/bot/bot_settings", {})
 
 		assert.is_truthy(find_install_call(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
@@ -1203,9 +1234,72 @@ describe("startup regressions", function()
 		assert.is_truthy(find_install_call(harness.install_calls, "Sprint", "install_bot_unit_input_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HealingDeferral", "install_bot_group_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "MulePickup", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HazardAvoidance", "install_bot_group_hooks"))
+		assert.is_truthy(find_install_call(harness.install_calls, "HazardAvoidance", "install_hazard_prop_hooks"))
 		assert.is_truthy(find_install_call(harness.install_calls, "HumanLikeness", "patch_bot_settings"))
 		assert.is_truthy(find_install_call(harness.install_calls, "Debug", "install_combat_utility_diagnostics"))
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
+	end)
+
+	it("blocks weapon actions against a non-aggroed daemonhost target", function()
+		local bot = "bot_1"
+		local daemonhost = "daemonhost_1"
+		local non_aggroed = true
+		local harness = make_bootstrap_harness({
+			Settings = {
+				is_feature_enabled = function(setting_id)
+					return setting_id == "daemonhost_avoidance"
+				end,
+			},
+			SharedRules = {
+				DAEMONHOST_BREED_NAMES = {
+					chaos_daemonhost = true,
+				},
+				is_non_aggroed_daemonhost = function(target_unit)
+					assert.equals(daemonhost, target_unit)
+					if non_aggroed then
+						return true, "passive", 1
+					end
+					return false, "aggroed", 6
+				end,
+			},
+		})
+		harness:load()
+		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
+		local saved_blackboards = rawget(_G, "BLACKBOARDS")
+		local saved_script_unit = rawget(_G, "ScriptUnit")
+
+		rawset(_G, "BLACKBOARDS", {
+			[bot] = {
+				perception = {
+					target_enemy = daemonhost,
+				},
+			},
+		})
+		rawset(_G, "ScriptUnit", {
+			has_extension = function(unit, system_name)
+				if unit == daemonhost and system_name == "unit_data_system" then
+					return test_helper.make_minion_unit_data_extension({ name = "chaos_daemonhost" })
+				end
+				return nil
+			end,
+		})
+
+		local blocked, reason, details = weapon_register.args[1].should_block_weapon_action_input(bot, "shoot_pressed")
+		local cleanup_blocked = weapon_register.args[1].should_block_weapon_action_input(bot, "unwield_to_previous")
+		non_aggroed = false
+		local aggroed_blocked = weapon_register.args[1].should_block_weapon_action_input(bot, "shoot_pressed")
+
+		rawset(_G, "ScriptUnit", saved_script_unit)
+		rawset(_G, "BLACKBOARDS", saved_blackboards)
+
+		assert.is_true(blocked)
+		assert.equals("daemonhost_avoidance", reason)
+		assert.matches("target=chaos_daemonhost", details)
+		assert.matches("stage=1", details)
+		assert.matches("aggro_state=passive", details)
+		assert.is_false(cleanup_blocked)
+		assert.is_false(aggroed_blocked)
 	end)
 
 	it("registers every hook_require path declared in BetterBots.lua", function()
@@ -1220,6 +1314,7 @@ describe("startup regressions", function()
 			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
 			"scripts/extension_systems/behavior/nodes/bt_random_utility_node",
 			"scripts/extension_systems/group/bot_group",
+			"scripts/extension_systems/hazard_prop/hazard_prop_extension",
 			"scripts/extension_systems/input/bot_unit_input",
 			"scripts/extension_systems/perception/bot_perception_extension",
 			"scripts/settings/ability/ability_templates/ability_templates",
@@ -1299,16 +1394,28 @@ describe("startup regressions", function()
 		harness:load()
 
 		local validated = {}
+		local emitted_events = {}
 		harness.modules.ChargeNavValidation.should_validate = function(template_name)
 			return template_name == "zealot_dash"
 		end
+		harness.modules.ChargeNavValidation.should_emit_block_event = function(reason)
+			return reason ~= "cached_ray_blocked"
+		end
+		local validate_calls = 0
 		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source)
+			validate_calls = validate_calls + 1
 			validated[#validated + 1] = {
 				unit = unit,
 				template_name = template_name,
 				source = source,
 			}
-			return false, "ray_blocked"
+			return false, validate_calls == 1 and "ray_blocked" or "cached_ray_blocked"
+		end
+		harness.modules.EventLog.is_enabled = function()
+			return true
+		end
+		harness.modules.EventLog.emit = function(event)
+			emitted_events[#emitted_events + 1] = event
 		end
 
 		local called = 0
@@ -1334,6 +1441,7 @@ describe("startup regressions", function()
 			action
 		)
 		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10.1)
 
 		assert.equals(0, called)
 		assert.same({
@@ -1342,7 +1450,23 @@ describe("startup regressions", function()
 				template_name = "zealot_dash",
 				source = "bt_enter",
 			},
+			{
+				unit = "bot_unit",
+				template_name = "zealot_dash",
+				source = "bt_enter",
+			},
 		}, validated)
+		assert.same({
+			{
+				t = 0,
+				event = "blocked",
+				bot = 1,
+				ability = "unknown",
+				template = "zealot_dash",
+				source = "bt_enter",
+				reason = "ray_blocked",
+			},
+		}, emitted_events)
 	end)
 
 	it("does not mutate rescue aim before bt_enter charge validation blocks the action", function()

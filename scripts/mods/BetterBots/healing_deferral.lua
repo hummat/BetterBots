@@ -21,6 +21,7 @@ local EMERGENCY_THRESHOLD_SETTING_ID = "healing_deferral_emergency_threshold"
 local DEFAULT_MODE = "stations_and_deployables"
 local DEFERRAL_THRESHOLD = 0.9
 local EMERGENCY_THRESHOLD = 0.25
+local BOT_HEALTH_STATION_PRIORITY_MARGIN = 0.15
 local VALID_MODES = {
 	off = true,
 	stations_only = true,
@@ -196,6 +197,39 @@ local function _should_skip_health_station_use(
 	return false, nil
 end
 
+local function _more_injured_bot_count(unit, bot_units, bot_health_pct, health_pct_fn, priority_margin)
+	if not (unit and bot_units and bot_health_pct and health_pct_fn) then
+		return 0
+	end
+
+	local margin = priority_margin or BOT_HEALTH_STATION_PRIORITY_MARGIN
+	local more_injured_count = 0
+
+	for i = 1, #bot_units do
+		local other_unit = bot_units[i]
+
+		if other_unit and other_unit ~= unit then
+			local other_health_pct = health_pct_fn(other_unit)
+
+			if other_health_pct and other_health_pct + margin < bot_health_pct then
+				more_injured_count = more_injured_count + 1
+			end
+		end
+	end
+
+	return more_injured_count
+end
+
+local function _should_defer_to_more_injured_bot(unit, bot_units, bot_health_pct, charge_amount, health_pct_fn)
+	local charges = tonumber(charge_amount) or 0
+
+	if charges < 1 then
+		return false
+	end
+
+	return _more_injured_bot_count(unit, bot_units, bot_health_pct, health_pct_fn) >= charges
+end
+
 local function _apply_health_station_deferral(health_station_component)
 	health_station_component.needs_health = false
 	health_station_component.needs_health_queue_number = 0
@@ -342,6 +376,25 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
+		if
+			_should_defer_to_more_injured_bot(
+				unit,
+				self._side and self._side.valid_bot_units,
+				bot_health_pct,
+				charge_amount,
+				_health.current_health_percent
+			)
+		then
+			_apply_health_station_deferral(health_station_component)
+			if _health_station_log_state_changed(unit, "bot_priority") then
+				_log("healing_station:" .. tostring(unit), "deferred health station to more injured bot")
+			end
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
 		health_station_component.needs_health = true
 		health_station_component.needs_health_queue_number = 1
 		if _health_station_log_state_changed(unit, "allow") then
@@ -435,6 +488,7 @@ M.any_human_needs_healing = _any_human_needs_healing
 M.should_defer_healing = _should_defer_healing
 M.should_defer_resource = _should_defer_resource
 M.should_skip_health_station_use = _should_skip_health_station_use
+M.should_defer_to_more_injured_bot = _should_defer_to_more_injured_bot
 M.bot_preserves_wounded_state = _bot_preserves_wounded_state
 M.apply_health_station_deferral = _apply_health_station_deferral
 M.apply_health_deployable_deferral = _apply_health_deployable_deferral

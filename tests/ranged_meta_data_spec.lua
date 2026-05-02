@@ -194,6 +194,17 @@ describe("ranged_meta_data", function()
 			assert.equals(64, policy.hipfire_distance_sq)
 		end)
 
+		it("treats shotgun-grenade thumpers as close-range hipfire weapons", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_thumper_p1_m1",
+				keywords = { "ranged", "shotgun_grenade", "p1" },
+			})
+
+			assert.equals("shotgun_grenade", policy.family)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
+			assert.equals(64, policy.hipfire_distance_sq)
+		end)
+
 		it("keeps heavy stubbers between shotgun and flamer in the hipfire window", function()
 			local policy = RangedMetaData.close_range_ranged_policy({
 				name = "ogryn_heavystubber_p1_m1",
@@ -212,6 +223,108 @@ describe("ranged_meta_data", function()
 			})
 
 			assert.is_nil(policy)
+		end)
+	end)
+
+	describe("anti_armor_ranged_policy", function()
+		it("covers ranged families with local anti-armor evidence", function()
+			local cases = {
+				{
+					family = "plasmagun",
+					template = { name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+					min_distance_sq = 100,
+				},
+				{
+					family = "bolter",
+					template = { name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "boltpistol",
+					template = { name = "boltpistol_p1_m1", keywords = { "ranged", "boltpistol", "p1" } },
+					min_distance_sq = 100,
+				},
+				{
+					family = "lasgun_p2",
+					template = { name = "lasgun_p2_m1", keywords = { "ranged", "lasgun", "p2" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "stubrevolver",
+					template = { name = "stubrevolver_p1_m2", keywords = { "ranged", "stub_pistol", "p1" } },
+					min_distance_sq = 144,
+				},
+				{
+					family = "heavystubber",
+					template = {
+						name = "ogryn_heavystubber_p2_m2",
+						keywords = { "ranged", "heavystubber", "p2" },
+					},
+					min_distance_sq = 144,
+				},
+			}
+
+			for i = 1, #cases do
+				local case = cases[i]
+				local policy = RangedMetaData.anti_armor_ranged_policy(case.template)
+
+				assert.equals(case.family, policy.family)
+				assert.equals(case.min_distance_sq, policy.min_target_distance_sq)
+			end
+		end)
+
+		it("does not treat generic weakspot-capable guns as anti-armor ranged families", function()
+			local excluded = {
+				{ name = "lasgun_p1_m1", keywords = { "ranged", "lasgun", "p1" } },
+				{ name = "lasgun_p3_m1", keywords = { "ranged", "lasgun", "p3" } },
+				{ name = "autogun_p1_m1", keywords = { "ranged", "autogun", "p1" } },
+				{ name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+				{ name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				{ name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+			}
+
+			for i = 1, #excluded do
+				assert.is_nil(RangedMetaData.anti_armor_ranged_policy(excluded[i]))
+			end
+		end)
+	end)
+
+	describe("supports_weakspot_aim", function()
+		it("covers the original finesse families plus anti-armor ranged families", function()
+			local supported = {
+				{ name = "lasgun_p1_m1", keywords = { "ranged", "lasgun", "p1" } },
+				{ name = "autogun_p1_m1", keywords = { "ranged", "autogun", "p1" } },
+				{ name = "bolter_p1_m2", keywords = { "ranged", "bolter", "p1" } },
+				{ name = "stubrevolver_p1_m2", keywords = { "ranged", "stub_pistol", "p1" } },
+				{ name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+				{ name = "boltpistol_p1_m1", keywords = { "ranged", "boltpistol", "p1" } },
+				{ name = "ogryn_heavystubber_p1_m1", keywords = { "ranged", "heavystubber", "p1" } },
+				{ name = "ogryn_heavystubber_p2_m2", keywords = { "ranged", "heavystubber", "p2" } },
+			}
+
+			for i = 1, #supported do
+				assert.is_true(
+					RangedMetaData.supports_weakspot_aim(supported[i]),
+					supported[i].name .. " should support weakspot aim"
+				)
+			end
+		end)
+
+		it("still excludes close-range spray and blast families", function()
+			local excluded = {
+				{ name = "autopistol_p1_m1", keywords = { "ranged", "autopistol", "p1" } },
+				{ name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				{ name = "flamer_p1_m1", keywords = { "ranged", "flamer", "p1" } },
+				{ name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
+				{ name = "ogryn_thumper_p1_m1", keywords = { "ranged", "shotgun_grenade", "p1" } },
+			}
+
+			for i = 1, #excluded do
+				assert.is_false(
+					RangedMetaData.supports_weakspot_aim(excluded[i]),
+					excluded[i].name .. " should not support weakspot aim"
+				)
+			end
 		end)
 	end)
 
@@ -634,6 +747,8 @@ describe("ranged_meta_data", function()
 		it("sets fire_action_input but keeps fire_action_name default when action_shoot exists", function()
 			local templates = {
 				plasma = make_ranged_template({
+					name = "plasmagun_p1_m1",
+					keywords = { "ranged", "plasmagun", "p1" },
 					action_inputs = {
 						shoot_charge = {
 							input_sequence = {
@@ -653,6 +768,7 @@ describe("ranged_meta_data", function()
 			local meta = templates.plasma.attack_meta_data
 			assert.is_table(meta)
 			assert.equals("shoot_charge", meta.fire_action_input)
+			assert.same({ "j_head", "j_spine" }, meta.aim_at_node)
 			assert.is_nil(meta.fire_action_name)
 		end)
 

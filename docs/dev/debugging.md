@@ -59,6 +59,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `grenade queued <input> for <grenade>` | Grenade/blitz stage machine advanced a named input for a specific grenade; use this to distinguish Assail aimed `zoom`/`zoom_shoot` from crowd-burst `shoot` |
 | `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>` / `grenade aim unavailable for <grenade>` | Aim solver path chosen for the current grenade/blitz; strongest runtime signal for new Assail/area-grenade aiming logic. Aim lines include `bot=`, `target=`, `target_alive=`, and `target_breed=` so no-LOS aborts can be correlated with later throws. `(no_los)` means the target perception reported wall occlusion, so the throw was refused before release. |
 | `grenade aim lost dead target for <grenade>` | The grenade/blitz had a target earlier in the sequence, but that unit died before release so BetterBots aborted instead of using a stale aim point |
+| `grenade soft-hold ignored after commit` | A grenade/blitz already reached the aimed-throw stage, so a revalidation `*_hold` rule was treated as transient density/context drift and the throw continued; hard `*_block_*` rules still abort |
 | `grenade charge query failed for <grenade>` | The live ability extension threw while BetterBots queried grenade/blitz charges; Assail crowd bursts then fail closed as `charges unknown` |
 | `grenade retained live precision target for <grenade>` | Precision blitz lost the live perception slot during the handoff but kept the already-resolved still-alive target instead of aborting immediately |
 | `grenade burst unavailable for <grenade>` | A depletion-style Assail crowd burst was refused because the live shard count could not be resolved, so BetterBots failed closed instead of guessing |
@@ -83,9 +84,12 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `type flip ` | Target-type hysteresis allowed a real melee/ranged transition at the perception/math layer (#90) |
 | `type hold ` | Target-type hysteresis actively suppressed a raw type flip at the perception/math layer (#90) |
 | `close-range ranged family kept ranged target type` | Supported close-range ranged family overrode the normal melee fallback and kept the bot in ranged mode (#41 narrow) |
+| `anti-armor ranged family kept ranged target type` | Mauler/Bulwark/Crusher target was kept ranged for an explicit anti-armor secondary family (plasma, bolter/bolt pistol, helbore, stub revolver, heavy stubber) despite vanilla `killshot`'s armored-elite ranged penalty (#92 validation path) |
+| `anti-armor ranged target skipped` | Mauler/Bulwark/Crusher did not qualify for the anti-armor ranged lift; includes reason, secondary weapon resolution status, distance/min-distance, chosen type, and melee/ranged scores (#92 diagnostic path) |
 | `close-range hipfire suppressed ADS` | Supported close-range ranged family stayed in hipfire instead of ADS inside the close-range window (#41 narrow) |
 | `melee defend suppressed for attack commit` | BetterBots suppressed vanilla's broad melee block gate so the bot can commit attacks into a high-value armored target when only one or two melee attackers are registered and the current target is not actively attacking the bot |
 | `melee special prelude queued before` | Melee special was armed before the chosen attack; the `(family=...)` suffix now distinguishes `powersword_1h`, `powersword_2h`, `forcesword_1h`, `forcesword_2h`, `thunderhammer`, `chain`, `combat_axe_special`, `combat_sword_special`, `combat_knife_jab`, `powermaul`, `ogryn_powermaul`, `ogryn_latrine_shovel`, `ogryn_club_uppercut`, `ogryn_club_fist`, `ogryn_pickaxe`, and `ogryn_combatblade_uppercut` |
+| `melee direct special paced` | A direct sweep-style weapon special was still on BetterBots' per-bot reuse timer, so the chosen melee attack was left unwrapped instead of spamming another `special_action` |
 | `armed shotgun special for` | Supported shotgun special-shell loader rewrote a queued fire input into `special_action`; line includes template, current target breed, bot slot, and the original fire input |
 | `spent shotgun special for` | A previously armed supported shotgun later fired; line includes template, current spend-time target breed, bot slot, and fire input so wasted shells can be distinguished from good spends |
 | `queued rippergun bayonet for` | Supported rippergun fire was rewritten into the close-range `stab` input; line includes template, current target breed, bot slot, and original fire input |
@@ -120,9 +124,21 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `queued pocketable wield` / `queued pocketable input` | Carried pocketable state machine advanced into wield/use |
 | `pocketable use completed` / `pocketable ended without confirmation` / `pocketable timed out waiting for consume|wield` | Pocketable follow-through either finished, ended ambiguously, or stalled |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
+| `hazard_prop triggered` | A fused hazard prop entered vanilla's triggered state; line compares the vanilla AoE threat origin (`POSITION_LOOKUP`) against the broadphase and `c_explosion` positions, plus radius/timer (#107) |
+| `hazard_prop buffered threat` | BetterBots emitted an extra buffered AoE threat from the barrel `c_explosion` node when available (#107) |
+| `aoe_threat accepted` / `aoe_threat skipped` / `aoe_threat missed` | Vanilla `BotGroup.aoe_threat_created` result per bot. `accepted` means an escape direction was stored, `skipped` means an existing later threat won, and `missed` means vanilla did not store a usable escape direction (#107) |
+| `aoe_threat consumed` | `BotUnitInput._update_movement` actually consumed a stored AoE threat and wrote the movement vector; use this to separate threat creation from movement execution (#107) |
+| `movement safety blocked` | BetterBots cancelled a pending dodge whose projected endpoint failed nav continuity or dropped too far, used mainly for ledge safety (#107). Logged once per bot/reason per load. Ordinary movement fails open because stairs/downhill pathing can look like a ledge in the coarse endpoint probe. |
+| `movement safety steered away from daemonhost` | A bot inside the tighter daemonhost movement radius had movement biased away from a non-aggroed daemonhost (#107/#17). Logged once per bot/strength bucket per load and includes `bucket=<soft|medium|firm>` plus `strength=<N>`. The configurable keepout radius still controls risky action suppression. |
+| `daemonhost scan source` / `daemonhost scan candidate` | Trace-only scanner diagnostics for passive/awake daemonhost detection. Source lines show the first observed list size per source; candidate lines show breed, liveness, aggro state, stage, position availability, accepted flag, and rejection reason. |
+| `target near daemonhost scan` | Debug-only diagnostic emitted once per bot+target+daemonhost+range bucket when the bot has a current target and BetterBots can see a non-aggroed daemonhost; use it to prove the detector saw the daemonhost even if no suppression fired yet (#17/#107) |
 | `skipped ping for <target> (reason: recent_companion_tag)` | Generic pinging backed off because an Arbites bot had just issued a mastiff smart-tag on the same target; use this when checking remaining tag-spam reports |
-| `melee suppressed (daemonhost nearby)` / `ranged suppressed (daemonhost nearby)` | Close-range daemonhost safety gate fired; bot was inside the tight daemonhost combat radius and refused the attack (`#17`) |
-| `melee suppressed (target is dormant daemonhost)` / `ranged suppressed (target is dormant daemonhost)` | Non-aggroed daemonhost target suppression fired outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state` (`#17`) |
+| `ranged suppressed (daemonhost nearby)` | Close-range daemonhost safety gate fired; bot was inside the tight daemonhost combat radius and refused ranged fire (`#17`). Mixed-target melee is still allowed; direct dormant daemonhost targets still log `melee suppressed (target is dormant daemonhost...)`. |
+| `melee suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` / `ranged suppressed (...)` | Non-aggroed daemonhost target suppression fired outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state` (`#17`) |
+| `ranged suppressed (target near dormant daemonhost)` | Bot refused ranged fire at a non-daemonhost target whose position was inside the dormant daemonhost keepout zone (`#17/#107`) |
+| `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)` | Charge/dash nav validation refused a launch endpoint inside the dormant daemonhost keepout zone (`#17/#107`) |
+| `blocked foreign weapon action <input> while keeping daemonhost_avoidance target=<breed> stage=<N> aggro_state=<state> dormant=true` | Central `weapon_action` queue guard suppressed direct ranged/melee/grenade inputs against a non-aggroed daemonhost target (`#17`) |
+| `ability allowed against daemonhost: <ability> (rule=<rule>, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` | Ability activation was allowed against a daemonhost; use this with first-action timestamps to distinguish legitimate aggroed fights from dormant misclassification (`#17`) |
 | `skipped ping for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped companion tag for chaos_daemonhost (reason: dormant_daemonhost)` / `skipped player-tag boost for chaos_daemonhost (reason: dormant_daemonhost)` | Stage-aware daemonhost avoidance suppressed pinging, mastiff smart-tagging, or human-tag score boosts on a non-aggroed daemonhost (#17) |
 | `shield (` / `escort (` | Ally detected in objective interaction — the full line is `<profile> (<interaction_type>) dist=<N>`. Key: `interaction_scan:<unit>`, 5s throttle (#37) |
 | `revive candidate observed: <ability> (template=<template>, need_type=<type>)` | Bot selected a rescue destination while carrying a defensive revive ability, before `BtBotInteractAction.enter`. Use this to tell selector/path misses from interact-hook misses. Key: `revive_candidate:<ability>:<unit>` (#7) |
@@ -146,8 +162,12 @@ bb-log events rules   # JSONL: true/false decision counts by ability+rule
 bb-log events trace N # JSONL: timeline for bot slot N
 bb-log events holds   # JSONL: false decision distribution
 bb-log events items   # JSONL: item stage transitions + blocks
+bb-log events scenarios  # JSONL: /bb_scenario start/spawn/result rows
 bb-log events raw 'jq-filter'  # JSONL: raw jq passthrough
 ```
+
+For recurring "check for regressions" requests and major-release log reviews,
+use `docs/dev/core-regression-checks.md` as the checklist.
 
 **Manual grep recipes** (if bb-log unavailable):
 ```bash
@@ -191,6 +211,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 2. `/bb_decide`
    - Shows whether each alive bot would use its ability right now, without actually triggering it.
    - Includes the current decision (`true/false`) and rule for each bot.
+   - Context snapshots include `target_ally_need_type`, which separates hard disables (`knocked_down`, `ledge`, `netted`, `hogtied`) from soft heal/attention states. Rescue movement and support rules should not spend cooldowns on soft aid alone.
    - Best for threshold tuning or "why didn't it cast?" questions.
    - Do **not** run after every successful cast; run around suspected misses or surprising behavior.
 3. `/bb_brain`
@@ -208,6 +229,16 @@ These are implemented and intended for targeted diagnostics, not constant spam.
    - Resets all BetterBots settings to their defaults and saves them when the DMF save hook is available.
    - Each `mod:set` is `pcall`-wrapped, so a failure on one setting does not abort the loop. On any failure the echo reads `"BetterBots: reset partially failed: <id (err), ...>"`; clean success echoes `"BetterBots: all settings reset to defaults"`.
    - Reopen the mod settings menu if the UI does not immediately redraw after the reset.
+6. `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear`
+   - Lists and runs scripted validation spawns for live Solo Play testing.
+   - Built-in scenarios: `poxburster_push`, `crusher_pack`, `mauler_weakspot`, `mixed_horde_pressure`, `daemonhost_passive_near`, `daemonhost_aggroed_control`.
+   - Optional `distance` overrides the forward spawn distance in meters; optional `count` repeats each scenario spawn and spreads copies sideways. `mixed_horde_pressure` caps repeat count at 2 because its base composition is already 20 spawned units.
+   - `poxburster_push` spawns near the first live bot and targets that bot when possible; if no live bot can be resolved, it falls back to the local player.
+   - `mixed_horde_pressure` spawns trash, melee, Maulers, a gunner, and a grenadier to exercise ability triggers, grenade/blitz targeting, melee specials, target-type hysteresis, and perf under realistic clutter.
+   - `daemonhost_passive_near` spawns `chaos_daemonhost` with `optional_aggro_state = "passive"` and no forced target; use it for `#17` dormant-classifier validation. Useful detection/suppression markers are `daemonhost scan source`, `daemonhost scan candidate`, `target near daemonhost scan`, `movement safety steered away from daemonhost`, `skipped ping for chaos_daemonhost (reason: dormant_daemonhost)`, `melee/ranged suppressed (... daemonhost ... dormant=true)`, `ranged suppressed (target near dormant daemonhost)`, `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)`, `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true`, and `daemonhost_nearby_target`; `ability allowed against daemonhost ... dormant=false` before real aggro is the failure marker.
+   - `daemonhost_aggroed_control` spawns an aggroed daemonhost targeting the player; use it as the control case proving BetterBots still allows legitimate daemonhost combat once aggro is real.
+   - `/bb_scenario_clear` despawns units created by the scenario harness via `MinionSpawnManager:despawn_minion`.
+   - Scenario start/spawn/result rows go to JSONL with requested and resolved distance/count fields and are summarized by `bb-log events scenarios`.
 
 ### Practical debug workflow
 

@@ -124,20 +124,24 @@ case "$cmd" in
                         jq -r 'select(.event=="decision" and .result==false) | "\(.ability) \(.rule) (bot=\(.bot))"' "$events_file" \
                             | sort | uniq -c | sort -rn | head -20
                         ;;
-                    items)
-                        echo "=== Item stage transitions ==="
-                        jq -r 'select(.event=="item_stage") | "\(.ability) \(.stage) profile=\(.profile)"' "$events_file" \
-                            | sort | uniq -c | sort -rn
-                        echo ""
-                        echo "=== Item blocks ==="
-                        jq -r 'select(.event=="blocked") | "\(.ability) \(.reason) profile=\(.profile)"' "$events_file" \
-                            | sort | uniq -c | sort -rn
-                        ;;
-                    *)
-                        echo "Unknown events subcommand: $events_cmd"
-                        echo "Usage: bb-log events [summary|rules|trace|holds|items|raw] [file-index]"
-                        echo "       bb-log events trace <bot-slot> [file-index]"
-                        echo "       bb-log events raw [jq-filter] [file-index]"
+					items)
+						echo "=== Item stage transitions ==="
+						jq -r 'select(.event=="item_stage") | "\(.ability) \(.stage) profile=\(.profile)"' "$events_file" \
+							| sort | uniq -c | sort -rn
+						echo ""
+						echo "=== Item blocks ==="
+						jq -r 'select(.event=="blocked") | "\(.ability) \(.reason) profile=\(.profile)"' "$events_file" \
+							| sort | uniq -c | sort -rn
+						;;
+					scenarios)
+						echo "=== Scenario events ==="
+						jq -r 'select(.event | startswith("scenario_")) | "\(.t) \(.event) scenario=\(.scenario // "-") status=\(.status // "-") breed=\(.breed // "-") reason=\(.reason // "-") distance=\(.requested_distance // .forward_distance // "-") count=\(.requested_count // .repeat_count // "-") repeat=\(.repeat_index // "-") run=\(.run_id // "-")"' "$events_file"
+						;;
+					*)
+						echo "Unknown events subcommand: $events_cmd"
+						echo "Usage: bb-log events [summary|rules|trace|holds|items|scenarios|raw] [file-index]"
+						echo "       bb-log events trace <bot-slot> [file-index]"
+						echo "       bb-log events raw [jq-filter] [file-index]"
                         exit 1
                         ;;
                 esac
@@ -227,7 +231,7 @@ case "$cmd" in
         echo "Unknown command: $cmd"
         echo "Usage: bb-log [activations|rules|holds|summary|errors|warnings|tail|list|raw|events] [log-index]"
         echo "       bb-log raw <pattern> [log-index]"
-        echo "       bb-log events [summary|rules|trace|holds|items|raw] [file-index]"
+        echo "       bb-log events [summary|rules|trace|holds|items|scenarios|raw] [file-index]"
         exit 1
         ;;
 esac

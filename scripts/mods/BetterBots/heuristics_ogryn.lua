@@ -2,6 +2,17 @@ local _debug_log
 local _debug_enabled
 local _missing_talents_context_logged = false
 
+local HARD_ALLY_AID_TYPES = {
+	knocked_down = true,
+	ledge = true,
+	netted = true,
+	hogtied = true,
+}
+
+local function _target_ally_needs_hard_aid(context)
+	return context.target_ally_needs_aid == true and HARD_ALLY_AID_TYPES[context.target_ally_need_type] == true
+end
+
 local OGRYN_CHARGE_THRESHOLDS = {
 	aggressive = {
 		opportunity_min_dist = 4,
@@ -34,7 +45,7 @@ local function _can_activate_ogryn_charge(context, thresholds)
 	if context.priority_target_enemy and target_distance and target_distance > 4 then
 		return true, "ogryn_charge_priority_target"
 	end
-	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 6 then
+	if _target_ally_needs_hard_aid(context) and (context.target_ally_distance or math.huge) > 6 then
 		return true, "ogryn_charge_ally_aid"
 	end
 	if

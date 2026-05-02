@@ -70,7 +70,7 @@ This mod targets bot ability activation in three paths:
     - blocks ability activation when `blackboard.behavior.current_interaction_unit ~= nil`
     - applied in both BT condition hook and fallback path (after in-progress state machines)
 13a. Human revive priority (#108, via `revive_ability.lua`):
-    - hook `BotBehaviorExtension._verify_target_ally_aid_destination` (post-process): before BT evaluation and movement refresh, detects knocked-down human units on the bot side and assigns the nearest live bot as the urgent reviver
+    - hook `BotBehaviorExtension._verify_target_ally_aid_destination` (post-process): before BT evaluation and movement refresh, detects knocked-down human units on the bot side and assigns the nearest live bot as the urgent reviver, with a short per-human owner lease so close bots do not churn the assignment every frame
     - writes the vanilla revive seam instead of replacing the BT node: `perception.target_ally`, `target_ally_needs_aid`, `target_ally_need_type = "knocked_down"`, `behavior.revive_with_urgent_target = true`, and `follow.needs_destination_refresh = true`
     - lets vanilla `_refresh_destination()` compute `target_ally_aid_destination` and `can_revive` perform the final interaction check; stale assignments clear when the human stands up, dies, or the setting is disabled
     - exposed through `enable_human_revive_priority` and logs `human_revive_priority:<bot>:<human>` when debug logging is enabled
@@ -102,7 +102,8 @@ This mod targets bot ability activation in three paths:
     - uses `set_aim_rotation` for standard grenades, handleless grenades, Ogryn grenade throws, and zealot throwing knives; preserves flat fallback for near-flat, true-flight, and non-ballistic families
 21. Healing deferral (#39, via `healing_deferral.lua`):
     - hook `BotBehaviorExtension._update_health_stations` (post-process): clears `needs_health` when any human player is below the configured threshold (default 90%) and the bot is not in the configured emergency override state (default <25%)
-    - when every eligible human is above reserve, the same hook now promotes health-station demand for any damaged non-Martyrdom bot and forces queue number `1`, overriding vanilla's heavier-damage threshold so slightly-damaged or corruption-only bots stop leaving spare medicae charges stranded
+    - when every eligible human is above reserve, the same hook now promotes health-station demand for any damaged non-Martyrdom bot, overriding vanilla's heavier-damage threshold so slightly-damaged or corruption-only bots stop leaving spare medicae charges stranded
+    - scarce station charges are reserved for clearly more-injured bots first; a healthier bot can still use medicae when spare charges remain after worse bots are covered
     - hook `BotGroup._update_pickups_and_deployables_near_player` (post-process): clears `health_deployable` assignments under the same defer-to-human rule when med-crate deferral is enabled; when humans are above reserve, vanilla's existing `needs_non_permanent_health` flag already gives crates an "any healable damage" onset
     - Martyrdom zealots are an explicit exception to the generic emergency override: when healing deferral is enabled, live station and med-crate seams stay blocked so the bot preserves its low-health keystone value
     - exposes DMF settings for mode (`off`, `health stations only`, `health stations + med-crates`), human-priority threshold, and emergency override; strict mode can disable the emergency override entirely
@@ -120,7 +121,7 @@ This mod targets bot ability activation in three paths:
     - stale-pickup cleanup (dead-unit references) runs unconditionally; tome-blocking and grimoire-blocking only run when their respective toggle is off, so opting in to either pickup type no longer strands dead references in `_available_mule_pickups` / `pickup_component.mule_pickup` / behavior-component interaction targets
     - hook `BotBehaviorExtension._refresh_destination` (post-process): sanitizes live mule state (stale drops for any type; blocked references for whichever type is currently disabled)
     - hook `BotGroup.init`, `BotGroup._update_mule_pickups`, and setting-change sync: backfills missing mule slot caches on construction, then prunes cached reservations and explicit `slot_pocketable` pickup orders immediately when a pickup type is disabled, so bots can fall through to the other type without waiting for the vanilla cache to expire
-    - post-processes vanilla `_update_mule_pickups()` assignment to ignore the stock "suppress mule pickup while any human is within ~20m of the book" rule; BetterBots now claims the nearest eligible unassigned book for a bot with a free mule slot and an in-leash follow position, then marks destination refresh so ordinary book pickup can happen in the common nearby-player case
+    - post-processes vanilla `_update_mule_pickups()` assignment to ignore the stock "suppress mule pickup while any human is within ~20m of the book" rule; BetterBots now materializes valid explicit pickup orders into `pickup_component.mule_pickup`, claims the nearest eligible unassigned book for a bot with a free mule slot and an in-leash follow position, then marks destination refresh so ordinary book pickup can happen in the common nearby-player case
     - `pocketable_pickup.lua` extends the same carry path to supported pocketables (`ammo_cache_pocketable`, `medical_crate_pocketable`, the three combat stims, and `syringe_corruption_pocketable`) by patching `bots_mule_pickup`, mirroring `inventory_slot_name -> slot_name`, and letting vanilla `PocketableInteraction.stop` perform the actual slot insert
     - proactive pocketable assignment is human-first: BetterBots refuses to claim a supported pocketable while any human still has the matching slot open, unless the pickup came from an explicit bot order
     - hook `BotOrder.pickup`: rejects pickup orders for whichever book type is currently disabled, rejects unsupported pocketables entirely, and leaves supported pocketable orders intact when the feature is enabled
@@ -140,6 +141,13 @@ This mod targets bot ability activation in three paths:
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
+24a. Movement safety / hazard avoidance (#107, via `hazard_avoidance.lua` and `sprint.lua`):
+    - hook `HazardPropExtension.set_current_state`: when a hazard prop enters `triggered`, logs the vanilla threat origin (`POSITION_LOOKUP`), broadphase position, `c_explosion` position, radius, and timer so fused-barrel offset issues are visible in one log
+    - emits a buffered BetterBots AoE threat from the barrel `c_explosion` node when available, using the explosion template radius plus `hazard_avoidance_buffer`
+    - hook `BotGroup.aoe_threat_created`: after vanilla evaluates the threat, logs per bot whether the AoE threat was accepted, skipped because an existing later threat won, or missed because vanilla did not store an escape direction
+    - `sprint.lua` owns the existing `BotUnitInput._update_movement` hook and forwards post-vanilla movement state to `hazard_avoidance.lua`, which logs when `BotUnitInput` actually consumes an AoE threat for movement
+    - applies a conservative ledge endpoint guard after vanilla movement: projected short movement that fails nav continuity or drops too far cancels pending dodge only. Ordinary movement fails open because the coarse nav/drop probe misclassifies stairs and downhill traversal.
+    - daemonhost keepout steering remains in `sprint.lua` because it reuses the per-frame non-aggroed daemonhost scan; bots inside a tight movement radius get a distance-weighted movement bias away from the daemonhost, bots inside `daemonhost_keepout_distance` suppress risky actions, and sprint suppression still uses the wider 20m anti-aggro radius. The scan uses the bot side's known enemy relation list plus `Managers.state.minion_spawn:spawned_minions()`, not just active `ai_target_units`, so passive daemonhosts can still be treated as known hazards before they become bot AI targets.
 25. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
@@ -173,11 +181,11 @@ This mod targets bot ability activation in three paths:
     - supported templates: flamer, Purgatus, recon lasguns, infantry autoguns, braced autoguns, autopistol, dual autopistols, bolter hipfire, Ogryn heavy stubbers, and rippergun braced fire
     - cross-references with `actions` via `start_input` to find correct action names
     - only injects when vanilla fallback would fail; standard weapons (lasgun, autogun, bolter, flamer) are skipped
-    - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted finesse families (lasgun, autogun, bolter, stub revolver) when the template leaves `aim_at_node` unset (#91 MVP)
+    - also injects vanilla-style `aim_at_node = { "j_head", "j_spine" }` for allowlisted weakspot families (lasguns, autoguns, bolters/bolt pistols, stub revolvers, plasma guns, and both twin-linked `ogryn_heavystubber_p1_*` and single `ogryn_heavystubber_p2_*` heavy stubbers) when the template leaves `aim_at_node` unset (#91 MVP)
     - fixes plasma gun (`shoot_charge`), force staff (`shoot_pressed` → `rapid_left`), and other exotic fire paths
 29a. Ranged weapon specials (#33 follow-up, via `ranged_special_action.lua` + `weapon_action.lua`):
     - rewrites queued `shoot_pressed` / `zoom_shoot` inputs into `special_action` for the verified `ranged_load_special` shotgun families only (`shotgun_p1_m1/m2/m3`, `shotgun_p4_m1/m2`)
-    - rewrites queued close-range rippergun fire into `stab` for `ogryn_rippergun_p1_m1/m2/m3` when the current target is inside the configured bayonet distance and is elite/special/captain/monster/boss or armored/super-armor
+    - rewrites queued close-range rippergun fire into `stab` for `ogryn_rippergun_p1_m1/m2/m3` when the current target is inside the configured bayonet distance and is elite/special/captain/monster/boss or armored/super-armor; target-type hysteresis still lets close hard-armored melee targets flip to melee instead of trapping the bot in bayonet spam
     - rewrites queued close-range Ogryn heavy-stubber p1 `shoot` fire into `stab` and thumper `shoot_pressed` fire into `bash` under the same target-value policy, controlled by the separate ranged-bash distance slider
     - rewrites verified one-step human ranged bashes/pistol whips (`autogun_p2`, bolters, bolt pistols, flamer, laspistol, stub revolver, dual autopistols) under the same close-range target-value policy
     - rewrite policy is target-value driven: visible elite/special/captain/monster/boss or armored/super-armor target required; `shotgun_p2_m1`, autogun p3, force-staff stabs, flashlight variants, mauls, and other hold/release or non-combat specials are still out of scope
@@ -191,7 +199,10 @@ This mod targets bot ability activation in three paths:
     - hooks `BotPerceptionExtension._update_target_enemy` after vanilla target selection writes `perception_component`, leaving BT and weapon actions untouched
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
+    - when the bot has an explicit anti-armor secondary family (plasma, bolter/bolt pistol, helbore, stub revolver, heavy stubber), lifts the ranged score above melee for Mauler/Bulwark/Crusher targets at that family's policy distance so vanilla `killshot`'s `-5` armored-elite ranged weight does not force a long melee chase
+    - suppresses the generic close-range ranged-family hold for hard-armored targets unless an explicit anti-armor ranged policy is active, so heavy stubbers below their anti-armor minimum and unsupported families like ripperguns can still swap to melee instead of staying ranged for point-blank specials
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
+    - logs `anti-armor ranged family kept ranged target type ...` when the anti-armor target-type lift fires
 31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
     - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
@@ -210,6 +221,7 @@ This mod targets bot ability activation in three paths:
 31b. Charge/dash nav validation (#13, via `charge_nav_validation.lua`):
     - shared validator runs only after a charge/dash heuristic already wants to fire; it is not part of `build_context()` and does not add per-frame GwNav queries
     - validates the launch endpoint the lunge will actually use: explicit ally aim for rescue charges, current targeted-dash enemy position for zealot dash variants, and `BotNavigationExtension:destination()` only as the fallback for directional charges
+    - rejects launch endpoints inside the dormant daemonhost keepout zone before the GwNav ray query (`charge_nav=daemonhost_target_near`)
     - wired into both `BtBotActivateAbilityAction.enter` and `ability_queue.lua`; both paths validate before mutating rescue aim, so a blocked charge does not leave `BotUnitInput` stuck on the ally position
     - caches same-destination failures per bot for 0.5s; a refreshed destination bypasses the cache immediately, preventing repeated queries against an unchanged bad path while still allowing prompt retries after follow-path refresh
     - exposed through the `enable_charge_nav_validation` setting so users have a kill switch if Fatshark changes BotNavigationExtension or GwNav behavior before BetterBots catches up
@@ -268,6 +280,7 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
 | `BotBehaviorExtension._verify_target_ally_aid_destination` | `ReviveAbility` human-revive priority | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
 | `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
+| `BotUnitInput._update_movement` | `Sprint`, `HazardAvoidance` movement safety | `sprint.lua` hook forwards to `hazard_avoidance.lua` |
 | `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
 
 **Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
@@ -281,7 +294,7 @@ mod:hook_require("scripts/extension_systems/.../some_file", function(Target)
 end)
 ```
 
-The sentinel string must live on the engine class table (`rawget(Target, SENTINEL)`), not in a module-level Lua local (`setmetatable({}, {__mode="k"})`). Module locals reset when `BetterBots.lua` re-executes on hot reload; the engine class persists. Current callers of this pattern: `poxburster.lua`, `revive_ability.lua`, `ammo_policy.lua`, `weapon_action.lua`, `smart_targeting.lua`, and the two consolidated dispatchers in `BetterBots.lua`.
+The sentinel string must live on the engine class table (`rawget(Target, SENTINEL)`), not in a module-level Lua local (`setmetatable({}, {__mode="k"})`). Module locals reset when `BetterBots.lua` re-executes on hot reload; the engine class persists. Current callers of this pattern: `poxburster.lua`, `revive_ability.lua`, `ammo_policy.lua`, `weapon_action.lua`, `smart_targeting.lua`, `hazard_avoidance.lua`, and the consolidated dispatchers in `BetterBots.lua`.
 
 Regression coverage: `tests/startup_regressions_spec.lua` includes idempotency tests that simulate hot reload by loading the test harness twice with a shared extension table and assert zero new hook registrations on the second load.
 
@@ -330,7 +343,7 @@ Rule when adding a new mode or a new consumer: every reader of `change.*` must g
 
 `grenade_fallback.try_queue` evaluates the grenade heuristic twice per attempt: once at idle to decide "wield a grenade" and once after the aim window to re-check before releasing the throw. Both calls share `_evaluate_grenade_heuristic`. Density-gated templates (`_grenade_horde`, frag/box/fire/adamant) hard-gate at `num_nearby >= N`; across a ~0.5–1s aim window, `num_nearby` fluctuates as enemies move in and out of the bot's 5m proximity radius, so a strict re-check loses every throw to a transient one-enemy dip.
 
-Mitigation: `_evaluate_grenade_heuristic` accepts `opts.revalidation = true`. When set, the dispatcher temporarily mutates `context.num_nearby = num_nearby + 1` for the duration of the call and restores the original value before returning. `grenade_fallback.lua` passes `{ revalidation = true }` only at the aim-window re-check. The relaxation is bounded to one enemy — `0 → 1` is still held, so "threw into empty space" is impossible.
+Mitigation: `_evaluate_grenade_heuristic` accepts `opts.revalidation = true`. When set, the dispatcher temporarily mutates `context.num_nearby = num_nearby + 1` for the duration of the call and restores the original value before returning. `grenade_fallback.lua` passes `{ revalidation = true }` only at the aim-window re-check. The relaxation is bounded to one enemy -- `0 -> 1` is still held by the heuristic itself. After the bot has already committed to an aimed throw, `grenade_fallback` treats a revalidation rule ending in `_hold` as a soft hold and continues the throw, while hard block rules such as `*_block_melee_range` still abort.
 
 When tuning grenade density thresholds in `heuristics_grenade.lua`, remember the effective revalidation floor is `threshold - 1`, not `threshold`. If you lower frag from 6 to 5, the revalidation check accepts throws at 4 nearby. Raise the initial threshold rather than relaxing the delta if that becomes too permissive. Test coverage: `tests/heuristics_spec.lua` `describe "evaluate_grenade_heuristic"` pins both the relaxation and the empty-context floor.
 
@@ -369,7 +382,15 @@ Key design:
 - **Hot-reload recovery**: On `Ctrl+Shift+R`, module state resets but DMF doesn't re-fire `on_game_state_changed`. Load-time code detects alive bots and re-enables logging.
 - **False-decision compression**: Tracks skip counts per (bot, ability) to weight false decisions without flooding the file.
 
-Analysis via `bb-log events [summary|rules|holds|items|trace|raw]`. See `docs/dev/logging.md` for event schema.
+Analysis via `bb-log events [summary|rules|holds|items|scenarios|trace|raw]`. See `docs/dev/logging.md` for event schema.
+
+## Scripted validation scenarios
+
+`scenario_harness.lua` registers `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear` for controlled live validation runs. The harness is only available while the local client is the server and `Managers.state.minion_spawn` is ready.
+
+It uses the same raw spawn path as Creature Spawner: `Managers.state.minion_spawn:spawn_minion(breed_name, position, rotation, side_id, spawn_params)`. Most scenarios spawn aggroed enemies with `optional_target_unit` set to the local player or first live bot; `poxburster_push` anchors on the first live bot when available so the burster targets a bot rather than the player. `daemonhost_passive_near` passes `optional_aggro_state = "passive"` and omits `optional_target_unit` so the daemonhost starts from the passive path, while `daemonhost_aggroed_control` forces the opposite control case. Scenario spawns can carry per-entry counts for mixed compositions; command-level repeat count is capped per scenario so mixed hordes cannot accidentally turn into very large stress tests.
+
+Each run emits `scenario_start`, `scenario_spawn`, `scenario_spawn_failed`, `scenario_result`, and `scenario_clear` JSONL events. Inspect them with `bb-log events scenarios`.
 
 ## Performance analysis
 
@@ -389,6 +410,7 @@ For v1.0.0 release decisions, BetterBots now treats perf as a mission-end benchm
 | Heuristic evaluation | ~20 arithmetic comparisons | Pure comparisons on pre-built context table, no allocations, no engine calls |
 | `_can_activate_ability` (BT condition) | 1 `require` (cached) + `build_context` + heuristic | Only fires when BT priority selector reaches the ability node — usually short-circuited by higher-priority nodes |
 | `_fallback_try_queue_combat_ability` (update hook) | Same as above + state machine checks | Most frames exit early (cooldown not ready, retry timer, `can_use_ability("combat_ability") == false`, or state guard) |
+| `grenade_fallback.try_queue` idle path | Grenade/blitz availability + context + heuristic | Negative idle decisions are cadence-limited to 0.15s per bot so "no throw now" does not rebuild context every fixed frame; active throw stages still update every tick. |
 | Event logging (`emit`) | 1 table append per event | Buffered; flush to disk every 15s or 500 events. Off by default. |
 | Debug logging (`_debug_log`) | 1 string concat for key + 1 table lookup | Message body only built when debug enabled, but key argument is always evaluated |
 

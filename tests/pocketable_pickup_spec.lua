@@ -18,6 +18,7 @@ describe("pocketable_pickup", function()
 	local extension_map
 	local inventory_component
 	local carried_templates
+	local visual_loadout_api
 	local pickups
 	local bot_health_pct
 	local bot_corruption_pct
@@ -56,11 +57,7 @@ describe("pocketable_pickup", function()
 				local exts = extension_map[target_unit]
 				return exts and exts[system_name] or nil
 			end,
-			visual_loadout_api = {
-				weapon_template_from_slot = function(_, slot_name)
-					return carried_templates[slot_name]
-				end,
-			},
+			visual_loadout_api = visual_loadout_api,
 			health_module = {
 				current_health_percent = function(target_unit)
 					if target_unit == unit then
@@ -140,6 +137,11 @@ describe("pocketable_pickup", function()
 					use_self = {},
 				},
 			},
+		}
+		visual_loadout_api = {
+			weapon_template_from_slot = function(_, slot_name)
+				return carried_templates[slot_name]
+			end,
 		}
 		extension_map = {
 			[unit] = {
@@ -295,6 +297,30 @@ describe("pocketable_pickup", function()
 			component = "weapon_action",
 			input = "use_self",
 		}, queued_inputs[2])
+	end)
+
+	it("resolves carried pocketables through the real visual-loadout extension API", function()
+		visual_loadout_api = {}
+		extension_map[unit].visual_loadout_system = {
+			weapon_template_from_slot = function(_self, slot_name)
+				return carried_templates[slot_name]
+			end,
+		}
+		init_module()
+
+		build_context_result = test_helper.make_context({
+			num_nearby = 4,
+			challenge_rating_sum = 8,
+			target_is_elite_special = true,
+		})
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.same({
+			component = "weapon_action",
+			input = "wield",
+			raw_input = "wield_4",
+		}, queued_inputs[1])
 	end)
 
 	it(

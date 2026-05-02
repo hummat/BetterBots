@@ -138,25 +138,47 @@ local function _classify_pickup_target(target_unit)
 end
 
 local function _bot_is_alive(unit, player)
-	if ALIVE ~= nil then
-		local alive = ALIVE[unit]
+	if HEALTH_ALIVE ~= nil then
+		local alive = HEALTH_ALIVE[unit]
 		if alive ~= nil then
 			return alive == true
+		end
+	end
+
+	local saw_dead = false
+
+	if player and player.unit_is_alive then
+		local ok, alive = pcall(player.unit_is_alive, player)
+		if ok then
+			if alive == true then
+				return true
+			elseif alive == false then
+				return false
+			end
+		end
+	end
+
+	if ALIVE ~= nil then
+		local alive = ALIVE[unit]
+		if alive == true then
+			return true
+		elseif alive == false then
+			saw_dead = true
 		end
 	end
 
 	if Unit and Unit.alive then
-		local alive = Unit.alive(unit)
-		if alive ~= nil then
-			return alive == true
+		local ok, alive = pcall(Unit.alive, unit)
+		if ok then
+			if alive == true then
+				return true
+			elseif alive == false then
+				saw_dead = true
+			end
 		end
 	end
 
-	if player and player.unit_is_alive then
-		return player:unit_is_alive()
-	end
-
-	return unit ~= nil
+	return unit ~= nil and not saw_dead
 end
 
 local function _eligible_bot_for_family(bot_unit, descriptor)

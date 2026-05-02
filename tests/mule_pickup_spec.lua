@@ -391,7 +391,82 @@ describe("mule_pickup", function()
 		assert.is_table(instance._available_mule_pickups.slot_pocketable)
 	end)
 
+	it("clears stale pickup orders before vanilla mule pickup update runs", function()
+		local stale_tome = { pickup_type = "tome", deleted = true }
+		local bot_unit = "bot_1"
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = {},
+				pickup_orders = {
+					slot_pocketable = {
+						unit = stale_tome,
+						pickup_name = "tome",
+					},
+				},
+				behavior_component = {},
+			},
+		}
+		local BotGroup = {
+			_available_mule_pickups = {
+				slot_pocketable = {
+					[stale_tome] = 20,
+				},
+			},
+			data = function()
+				return bot_data
+			end,
+			_update_mule_pickups = function(self)
+				assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable)
+				assert.is_nil(self._available_mule_pickups.slot_pocketable[stale_tome])
+			end,
+			init = function() end,
+		}
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		BotGroup:_update_mule_pickups()
+
+		assert.is_truthy(find_debug_log("cleared stale mule pickup ref (source=pickup_orders.slot_pocketable)"))
+	end)
+
+	it("clears stale small-pocketable orders before vanilla mule pickup update runs", function()
+		local stale_stim = { pickup_type = "syringe_corruption_pocketable", deleted = true }
+		local bot_unit = "bot_1"
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = {},
+				pickup_orders = {
+					slot_pocketable_small = {
+						unit = stale_stim,
+						pickup_name = "syringe_corruption_pocketable",
+					},
+				},
+				behavior_component = {},
+			},
+		}
+		local BotGroup = {
+			_available_mule_pickups = {
+				slot_pocketable_small = {
+					[stale_stim] = 20,
+				},
+			},
+			data = function()
+				return bot_data
+			end,
+			_update_mule_pickups = function(self)
+				assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable_small)
+				assert.is_nil(self._available_mule_pickups.slot_pocketable_small[stale_stim])
+			end,
+			init = function() end,
+		}
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		BotGroup:_update_mule_pickups()
+
+		assert.is_truthy(find_debug_log("cleared stale mule pickup ref (source=pickup_orders.slot_pocketable_small)"))
+	end)
+
 	it("installs BotGroup hooks only once per shared class table", function()
+		local hook_calls = {}
 		local hook_safe_calls = {}
 		local BotGroup = {
 			init = function() end,
@@ -400,6 +475,12 @@ describe("mule_pickup", function()
 
 		MulePickup.init({
 			mod = {
+				hook = function(_, target, method_name)
+					hook_calls[#hook_calls + 1] = {
+						target = target,
+						method = method_name,
+					}
+				end,
 				hook_safe = function(_, target, method_name)
 					hook_safe_calls[#hook_safe_calls + 1] = {
 						target = target,
@@ -429,7 +510,8 @@ describe("mule_pickup", function()
 		MulePickup.install_bot_group_hooks(BotGroup)
 		MulePickup.install_bot_group_hooks(BotGroup)
 
-		assert.equals(2, #hook_safe_calls)
+		assert.equals(1, #hook_safe_calls)
+		assert.equals(1, #hook_calls)
 	end)
 
 	it("assigns an available tome mule pickup even when vanilla leaves it unclaimed", function()
@@ -485,6 +567,65 @@ describe("mule_pickup", function()
 		assert.equals(tome_unit, pickup_component.mule_pickup)
 		assert.equals(1, pickup_component.mule_pickup_distance)
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+	end)
+
+	it("materializes explicit tome pickup orders when vanilla leaves mule state empty", function()
+		local tome_unit = { pickup_type = "tome" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {
+					slot_pocketable = {
+						unit = tome_unit,
+						pickup_name = "tome",
+					},
+				},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[tome_unit] = { x = 4, y = 0, z = 0 },
+		}
+		_G.BLACKBOARDS[bot_unit] = {
+			follow = {
+				needs_destination_refresh = false,
+			},
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.equals(tome_unit, pickup_component.mule_pickup)
+		assert.equals(3, pickup_component.mule_pickup_distance)
+		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+		assert.is_truthy(find_debug_log("assigned ordered mule pickup for tome"))
 	end)
 
 	it("does not assign proactive pocketables when policy rejects the pickup", function()
@@ -591,6 +732,55 @@ describe("mule_pickup", function()
 		assert.equals(math.huge, pickup_component.mule_pickup_distance)
 	end)
 
+	it("keeps explicit ordered pocketables during refresh even when a human slot is open", function()
+		local stim_unit = { pickup_type = "syringe_power_boost_pocketable" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = stim_unit,
+			mule_pickup_distance = 4,
+		}
+		local bot_group = {
+			_available_mule_pickups = {
+				slot_pocketable_small = {},
+			},
+		}
+		local data = {
+			pickup_component = pickup_component,
+			pickup_orders = {
+				slot_pocketable_small = {
+					unit = stim_unit,
+					pickup_name = "syringe_power_boost_pocketable",
+				},
+			},
+			behavior_component = {},
+		}
+
+		policy_allow_pickup = function(_unit, pickup_unit, _bot_group, bot_data)
+			local order = bot_data and bot_data.pickup_orders and bot_data.pickup_orders.slot_pocketable_small
+			if order and order.unit == pickup_unit then
+				return true, nil
+			end
+
+			return false, "human_slot_open"
+		end
+
+		MulePickup.on_refresh_destination({
+			_unit = bot_unit,
+			_pickup_component = pickup_component,
+			_behavior_component = {},
+			_bot_group = bot_group,
+			_group_extension = {
+				bot_group_data = function()
+					return data
+				end,
+			},
+		})
+
+		assert.equals(stim_unit, pickup_component.mule_pickup)
+		assert.equals(4, pickup_component.mule_pickup_distance)
+		assert.is_nil(find_debug_log("blocked pocketable mule pickup"))
+	end)
+
 	it("blocks pickup orders when policy rejects the requested pocketable", function()
 		policy_block_order = function()
 			return true, "unsupported_pocketable"
@@ -602,6 +792,37 @@ describe("mule_pickup", function()
 
 		assert.is_true(blocked)
 		assert.equals("unsupported_pocketable", reason)
+	end)
+
+	it("installs the BotOrder pickup hook once per shared table", function()
+		local hook_require_callbacks = {}
+		local pickup_hook_count = 0
+		fake_mod.hook_require = function(_, path, callback)
+			hook_require_callbacks[path] = callback
+		end
+		fake_mod.hook = function(_, target, method_name, handler)
+			if method_name == "pickup" then
+				pickup_hook_count = pickup_hook_count + 1
+			end
+			local original = target[method_name]
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end
+
+		MulePickup.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/utilities/bot_order"]
+		local BotOrder = {
+			pickup = function()
+				return "picked"
+			end,
+		}
+		callback(BotOrder)
+		callback(BotOrder)
+
+		assert.equals(1, pickup_hook_count)
+		assert.equals("picked", BotOrder.pickup("bot", "pickup", "player"))
 	end)
 
 	it("logs actual tome pickup success after a successful pocketable interaction", function()

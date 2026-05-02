@@ -65,7 +65,7 @@ end
 function M.is_non_aggroed_daemonhost(target_unit)
 	local aggro_state, stage = M.daemonhost_state(target_unit)
 	if stage ~= nil then
-		return stage ~= M.DAEMONHOST_STAGE_AGGROED, aggro_state, stage
+		return stage < M.DAEMONHOST_STAGE_AGGROED, aggro_state, stage
 	end
 	if aggro_state ~= nil then
 		return aggro_state ~= "aggroed", aggro_state, stage

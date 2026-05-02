@@ -78,7 +78,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `fallback item blocked ...` (unsupported template, no wield input, timeout, etc.)
 - `charge consumed for ...` (ability charge spent, strongest success signal)
 - `grenade queued wield for <grenade> (rule=<rule>)` (grenade fallback started a throw sequence)
-- `grenade held <grenade> (rule=<rule>, nearby=<N>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason; `rule=*block_recent_use` is the confirmation signal for the non-explosive reuse pacing gate on fire/smoke-type grenades)
+- `grenade held <grenade> (rule=<rule>, nearby=<N>, distance=<d|none>, challenge=<N>, elites=<N>, specials=<N>, monsters=<N>, breed=<breed|none>, peril=<N|nil>)` (grenade/blitz heuristic withheld use for an actionable reason; `rule=*block_recent_use` is the confirmation signal for the non-explosive reuse pacing gate on fire/smoke-type grenades)
 - `unsupported grenade template <grenade> (rule=<rule>)` (heuristic approved a grenade/blitz template that BetterBots has no throw profile for)
 - `grenade queued <input> for <grenade>` (grenade fallback advanced through the named throw/blitz input; use this to distinguish Assail `zoom`/`zoom_shoot` from the crowd-burst `shoot` path)
 - `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade> (<reason>)` / `grenade aim unavailable for <grenade> (<reason>)` (aim solver confirmation for ballistic vs flat vs failed aim acquisition; debug lines include `bot=`, `target=`, `target_alive=`, `target_alive_source=`, and `target_breed=`)
@@ -132,6 +132,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
+- `blocked foreign weapon action <input> while keeping daemonhost_avoidance target=<breed> stage=<N> aggro_state=<state> dormant=true` (central `weapon_action` queue guard suppressed direct ranged/melee/grenade inputs against a non-aggroed daemonhost target; validation signal for `#17`)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `normalized shoot scratchpad inputs (fire=<input>, aim_fire=<input>, aim=<input>, unaim=<input>)` (`#43` validation; `BtBotShootAction.enter` repaired stale/default shoot inputs against the live wielded template before `_may_fire` validates them. For plasma, expect `fire=shoot_charge, aim_fire=shoot_charge`.)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw> target_slot=<slot> target=<unit|none> target_alive=<alive|dead|unknown|none> target_breed=<breed|unknown>` (`#43` validation; template-tagged queued weapon input, keyed by target so suspected ghost-target shots can be separated from normal target changes)
@@ -144,6 +145,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `close-range ranged family kept ranged target type (family=<family>, distance=<d>, ranged_score=<r>, melee_score=<m>)` (`#41` narrow Sprint 3 override; a supported close-range ranged family kept the bot in ranged mode under point-blank pressure instead of flipping to melee)
 - `close-range hipfire suppressed ADS (family=<family>, distance=<d>)` (`#41` narrow Sprint 3 ADS suppression; a supported close-range ranged family stayed in hipfire inside the family policy window)
 - `melee special prelude queued before <attack> (family=<family>)` (`#33`/`#103` melee-special identity; BetterBots prepended `special_action` before the chosen melee attack, with the family marker distinguishing powered weapons, chain weapons, direct combat axe/sword/knife specials, power mauls, Ogryn latrine shovels, clubs, pickaxes, and combat blades)
+- `melee direct special paced (family=<family>, elapsed=<N>, cooldown=<N>)` (`#33` direct-special pacing; BetterBots left the chosen melee attack unwrapped because a direct sweep-style `special_action` was already queued inside the per-bot reuse window)
 - `supported special family missing action metadata (weapon=<template>, family=<family>)` (one-shot debug diagnostic that a supported melee-special template matched BetterBots' family policy but did not expose a resolvable `special_action` action for that family; catches future Fatshark action-kind renames and partial policy additions without silently dropping the feature)
 - `queued rippergun bayonet for <template> target=<breed> (bot=<slot>, fire_input=<input>)` (`#33` ranged-special identity; BetterBots rewrote close-range rippergun fire into the bayonet `stab` input for a valuable target)
 - `queued ranged bash for <template> target=<breed> (bot=<slot>, fire_input=<input>)` (`#33` ranged-special identity; BetterBots rewrote close-range supported heavy-stubber/thumper, direct ranged bash, or pistol-whip fire into a weapon-special input for a valuable target)
@@ -151,6 +153,8 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `bot <slot> suppressed opposite-type switch <old> -> <new> (elapsed=<N>s)` (`#90` symptom-layer validation; `wrong_slot_for_target_type` wanted an immediate opposite-type reswitch, but the BT-side debounce suppressed it for a non-priority target)
 - `bot <slot> wrong slot for <target_type> target (wielded=<slot>, wanted=<slot>)` (`#90` symptom-layer condition signal; `wrong_slot_for_target_type` fired for the current target type, so the BT wanted a weapon swap)
 - `bot <slot> switch_melee entered (wielded=<slot>, wanted=slot_primary, target_type=melee)` / `bot <slot> switch_ranged entered (wielded=<slot>, wanted=slot_secondary, target_type=ranged)` (`#90` action-layer signal; the inventory-switch node actually executed instead of just evaluating the target-type math)
+- `anti-armor ranged family kept ranged target type (family=<family>, breed=<breed>, distance=<d>)` (`#92` target-type validation; a Mauler/Bulwark/Crusher stayed ranged for an explicit anti-armor secondary family despite vanilla `killshot`'s armored-elite ranged penalty)
+- `anti-armor ranged target skipped (reason=<reason>, weapon=<template>, secondary_status=<status>, breed=<breed>, distance=<d>, min_distance=<d|none>, chosen=<melee|ranged>, melee=<score>, ranged=<score>)` (`#92` target-type diagnostic; a Mauler/Bulwark/Crusher did not qualify for the anti-armor ranged lift, with enough context to distinguish unsupported secondary templates, missing visual-loadout resolution, and too-close policy distance)
 - `weakspot aim selected j_head|j_spine (weapon=<template>, bot=<slot>)` (`#91` validation; bot entered `BtBotShootAction` with the head/spine weakspot aim table active while the `Weakspot aim` feature was enabled and selected an actual runtime node)
 - `suppressed stale shoot aim input <input> for <template> (bot=<unit>)` / `suppressed stale shoot unaim input <input> for <template> (bot=<unit>)` (`BtBotShootAction` tried to carry an old ADS input onto a live non-aim template after a weapon/context change; BetterBots suppressed the queue before it reached `ActionInputParser`)
 - `shoot scratchpad normalization skipped: missing unit_data_system or visual_loadout_system` (one-shot diagnostic from the `BtBotShootAction.enter` hook; BetterBots could not normalize ADS/brace inputs for that bot)
@@ -161,10 +165,15 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `pushing poxburster (bypassed outnumbered gate)` (poxburster melee hook forced a push; direct validation signal for `#54`)
-- `melee suppressed (daemonhost nearby)` (bot refused melee because it was inside the close daemonhost safety radius; tight proximity gate for `#17`)
 - `ranged suppressed (daemonhost nearby)` (bot refused ranged fire because it was inside the close daemonhost safety radius; tight proximity gate for `#17`)
-- `melee suppressed (target is dormant daemonhost)` (bot refused melee because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
-- `ranged suppressed (target is dormant daemonhost)` (bot refused ranged fire because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
+- `melee suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (bot refused melee because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
+- `ranged suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (bot refused ranged fire because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
+- `ranged suppressed (target near dormant daemonhost)` (bot refused ranged fire at a non-daemonhost enemy standing inside the dormant daemonhost keepout zone; validation signal for mixed-target `#17/#107` tests)
+- `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)` (charge/dash validation refused a launch endpoint inside the dormant daemonhost keepout zone; validation signal for mixed-target `#17/#107` tests)
+- `daemonhost scan source source=<ai_target_units|relation_units|spawned_minions> count=<N>` (trace-only scan diagnostic emitted once per source per load, with the first observed list size; use it when a passive daemonhost exists but no later target/proximity suppression marker appears)
+- `daemonhost scan candidate source=<source> unit=<unit> breed=<breed> alive=<bool> aggro_state=<state|nil> stage=<N|nil> position=<yes|no> accepted=<bool> reason=<accepted|dead|aggroed>` (trace-only classifier diagnostic emitted once per daemonhost candidate/source/state tuple; distinguishes liveness, breed, stage, aggro, and missing-position rejection)
+- `target near daemonhost scan target=<breed> target_unit=<unit> daemonhost=<unit> bucket=<inner|alert|keepout|near|far> target_dh_dist=<N> bot_target_dist=<N|unknown>` (debug-only diagnostic emitted once per bot+target+daemonhost+bucket when BetterBots sees any non-aggroed daemonhost while a bot has a current target; use it to distinguish detector misses from suppression policy misses)
+- `ability allowed against daemonhost: <ability> (rule=<rule>, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (ability activation was allowed against a daemonhost; use the first such line in a daemonhost encounter to distinguish normal aggroed combat from dormant misclassification)
 - `sprint STOP (daemonhost_nearby)` (bot dropped sprint because it entered daemonhost safety radius; movement-side validation signal for `#17`)
 - `patched visual loadout is_local_unit=false for bot (pre-init)` (spawn-time loadout VFX suppression applied before slot scripts initialized; direct validation signal for `#53`)
 - `patched ability effect context is_local_unit=false for bot` (ability effect VFX suppression applied for bot-owned ability contexts; VFX validation signal)
@@ -193,6 +202,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots: blackboard utility unavailable; mule pickup destination refresh skipped` (one-shot warning that the blackboard write helper could not be loaded, so mule destination refresh fell back to a no-op for that session)
 - `ammo policy skipped: no pickup_component` (debug-only diagnostic that `_update_ammo` ran on a bot without a pickup component, so reserve logic was skipped for that tick)
 - `deferred health station to human player` / `deferred medical crate to human player` (healing deferral yielded a medicae station or med-crate because a human player was below the configured reserve)
+- `deferred health station to more injured bot` (station-charge-aware bot ordering yielded a scarce medicae charge to a clearly more-injured bot)
 - `battle cry request noted: aggressive preset override for <N>s` / `need ammo request noted for <N>s` / `need health request noted for <N>s` (`com_wheel_response.lua` observed the relevant communication-wheel trigger and cached its short-lived override state)
 - `smart-tag pickup routed <pickup> to bot <slot> (family=<family>)` / `smart-tag pickup ignored for <pickup> (reason=<reason>[, detail=bot=<slot>:<reason>, ...])` (`smart_tag_orders.lua` accepted or rejected an explicit item tag after reusing the normal BetterBots pickup policy gates; `detail=` is only present when `reason=no_eligible_bot`)
 - `queued pocketable wield <input> for <pickup>` / `queued pocketable input <input> for <pickup>` (`pocketable_pickup.lua` advanced the carried-item state machine into wield/use)
@@ -207,6 +217,9 @@ The following were removed/throttled to reduce chat spam during testing:
 - **`decision -> false`** — suppressed; BT-path false decisions are no longer logged
 - **`fallback held` with `nearby=0`** — suppressed; idle holds produce no log output
 - **`blocked (template_name=none)` in BT path** — throttled to 20s (was 2s); expected for item abilities
+- **Cached `charge_nav` blocked JSONL events** — suppressed; the first concrete
+  failure reason is still emitted, but `cached_<reason>` repeats are console-
+  throttled only and do not enter `betterbots_events_*.jsonl`
 
 **Observability impact:** Idle-state bot decisions (no enemies nearby) are completely invisible in new logs. `bb-log summary` `held_idle` counter will show 0 for runs after this change. This is acceptable for combat-focused heuristic tuning but means idle behavior issues won't appear in logs. Re-enable by reverting the guards in `debug.lua:log_ability_decision` and `BetterBots.lua:_fallback_try_queue_combat_ability` if needed.
 
@@ -335,7 +348,7 @@ self-defense behavior.
 
 Events carry `attempt_id` (monotonic per session) to link decision → queued → consumed chains. `bot` field is the player slot index.
 
-`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation.
+`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation and `target_is_near_dormant_daemonhost` for daemonhost keepout checks.
 
 ### Analysis
 

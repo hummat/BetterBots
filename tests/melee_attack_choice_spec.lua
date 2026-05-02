@@ -2409,6 +2409,209 @@ describe("melee_attack_choice", function()
 		end
 	end)
 
+	it("paces Ogryn club fist specials after a queued direct special", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local fixed_t = 13
+		local debug_logs = {}
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+		_G.ScriptUnit = {
+			has_extension = function()
+				return {
+					read_component = function(_, component_name)
+						if component_name == "weapon_action" then
+							return { template_name = "ogryn_club_p2_m3" }
+						end
+						return nil
+					end,
+				}
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function(key, _, message)
+				debug_logs[#debug_logs + 1] = {
+					key = key,
+					message = message,
+				}
+			end,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			bb_unit = "bot_unit",
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "ogryn_club_p2_m3",
+				attack_meta_data = {
+					light_attack = attack_meta({ arc = 0, penetrating = false }),
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.4,
+				family = "ogryn_club_fist",
+				is_direct_attack = true,
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local first_chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+		assert.equals("special_action", first_chosen.action_inputs[1].action_input)
+
+		MeleeAttackChoice.observe_queued_weapon_action("bot_unit", "special_action")
+		fixed_t = 14
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+		assert.equals(heavy_attack, chosen)
+		local paced_log
+		for i = 1, #debug_logs do
+			if string.find(debug_logs[i].message, "melee direct special paced", 1, true) then
+				paced_log = debug_logs[i]
+				break
+			end
+		end
+		assert.is_truthy(paced_log)
+
+		fixed_t = 20
+		chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+		assert.equals("special_action", chosen.action_inputs[1].action_input)
+	end)
+
+	it("paces direct sweep specials for power mauls after queue confirmation", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local fixed_t = 13
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+		_G.ScriptUnit = {
+			has_extension = function()
+				return {
+					read_component = function(_, component_name)
+						if component_name == "weapon_action" then
+							return { template_name = "powermaul_p1_m1" }
+						end
+						return nil
+					end,
+				}
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return true
+			end,
+			fixed_time = function()
+				return fixed_t
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			ARMOR_TYPE_SUPER_ARMOR = SUPER_ARMOR,
+		})
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			bb_unit = "bot_unit",
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "powermaul_p1_m1",
+				attack_meta_data = {
+					light_attack = attack_meta({ arc = 0, penetrating = false }),
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.5,
+				family = "powermaul",
+				is_direct_attack = true,
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			},
+		}
+
+		local first_chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+		assert.equals("special_action", first_chosen.action_inputs[1].action_input)
+
+		MeleeAttackChoice.observe_queued_weapon_action("bot_unit", "special_action")
+		fixed_t = 14
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { name = "renegade_executor", tags = { elite = true } }, scratchpad)
+
+		assert.equals(heavy_attack, chosen)
+	end)
+
 	it("does not prepend remaining Ogryn direct specials for ordinary unarmored specialists", function()
 		local cases = {
 			{

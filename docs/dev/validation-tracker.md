@@ -62,6 +62,175 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-05-02-daemonhost-hazard-smart-tag-closure
+
+```text
+Run ID: 2026-05-02-daemonhost-hazard-smart-tag-closure
+Date (local): 2026-05-02
+Date (UTC): 2026-05-02
+Git commit: dev/post-v1.0 local branch before commits 82ceb32/a8453fb
+Log file: console-2026-05-02-14.33.58-fe67c8a9-b7bf-472f-8848-c73f3602b77a.log
+Map + difficulty: targeted daemonhost scenario plus live hazard/smart-tag checks
+
+#17 daemonhost avoidance: PASS / CLOSED
+- daemonhost classifier accepted the scenario DH as non-aggroed:
+  - `daemonhost scan candidate ... breed=chaos_daemonhost alive=true aggro_state=passive stage=1 ... accepted=true`
+  - later repeats at `stage=2` and `stage=4`
+- movement safety fired while the DH was non-aggroed: repeated `movement safety steered away from daemonhost`
+- mixed-target keepout fired after a Mauler spawn near the DH:
+  - `target near daemonhost scan target=renegade_executor ... bucket=inner`
+  - `ranged suppressed (target near dormant daemonhost)`
+  - `grenade held ... rule=daemonhost_nearby_target` for Ogryn frag, Zealot fire grenade, Veteran krak, and Psyker smite
+  - `fallback held zealot_dash (rule=daemonhost_nearby_target)` and `fallback held ogryn_taunt_shout (rule=daemonhost_nearby_target)`
+- mixed-target melee remained available for self-defense
+
+#107 hazard movement safety: PASS / CLOSED
+- `hazard_prop triggered ...`
+- vanilla/BetterBots threat path stored bot threats: `aoe_threat accepted ...`
+- movement consumed them: `aoe_threat consumed ... move=... escape=...`
+- ledge endpoint guard fired: `movement safety blocked unit=<slot> reason=ledge_ray_blocked`
+- daemonhost close movement steering was validated in the same movement-safety pass
+
+#96 smart-tag item bridge: PASS / CLOSED
+- explicit supported item tags routed to bots:
+  - `smart-tag pickup routed syringe_speed_boost_pocketable to bot 3/4/5 (family=slot_order)`
+  - `smart-tag pickup routed syringe_power_boost_pocketable to bot 2/3/5 (family=slot_order)`
+- no `bot_dead` rejection appeared in this run
+- same run exposed duplicate `BotOrder.pickup` rehook warnings; fixed afterward in `a8453fb`
+
+Conclusion:
+- Closed `#17`, `#96`, `#100`, and `#107` on GitHub on 2026-05-02.
+- Do not close `#92` from this evidence; it remains too niche / under-observed unless a cheap scenario exposes the weakspot marker.
+```
+
+### Run 2026-05-02-daemonhost-passive-scenario-01
+
+```text
+Run ID: 2026-05-02-daemonhost-passive-scenario-01
+Date (local): 2026-05-02
+Date (UTC): 2026-05-02
+Git commit: da19d7a+ (local dirty tree: passive daemonhost scenario + weakspot crash fix)
+Log file: console-2026-05-02-09.54.51-c4128d88-f30f-413a-83f9-5e8a38987e40.log
+Map + difficulty: targeted `/bb_scenario daemonhost_passive_near`
+
+#17 daemonhost avoidance: FAIL before follow-up fix
+- scenario spawned `chaos_daemonhost` via `daemonhost_passive_near` at t=17.2115
+- first daemonhost combat appeared ~18s later:
+  - `bot 4 pinged chaos_daemonhost (reason: target_enemy)`
+  - `bot 5 pinged chaos_daemonhost (reason: target_enemy_focus_target_override)`
+  - weapon/grenade actions followed against `target_breed=chaos_daemonhost` (`zoom`, `shoot_pressed`, Ogryn rock, Veteran krak, Assail, melee attacks)
+- no `dormant_daemonhost` skip/suppress marker appeared before the attacks
+- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. Later 2026-05-02 retests still lacked `daemonhost_nearby` / keepout markers while the player circled the passive DH, then blocked ranged better but still allowed Krak grenades and Zealot dash toward a Mauler inside the awake-but-not-aggroed DH zone. Follow-up code now also scans `Managers.state.minion_spawn:spawned_minions()` when side lookup is missing, logs `daemonhost scan source` / `daemonhost scan candidate` classifier diagnostics, logs `target near daemonhost scan` once per bot+target+daemonhost+range bucket, blocks ranged fire at non-daemonhost targets inside dormant DH keepout, blocks grenade/blitz decisions with `daemonhost_nearby_target`, and blocks charge/dash endpoints with `charge_nav=daemonhost_target_near`. Re-test should pass only if the next passive/awake run shows `target near daemonhost scan`, `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)`, `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true`, or `daemonhost_nearby_target`, with no damaging weapon/grenade release or dash into enemies inside its keepout zone. If those suppression markers are absent, inspect `daemonhost scan source` and `daemonhost scan candidate` first.
+
+#107 hazard movement safety: code-complete after this failed run; live re-test pending
+- the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for pending dodge output only. A 2026-05-02 retest showed generic movement endpoint blocking misclassified stairs/downhill traversal as `ledge_drop`, so normal movement now fails open.
+- re-test should check `/bb_scenario daemonhost_passive_near` plus a mission segment with barrels, floor hazards, and ledges
+- expected markers: `movement safety steered away from daemonhost`, `daemonhost scan source`, `daemonhost scan candidate`, `target near daemonhost scan`, `ranged suppressed (target near dormant daemonhost)`, `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)`, `daemonhost_nearby_target`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
+```
+
+### Run 2026-04-29-post-v1-validation-rollup
+
+```text
+Run ID: 2026-04-29-post-v1-validation-rollup
+Date (local): 2026-04-29
+Date (UTC): 2026-04-29
+Git commit: dev/post-v1.0 April 29 validation branch
+Log files:
+- console-2026-04-29-16.32.07-a435de8b-052f-4722-89b6-60c12c07c3a9.log
+- console-2026-04-29-16.58.08-db4d37bd-80f0-4296-91c1-d15b5c5a0e50.log
+- console-2026-04-29-17.10.48-79271f1d-b285-428d-82a3-5f42e970f3b9.log
+- console-2026-04-29-17.58.08-8271338f-2e3d-413f-9bda-b7f2fa277afd.log
+- console-2026-04-29-18.20.42-2637bc0d-fa9c-4ef1-81ac-948f5e33f7bb.log
+- console-2026-04-29-18.46.59-5cba60d0-4e7b-472c-9070-8ea2d4fa4159.log
+- console-2026-04-29-19.11.14-595beab0-65b3-4115-9dcd-9a8514037073.log
+
+Regression checks:
+- BetterBots warnings: no in latest checked run (`./bb-log warnings` = none)
+- Lua errors: no in latest checked run (`./bb-log errors` = none)
+
+#108 human revive priority:
+- PASS
+  - key lines / timestamps: `17:14:31.929 ... [bot=2] human revive priority assigned ... reason=mission_critical distance=4.1089`
+  - follow-up pathing/interaction: `17:14:32.034 ... sprint START (ally_rescue)`, `17:14:33.178 ... shield (revive) dist=10.9`, and `17:14:33.289 ... grenade blocked: interacting with [Unit '#ID[f888cbd0f5a35360]']`
+  - repeat evidence: second revive-pressure window at `17:18:55.294` assignment, `17:18:55.338` ally-rescue sprint, `17:18:55.565` shield, and `17:18:55.790` interacting block on the same human unit
+  - note: the log does not print a literal vanilla `do_revive` marker, but the assignment -> ally-rescue sprint -> shield/interacting sequence validates the BetterBots seam and shows vanilla interaction ownership took over
+
+#106 perf cap:
+- PASS
+  - mission-end `bb-perf:auto` totals across April 29: `116.5`, `79.3`, `98.1`, `90.2`, `90.1`, `102.2`, `95.7 us/bot/frame`
+  - median: `95.7 us/bot/frame`
+  - worst run: `116.5 us/bot/frame`
+  - `ability_queue + grenade_fallback` stayed below 50% in the checked runs; worst checked share was the 18:46 run at `(3161 + 422) / 7715 = 46.4%`
+
+#100 scenario harness:
+- PASS for MVP live spawn/logging
+  - key lines / timestamps: `bb-log events scenarios` showed three `mauler_weakspot` runs (`mauler_weakspot:49788`, `:82096`, `:112923`), each with 10 `scenario_spawn` rows for `renegade_executor` at distance 22 and `scenario_result status=spawned`
+  - follow-up: do not hold the MVP issue open for scenario-library quality; track useful new scenarios separately
+
+#17 daemonhost avoidance:
+- NOT VALIDATED
+  - April 29 logs only show context dumps with `target_is_dormant_daemonhost = false`
+  - no decisive first-action `ability allowed against daemonhost ... stage=<N> aggro_state=<state> dormant=<bool>` or `melee/ranged suppressed (... daemonhost ...)` marker was found
+  - next useful action is a targeted daemonhost scenario if spawning one is reliable, not more random log review
+
+#92 per-breed weakspot:
+- DEPRIORITIZED
+  - Mauler scenario validated the important behavior: anti-armor ranged target type above 12m, melee fallback below 12m, no heavy-stubber bash loop, and hard-armor knife blocks
+  - remaining generic `weakspot aim selected` proof is too niche to chase manually
+
+Conclusion:
+- `#108`, `#106`, and `#100` are closed.
+- `#17` was later closed from the 2026-05-02 targeted daemonhost run above.
+- Do not spend more manual validation time on `#92` unless the scenario harness makes it cheap.
+```
+
+### Run 2026-04-29-mauler-weakspot-scenario-01
+
+```text
+Run ID: 2026-04-29-mauler-weakspot-scenario-01
+Date (local): 2026-04-29
+Date (UTC): 2026-04-29
+Git commit: 833e140
+Log file: console-2026-04-29-19.11.14-595beab0-65b3-4115-9dcd-9a8514037073.log
+Bot lineup / abilities: validation roster with bolter, heavy stubber, krak grenade, Ogryn frag, and Zealot throwing knives present
+Map + difficulty: `/bb_scenario mauler_weakspot 22 10` targeted scenario smoke
+
+Regression checks:
+- fresh launch / startup load: UNKNOWN
+- duplicate startup spam: no evidence in summary
+- BetterBots warnings: no (`./bb-log summary` = `BB warnings: 0`)
+- Lua errors: no (`./bb-log summary` = `Error lines: 0`)
+
+Scenario harness / #100 evidence:
+- Scenario command distance/count: PASS
+  - key lines / timestamps: three `mauler_weakspot` runs spawned 10 `renegade_executor` units at distance 22 (`mauler_weakspot:49788`, `mauler_weakspot:82096`, `mauler_weakspot:112923`)
+
+Sprint 1 / #92 evidence:
+- Mauler anti-armor ranged target type: PASS
+  - key lines / timestamps: `anti-armor ranged family kept ranged target type (family=bolter, breed=renegade_executor, distance=24.94)` and `family=heavystubber ... distance=24.19` at 19:13:29, with repeated keep-ranged markers above the 12m minimum
+- Close hard-armor melee fallback: PASS
+  - key lines / timestamps: `anti-armor ranged target skipped (reason=distance_below_min, weapon=bolter_p1_m1, ... distance=12.00, min_distance=12.00, chosen=melee)` plus `bot 5 switch_melee entered` at 19:13:37; equivalent heavy-stubber skip/switch at 19:13:37 and 19:14:40
+- Heavy-stubber ranged bash loop regression: PASS
+  - key lines / timestamps: no `queued ranged bash` marker found in the checked raw log
+- Mauler weakspot override: PARTIAL PASS
+  - key lines / timestamps: `weakspot override applied (breed=renegade_executor, node=j_spine)` at 19:13:29 and 19:14:05
+  - remaining gap: no `weakspot aim selected` marker in this run; Mauler spine override is not enough to close generic weakspot validation
+
+Grenade / blitz evidence:
+- Zealot knives blocked against Maulers: PASS
+  - key lines / timestamps: repeated `grenade held zealot_throwing_knives (rule=grenade_knives_block_hard_armor, ... breed=renegade_executor, ...)`
+  - negative evidence: no `grenade queued wield for zealot_throwing_knives`, `ability blitz activated zealot_throwing_knives`, `bot weapon ... zealot_throwing_knives`, or release line found
+- Veteran krak against Maulers: PASS
+  - key lines / timestamps: 7 `veteran_krak_grenade` consumes in `./bb-log summary`, with repeated `grenade releasing toward ... target_breed=renegade_executor`
+- Ogryn frag against Mauler packs: PASS
+  - key lines / timestamps: 1 `ogryn_grenade_frag` consume in `./bb-log summary`, with `grenade releasing toward ... target_breed=renegade_executor` at 19:13:34
+
+Conclusion:
+- The anti-armor target-type regression and heavy-stubber bash-loop regression look fixed in this scenario.
+- Knife hard-armor blocking is behaving correctly in the log; visual knife-like behavior was not backed by a BetterBots knife queue/release marker.
+- Keep `#92` open for a non-Mauler weakspot target that should produce `weakspot aim selected`.
+```
+
 ### Run 2026-04-22-v1-0-0-followup-02
 
 ```text
@@ -1709,7 +1878,7 @@ Map + difficulty: live daemonhost encounter
   - offensive abilities were still allowed near a sleeping daemonhost before `target_enemy`/target-state suppression converged
 
 Follow-up fix staged after this run:
-- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
+- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range ranged checks
 - keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
 ```
 
@@ -1747,6 +1916,7 @@ Conclusion:
 - if the daemonhost was already fully aggroed before `09:22:29`, bot commitment was expected
 - if it was still dormant or only waking, this is still a daemonhost-avoidance failure
 - the text log lacks the decisive first-action `target_daemonhost_stage` / `target_daemonhost_aggro_state` values, so the next validation pass needs those values logged when a daemonhost target/action is allowed or suppressed
+- follow-up 2026-04-28: text logging now includes `target=<breed> stage=<N> aggro_state=<state> dormant=<bool>` on dormant melee/ranged suppression and on allowed ability activations against daemonhost targets. The next daemonhost run should use the first `ability allowed against daemonhost` or `*_suppressed (... daemonhost ...)` line as the decisive classifier evidence.
 ```
 
 ### Run 2026-04-16-v0.11.0-target-type-hysteresis-closure

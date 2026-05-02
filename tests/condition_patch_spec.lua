@@ -1,7 +1,7 @@
 -- Tests for condition_patch.lua daemonhost combat suppression wrappers (#17).
--- Verifies that melee/ranged combat is suppressed when the bot is inside the
--- close daemonhost safety radius, or when the current target IS a dormant
--- daemonhost outside that radius.
+-- Verifies that direct dormant daemonhost targets are suppressed, while
+-- mixed-target melee remains available and ranged combat keeps the broader
+-- daemonhost safety gates.
 local test_helper = require("tests.test_helper")
 
 local _extensions = {}
@@ -12,6 +12,7 @@ local _fixed_time_value = 0
 local _game_object_ids = {}
 local _game_object_fields = {}
 local _is_near_daemonhost_result = false
+local _is_position_near_daemonhost_result = false
 local _saved_globals = {}
 local SharedRules
 local CombatAbilityIdentity
@@ -76,6 +77,7 @@ local function reset()
 	_debug_enabled_result = false
 	_fixed_time_value = 0
 	_is_near_daemonhost_result = false
+	_is_position_near_daemonhost_result = false
 end
 
 local function find_debug_log(pattern)
@@ -202,6 +204,9 @@ describe("condition_patch", function()
 			is_near_daemonhost = function()
 				return _is_near_daemonhost_result
 			end,
+			is_position_near_daemonhost = function()
+				return _is_position_near_daemonhost_result
+			end,
 			is_suppressed = function()
 				return false
 			end,
@@ -262,6 +267,9 @@ describe("condition_patch", function()
 			end,
 			is_near_daemonhost = function()
 				return _is_near_daemonhost_result
+			end,
+			is_position_near_daemonhost = function()
+				return _is_position_near_daemonhost_result
 			end,
 			is_suppressed = function()
 				return false
@@ -428,7 +436,7 @@ describe("condition_patch", function()
 	end)
 
 	describe("combat wrapper integration", function()
-		it("suppresses melee against non-DH target when inside daemonhost safety radius", function()
+		it("allows melee against non-DH target when inside daemonhost safety radius", function()
 			local target = "poxwalker1"
 			setup_breed(target, "chaos_poxwalker")
 			_is_near_daemonhost_result = true
@@ -448,8 +456,33 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_true(result)
+			assert.is_true(melee_called)
+		end)
+
+		it("suppresses ranged against non-DH target standing inside dormant daemonhost keepout", function()
+			local target = "mauler_inside_dh_zone"
+			setup_breed(target, "renegade_executor")
+			_G.POSITION_LOOKUP[target] = { x = 3, y = 0, z = 0 }
+			_is_position_near_daemonhost_result = true
+
+			local bb = make_blackboard(target)
+			local ranged_called = false
+			local conditions = {
+				has_target_and_ammo_greater_than = function()
+					ranged_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_target_near_dh")
+
+			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, {}, {}, false)
 			assert.is_false(result)
-			assert.is_false(melee_called)
+			assert.is_false(ranged_called)
 		end)
 
 		it("suppresses melee against dormant daemonhost target", function()
@@ -473,6 +506,34 @@ describe("condition_patch", function()
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
 			assert.is_false(result)
 			assert.is_false(orig_called) -- original never called
+		end)
+
+		it("logs daemonhost stage and aggro_state when suppressing dormant melee", function()
+			_debug_enabled_result = true
+			local target = "dh_stage_log"
+			setup_breed(target, "chaos_daemonhost")
+			setup_daemonhost_state(target, {
+				aggro_state = "aggroed",
+				stage = 5,
+			})
+
+			local bb = make_blackboard(target)
+			local conditions = {
+				bot_in_melee_range = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_stage_log")
+
+			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
+			assert.is_false(result)
+			assert.is_truthy(find_debug_log("stage=5"))
+			assert.is_truthy(find_debug_log("aggro_state=aggroed"))
+			assert.is_truthy(find_debug_log("target=chaos_daemonhost"))
 		end)
 
 		it("allows melee against aggroed daemonhost target", function()
@@ -783,6 +844,48 @@ describe("condition_patch", function()
 			assert.is_false(result)
 		end)
 
+		it("daemonhost suppression interrupts a running combat ability BT node", function()
+			ConditionPatch.init({
+				shared_rules = SharedRules,
+				mod = { echo = function() end, hook_require = function() end },
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				is_near_daemonhost = function()
+					return true
+				end,
+				is_suppressed = function()
+					return true, "daemonhost_nearby"
+				end,
+				equipped_combat_ability_name = function()
+					return "veteran_combat_ability_shout"
+				end,
+				patched_bt_bot_conditions = {},
+				patched_bt_conditions = {},
+				rescue_intent = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+				CONDITIONS_PATCH_VERSION = "test",
+			})
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				"bot1",
+				{ behavior = {}, perception = {} },
+				{ ability_component_name = "combat_ability_action" },
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				true
+			)
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_false(result)
+		end)
+
 		it("logs when BetterBots overrides the vanilla ranged ammo threshold", function()
 			_debug_enabled_result = true
 			local target = "gunner1"
@@ -1086,6 +1189,107 @@ describe("condition_patch", function()
 
 			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
 			assert.is_false(result)
+		end)
+
+		it("logs daemonhost stage and aggro_state when allowing ability activation", function()
+			_debug_enabled_result = true
+			local unit = "bot1"
+			local daemonhost = "dh_allowed"
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_daemonhost_state(daemonhost, {
+				aggro_state = "aggroed",
+				stage = 6,
+			})
+			_extensions[unit] = {
+				unit_data_system = test_helper.make_player_unit_data_extension({
+					combat_ability_action = { template_name = "ogryn_taunt_shout" },
+				}),
+				ability_system = test_helper.make_player_ability_extension({
+					action_input_is_currently_valid = function()
+						return true
+					end,
+				}),
+				action_input_system = test_helper.make_player_action_input_extension({
+					action_input_parsers = {
+						combat_ability_action = {
+							_ACTION_INPUT_SEQUENCE_CONFIGS = {
+								ogryn_taunt_shout = {
+									shout_pressed = {
+										buffer_time = 0.5,
+									},
+								},
+							},
+						},
+					},
+				}),
+			}
+
+			ConditionPatch.wire({
+				Heuristics = {
+					resolve_decision = function()
+						return true,
+							"ogryn_taunt_monster_fight",
+							{
+								target_enemy = daemonhost,
+								target_breed_name = "chaos_daemonhost",
+								target_is_monster = true,
+								target_is_dormant_daemonhost = false,
+								target_daemonhost_aggro_state = "aggroed",
+								target_daemonhost_stage = 6,
+							}
+					end,
+				},
+				MetaData = { inject = function() end },
+				Debug = {
+					log_ability_decision = function() end,
+					bot_slot_for_unit = function()
+						return 1
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+			})
+
+			local ability_templates = {
+				ogryn_taunt_shout = {
+					ability_meta_data = {
+						activation = {
+							action_input = "shout_pressed",
+						},
+					},
+				},
+			}
+			local orig_require = require
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return ability_templates
+				end
+
+				return orig_require(path)
+			end)
+
+			local ok, result = pcall(
+				ConditionPatch.can_activate_ability,
+				{},
+				unit,
+				{ behavior = {}, perception = { target_enemy = daemonhost } },
+				{},
+				{},
+				{ ability_component_name = "combat_ability_action" },
+				false
+			)
+
+			rawset(_G, "require", orig_require)
+
+			assert.is_true(ok, "can_activate_ability threw: " .. tostring(result))
+			assert.is_true(result)
+			assert.is_truthy(find_debug_log("ability allowed against daemonhost"))
+			assert.is_truthy(find_debug_log("rule=ogryn_taunt_monster_fight"))
+			assert.is_truthy(find_debug_log("stage=6"))
+			assert.is_truthy(find_debug_log("aggro_state=aggroed"))
 		end)
 
 		it("passes the veteran shout semantic key into the team cooldown lookup", function()

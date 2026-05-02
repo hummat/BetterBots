@@ -334,6 +334,9 @@ describe("healing_deferral", function()
 				},
 				health_module = {
 					current_health_percent = function(unit)
+						if opts.bot_health_by_unit and opts.bot_health_by_unit[unit] then
+							return opts.bot_health_by_unit[unit]
+						end
 						if unit == "bot1" then
 							return opts.bot_health_pct
 						end
@@ -404,6 +407,64 @@ describe("healing_deferral", function()
 				},
 				_side = {
 					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("defers a healthier bot when the last station charge is needed by a worse bot", function()
+			local station_unit = install_hook_fixture({
+				bot_health_by_unit = {
+					bot1 = 0.95,
+					bot2 = 0.10,
+					human1 = 0.95,
+				},
+				charge_amount = 1,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = true,
+					needs_health_queue_number = 1,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+					valid_bot_units = { "bot1", "bot2" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("allows a healthier bot when spare station charges cover worse bots", function()
+			local station_unit = install_hook_fixture({
+				bot_health_by_unit = {
+					bot1 = 0.95,
+					bot2 = 0.10,
+					human1 = 0.95,
+				},
+				charge_amount = 2,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+					valid_bot_units = { "bot1", "bot2" },
 				},
 			}
 

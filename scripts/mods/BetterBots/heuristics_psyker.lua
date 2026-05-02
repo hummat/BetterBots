@@ -2,6 +2,27 @@ local _debug_log
 local _debug_enabled
 local _missing_talents_context_logged = false
 
+local HARD_ALLY_AID_TYPES = {
+	knocked_down = true,
+	ledge = true,
+	netted = true,
+	hogtied = true,
+}
+
+local function _target_ally_needs_hard_aid(context)
+	return context.target_ally_needs_aid == true and HARD_ALLY_AID_TYPES[context.target_ally_need_type] == true
+end
+
+local function _force_field_should_help_ally(context)
+	if not context.target_ally_needs_aid then
+		return false
+	end
+	if _target_ally_needs_hard_aid(context) then
+		return true
+	end
+	return context.num_nearby >= 2
+end
+
 local PSYKER_SHOUT_THRESHOLDS = {
 	aggressive = {
 		high_peril = 0.60,
@@ -229,7 +250,7 @@ local function _can_activate_force_field(context, thresholds)
 	if context.ally_interacting and (context.ranged_count >= 1 or context.num_nearby >= 2) then
 		return true, "force_field_protect_interactor"
 	end
-	if context.target_ally_needs_aid then
+	if _force_field_should_help_ally(context) then
 		return true, "force_field_ally_aid"
 	end
 	if context.toughness_pct > thresholds.block_safe_toughness then

@@ -100,7 +100,7 @@ IF has(psyker_overcharge_stance_infinite_casting)
 
 ### USE WHEN
 - `num_nearby >= 3 AND toughness_pct < 0.40` — under pressure
-- Ally needs aid AND `num_nearby >= 2` — protect downed ally
+- Hard ally aid (`knocked_down`, `ledge`, `netted`, `hogtied`) or soft ally aid with `num_nearby >= 2` — protect rescue window
 - `target_enemy_type == "ranged" AND num_nearby >= 2` — ranged fire
 
 ### DON'T USE WHEN

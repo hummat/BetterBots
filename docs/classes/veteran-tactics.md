@@ -40,7 +40,7 @@ Aggressive — 30s is short. Use whenever elites present.
 - Surrounded (`num_nearby >= 4`) — 2.5s heavy stagger in 9m radius
 - Toughness below 50% with enemies nearby — instant full recovery
 - Toughness below 25% with any enemies — emergency
-- Ally downed within 9m (revive talent)
+- Ally downed within 9m (revive talent), or ally aid with enemies nearby
 
 ### DON'T USE WHEN
 - No enemies within 9m — stagger hits nothing
@@ -52,7 +52,8 @@ Aggressive — 30s is short. Use whenever elites present.
 IF num_nearby >= 4 THEN activate
 IF toughness_pct < 0.50 AND num_nearby >= 2 THEN activate
 IF toughness_pct < 0.25 AND num_nearby >= 1 THEN activate
-IF target_ally_needs_aid AND ally_distance <= 9 THEN activate
+IF target_ally_needs_aid AND need_type == "knocked_down" AND ally_distance <= 9 THEN activate
+IF target_ally_needs_aid AND ally_distance <= 9 AND num_nearby >= 1 THEN activate
 BLOCK IF toughness_pct > 0.80 AND num_nearby <= 2
 ```
 **Confidence:** HIGH — community consensus: "spam it, 30s CD."

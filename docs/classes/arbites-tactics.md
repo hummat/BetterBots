@@ -36,7 +36,7 @@ BLOCK IF toughness_pct > 0.70 AND num_nearby <= 1
 ### USE WHEN
 - 2+ enemies at 3-10m — stagger everything in path
 - Special at 3-10m — gap close
-- Ally being disabled (`priority_target_enemy`) and target > 3m
+- Ally being disabled (`priority_target_enemy`) and target > 3m, or hard ally aid (`knocked_down`, `ledge`, `netted`, `hogtied`) with ally > 3m away
 - Freely — 20s CD is the shortest combat ability cooldown in the game
 
 ### DON'T USE WHEN
@@ -49,6 +49,7 @@ BLOCK IF toughness_pct > 0.70 AND num_nearby <= 1
 IF num_nearby >= 2 AND target_dist > 3 AND target_dist < 10 THEN activate
 IF target has "special" AND target_dist > 3 AND target_dist < 10 THEN activate
 IF priority_target_enemy AND target_dist > 3 THEN activate
+IF target_ally_needs_aid AND need_type IN {knocked_down, ledge, netted, hogtied} AND ally_dist > 3 THEN activate
 BLOCK IF target_dist < 3
 BLOCK IF num_nearby == 0
 ```

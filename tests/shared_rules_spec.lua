@@ -86,4 +86,39 @@ describe("shared_rules", function()
 		assert.equals("alerted", aggro_state)
 		assert.equals(SharedRules.DAEMONHOST_STAGE_AGGROED, stage)
 	end)
+
+	it("treats daemonhost stages after aggroed as aggroed", function()
+		rawset(_G, "BLACKBOARDS", {
+			daemonhost_1 = {
+				perception = {
+					aggro_state = "aggroed",
+				},
+			},
+		})
+		rawset(_G, "Managers", {
+			state = {
+				unit_spawner = {
+					game_object_id = function()
+						return 42
+					end,
+				},
+				game_session = {
+					game_session = function()
+						return "session"
+					end,
+				},
+			},
+		})
+		rawset(_G, "GameSession", {
+			game_object_field = function()
+				return SharedRules.DAEMONHOST_STAGE_AGGROED + 1
+			end,
+		})
+
+		local is_safe, aggro_state, stage = SharedRules.is_non_aggroed_daemonhost("daemonhost_1")
+
+		assert.is_false(is_safe)
+		assert.equals("aggroed", aggro_state)
+		assert.equals(SharedRules.DAEMONHOST_STAGE_AGGROED + 1, stage)
+	end)
 end)

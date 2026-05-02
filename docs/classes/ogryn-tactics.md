@@ -21,7 +21,7 @@
 ### PROPOSED BOT RULES
 ```
 IF priority_target_enemy AND target_dist > 4 THEN activate (HIGH)
-IF target_ally_needs_aid AND ally_dist > 6 THEN activate (HIGH)
+IF target_ally_needs_aid AND need_type IN {knocked_down, ledge, netted, hogtied} AND ally_dist > 6 THEN activate (HIGH)
 IF opportunity_target AND target_dist >= 8 AND target_dist <= 18 THEN activate (MEDIUM)  -- 18m requires ogryn_charge_increased_distance talent (base: 12m)
 IF num_nearby >= 4 AND toughness_pct < 0.20 THEN activate (MEDIUM)
 BLOCK IF target_dist < 4
@@ -116,12 +116,12 @@ BetterBots now covers the shipped Ogryn default special actions that matter most
 
 - `ogryn_club_p1_m1`: queues the uppercut special before a melee attack only against high-health or armored targets.
 - `ogryn_club_p1_m2/m3`: folds the latrine shovel before high-health or armored targets, with heavy follow-up bias for the hardest targets.
-- `ogryn_club_p2_m1/m2/m3`: queues the fist/slap special before high-health or armored targets.
+- `ogryn_club_p2_m1/m2/m3`: queues the fist/slap special before high-health or armored targets, then paces repeat use so the bot does not replace every club swing with a hand attack.
 - `ogryn_pickaxe_2h_p1_m1/m2/m3`: queues the pickaxe special before high-health or armored targets.
 - `ogryn_combatblade_p1_m1/m2/m3`: queues the uppercut special before high-health or armored targets.
 - `ogryn_powermaul_p1_m1/m2/m3`: activates the power maul special before high-health or armored targets.
-- `ogryn_rippergun_p1_m1/m2/m3`: rewrites close-range fire into the bayonet `stab` input when the current target is inside the configured bayonet distance and worth a melee special.
-- `ogryn_heavystubber_p1_m1/m2/m3` and `ogryn_thumper_p1_m1`: rewrite close-range fire into the melee bash input when the current target is inside the configured ranged-bash distance and worth a melee special.
+- `ogryn_rippergun_p1_m1/m2/m3`: rewrites close-range fire into the bayonet `stab` input when the current target is inside the configured bayonet distance and worth a melee special, but target-type correction no longer keeps the bot in ranged mode against point-blank hard-armored elites just to bayonet them.
+- `ogryn_heavystubber_p1_m1/m2/m3` and `ogryn_thumper_p1_m1`: rewrite close-range fire into the melee bash input when the current target is inside the configured ranged-bash distance and worth a melee special; heavy stubbers can still swap back to melee when hard-armored targets are below the anti-armor ranged policy distance. Thumper-style `shotgun_grenade` weapons use the same close-range hipfire policy as shotguns, so bots stop bracing them into nearby targets.
 - `ogryn_heavystubber_p2_m1/m2/m3`: deliberately ignored; the special is a flashlight toggle, not a combat action.
 
 These are all gated by the existing `melee_improvements` or `ranged_improvements` settings, not by new Ogryn-only toggles.

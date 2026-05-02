@@ -49,6 +49,16 @@ local VETERAN_STANCE_THRESHOLDS = {
 	conservative = { block_surrounded = 4, urgent_max_enemies = 1 },
 }
 
+local function _voc_should_help_ally(context)
+	if not context.target_ally_needs_aid then
+		return false
+	end
+	if context.target_ally_need_type == "knocked_down" then
+		return true
+	end
+	return context.num_nearby >= 1
+end
+
 local function _can_activate_veteran_combat_ability(
 	conditions,
 	unit,
@@ -85,7 +95,7 @@ local function _can_activate_veteran_combat_ability(
 			return true, "veteran_voc_critical_toughness"
 		end
 		if
-			context.target_ally_needs_aid
+			_voc_should_help_ally(context)
 			and (context.target_ally_distance or math.huge) <= thresholds_voc.ally_aid_dist
 		then
 			return true, "veteran_voc_ally_aid"

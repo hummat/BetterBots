@@ -77,6 +77,7 @@ local FEATURE_GATES = {
 	bot_tome_pickup = "enable_bot_tome_pickup",
 	weakspot_aim = "enable_weakspot_aim",
 	charge_nav_validation = "enable_charge_nav_validation",
+	hazard_movement_avoidance = "enable_hazard_movement_avoidance",
 }
 
 -- Preset system
@@ -121,6 +122,7 @@ M.DEFAULTS = {
 	enable_bot_tome_pickup = true,
 	enable_weakspot_aim = true,
 	enable_charge_nav_validation = true,
+	enable_hazard_movement_avoidance = true,
 	human_timing_profile = "auto",
 	pressure_leash_profile = "auto",
 	human_timing_reaction_min = 2,
@@ -135,6 +137,8 @@ M.DEFAULTS = {
 	pressure_leash_floor_m = 7,
 	enable_bot_grimoire_pickup = false,
 	sprint_follow_distance = 12,
+	daemonhost_keepout_distance = 14,
+	hazard_avoidance_buffer = 1.5,
 	special_chase_penalty_range = 18,
 	player_tag_bonus = 3,
 	melee_horde_light_bias = 4,
@@ -474,6 +478,14 @@ end
 
 function M.sprint_follow_distance()
 	return _read_slider_with_legacy("sprint_follow_distance", "enable_sprint", 12, 0, 30)
+end
+
+function M.daemonhost_keepout_distance()
+	return _read_numeric_setting("daemonhost_keepout_distance", 14, 7.5, 20)
+end
+
+function M.hazard_avoidance_buffer()
+	return _read_numeric_setting("hazard_avoidance_buffer", 1.5, 0, 5)
 end
 
 function M.special_chase_penalty_range()

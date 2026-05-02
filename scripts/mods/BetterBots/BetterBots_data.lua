@@ -109,6 +109,11 @@ return {
 						default_value = DEFAULTS.enable_daemonhost_avoidance,
 					},
 					{
+						setting_id = "enable_hazard_movement_avoidance",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_hazard_movement_avoidance,
+					},
+					{
 						setting_id = "enable_target_type_hysteresis",
 						type = "checkbox",
 						default_value = DEFAULTS.enable_target_type_hysteresis,
@@ -210,6 +215,8 @@ return {
 				type = "group",
 				sub_widgets = {
 					make_numeric("sprint_follow_distance", { 0, 30 }, 2),
+					make_numeric("daemonhost_keepout_distance", { 7.5, 20 }, 0.5),
+					make_numeric("hazard_avoidance_buffer", { 0, 5 }, 0.5),
 					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
 					make_numeric("player_tag_bonus", { 0, 10 }, 1),
 					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
