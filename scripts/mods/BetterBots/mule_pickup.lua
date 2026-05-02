@@ -25,7 +25,6 @@ local BOT_ORDER_PATCH_SENTINEL = "__bb_mule_pickup_bot_order_installed"
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
-local POCKETABLE_SLOT_NAME = "slot_pocketable"
 local MULE_PICKUP_MAX_DISTANCE_SQ = 400
 
 local function _log(key, message)
@@ -526,8 +525,8 @@ local function _clear_behavior_targets(behavior_component, unit, bot_group, data
 	return changed
 end
 
-local function _clear_grimoire_pickup_order(pickup_orders, unit)
-	local order = pickup_orders and pickup_orders[POCKETABLE_SLOT_NAME]
+local function _clear_blocked_pickup_order(pickup_orders, slot_name, unit)
+	local order = pickup_orders and pickup_orders[slot_name]
 	if not order then
 		return nil
 	end
@@ -537,29 +536,33 @@ local function _clear_grimoire_pickup_order(pickup_orders, unit)
 		return nil
 	end
 
-	pickup_orders[POCKETABLE_SLOT_NAME] = nil
+	pickup_orders[slot_name] = nil
 	if reason == "stale" then
-		_log_stale_clear(tostring(unit) .. ":pickup_order", "pickup_orders.slot_pocketable")
+		_log_stale_clear(
+			tostring(unit) .. ":pickup_order:" .. tostring(slot_name),
+			"pickup_orders." .. tostring(slot_name)
+		)
 	end
 
 	return reason
 end
 
-local function _clear_cached_grimoire_pickups(bot_group)
+local function _clear_cached_mule_pickups(bot_group)
 	local available_mule_pickups = bot_group and bot_group._available_mule_pickups
-	local available_pickups = available_mule_pickups and available_mule_pickups[POCKETABLE_SLOT_NAME]
-	if not available_pickups then
+	if not available_mule_pickups then
 		return false
 	end
 
 	local changed = false
-	for pickup_unit in pairs(available_pickups) do
-		local should_clear, reason = _should_clear_mule_unit(pickup_unit)
-		if should_clear then
-			available_pickups[pickup_unit] = nil
-			changed = true
-			if reason == "stale" then
-				_log_stale_clear(pickup_unit, "_available_mule_pickups.slot_pocketable")
+	for slot_name, available_pickups in pairs(available_mule_pickups) do
+		for pickup_unit in pairs(available_pickups) do
+			local should_clear, reason = _should_clear_mule_unit(pickup_unit)
+			if should_clear then
+				available_pickups[pickup_unit] = nil
+				changed = true
+				if reason == "stale" then
+					_log_stale_clear(pickup_unit, "_available_mule_pickups." .. tostring(slot_name))
+				end
 			end
 		end
 	end
@@ -567,32 +570,35 @@ local function _clear_cached_grimoire_pickups(bot_group)
 	return changed
 end
 
-function M.sync_live_bot_group(bot_group)
+function M.sanitize_live_bot_group(bot_group)
 	M.patch_pickups()
 
 	if not bot_group then
-		return false
+		return false, nil
 	end
 
 	local changed = _ensure_mule_pickup_slots(bot_group)
-	if _clear_cached_grimoire_pickups(bot_group) then
+	if _clear_cached_mule_pickups(bot_group) then
 		changed = true
 	end
 	local bot_data = (bot_group.data and bot_group:data()) or bot_group._bot_data
 	if not bot_data then
-		return changed
+		return changed, nil
 	end
+	local available_mule_pickups = bot_group._available_mule_pickups or {}
 
 	for unit, data in pairs(bot_data) do
 		local unit_changed = false
-		local pickup_order_clear_reason = _clear_grimoire_pickup_order(data.pickup_orders, unit)
-		if pickup_order_clear_reason then
-			unit_changed = true
-			changed = true
-			if pickup_order_clear_reason == "grimoire" then
-				_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
-			elseif pickup_order_clear_reason == "tome" then
-				_log("mule_pickup_order_clear:" .. tostring(unit), "cleared tome mule pickup order")
+		for slot_name in pairs(available_mule_pickups) do
+			local pickup_order_clear_reason = _clear_blocked_pickup_order(data.pickup_orders, slot_name, unit)
+			if pickup_order_clear_reason then
+				unit_changed = true
+				changed = true
+				if pickup_order_clear_reason == "grimoire" then
+					_log("mule_pickup_order_clear:" .. tostring(unit), "cleared grimoire mule pickup order")
+				elseif pickup_order_clear_reason == "tome" then
+					_log("mule_pickup_order_clear:" .. tostring(unit), "cleared tome mule pickup order")
+				end
 			end
 		end
 
@@ -609,6 +615,15 @@ function M.sync_live_bot_group(bot_group)
 		if unit_changed and _mark_destination_refresh(unit) then
 			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing mule state")
 		end
+	end
+
+	return changed, bot_data
+end
+
+function M.sync_live_bot_group(bot_group)
+	local changed, bot_data = M.sanitize_live_bot_group(bot_group)
+	if not (bot_group and bot_data) then
+		return changed
 	end
 
 	if _assign_ordered_mule_pickups(bot_group, bot_data) then
@@ -662,13 +677,43 @@ function M.should_block_pickup_order(pickup_unit)
 	return false, nil
 end
 
+local function _refresh_destination_context(self)
+	local bot_group = self and self._bot_group or nil
+	local group_extension = self and self._group_extension or nil
+	local data
+
+	if not bot_group and group_extension and group_extension.bot_group then
+		local ok, value = pcall(group_extension.bot_group, group_extension)
+		if ok then
+			bot_group = value
+		end
+	end
+
+	if group_extension and group_extension.bot_group_data then
+		local ok, value = pcall(group_extension.bot_group_data, group_extension)
+		if ok then
+			data = value
+		end
+	end
+
+	if not data and bot_group and bot_group.data and self and self._unit then
+		local ok, bot_data = pcall(bot_group.data, bot_group)
+		if ok and bot_data then
+			data = bot_data[self._unit]
+		end
+	end
+
+	return bot_group, data
+end
+
 -- Called from the consolidated _refresh_destination hook_safe in BetterBots.lua.
 -- DMF dedupes hook registrations by (mod, obj, method); registering one hook
 -- per feature on the same method silently drops all but the first (#_refresh_destination).
 function M.on_refresh_destination(self)
-	local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit)
+	local bot_group, data = _refresh_destination_context(self)
+	local changed = M.sanitize_mule_pickup(self._pickup_component, self._unit, bot_group, data)
 	if changed then
-		_clear_behavior_targets(self._behavior_component, self._unit)
+		_clear_behavior_targets(self._behavior_component, self._unit, bot_group, data)
 	end
 end
 
@@ -684,8 +729,11 @@ function M.install_bot_group_hooks(BotGroup)
 		_ensure_mule_pickup_slots(self)
 	end)
 
-	_mod:hook_safe(BotGroup, "_update_mule_pickups", function(self)
+	_mod:hook(BotGroup, "_update_mule_pickups", function(func, self, ...)
+		M.sanitize_live_bot_group(self)
+		local result = func(self, ...)
 		M.sync_live_bot_group(self)
+		return result
 	end)
 end
 

@@ -391,7 +391,82 @@ describe("mule_pickup", function()
 		assert.is_table(instance._available_mule_pickups.slot_pocketable)
 	end)
 
+	it("clears stale pickup orders before vanilla mule pickup update runs", function()
+		local stale_tome = { pickup_type = "tome", deleted = true }
+		local bot_unit = "bot_1"
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = {},
+				pickup_orders = {
+					slot_pocketable = {
+						unit = stale_tome,
+						pickup_name = "tome",
+					},
+				},
+				behavior_component = {},
+			},
+		}
+		local BotGroup = {
+			_available_mule_pickups = {
+				slot_pocketable = {
+					[stale_tome] = 20,
+				},
+			},
+			data = function()
+				return bot_data
+			end,
+			_update_mule_pickups = function(self)
+				assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable)
+				assert.is_nil(self._available_mule_pickups.slot_pocketable[stale_tome])
+			end,
+			init = function() end,
+		}
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		BotGroup:_update_mule_pickups()
+
+		assert.is_truthy(find_debug_log("cleared stale mule pickup ref (source=pickup_orders.slot_pocketable)"))
+	end)
+
+	it("clears stale small-pocketable orders before vanilla mule pickup update runs", function()
+		local stale_stim = { pickup_type = "syringe_corruption_pocketable", deleted = true }
+		local bot_unit = "bot_1"
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = {},
+				pickup_orders = {
+					slot_pocketable_small = {
+						unit = stale_stim,
+						pickup_name = "syringe_corruption_pocketable",
+					},
+				},
+				behavior_component = {},
+			},
+		}
+		local BotGroup = {
+			_available_mule_pickups = {
+				slot_pocketable_small = {
+					[stale_stim] = 20,
+				},
+			},
+			data = function()
+				return bot_data
+			end,
+			_update_mule_pickups = function(self)
+				assert.is_nil(bot_data[bot_unit].pickup_orders.slot_pocketable_small)
+				assert.is_nil(self._available_mule_pickups.slot_pocketable_small[stale_stim])
+			end,
+			init = function() end,
+		}
+
+		MulePickup.install_bot_group_hooks(BotGroup)
+		BotGroup:_update_mule_pickups()
+
+		assert.is_truthy(find_debug_log("cleared stale mule pickup ref (source=pickup_orders.slot_pocketable_small)"))
+	end)
+
 	it("installs BotGroup hooks only once per shared class table", function()
+		local hook_calls = {}
 		local hook_safe_calls = {}
 		local BotGroup = {
 			init = function() end,
@@ -400,6 +475,12 @@ describe("mule_pickup", function()
 
 		MulePickup.init({
 			mod = {
+				hook = function(_, target, method_name)
+					hook_calls[#hook_calls + 1] = {
+						target = target,
+						method = method_name,
+					}
+				end,
 				hook_safe = function(_, target, method_name)
 					hook_safe_calls[#hook_safe_calls + 1] = {
 						target = target,
@@ -429,7 +510,8 @@ describe("mule_pickup", function()
 		MulePickup.install_bot_group_hooks(BotGroup)
 		MulePickup.install_bot_group_hooks(BotGroup)
 
-		assert.equals(2, #hook_safe_calls)
+		assert.equals(1, #hook_safe_calls)
+		assert.equals(1, #hook_calls)
 	end)
 
 	it("assigns an available tome mule pickup even when vanilla leaves it unclaimed", function()
@@ -648,6 +730,55 @@ describe("mule_pickup", function()
 		assert.is_true(changed)
 		assert.is_nil(pickup_component.mule_pickup)
 		assert.equals(math.huge, pickup_component.mule_pickup_distance)
+	end)
+
+	it("keeps explicit ordered pocketables during refresh even when a human slot is open", function()
+		local stim_unit = { pickup_type = "syringe_power_boost_pocketable" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = stim_unit,
+			mule_pickup_distance = 4,
+		}
+		local bot_group = {
+			_available_mule_pickups = {
+				slot_pocketable_small = {},
+			},
+		}
+		local data = {
+			pickup_component = pickup_component,
+			pickup_orders = {
+				slot_pocketable_small = {
+					unit = stim_unit,
+					pickup_name = "syringe_power_boost_pocketable",
+				},
+			},
+			behavior_component = {},
+		}
+
+		policy_allow_pickup = function(_unit, pickup_unit, _bot_group, bot_data)
+			local order = bot_data and bot_data.pickup_orders and bot_data.pickup_orders.slot_pocketable_small
+			if order and order.unit == pickup_unit then
+				return true, nil
+			end
+
+			return false, "human_slot_open"
+		end
+
+		MulePickup.on_refresh_destination({
+			_unit = bot_unit,
+			_pickup_component = pickup_component,
+			_behavior_component = {},
+			_bot_group = bot_group,
+			_group_extension = {
+				bot_group_data = function()
+					return data
+				end,
+			},
+		})
+
+		assert.equals(stim_unit, pickup_component.mule_pickup)
+		assert.equals(4, pickup_component.mule_pickup_distance)
+		assert.is_nil(find_debug_log("blocked pocketable mule pickup"))
 	end)
 
 	it("blocks pickup orders when policy rejects the requested pocketable", function()
