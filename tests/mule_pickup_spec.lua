@@ -604,6 +604,37 @@ describe("mule_pickup", function()
 		assert.equals("unsupported_pocketable", reason)
 	end)
 
+	it("installs the BotOrder pickup hook once per shared table", function()
+		local hook_require_callbacks = {}
+		local pickup_hook_count = 0
+		fake_mod.hook_require = function(_, path, callback)
+			hook_require_callbacks[path] = callback
+		end
+		fake_mod.hook = function(_, target, method_name, handler)
+			if method_name == "pickup" then
+				pickup_hook_count = pickup_hook_count + 1
+			end
+			local original = target[method_name]
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end
+
+		MulePickup.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/utilities/bot_order"]
+		local BotOrder = {
+			pickup = function()
+				return "picked"
+			end,
+		}
+		callback(BotOrder)
+		callback(BotOrder)
+
+		assert.equals(1, pickup_hook_count)
+		assert.equals("picked", BotOrder.pickup("bot", "pickup", "player"))
+	end)
+
 	it("logs actual tome pickup success after a successful pocketable interaction", function()
 		local PocketableInteraction = {
 			stop = function(_, world, interactor_unit, interaction_context, t, result, interactor_is_server)

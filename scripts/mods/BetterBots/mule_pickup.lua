@@ -21,6 +21,7 @@ local _warned_blackboard_module_lookup_failure
 local _pickups_registry
 local BOT_GROUP_PATCH_SENTINEL = "__bb_mule_pickup_bot_group_installed"
 local INTERACTION_PATCH_SENTINEL = "__bb_mule_pickup_interaction_installed"
+local BOT_ORDER_PATCH_SENTINEL = "__bb_mule_pickup_bot_order_installed"
 
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
@@ -642,6 +643,12 @@ function M.register_hooks()
 	)
 
 	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
+		if not BotOrder or rawget(BotOrder, BOT_ORDER_PATCH_SENTINEL) then
+			return
+		end
+
+		BotOrder[BOT_ORDER_PATCH_SENTINEL] = true
+
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
 			local blocked, reason = M.should_block_pickup_order(pickup_unit)
 			if blocked then

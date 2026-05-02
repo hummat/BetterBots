@@ -7,6 +7,7 @@ describe("smart_tag_orders", function()
 	local saved_managers = rawget(_G, "Managers")
 	local saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 	local saved_alive = rawget(_G, "ALIVE")
+	local saved_health_alive = rawget(_G, "HEALTH_ALIVE")
 	local saved_vector3 = rawget(_G, "Vector3")
 	local debug_logs
 	local pickup_orders
@@ -100,6 +101,7 @@ describe("smart_tag_orders", function()
 
 		_G.POSITION_LOOKUP = {}
 		_G.ALIVE = {}
+		_G.HEALTH_ALIVE = {}
 		_G.Managers = {
 			player = {
 				player_by_unit = function(_, unit)
@@ -190,6 +192,7 @@ describe("smart_tag_orders", function()
 		_G.Managers = saved_managers
 		_G.POSITION_LOOKUP = saved_position_lookup
 		_G.ALIVE = saved_alive
+		_G.HEALTH_ALIVE = saved_health_alive
 		_G.Vector3 = saved_vector3
 	end)
 
@@ -408,7 +411,7 @@ describe("smart_tag_orders", function()
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
-	it("prefers direct unit liveness over stale player liveness when ALIVE is missing", function()
+	it("rejects health-dead bots when ALIVE is missing even if the unit object still exists", function()
 		target_unit.pickup_type = "syringe_power_boost_pocketable"
 		pickup_defs.syringe_power_boost_pocketable = {
 			inventory_slot_name = "slot_pocketable_small",
@@ -433,11 +436,77 @@ describe("smart_tag_orders", function()
 		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
 		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
 
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("no_eligible_bot", reason)
+		assert.equals(0, #pickup_orders)
+		assert.is_truthy(debug_logs[1].message:find("bot_dead", 1, true))
+	end)
+
+	it("does not reject live bots when ALIVE is stale false", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+			unit_is_alive = function()
+				return true
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = false
+		unit_alive_by_unit[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
 		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
 
 		assert.is_true(handled)
 		assert.equals(bot_one, selected_bot)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("does not route pickups to health-dead bots just because the unit object still exists", function()
+		target_unit.pickup_type = "syringe_power_boost_pocketable"
+		pickup_defs.syringe_power_boost_pocketable = {
+			inventory_slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+			unit_is_alive = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = false
+		unit_alive_by_unit[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("no_eligible_bot", reason)
+		assert.equals(0, #pickup_orders)
+		assert.is_truthy(debug_logs[1].message:find("bot_dead", 1, true))
 	end)
 
 	it("accumulates distinct rejection reasons across multiple bots", function()
