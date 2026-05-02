@@ -343,7 +343,8 @@ return {
 		en = "Daemonhost keepout distance (m)",
 	},
 	daemonhost_keepout_distance_description = {
-		en = "Bots try to move away and suppress risky actions inside this distance from a sleeping daemonhost.",
+		en = "Bots suppress risky actions inside this distance from a sleeping daemonhost. "
+			.. "Movement is softly biased away at closer range.",
 	},
 	hazard_avoidance_buffer = {
 		en = "Hazard avoidance buffer (m)",

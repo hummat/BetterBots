@@ -526,11 +526,10 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	-- #17: suppress melee/ranged combat when the bot is inside the close
-	-- daemonhost safety radius, or when its current target IS a non-aggroed
-	-- daemonhost outside that radius. The proximity gate is intentionally
-	-- tight (Sprint.DAEMONHOST_COMBAT_RANGE_SQ) so bots still fight mixed
-	-- encounters unless they are actually crowding the sleeping DH.
+	-- #17: suppress direct melee against a non-aggroed daemonhost target.
+	-- Mixed-target melee stays available so bots can still defend themselves;
+	-- ranged, blitzes, abilities, and charge endpoints carry the broader
+	-- daemonhost safety gates.
 	local orig_bot_in_melee_range = conditions.bot_in_melee_range
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
@@ -544,16 +543,6 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 					nil,
 					"info"
 				)
-			end
-			if _is_close_to_dormant_daemonhost(unit) then
-				if _debug_enabled() then
-					_debug_log(
-						"dh_suppress_melee_nearby:" .. tostring(unit),
-						_fixed_time(),
-						"melee suppressed (daemonhost nearby)"
-					)
-				end
-				return false
 			end
 			if dh_avoidance and _is_dormant_daemonhost_target(unit, blackboard) then
 				if _debug_enabled() then

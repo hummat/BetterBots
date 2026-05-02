@@ -202,6 +202,9 @@ function M.load_and_init(ctx)
 		is_enabled = function()
 			return Settings.is_feature_enabled("charge_nav_validation")
 		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
+		end,
 	})
 
 	EngagementLeash.init({

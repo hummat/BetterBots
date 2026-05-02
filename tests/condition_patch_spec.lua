@@ -1,7 +1,7 @@
 -- Tests for condition_patch.lua daemonhost combat suppression wrappers (#17).
--- Verifies that melee/ranged combat is suppressed when the bot is inside the
--- close daemonhost safety radius, or when the current target IS a dormant
--- daemonhost outside that radius.
+-- Verifies that direct dormant daemonhost targets are suppressed, while
+-- mixed-target melee remains available and ranged combat keeps the broader
+-- daemonhost safety gates.
 local test_helper = require("tests.test_helper")
 
 local _extensions = {}
@@ -436,7 +436,7 @@ describe("condition_patch", function()
 	end)
 
 	describe("combat wrapper integration", function()
-		it("suppresses melee against non-DH target when inside daemonhost safety radius", function()
+		it("allows melee against non-DH target when inside daemonhost safety radius", function()
 			local target = "poxwalker1"
 			setup_breed(target, "chaos_poxwalker")
 			_is_near_daemonhost_result = true
@@ -456,8 +456,8 @@ describe("condition_patch", function()
 			ConditionPatch._install_condition_patch(conditions, {}, "test")
 
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
-			assert.is_false(result)
-			assert.is_false(melee_called)
+			assert.is_true(result)
+			assert.is_true(melee_called)
 		end)
 
 		it("suppresses ranged against non-DH target standing inside dormant daemonhost keepout", function()

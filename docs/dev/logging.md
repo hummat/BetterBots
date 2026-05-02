@@ -132,6 +132,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `state_fail_retry ...` (combat ability state transition failed; fast retry scheduled)
 - `blocked weapon switch while keeping ...` (bot `wield` request suppressed during protected relic/force-field stages)
 - `blocked foreign weapon action <input> while keeping <grenade> <stage>` (grenade/blitz sequence suppressed a stray `weapon_action` input from another behavior path)
+- `blocked foreign weapon action <input> while keeping daemonhost_avoidance target=<breed> stage=<N> aggro_state=<state> dormant=true` (central `weapon_action` queue guard suppressed direct ranged/melee/grenade inputs against a non-aggroed daemonhost target; validation signal for `#17`)
 - `_may_fire swap: fire=<input> -> aim_fire=<input>` (`#43` validation; `_may_fire()` swapped fire input for ADS/charge weapon — one-shot per scratchpad)
 - `normalized shoot scratchpad inputs (fire=<input>, aim_fire=<input>, aim=<input>, unaim=<input>)` (`#43` validation; `BtBotShootAction.enter` repaired stale/default shoot inputs against the live wielded template before `_may_fire` validates them. For plasma, expect `fire=shoot_charge, aim_fire=shoot_charge`.)
 - `bot weapon: bot=<slot> slot=<slot> weapon_template=<template> warp_template=<template> action=<input> raw_input=<raw> target_slot=<slot> target=<unit|none> target_alive=<alive|dead|unknown|none> target_breed=<breed|unknown>` (`#43` validation; template-tagged queued weapon input, keyed by target so suspected ghost-target shots can be separated from normal target changes)
@@ -164,11 +165,14 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `penalizing friendly companion pin <breed> -100` (melee target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `penalizing ranged target for friendly companion pin -100` (ranged target scoring de-prioritized an enemy already pinned by a friendly mastiff; direct validation signal for `#69`)
 - `pushing poxburster (bypassed outnumbered gate)` (poxburster melee hook forced a push; direct validation signal for `#54`)
-- `melee suppressed (daemonhost nearby)` (bot refused melee because it was inside the close daemonhost safety radius; tight proximity gate for `#17`)
 - `ranged suppressed (daemonhost nearby)` (bot refused ranged fire because it was inside the close daemonhost safety radius; tight proximity gate for `#17`)
 - `melee suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (bot refused melee because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
 - `ranged suppressed (target is dormant daemonhost, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (bot refused ranged fire because its current target was a non-aggroed daemonhost outside the proximity gate; stage-aware when daemonhost `stage` is available, otherwise falls back to `aggro_state`; direct validation signal for `#17`)
 - `ranged suppressed (target near dormant daemonhost)` (bot refused ranged fire at a non-daemonhost enemy standing inside the dormant daemonhost keepout zone; validation signal for mixed-target `#17/#107` tests)
+- `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)` (charge/dash validation refused a launch endpoint inside the dormant daemonhost keepout zone; validation signal for mixed-target `#17/#107` tests)
+- `daemonhost scan source source=<ai_target_units|relation_units|spawned_minions> count=<N>` (trace-only scan diagnostic emitted once per source/count combination; use it when a passive daemonhost exists but no later target/proximity suppression marker appears)
+- `daemonhost scan candidate source=<source> unit=<unit> breed=<breed> alive=<bool> aggro_state=<state|nil> stage=<N|nil> position=<yes|no> accepted=<bool> reason=<accepted|dead|aggroed>` (trace-only classifier diagnostic emitted once per daemonhost candidate/source/state tuple; distinguishes liveness, breed, stage, aggro, and missing-position rejection)
+- `target near daemonhost scan target=<breed> target_unit=<unit> daemonhost=<unit> bucket=<inner|alert|keepout|near|far> target_dh_dist=<N> bot_target_dist=<N|unknown>` (debug-only diagnostic emitted once per bot+target+daemonhost+bucket when BetterBots sees any non-aggroed daemonhost while a bot has a current target; use it to distinguish detector misses from suppression policy misses)
 - `ability allowed against daemonhost: <ability> (rule=<rule>, target=<breed> stage=<N> aggro_state=<state> dormant=<bool>)` (ability activation was allowed against a daemonhost; use the first such line in a daemonhost encounter to distinguish normal aggroed combat from dormant misclassification)
 - `sprint STOP (daemonhost_nearby)` (bot dropped sprint because it entered daemonhost safety radius; movement-side validation signal for `#17`)
 - `patched visual loadout is_local_unit=false for bot (pre-init)` (spawn-time loadout VFX suppression applied before slot scripts initialized; direct validation signal for `#53`)
@@ -340,7 +344,7 @@ self-defense behavior.
 
 Events carry `attempt_id` (monotonic per session) to link decision → queued → consumed chains. `bot` field is the player slot index.
 
-`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation.
+`ctx` is the `Debug.context_snapshot(...)` payload. It includes the combat signals used by heuristics, including `in_hazard` for hazard-aware validation and `target_is_near_dormant_daemonhost` for daemonhost keepout checks.
 
 ### Analysis
 

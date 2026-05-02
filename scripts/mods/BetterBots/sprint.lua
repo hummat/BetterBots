@@ -13,6 +13,10 @@ local _logged_dh_avoidance_off = false
 
 local DEFAULT_SPRINT_FOLLOW_DISTANCE = 12
 local DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE = 14
+local DEFAULT_DAEMONHOST_STEER_DISTANCE = 10
+local DAEMONHOST_HARD_STEER_DISTANCE = 4
+local DAEMONHOST_MIN_STEER_STRENGTH = 0.05
+local DAEMONHOST_MAX_STEER_STRENGTH = 0.75
 local DAEMONHOST_SAFE_RANGE_SQ = 20 * 20
 local DAEMONHOST_COMBAT_RANGE_SQ = DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE * DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE
 local DAEMONHOST_BREED_NAMES = {
@@ -35,20 +39,146 @@ local _dh_units_cache_t = nil
 local _dh_units_cache_side = nil
 local _dh_units_cache = {}
 local _side_system_warned = false
+local _logged_dh_scan_sources = {}
+local _logged_dh_scan_candidates = setmetatable({}, { __mode = "k" })
+local _logged_dh_keepout_move = setmetatable({}, { __mode = "k" })
 
 local function _unit_is_alive(unit)
-	if ALIVE ~= nil then
-		local alive = ALIVE[unit]
+	if HEALTH_ALIVE ~= nil then
+		local alive = HEALTH_ALIVE[unit]
 		if alive ~= nil then
 			return alive == true
 		end
 	end
 
-	if Unit and Unit.alive then
-		return Unit.alive(unit)
+	local saw_dead = false
+
+	if ALIVE ~= nil then
+		local alive = ALIVE[unit]
+		if alive == true then
+			return true
+		elseif alive == false then
+			saw_dead = true
+		end
 	end
 
-	return false
+	if Unit and Unit.alive then
+		local ok, alive = pcall(Unit.alive, unit)
+		if ok then
+			if alive == true then
+				return true
+			elseif alive == false then
+				saw_dead = true
+			end
+		end
+	end
+
+	return unit ~= nil and not saw_dead
+end
+
+local function _is_daemonhost_breed_name(breed_name)
+	return breed_name
+		and (DAEMONHOST_BREED_NAMES[breed_name] or tostring(breed_name):lower():find("daemonhost", 1, true) ~= nil)
+end
+
+local function _table_count(units)
+	if not units then
+		return 0
+	end
+
+	local array_count = #units
+	local total_count = 0
+	for _ in pairs(units) do
+		total_count = total_count + 1
+	end
+
+	return math.max(array_count, total_count)
+end
+
+local function _log_daemonhost_scan_source(source, units)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local count = _table_count(units)
+	local key = tostring(source) .. ":" .. tostring(count)
+	if _logged_dh_scan_sources[key] then
+		return
+	end
+
+	_logged_dh_scan_sources[key] = true
+	_debug_log(
+		"daemonhost_scan_source:" .. key,
+		_fixed_time(),
+		"daemonhost scan source source=" .. tostring(source) .. " count=" .. tostring(count),
+		nil,
+		"trace"
+	)
+end
+
+local function _format_optional(value)
+	return value == nil and "nil" or tostring(value)
+end
+
+local function _log_daemonhost_scan_candidate(
+	source,
+	enemy_unit,
+	breed_name,
+	alive,
+	accepted,
+	reason,
+	aggro_state,
+	stage
+)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local per_unit = _logged_dh_scan_candidates[enemy_unit]
+	if not per_unit then
+		per_unit = {}
+		_logged_dh_scan_candidates[enemy_unit] = per_unit
+	end
+
+	local key = table.concat({
+		tostring(source),
+		tostring(breed_name),
+		tostring(alive),
+		tostring(accepted),
+		tostring(reason),
+		tostring(aggro_state),
+		tostring(stage),
+	}, ":")
+	if per_unit[key] then
+		return
+	end
+
+	per_unit[key] = true
+	local position = POSITION_LOOKUP and POSITION_LOOKUP[enemy_unit] ~= nil
+	_debug_log(
+		"daemonhost_scan_candidate:" .. tostring(source) .. ":" .. tostring(enemy_unit),
+		_fixed_time(),
+		"daemonhost scan candidate source="
+			.. tostring(source)
+			.. " unit="
+			.. tostring(enemy_unit)
+			.. " breed="
+			.. _format_optional(breed_name)
+			.. " alive="
+			.. tostring(alive == true)
+			.. " aggro_state="
+			.. _format_optional(aggro_state)
+			.. " stage="
+			.. _format_optional(stage)
+			.. " position="
+			.. (position and "yes" or "no")
+			.. " accepted="
+			.. tostring(accepted == true)
+			.. " reason="
+			.. tostring(reason),
+		nil,
+		"trace"
+	)
 end
 
 local function _vec_component(value, key, index)
@@ -91,26 +221,47 @@ local function _normalized_flat(x, y)
 	return x / length, y / length
 end
 
-local function _add_non_aggroed_daemonhost_units(units, seen)
+local function _add_non_aggroed_daemonhost_units(source, units, seen)
+	_log_daemonhost_scan_source(source, units)
 	if not units then
 		return
 	end
 
 	for i = 1, #units do
 		local enemy_unit = units[i]
-		if enemy_unit and not seen[enemy_unit] and _unit_is_alive(enemy_unit) then
+		if enemy_unit and not seen[enemy_unit] then
 			seen[enemy_unit] = true
+			local alive = _unit_is_alive(enemy_unit)
 			local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
 			if unit_data_ext then
 				local breed = unit_data_ext:breed()
-				if breed and DAEMONHOST_BREED_NAMES[breed.name] then
-					local is_non_aggroed = _is_non_aggroed_daemonhost and _is_non_aggroed_daemonhost(enemy_unit)
+				local breed_name = breed and breed.name
+				if _is_daemonhost_breed_name(breed_name) then
+					local is_non_aggroed = nil
+					local aggro_state = nil
+					local stage = nil
+					if _is_non_aggroed_daemonhost then
+						is_non_aggroed, aggro_state, stage = _is_non_aggroed_daemonhost(enemy_unit)
+					end
 					if is_non_aggroed == nil then
 						local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
 						local dh_perception = dh_bb and dh_bb.perception
-						is_non_aggroed = not (dh_perception and dh_perception.aggro_state == "aggroed")
+						aggro_state = dh_perception and dh_perception.aggro_state
+						is_non_aggroed = aggro_state ~= "aggroed"
 					end
-					if is_non_aggroed then
+					local accepted = alive and is_non_aggroed == true
+					local reason = accepted and "accepted" or (not alive and "dead" or "aggroed")
+					_log_daemonhost_scan_candidate(
+						source,
+						enemy_unit,
+						breed_name,
+						alive,
+						accepted,
+						reason,
+						aggro_state,
+						stage
+					)
+					if accepted then
 						_dh_units_cache[#_dh_units_cache + 1] = enemy_unit
 					end
 				end
@@ -129,10 +280,11 @@ local function _non_aggroed_daemonhost_units(side, fixed_t)
 	end
 
 	local seen = {}
-	_add_non_aggroed_daemonhost_units(side and side.ai_target_units, seen)
+	local side_ai_target_units = side and side.ai_target_units or nil
+	_add_non_aggroed_daemonhost_units("ai_target_units", side_ai_target_units, seen)
 	local relation_units = side and side.relation_units and side:relation_units("enemy") or nil
-	if relation_units ~= side.ai_target_units then
-		_add_non_aggroed_daemonhost_units(relation_units, seen)
+	if relation_units ~= side_ai_target_units then
+		_add_non_aggroed_daemonhost_units("relation_units", relation_units, seen)
 	end
 
 	local minion_spawn = Managers and Managers.state and Managers.state.minion_spawn
@@ -143,7 +295,7 @@ local function _non_aggroed_daemonhost_units(side, fixed_t)
 			spawned_minions = result
 		end
 	end
-	_add_non_aggroed_daemonhost_units(spawned_minions, seen)
+	_add_non_aggroed_daemonhost_units("spawned_minions", spawned_minions, seen)
 
 	_dh_units_cache_t = fixed_t
 	_dh_units_cache_side = side
@@ -167,23 +319,19 @@ local function _nearest_daemonhost_from_position(unit, unit_position)
 		return nil, nearest
 	end
 
-	local side_system = Managers and Managers.state and Managers.state.extension
-	if not side_system then
-		return nil, nearest
-	end
-
-	local ok, ss = pcall(side_system.system, side_system, "side_system")
-	if not ok or not ss then
-		if not _side_system_warned then
+	local extension_manager = Managers and Managers.state and Managers.state.extension
+	local side = nil
+	if extension_manager then
+		local ok, ss = pcall(extension_manager.system, extension_manager, "side_system")
+		if ok and ss then
+			side = ss.side_by_unit and ss.side_by_unit[unit]
+		elseif not _side_system_warned then
 			_side_system_warned = true
-			_debug_log("dh_side_system_fail", 0, "daemonhost scan unavailable, sprint safety disabled", nil, "info")
+			_debug_log("dh_side_system_fail", 0, "daemonhost scan using minion-spawn fallback only", nil, "info")
 		end
-		return nil, nearest
-	end
-
-	local side = ss.side_by_unit and ss.side_by_unit[unit]
-	if not side then
-		return nil, nearest
+	elseif not _side_system_warned then
+		_side_system_warned = true
+		_debug_log("dh_side_system_fail", 0, "daemonhost scan using minion-spawn fallback only", nil, "info")
 	end
 
 	local daemonhost_units = _non_aggroed_daemonhost_units(side, fixed_t)
@@ -230,16 +378,84 @@ local function _daemonhost_keepout_range_sq()
 	return distance * distance
 end
 
+local function _daemonhost_steer_range_sq()
+	local distance = _daemonhost_keepout_distance and _daemonhost_keepout_distance()
+		or DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE
+	distance = math.min(distance or DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE, DEFAULT_DAEMONHOST_STEER_DISTANCE)
+	distance = math.max(distance, 0)
+
+	return distance * distance
+end
+
+local function _daemonhost_steer_strength(dist_sq)
+	local steer_distance = math.sqrt(_daemonhost_steer_range_sq())
+	if steer_distance <= 0 then
+		return 0
+	end
+
+	local distance = math.sqrt(dist_sq)
+	if distance >= steer_distance then
+		return 0
+	end
+
+	local blend_width = math.max(steer_distance - DAEMONHOST_HARD_STEER_DISTANCE, 0.001)
+	local strength = (steer_distance - distance) / blend_width
+	strength = math.max(strength, DAEMONHOST_MIN_STEER_STRENGTH)
+
+	return math.min(strength, DAEMONHOST_MAX_STEER_STRENGTH)
+end
+
+local function _daemonhost_steer_bucket(strength)
+	if strength >= 0.5 then
+		return "firm"
+	elseif strength >= 0.2 then
+		return "medium"
+	end
+
+	return "soft"
+end
+
+local function _log_daemonhost_keepout_move(unit, dist_sq, strength)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local bucket = _daemonhost_steer_bucket(strength)
+	local per_unit = _logged_dh_keepout_move[unit]
+	if not per_unit then
+		per_unit = {}
+		_logged_dh_keepout_move[unit] = per_unit
+	elseif per_unit[bucket] then
+		return
+	end
+
+	per_unit[bucket] = true
+	_debug_log(
+		"dh_keepout_move:" .. tostring(unit) .. ":" .. bucket,
+		_fixed_time(),
+		string.format(
+			"movement safety steered away from daemonhost bucket=%s dist=%.2f steer=%.2f keepout=%.2f strength=%.2f",
+			bucket,
+			math.sqrt(dist_sq),
+			math.sqrt(_daemonhost_steer_range_sq()),
+			math.sqrt(_daemonhost_keepout_range_sq()),
+			strength
+		),
+		nil,
+		"debug"
+	)
+end
+
 -- Check if a non-aggroed daemonhost is within range. Accepts optional
 -- range_sq (default: 20m radius for sprint/abilities, pass DAEMONHOST_COMBAT_RANGE_SQ
--- for the tighter 10m combat suppression radius).
+-- for configured action suppression).
 local function _is_near_daemonhost(unit, range_sq)
 	return _nearest_dh_dist_sq(unit) < (range_sq or DAEMONHOST_SAFE_RANGE_SQ)
 end
 
 local function _is_position_near_daemonhost(reference_unit, position, range_sq)
-	local _, dist_sq = _nearest_daemonhost_from_position(reference_unit, position)
-	return dist_sq < (range_sq or DAEMONHOST_SAFE_RANGE_SQ)
+	local daemonhost_unit, dist_sq = _nearest_daemonhost_from_position(reference_unit, position)
+	return dist_sq < (range_sq or DAEMONHOST_SAFE_RANGE_SQ), daemonhost_unit, dist_sq
 end
 
 local function _daemonhost_avoidance_enabled()
@@ -252,7 +468,7 @@ local function _steer_away_from_daemonhost(self, unit)
 	end
 
 	local daemonhost_unit, dist_sq = _nearest_daemonhost(unit)
-	if not daemonhost_unit or dist_sq >= _daemonhost_keepout_range_sq() then
+	if not daemonhost_unit or dist_sq >= _daemonhost_steer_range_sq() then
 		if self and self._bb_movement_safety_blocked == "daemonhost_keepout" then
 			self._bb_movement_safety_blocked = nil
 		end
@@ -284,31 +500,37 @@ local function _steer_away_from_daemonhost(self, unit)
 		end
 	end
 
+	local local_away_x, local_away_y
 	if rotation and Quaternion and Quaternion.right and Quaternion.forward then
 		local away = { x = away_x, y = away_y, z = 0 }
-		move.x = _dot(Quaternion.right(rotation), away)
-		move.y = _dot(Quaternion.forward(rotation), away)
+		local_away_x = _dot(Quaternion.right(rotation), away)
+		local_away_y = _dot(Quaternion.forward(rotation), away)
 	else
-		move.x = 0
-		move.y = -1
+		local_away_x = 0
+		local_away_y = -1
 	end
 
+	local strength = _daemonhost_steer_strength(dist_sq)
+	if strength <= 0 then
+		return false
+	end
+
+	local move_x = _vec_component(move, "x", 1)
+	local move_y = _vec_component(move, "y", 2)
+	local blended_x = move_x * (1 - strength) + local_away_x * strength
+	local blended_y = move_y * (1 - strength) + local_away_y * strength
+	local clamped_x, clamped_y = _normalized_flat(blended_x, blended_y)
+	if clamped_x and clamped_y and (blended_x * blended_x + blended_y * blended_y > 1) then
+		blended_x = clamped_x
+		blended_y = clamped_y
+	end
+
+	move.x = blended_x
+	move.y = blended_y
 	self._dodge = false
 	self._bb_movement_safety_blocked = "daemonhost_keepout"
 
-	if _debug_enabled() then
-		_debug_log(
-			"dh_keepout_move:" .. tostring(unit),
-			_fixed_time(),
-			string.format(
-				"movement safety steered away from daemonhost dist=%.2f keepout=%.2f",
-				math.sqrt(dist_sq),
-				math.sqrt(_daemonhost_keepout_range_sq())
-			),
-			1,
-			"debug"
-		)
-	end
+	_log_daemonhost_keepout_move(unit, dist_sq, strength)
 
 	return true
 end
@@ -470,6 +692,9 @@ Sprint.init = function(deps)
 	_dh_nearest_unit_by_unit = setmetatable({}, { __mode = "k" })
 	_dh_nearest_dist_sq_by_unit = setmetatable({}, { __mode = "k" })
 	_dh_cache_t_by_unit = setmetatable({}, { __mode = "k" })
+	_logged_dh_scan_sources = {}
+	_logged_dh_scan_candidates = setmetatable({}, { __mode = "k" })
+	_logged_dh_keepout_move = setmetatable({}, { __mode = "k" })
 	for i = #_dh_units_cache, 1, -1 do
 		_dh_units_cache[i] = nil
 	end

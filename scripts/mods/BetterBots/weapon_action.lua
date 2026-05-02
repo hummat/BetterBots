@@ -670,7 +670,12 @@ function M.register_hooks(deps)
 							if _debug_enabled() then
 								local fixed_t = _fixed_time()
 								_debug_log(
-									"lock_weapon_action:" .. tostring(ability_name) .. ":" .. tostring(action_input),
+									"lock_weapon_action:"
+										.. tostring(ability_name)
+										.. ":"
+										.. tostring(action_input)
+										.. ":"
+										.. tostring(unit),
 									fixed_t,
 									"blocked foreign weapon action "
 										.. tostring(action_input)

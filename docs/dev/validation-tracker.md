@@ -79,12 +79,12 @@ Map + difficulty: targeted `/bb_scenario daemonhost_passive_near`
   - `bot 5 pinged chaos_daemonhost (reason: target_enemy_focus_target_override)`
   - weapon/grenade actions followed against `target_breed=chaos_daemonhost` (`zoom`, `shoot_pressed`, Ogryn rock, Veteran krak, Assail, melee attacks)
 - no `dormant_daemonhost` skip/suppress marker appeared before the attacks
-- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. A later 2026-05-02 retest still lacked `daemonhost_nearby` / keepout markers while the player circled the passive DH, implying the side-list scan did not see the passive spawned DH early enough. Follow-up code now also scans `Managers.state.minion_spawn:spawned_minions()` and blocks ranged fire at non-daemonhost targets inside dormant DH keepout. Re-test should pass only if the next passive run shows `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true`, or `daemonhost_nearby_target`, with no damaging weapon/grenade release against the passive daemonhost or enemies inside its keepout zone.
+- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. Later 2026-05-02 retests still lacked `daemonhost_nearby` / keepout markers while the player circled the passive DH, then blocked ranged better but still allowed Krak grenades and Zealot dash toward a Mauler inside the awake-but-not-aggroed DH zone. Follow-up code now also scans `Managers.state.minion_spawn:spawned_minions()` when side lookup is missing, logs `daemonhost scan source` / `daemonhost scan candidate` classifier diagnostics, logs `target near daemonhost scan` once per bot+target+daemonhost+range bucket, blocks ranged fire at non-daemonhost targets inside dormant DH keepout, blocks grenade/blitz decisions with `daemonhost_nearby_target`, and blocks charge/dash endpoints with `charge_nav=daemonhost_target_near`. Re-test should pass only if the next passive/awake run shows `target near daemonhost scan`, `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)`, `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true`, or `daemonhost_nearby_target`, with no damaging weapon/grenade release or dash into enemies inside its keepout zone. If those suppression markers are absent, inspect `daemonhost scan source` and `daemonhost scan candidate` first.
 
 #107 hazard movement safety: code-complete after this failed run; live re-test pending
 - the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for pending dodge output only. A 2026-05-02 retest showed generic movement endpoint blocking misclassified stairs/downhill traversal as `ledge_drop`, so normal movement now fails open.
 - re-test should check `/bb_scenario daemonhost_passive_near` plus a mission segment with barrels, floor hazards, and ledges
-- expected markers: `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `daemonhost_nearby_target`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
+- expected markers: `movement safety steered away from daemonhost`, `daemonhost scan source`, `daemonhost scan candidate`, `target near daemonhost scan`, `ranged suppressed (target near dormant daemonhost)`, `fallback blocked <charge_template> (charge_nav=daemonhost_target_near)`, `daemonhost_nearby_target`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
 ```
 
 ### Run 2026-04-29-post-v1-validation-rollup
@@ -1837,7 +1837,7 @@ Map + difficulty: live daemonhost encounter
   - offensive abilities were still allowed near a sleeping daemonhost before `target_enemy`/target-state suppression converged
 
 Follow-up fix staged after this run:
-- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range melee/ranged checks
+- restore a tight close-range daemonhost proximity gate for offensive abilities plus close-range ranged checks
 - keep the longer-range target-based dormant-daemonhost carve-out for direct daemonhost targets
 ```
 

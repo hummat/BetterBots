@@ -11,6 +11,7 @@ local _is_daemonhost_avoidance_enabled
 local _daemonhost_state
 local _is_position_near_daemonhost
 local _overlapping_liquids = {}
+local _logged_target_daemonhost_ranges = {}
 local SHIELD_INTERACTION_TYPES = {
 	scanning = true,
 	setup_decoding = true,
@@ -265,6 +266,73 @@ local function _copy_context(context)
 		copy[key] = value
 	end
 	return copy
+end
+
+local function _daemonhost_range_bucket(dist_sq)
+	if not dist_sq or dist_sq == math.huge then
+		return nil
+	end
+
+	local distance = math.sqrt(dist_sq)
+	if distance <= 7.5 then
+		return "inner"
+	elseif distance <= 12 then
+		return "alert"
+	elseif distance <= 14 then
+		return "keepout"
+	elseif distance <= 20 then
+		return "near"
+	end
+
+	return "far"
+end
+
+local function _format_distance(value)
+	return value and string.format("%.1f", value) or "unknown"
+end
+
+local function _log_target_daemonhost_range(unit, context, daemonhost_unit, target_daemonhost_dist_sq)
+	if not (_debug_log and _debug_enabled and _debug_enabled()) then
+		return
+	end
+	if not (context and context.target_enemy and daemonhost_unit) then
+		return
+	end
+
+	local bucket = _daemonhost_range_bucket(target_daemonhost_dist_sq)
+	if not bucket then
+		return
+	end
+
+	local key = table.concat({
+		tostring(unit),
+		tostring(context.target_enemy),
+		tostring(daemonhost_unit),
+		bucket,
+	}, ":")
+	if _logged_target_daemonhost_ranges[key] then
+		return
+	end
+	_logged_target_daemonhost_ranges[key] = true
+
+	_debug_log(
+		"target_daemonhost_range:" .. key,
+		_fixed_time(),
+		"target near daemonhost scan target="
+			.. tostring(context.target_breed_name or "unknown")
+			.. " target_unit="
+			.. tostring(context.target_enemy)
+			.. " daemonhost="
+			.. tostring(daemonhost_unit)
+			.. " bucket="
+			.. bucket
+			.. " target_dh_dist="
+			.. _format_distance(math.sqrt(target_daemonhost_dist_sq))
+			.. " bot_target_dist="
+			.. _format_distance(context.target_enemy_distance),
+		0,
+		"debug"
+	)
 end
 
 local function _perception_cache_matches(entry, fixed_t, perception_component, current_weapon_template_name)
@@ -601,8 +669,10 @@ local function build_context(unit, blackboard)
 				and _is_daemonhost_avoidance_enabled()
 				and _is_position_near_daemonhost
 			then
-				context.target_is_near_dormant_daemonhost =
+				local target_near_daemonhost, daemonhost_unit, target_daemonhost_dist_sq =
 					_is_position_near_daemonhost(unit, context.target_enemy_position)
+				context.target_is_near_dormant_daemonhost = target_near_daemonhost
+				_log_target_daemonhost_range(unit, context, daemonhost_unit, target_daemonhost_dist_sq)
 			end
 		end
 	end
@@ -701,6 +771,7 @@ return {
 
 		_interacting_cache_t = nil
 		_interacting_cache_side = nil
+		_logged_target_daemonhost_ranges = {}
 		for i = #_interacting_units, 1, -1 do
 			_interacting_units[i] = nil
 			_interacting_profiles[i] = nil

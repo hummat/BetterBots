@@ -317,6 +317,48 @@ describe("hazard_avoidance diagnostics", function()
 		assert.is_truthy(logs[1]:find("movement safety blocked", 1, true))
 	end)
 
+	it("logs repeated movement safety blocks once per unit and reason", function()
+		local logs = {}
+		local unit = { slot = "bot_1" }
+		_G.POSITION_LOOKUP[unit] = vector(0, 0, 0)
+		_G.Quaternion = {
+			right = function()
+				return vector(1, 0, 0)
+			end,
+			forward = function()
+				return vector(0, 1, 0)
+			end,
+		}
+		_G.Vector3 = function(x, y, z)
+			return vector(x, y, z)
+		end
+		local instance = {
+			_betterbots_player_unit = unit,
+			_dodge = true,
+			_move = { x = 0, y = 1 },
+			_first_person_component = {
+				rotation = "rotation",
+			},
+			_navigation_extension = {
+				_nav_world = "nav",
+				_traverse_logic = "traverse",
+			},
+		}
+
+		init_module(logs, {
+			nav_queries = {
+				ray_can_go = function()
+					return false, vector(0, 0, 0), vector(0, 2, -2)
+				end,
+			},
+		})
+		HazardAvoidance.on_bot_input_movement_updated(instance, unit)
+		instance._dodge = true
+		HazardAvoidance.on_bot_input_movement_updated(instance, unit)
+
+		assert.equals(1, #logs)
+	end)
+
 	it("does not block ordinary movement when a projected endpoint looks like a ledge", function()
 		local logs = {}
 		local unit = { slot = "bot_1" }

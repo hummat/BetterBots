@@ -224,6 +224,102 @@ describe("charge_nav_validation", function()
 		assert.same(vec(15, 0, 0), ray_end_position)
 	end)
 
+	it("blocks targeted dashes whose endpoint is inside dormant daemonhost keepout", function()
+		local ray_called = false
+		local blackboard = {
+			perception = {
+				target_enemy = "enemy_unit",
+			},
+		}
+
+		ChargeNavValidation.init({
+			fixed_time = function()
+				return fixed_t
+			end,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			nav_queries = nav_queries,
+			is_position_near_daemonhost = function(unit, position)
+				assert.equals("bot_unit", unit)
+				assert.same(vec(15, 0, 0), position)
+				return true
+			end,
+		})
+
+		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
+		_G.POSITION_LOOKUP.enemy_unit = vec(15, 0, 0)
+		nav_extension = {
+			destination = function()
+				return vec(0, 0, 0)
+			end,
+			destination_reached = function()
+				return true
+			end,
+			_nav_world = "nav_world",
+			_traverse_logic = "traverse_logic",
+		}
+		nav_queries.ray_can_go = function()
+			ray_called = true
+			return true, vec(0, 0, 0), vec(15, 0, 0)
+		end
+
+		local ok, reason = ChargeNavValidation.validate("bot_unit", "zealot_dash", "fallback", {
+			blackboard = blackboard,
+		})
+
+		assert.is_false(ok)
+		assert.equals("daemonhost_target_near", reason)
+		assert.is_false(ray_called)
+	end)
+
+	it("blocks explicit Ogryn and Arbites charge endpoints inside dormant daemonhost keepout", function()
+		local ray_called = false
+
+		ChargeNavValidation.init({
+			fixed_time = function()
+				return fixed_t
+			end,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			nav_queries = nav_queries,
+			is_position_near_daemonhost = function(unit, position)
+				assert.equals("bot_unit", unit)
+				assert.same(vec(20, 0, 0), position)
+				return true
+			end,
+		})
+
+		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
+		nav_extension = {
+			destination = function()
+				return vec(4, 0, 0)
+			end,
+			destination_reached = function()
+				return false
+			end,
+			_nav_world = "nav_world",
+			_traverse_logic = "traverse_logic",
+		}
+		nav_queries.ray_can_go = function()
+			ray_called = true
+			return true, vec(0, 0, 0), vec(20, 0, 0)
+		end
+
+		for _, template_name in ipairs({ "ogryn_charge", "ogryn_charge_increased_distance", "adamant_charge" }) do
+			local ok, reason = ChargeNavValidation.validate("bot_unit", template_name, "fallback", {
+				target_position = vec(20, 0, 0),
+			})
+
+			assert.is_false(ok, template_name)
+			assert.equals("daemonhost_target_near", reason, template_name)
+		end
+		assert.is_false(ray_called)
+	end)
+
 	it("prefers an explicit launch target position over the nav destination", function()
 		local ray_end_position
 

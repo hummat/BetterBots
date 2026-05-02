@@ -87,6 +87,7 @@ local function context_snapshot(context)
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,
 		target_is_dormant_daemonhost = context.target_is_dormant_daemonhost,
+		target_is_near_dormant_daemonhost = context.target_is_near_dormant_daemonhost,
 		target_daemonhost_aggro_state = context.target_daemonhost_aggro_state,
 		target_daemonhost_stage = context.target_daemonhost_stage,
 		target_is_super_armor = context.target_is_super_armor,

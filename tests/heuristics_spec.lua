@@ -3899,6 +3899,66 @@ describe("heuristics", function()
 			assert.equals(42, context.target_daemonhost_stage)
 		end)
 
+		it("logs current target distance to a known non-aggroed daemonhost once per range bucket", function()
+			local debug_logs = {}
+			_G.ALIVE.target_enemy = true
+			script_unit_extensions = {
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "renegade_executor",
+						tags = { elite = true },
+					}),
+				},
+			}
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_enabled = function()
+					return true
+				end,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				is_position_near_daemonhost = function(unit, position)
+					assert.equals("hazard_bot", unit)
+					assert.equals("target_pos", position)
+					return false, "daemonhost_unit", 16 * 16
+				end,
+			})
+
+			Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+			current_fixed_t = 43
+			Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.equals(1, #debug_logs)
+			assert.equals("target_daemonhost_range:hazard_bot:target_enemy:daemonhost_unit:near", debug_logs[1].key)
+			assert.matches("target near daemonhost scan target=renegade_executor", debug_logs[1].message)
+			assert.matches("target_unit=target_enemy", debug_logs[1].message)
+			assert.matches("daemonhost=daemonhost_unit", debug_logs[1].message)
+			assert.matches("bucket=near", debug_logs[1].message)
+			assert.matches("target_dh_dist=16.0", debug_logs[1].message)
+		end)
+
 		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()
 			local grenadier_breed = {
 				tags = { minion = true, special = true },

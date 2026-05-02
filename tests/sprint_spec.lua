@@ -17,6 +17,7 @@ local _mock_side_system = nil
 
 -- Mock time for per-frame caching — increment between tests to bust cache
 local _mock_time = 0
+local _debug_logs = {}
 
 -- Helper: build a mock BotUnitInput self with _move and _group_extension
 local function make_self(opts)
@@ -142,6 +143,9 @@ local function reset()
 	end
 	_mock_side_system = nil
 	_mock_time = _mock_time + 1 -- bust per-frame DH distance cache
+	for i = #_debug_logs, 1, -1 do
+		_debug_logs[i] = nil
+	end
 end
 
 describe("sprint", function()
@@ -782,6 +786,63 @@ describe("sprint", function()
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)
 
+		it("uses the minion spawn daemonhost scan even when side lookup is unavailable", function()
+			local unit = "bot1"
+			local dh = "dh_no_side"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			_mock_side_system = test_helper.make_side_system_double({
+				side_by_unit = {},
+			})
+			_spawned_minions[1] = dh
+
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+			assert.is_true(Sprint.is_position_near_daemonhost(unit, pos(6, 0, 0), Sprint.daemonhost_keepout_range_sq()))
+		end)
+
+		it("logs daemonhost candidate classification details in debug mode", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function(key, _fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = {
+						key = key,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+
+			local unit = "bot_debug"
+			local dh = "dh_debug"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system(unit, { dh })
+			_blackboards[dh] = { perception = { aggro_state = "aggroed" } }
+
+			assert.is_false(Sprint.is_near_daemonhost(unit))
+
+			local joined = ""
+			for i = 1, #_debug_logs do
+				joined = joined .. "\n" .. _debug_logs[i].message
+			end
+			assert.is_truthy(joined:find("daemonhost scan candidate", 1, true))
+			assert.is_truthy(joined:find("source=ai_target_units", 1, true))
+			assert.is_truthy(joined:find("breed=chaos_daemonhost", 1, true))
+			assert.is_truthy(joined:find("aggro_state=aggroed", 1, true))
+			assert.is_truthy(joined:find("accepted=false", 1, true))
+			assert.is_truthy(joined:find("reason=aggroed", 1, true))
+		end)
+
 		it("checks arbitrary positions against daemonhost danger range from the bot side", function()
 			local unit = "bot1"
 			local dh = "dh_near_target"
@@ -883,7 +944,7 @@ describe("sprint", function()
 			assert.is_false(input.sprinting)
 		end)
 
-		it("steers away from non-aggroed daemonhosts inside the keepout radius", function()
+		it("soft-steers away from non-aggroed daemonhosts inside the movement radius", function()
 			local bot = "bot_keepout"
 			local daemonhost = "daemonhost_keepout"
 			local self_obj = make_self({
@@ -905,9 +966,129 @@ describe("sprint", function()
 			end, self_obj, bot, input, 0.016, _mock_time)
 
 			assert.equals(0, self_obj._move.x)
-			assert.equals(-1, self_obj._move.y)
+			assert.is_true(self_obj._move.y < 1)
+			assert.is_true(self_obj._move.y > 0)
 			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
 			assert.is_false(input.sprinting)
+		end)
+
+		it("logs daemonhost movement steering once per unit and strength bucket", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function(key, _fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = {
+						key = key,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				sprint_follow_distance = function()
+					return 5
+				end,
+				daemonhost_keepout_distance = function()
+					return 14
+				end,
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+
+			local bot = "bot_keepout_log"
+			local daemonhost = "daemonhost_keepout_log"
+			local self_obj = make_self({
+				move = { x = 0, y = 1 },
+			})
+			self_obj._first_person_component = {
+				rotation = "rotation",
+			}
+
+			_positions[bot] = pos(0, 0, 0)
+			_positions[daemonhost] = pos(0, 8, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_side_system(bot, { daemonhost })
+
+			Sprint._on_update_movement(function()
+				self_obj._move.x = 0
+				self_obj._move.y = 1
+			end, self_obj, bot, input, 0.016, _mock_time)
+			self_obj._move.x = 0
+			self_obj._move.y = 1
+			Sprint._on_update_movement(function()
+				self_obj._move.x = 0
+				self_obj._move.y = 1
+			end, self_obj, bot, input, 0.016, _mock_time)
+
+			local movement_logs = 0
+			for i = 1, #_debug_logs do
+				if _debug_logs[i].message:find("movement safety steered away from daemonhost", 1, true) then
+					movement_logs = movement_logs + 1
+					assert.is_truthy(_debug_logs[i].message:find("bucket=medium", 1, true))
+				end
+			end
+
+			assert.equals(1, movement_logs)
+		end)
+
+		it("keeps passage movement positive at the edge of daemonhost movement radius", function()
+			local bot = "bot_soft_keepout"
+			local daemonhost = "daemonhost_soft_keepout"
+			local self_obj = make_self({
+				move = { x = 0, y = 1 },
+			})
+			self_obj._first_person_component = {
+				rotation = "rotation",
+			}
+
+			_positions[bot] = pos(0, 0, 0)
+			_positions[daemonhost] = pos(0, 9.9, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_side_system(bot, { daemonhost })
+
+			Sprint._on_update_movement(function()
+				self_obj._move.x = 0
+				self_obj._move.y = 1
+			end, self_obj, bot, input, 0.016, _mock_time)
+
+			assert.equals(0, self_obj._move.x)
+			assert.is_true(self_obj._move.y > 0)
+			assert.is_true(self_obj._move.y < 1)
+			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
+			assert.is_false(input.sprinting)
+		end)
+
+		it("does not force movement away across the full daemonhost action keepout", function()
+			local bot = "bot_outer_keepout"
+			local daemonhost = "daemonhost_outer_keepout"
+			local self_obj = make_self({
+				move = { x = 0, y = 1 },
+			})
+			self_obj._bb_movement_safety_blocked = "daemonhost_keepout"
+			self_obj._first_person_component = {
+				rotation = "rotation",
+			}
+
+			_positions[bot] = pos(0, 0, 0)
+			_positions[daemonhost] = pos(0, 12, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_side_system(bot, { daemonhost })
+
+			Sprint._on_update_movement(function()
+				self_obj._move.x = 0
+				self_obj._move.y = 1
+			end, self_obj, bot, input, 0.016, _mock_time)
+
+			assert.equals(0, self_obj._move.x)
+			assert.equals(1, self_obj._move.y)
+			assert.is_nil(self_obj._bb_movement_safety_blocked)
 		end)
 
 		it("short-circuits and does not mutate input when follow_distance = 0", function()

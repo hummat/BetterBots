@@ -19,6 +19,7 @@ local _fixed_time = function()
 end
 local _bot_slot_for_unit
 local _last_consumed_key_by_input = setmetatable({}, { __mode = "k" })
+local _logged_movement_safety_blocks = setmetatable({}, { __mode = "k" })
 
 local function _is_debug_enabled()
 	return _debug_enabled and _debug_enabled()
@@ -421,11 +422,20 @@ local function _apply_endpoint_safety(self, unit)
 	self._bb_movement_safety_blocked = reason
 
 	if _is_debug_enabled() then
+		local per_unit = _logged_movement_safety_blocks[unit]
+		if not per_unit then
+			per_unit = {}
+			_logged_movement_safety_blocks[unit] = per_unit
+		elseif per_unit[reason] then
+			return
+		end
+
+		per_unit[reason] = true
 		_debug_log(
 			"movement_safety:" .. tostring(reason) .. ":" .. tostring(unit),
 			_fixed_time(),
 			"movement safety blocked unit=" .. _unit_name(unit) .. " reason=" .. tostring(reason),
-			0,
+			nil,
 			"info"
 		)
 	end
@@ -483,6 +493,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time or _fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_last_consumed_key_by_input = setmetatable({}, { __mode = "k" })
+	_logged_movement_safety_blocks = setmetatable({}, { __mode = "k" })
 end
 
 function M.install_hazard_prop_hooks(HazardPropExtension)

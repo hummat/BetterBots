@@ -6,6 +6,7 @@ local _debug_enabled
 local _is_enabled
 local _NavQueries
 local _resolve_bot_target_unit_fn
+local _is_position_near_daemonhost
 
 local NAV_CHECK_ABOVE = 0.75
 local NAV_CHECK_BELOW = 0.5
@@ -200,6 +201,10 @@ function M.validate(unit, template_name, source, options)
 		return _remember_block(unit, template_name, source, fixed_t, too_close_reason, target_key)
 	end
 
+	if _is_position_near_daemonhost and _is_position_near_daemonhost(unit, target_position) then
+		return _remember_block(unit, template_name, source, fixed_t, "daemonhost_target_near", target_key)
+	end
+
 	local nav_world = navigation_extension._nav_world
 	if not nav_world then
 		return _remember_block(unit, template_name, source, fixed_t, "missing_nav_world", target_key)
@@ -233,6 +238,7 @@ function M.init(deps)
 	_NavQueries = deps.nav_queries or require("scripts/utilities/nav_queries")
 	local bot_targeting = deps.bot_targeting
 	_resolve_bot_target_unit_fn = bot_targeting and bot_targeting.resolve_bot_target_unit or nil
+	_is_position_near_daemonhost = deps.is_position_near_daemonhost
 end
 
 return M
