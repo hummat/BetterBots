@@ -216,6 +216,9 @@ The following were removed/throttled to reduce chat spam during testing:
 - **`decision -> false`** — suppressed; BT-path false decisions are no longer logged
 - **`fallback held` with `nearby=0`** — suppressed; idle holds produce no log output
 - **`blocked (template_name=none)` in BT path** — throttled to 20s (was 2s); expected for item abilities
+- **Cached `charge_nav` blocked JSONL events** — suppressed; the first concrete
+  failure reason is still emitted, but `cached_<reason>` repeats are console-
+  throttled only and do not enter `betterbots_events_*.jsonl`
 
 **Observability impact:** Idle-state bot decisions (no enemies nearby) are completely invisible in new logs. `bb-log summary` `held_idle` counter will show 0 for runs after this change. This is acceptable for combat-focused heuristic tuning but means idle behavior issues won't appear in logs. Re-enable by reverting the guards in `debug.lua:log_ability_decision` and `BetterBots.lua:_fallback_try_queue_combat_ability` if needed.
 

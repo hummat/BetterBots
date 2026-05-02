@@ -434,12 +434,14 @@ describe("ability_queue", function()
 			assert.same({}, emitted_events)
 		end)
 
-		it("blocks movement-ability fallback when charge nav validation fails", function()
+		it("logs the first movement-ability nav block but suppresses cached repeats", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require
 
 			local queued_inputs = 0
 			local validated
+			local validate_calls = 0
+			local emitted_events = {}
 			local ability_extension = test_helper.make_player_ability_extension({
 				can_use_ability = function()
 					return true
@@ -552,7 +554,11 @@ describe("ability_queue", function()
 				},
 				EventLog = {
 					is_enabled = function()
-						return false
+						return true
+					end,
+					emit_decision = function() end,
+					emit = function(event)
+						emitted_events[#emitted_events + 1] = event
 					end,
 				},
 				EngagementLeash = {
@@ -564,13 +570,17 @@ describe("ability_queue", function()
 					should_validate = function(template_name)
 						return template_name == "zealot_dash"
 					end,
+					should_emit_block_event = function(reason)
+						return reason ~= "cached_ray_blocked"
+					end,
 					validate = function(unit, template_name, source)
+						validate_calls = validate_calls + 1
 						validated = {
 							unit = unit,
 							template_name = template_name,
 							source = source,
 						}
-						return false, "ray_blocked"
+						return false, validate_calls == 1 and "ray_blocked" or "cached_ray_blocked"
 					end,
 				},
 				TeamCooldown = {
@@ -594,6 +604,7 @@ describe("ability_queue", function()
 			})
 
 			AbilityQueue.try_queue("bot_unit", { perception = {} })
+			AbilityQueue.try_queue("bot_unit", { perception = {} })
 
 			assert.equals(0, queued_inputs)
 			assert.same({
@@ -601,6 +612,19 @@ describe("ability_queue", function()
 				template_name = "zealot_dash",
 				source = "fallback",
 			}, validated)
+			assert.equals(2, validate_calls)
+			assert.same({
+				{
+					t = 10,
+					event = "blocked",
+					bot = 1,
+					ability = "zealot_targeted_dash",
+					template = "zealot_dash",
+					source = "fallback",
+					rule = "zealot_dash_priority_target",
+					reason = "ray_blocked",
+				},
+			}, emitted_events)
 		end)
 
 		it("validates fallback rescue geometry before mutating aim", function()

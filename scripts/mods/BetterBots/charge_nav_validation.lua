@@ -135,6 +135,10 @@ local function _remember_block(unit, template_name, source, fixed_t, reason, des
 	return false, reason
 end
 
+function M.should_emit_block_event(reason)
+	return type(reason) ~= "string" or string.sub(reason, 1, 7) ~= "cached_"
+end
+
 function M.should_validate(template_name)
 	if _is_enabled and not _is_enabled() then
 		return false

@@ -1394,16 +1394,28 @@ describe("startup regressions", function()
 		harness:load()
 
 		local validated = {}
+		local emitted_events = {}
 		harness.modules.ChargeNavValidation.should_validate = function(template_name)
 			return template_name == "zealot_dash"
 		end
+		harness.modules.ChargeNavValidation.should_emit_block_event = function(reason)
+			return reason ~= "cached_ray_blocked"
+		end
+		local validate_calls = 0
 		harness.modules.ChargeNavValidation.validate = function(unit, template_name, source)
+			validate_calls = validate_calls + 1
 			validated[#validated + 1] = {
 				unit = unit,
 				template_name = template_name,
 				source = source,
 			}
-			return false, "ray_blocked"
+			return false, validate_calls == 1 and "ray_blocked" or "cached_ray_blocked"
+		end
+		harness.modules.EventLog.is_enabled = function()
+			return true
+		end
+		harness.modules.EventLog.emit = function(event)
+			emitted_events[#emitted_events + 1] = event
 		end
 
 		local called = 0
@@ -1429,6 +1441,7 @@ describe("startup regressions", function()
 			action
 		)
 		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10.1)
 
 		assert.equals(0, called)
 		assert.same({
@@ -1437,7 +1450,23 @@ describe("startup regressions", function()
 				template_name = "zealot_dash",
 				source = "bt_enter",
 			},
+			{
+				unit = "bot_unit",
+				template_name = "zealot_dash",
+				source = "bt_enter",
+			},
 		}, validated)
+		assert.same({
+			{
+				t = 0,
+				event = "blocked",
+				bot = 1,
+				ability = "unknown",
+				template = "zealot_dash",
+				source = "bt_enter",
+				reason = "ray_blocked",
+			},
+		}, emitted_events)
 	end)
 
 	it("does not mutate rescue aim before bt_enter charge validation blocks the action", function()

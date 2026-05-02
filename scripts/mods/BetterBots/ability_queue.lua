@@ -377,7 +377,9 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 			target_position = rescue_ally_position,
 		})
 		if not nav_ok then
-			if _EventLog.is_enabled() then
+			local should_emit_block_event = not _ChargeNavValidation.should_emit_block_event
+				or _ChargeNavValidation.should_emit_block_event(nav_reason)
+			if should_emit_block_event and _EventLog.is_enabled() then
 				_EventLog.emit({
 					t = fixed_t,
 					event = "blocked",

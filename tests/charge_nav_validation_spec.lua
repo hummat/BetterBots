@@ -86,6 +86,13 @@ describe("charge_nav_validation", function()
 		assert.is_true(ChargeNavValidation.validate("bot_unit", "zealot_dash", "fallback"))
 	end)
 
+	it("suppresses cached block reasons from event logging", function()
+		assert.is_true(ChargeNavValidation.should_emit_block_event("ray_blocked"))
+		assert.is_true(ChargeNavValidation.should_emit_block_event(nil))
+		assert.is_false(ChargeNavValidation.should_emit_block_event("cached_ray_blocked"))
+		assert.is_false(ChargeNavValidation.should_emit_block_event("cached_daemonhost_target_near"))
+	end)
+
 	it("blocks when the bot has no navigation extension", function()
 		_G.POSITION_LOOKUP.bot_unit = vec(0, 0, 0)
 

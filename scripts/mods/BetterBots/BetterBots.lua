@@ -706,7 +706,9 @@ mod:hook_require(
 							target_position = rescue_ally_position,
 						})
 						if not nav_ok then
-							if EventLog.is_enabled() then
+							local should_emit_block_event = not ChargeNavValidation.should_emit_block_event
+								or ChargeNavValidation.should_emit_block_event(nav_reason)
+							if should_emit_block_event and EventLog.is_enabled() then
 								EventLog.emit({
 									t = _fixed_time(),
 									event = "blocked",
