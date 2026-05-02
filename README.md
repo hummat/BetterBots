@@ -14,9 +14,8 @@ A [DMF](https://github.com/Darktide-Mod-Framework/Darktide-Mod-Framework) mod th
 - **Primary maintainer is stepping back.** The project is stable and feature-complete against its original scope. Issues, PRs, and forks are welcome; review cadence will be best-effort.
 - **Post-1.0 scope is open-ended.** Items in the "may never ship" bucket (utility scoring, user-authored profiles, Tier 3 revive cover, grenade tactical evaluator) are good entry points for new contributors who want to pick up significant work.
 - **Active validation gaps** (none block v1.0.0, but they remain open):
-  - [`#17`](https://github.com/hummat/BetterBots/issues/17) dormant daemonhost suppression — still needs a live log with a dormant daemonhost present before first bot action
   - Hive Scum abilities and blitzes — implemented but DLC-blocked for the maintainer; relies on community reports
-  - Mission-end performance is currently above the documented v1.0 target of median ≤125 µs/bot/frame with no single run > 140. The `a24f078` diagnostic additions are the likely driver and a plausible first optimization target.
+  - Some broad post-1.0 follow-ups remain open by design. The core post-v1 validation items for daemonhost avoidance, scripted scenarios, hazard avoidance, revive priority, and the perf cap have live evidence and are closed.
 
 ## Project orientation
 
@@ -312,9 +311,8 @@ See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for contributor-side process note
 **Good entry points for new contributors:**
 
 - Pick up a [post-1.0 issue](https://github.com/hummat/BetterBots/issues?q=is%3Aopen+label%3Apost-1.0) if you want significant work. The bucket is explicitly open-ended.
-- Validate [`#17`](https://github.com/hummat/BetterBots/issues/17) (dormant daemonhost suppression) with a Solo Play log showing a pre-aggro daemonhost.
 - Hive Scum validation — if you own the DLC, run a Solo Play session with a Hive Scum bot and report back.
-- Performance — the v1.0 target (median ≤125 µs/bot/frame, no single run > 140) is currently missed. `ability_queue` and `grenade_fallback` are the top costs.
+- Performance — re-check the v1.0 target (median ≤125 µs/bot/frame, no single run > 140) if new runtime logs exceed the bar again.
 
 **Review cadence:** best-effort. Forks are fine. If activity resumes, it will show up in `docs/dev/status.md`.
 

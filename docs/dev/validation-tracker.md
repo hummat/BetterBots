@@ -62,6 +62,47 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-05-02-daemonhost-hazard-smart-tag-closure
+
+```text
+Run ID: 2026-05-02-daemonhost-hazard-smart-tag-closure
+Date (local): 2026-05-02
+Date (UTC): 2026-05-02
+Git commit: dev/post-v1.0 local branch before commits 82ceb32/a8453fb
+Log file: console-2026-05-02-14.33.58-fe67c8a9-b7bf-472f-8848-c73f3602b77a.log
+Map + difficulty: targeted daemonhost scenario plus live hazard/smart-tag checks
+
+#17 daemonhost avoidance: PASS / CLOSED
+- daemonhost classifier accepted the scenario DH as non-aggroed:
+  - `daemonhost scan candidate ... breed=chaos_daemonhost alive=true aggro_state=passive stage=1 ... accepted=true`
+  - later repeats at `stage=2` and `stage=4`
+- movement safety fired while the DH was non-aggroed: repeated `movement safety steered away from daemonhost`
+- mixed-target keepout fired after a Mauler spawn near the DH:
+  - `target near daemonhost scan target=renegade_executor ... bucket=inner`
+  - `ranged suppressed (target near dormant daemonhost)`
+  - `grenade held ... rule=daemonhost_nearby_target` for Ogryn frag, Zealot fire grenade, Veteran krak, and Psyker smite
+  - `fallback held zealot_dash (rule=daemonhost_nearby_target)` and `fallback held ogryn_taunt_shout (rule=daemonhost_nearby_target)`
+- mixed-target melee remained available for self-defense
+
+#107 hazard movement safety: PASS / CLOSED
+- `hazard_prop triggered ...`
+- vanilla/BetterBots threat path stored bot threats: `aoe_threat accepted ...`
+- movement consumed them: `aoe_threat consumed ... move=... escape=...`
+- ledge endpoint guard fired: `movement safety blocked unit=<slot> reason=ledge_ray_blocked`
+- daemonhost close movement steering was validated in the same movement-safety pass
+
+#96 smart-tag item bridge: PASS / CLOSED
+- explicit supported item tags routed to bots:
+  - `smart-tag pickup routed syringe_speed_boost_pocketable to bot 3/4/5 (family=slot_order)`
+  - `smart-tag pickup routed syringe_power_boost_pocketable to bot 2/3/5 (family=slot_order)`
+- no `bot_dead` rejection appeared in this run
+- same run exposed duplicate `BotOrder.pickup` rehook warnings; fixed afterward in `a8453fb`
+
+Conclusion:
+- Closed `#17`, `#96`, `#100`, and `#107` on GitHub on 2026-05-02.
+- Do not close `#92` from this evidence; it remains too niche / under-observed unless a cheap scenario exposes the weakspot marker.
+```
+
 ### Run 2026-05-02-daemonhost-passive-scenario-01
 
 ```text
@@ -138,8 +179,8 @@ Regression checks:
   - remaining generic `weakspot aim selected` proof is too niche to chase manually
 
 Conclusion:
-- Close `#108`, `#106`, and `#100`.
-- Keep `#17` open until a targeted daemonhost scenario or future live spawn produces the decisive first-action state line.
+- `#108`, `#106`, and `#100` are closed.
+- `#17` was later closed from the 2026-05-02 targeted daemonhost run above.
 - Do not spend more manual validation time on `#92` unless the scenario harness makes it cheap.
 ```
 
