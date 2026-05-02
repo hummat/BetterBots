@@ -294,9 +294,9 @@ end
 -- These windows are conservative "keep using the ranged plan" thresholds, not
 -- literal weapon max-range models. They are split by family/template so the
 -- bot's close-pressure carve-outs at least line up with broad weapon identity:
--- autopistols sit around 10 m near-range starts, shotguns/ripperguns start
--- stronger closer in, flamer/Purgatus are explicit close-pressure tools, and
--- the p3 electro staff is narrower than Purgatus' crowd-control profile.
+-- autopistols sit around 10 m near-range starts, shotguns/thumpers/ripperguns
+-- start stronger closer in, flamer/Purgatus are explicit close-pressure tools,
+-- and the p3 electro staff is narrower than Purgatus' crowd-control profile.
 local CLOSE_RANGE_RANGED_POLICIES = {
 	flamer = {
 		family = "flamer",
@@ -305,6 +305,11 @@ local CLOSE_RANGE_RANGED_POLICIES = {
 	},
 	shotgun = {
 		family = "shotgun",
+		hold_ranged_target_distance_sq = meters_sq(8),
+		hipfire_distance_sq = meters_sq(8),
+	},
+	shotgun_grenade = {
+		family = "shotgun_grenade",
 		hold_ranged_target_distance_sq = meters_sq(8),
 		hipfire_distance_sq = meters_sq(8),
 	},
@@ -378,6 +383,10 @@ local function close_range_ranged_policy(weapon_template)
 
 	if has_keyword(weapon_template, "shotgun") then
 		return CLOSE_RANGE_RANGED_POLICIES.shotgun
+	end
+
+	if has_keyword(weapon_template, "shotgun_grenade") then
+		return CLOSE_RANGE_RANGED_POLICIES.shotgun_grenade
 	end
 
 	if has_keyword(weapon_template, "heavystubber") then

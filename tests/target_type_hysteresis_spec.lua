@@ -879,7 +879,7 @@ describe("target_type_hysteresis", function()
 		-- Cases sit just outside each family's policy window (squared metres).
 		-- flamer/forcestaff_p2 = 12 m (144 sq), heavystubber = 11 m (121 sq),
 		-- autopistol = 10 m (100 sq), rippergun = 9 m (81 sq),
-		-- shotgun/forcestaff_p3 = 8 m (64 sq). Using +1 sq above each ceiling.
+		-- shotgun/shotgun_grenade/forcestaff_p3 = 8 m (64 sq). Using +1 sq above each ceiling.
 		local cases = {
 			{
 				family = "flamer",
@@ -889,6 +889,11 @@ describe("target_type_hysteresis", function()
 			{
 				family = "shotgun",
 				template = { name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
+				target_distance_sq = 65,
+			},
+			{
+				family = "shotgun_grenade",
+				template = { name = "ogryn_thumper_p1_m1", keywords = { "ranged", "shotgun_grenade", "p1" } },
 				target_distance_sq = 65,
 			},
 			{

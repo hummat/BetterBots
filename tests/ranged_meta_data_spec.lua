@@ -194,6 +194,17 @@ describe("ranged_meta_data", function()
 			assert.equals(64, policy.hipfire_distance_sq)
 		end)
 
+		it("treats shotgun-grenade thumpers as close-range hipfire weapons", function()
+			local policy = RangedMetaData.close_range_ranged_policy({
+				name = "ogryn_thumper_p1_m1",
+				keywords = { "ranged", "shotgun_grenade", "p1" },
+			})
+
+			assert.equals("shotgun_grenade", policy.family)
+			assert.equals(64, policy.hold_ranged_target_distance_sq)
+			assert.equals(64, policy.hipfire_distance_sq)
+		end)
+
 		it("keeps heavy stubbers between shotgun and flamer in the hipfire window", function()
 			local policy = RangedMetaData.close_range_ranged_policy({
 				name = "ogryn_heavystubber_p1_m1",
@@ -305,7 +316,7 @@ describe("ranged_meta_data", function()
 				{ name = "shotgun_p1_m1", keywords = { "ranged", "shotgun", "p1" } },
 				{ name = "flamer_p1_m1", keywords = { "ranged", "flamer", "p1" } },
 				{ name = "ogryn_rippergun_p1_m1", keywords = { "ranged", "rippergun", "p1" } },
-				{ name = "ogryn_thumper_p1_m1", keywords = { "ranged", "grenade_launcher", "p1" } },
+				{ name = "ogryn_thumper_p1_m1", keywords = { "ranged", "shotgun_grenade", "p1" } },
 			}
 
 			for i = 1, #excluded do
