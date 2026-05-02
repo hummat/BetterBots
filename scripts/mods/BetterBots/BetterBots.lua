@@ -193,7 +193,7 @@ local function _is_suppressed(unit)
 	-- they are crowding the sleeping daemonhost.
 	if
 		Settings.is_feature_enabled("daemonhost_avoidance")
-		and Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
+		and Sprint.is_near_daemonhost(unit, Sprint.daemonhost_keepout_range_sq())
 	then
 		return remember(true, "daemonhost_nearby")
 	end
@@ -363,7 +363,82 @@ local function _should_block_wield_input(unit)
 	return GrenadeFallback.should_block_wield_input(unit)
 end
 
+local DAEMONHOST_SAFE_WEAPON_ACTION_INPUTS = {
+	reload = true,
+	unwield_to_previous = true,
+	unzoom = true,
+	vent = true,
+	wield = true,
+	zoom_release = true,
+}
+
+local function _daemonhost_weapon_action_block_details(breed_name, aggro_state, stage)
+	return "target="
+		.. tostring(breed_name)
+		.. " stage="
+		.. tostring(stage ~= nil and stage or "missing")
+		.. " aggro_state="
+		.. tostring(aggro_state or "missing")
+		.. " dormant=true"
+end
+
+local function _target_breed_name(target_unit)
+	local script_unit = rawget(_G, "ScriptUnit")
+	local target_data_ext = target_unit
+		and script_unit
+		and script_unit.has_extension
+		and script_unit.has_extension(target_unit, "unit_data_system")
+	local breed = target_data_ext and target_data_ext.breed and target_data_ext:breed()
+	return breed and breed.name or nil
+end
+
+local function _should_block_daemonhost_weapon_action_input(unit, action_input)
+	if
+		DAEMONHOST_SAFE_WEAPON_ACTION_INPUTS[action_input]
+		or not (Settings and Settings.is_feature_enabled and Settings.is_feature_enabled("daemonhost_avoidance"))
+	then
+		return false
+	end
+
+	local blackboard = BLACKBOARDS and BLACKBOARDS[unit]
+	local perception = blackboard and blackboard.perception
+	local target_enemy = perception and perception.target_enemy
+	if not target_enemy then
+		return false
+	end
+
+	local breed_name = _target_breed_name(target_enemy)
+	local daemonhost_breeds = SharedRules.DAEMONHOST_BREED_NAMES
+	if not (breed_name and daemonhost_breeds and daemonhost_breeds[breed_name]) then
+		return false
+	end
+
+	local dormant, aggro_state, stage
+	if SharedRules.is_non_aggroed_daemonhost then
+		dormant, aggro_state, stage = SharedRules.is_non_aggroed_daemonhost(target_enemy)
+	elseif SharedRules.daemonhost_state then
+		aggro_state, stage = SharedRules.daemonhost_state(target_enemy)
+		dormant = stage ~= SharedRules.DAEMONHOST_STAGE_AGGROED and aggro_state ~= "aggroed"
+	else
+		local target_blackboard = BLACKBOARDS and BLACKBOARDS[target_enemy]
+		local target_perception = target_blackboard and target_blackboard.perception
+		aggro_state = target_perception and target_perception.aggro_state or nil
+		dormant = aggro_state ~= "aggroed"
+	end
+
+	if not dormant then
+		return false
+	end
+
+	return true, "daemonhost_avoidance", _daemonhost_weapon_action_block_details(breed_name, aggro_state, stage)
+end
+
 local function _should_block_weapon_action_input(unit, action_input)
+	local should_block, ability_name, block_reason = _should_block_daemonhost_weapon_action_input(unit, action_input)
+	if should_block then
+		return should_block, ability_name, block_reason
+	end
+
 	return GrenadeFallback.should_block_weapon_action_input(unit, action_input)
 end
 

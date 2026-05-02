@@ -62,6 +62,31 @@ Conclusion:
 
 ## Recorded Runs
 
+### Run 2026-05-02-daemonhost-passive-scenario-01
+
+```text
+Run ID: 2026-05-02-daemonhost-passive-scenario-01
+Date (local): 2026-05-02
+Date (UTC): 2026-05-02
+Git commit: da19d7a+ (local dirty tree: passive daemonhost scenario + weakspot crash fix)
+Log file: console-2026-05-02-09.54.51-c4128d88-f30f-413a-83f9-5e8a38987e40.log
+Map + difficulty: targeted `/bb_scenario daemonhost_passive_near`
+
+#17 daemonhost avoidance: FAIL before follow-up fix
+- scenario spawned `chaos_daemonhost` via `daemonhost_passive_near` at t=17.2115
+- first daemonhost combat appeared ~18s later:
+  - `bot 4 pinged chaos_daemonhost (reason: target_enemy)`
+  - `bot 5 pinged chaos_daemonhost (reason: target_enemy_focus_target_override)`
+  - weapon/grenade actions followed against `target_breed=chaos_daemonhost` (`zoom`, `shoot_pressed`, Ogryn rock, Veteran krak, Assail, melee attacks)
+- no `dormant_daemonhost` skip/suppress marker appeared before the attacks
+- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. Re-test should pass only if the next passive run shows `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true` and no damaging weapon/grenade release against the passive daemonhost.
+
+#107 hazard movement safety: code-complete after this failed run; live re-test pending
+- the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for bot movement/dodge output
+- re-test should check `/bb_scenario daemonhost_passive_near` plus a mission segment with barrels, floor hazards, and ledges
+- expected markers: `movement safety steered away from daemonhost`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
+```
+
 ### Run 2026-04-29-post-v1-validation-rollup
 
 ```text

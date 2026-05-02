@@ -63,7 +63,7 @@ local SCENARIOS = {
 	daemonhost_passive_near = {
 		description = "spawn one passive daemonhost without a forced target",
 		spawns = {
-			{ breed = "chaos_daemonhost", forward = 12, aggro_state = false, target = false },
+			{ breed = "chaos_daemonhost", forward = 12, aggro_state = "passive", target = false },
 		},
 		expect = {
 			"skipped ping for chaos_daemonhost (reason: dormant_daemonhost)",

@@ -1241,6 +1241,67 @@ describe("startup regressions", function()
 		assert.is_truthy(find_echo(harness.echoes, "BetterBots loaded"))
 	end)
 
+	it("blocks weapon actions against a non-aggroed daemonhost target", function()
+		local bot = "bot_1"
+		local daemonhost = "daemonhost_1"
+		local non_aggroed = true
+		local harness = make_bootstrap_harness({
+			Settings = {
+				is_feature_enabled = function(setting_id)
+					return setting_id == "daemonhost_avoidance"
+				end,
+			},
+			SharedRules = {
+				DAEMONHOST_BREED_NAMES = {
+					chaos_daemonhost = true,
+				},
+				is_non_aggroed_daemonhost = function(target_unit)
+					assert.equals(daemonhost, target_unit)
+					if non_aggroed then
+						return true, "passive", 1
+					end
+					return false, "aggroed", 6
+				end,
+			},
+		})
+		harness:load()
+		local weapon_register = find_named_call(harness.register_calls, "WeaponAction")
+		local saved_blackboards = rawget(_G, "BLACKBOARDS")
+		local saved_script_unit = rawget(_G, "ScriptUnit")
+
+		rawset(_G, "BLACKBOARDS", {
+			[bot] = {
+				perception = {
+					target_enemy = daemonhost,
+				},
+			},
+		})
+		rawset(_G, "ScriptUnit", {
+			has_extension = function(unit, system_name)
+				if unit == daemonhost and system_name == "unit_data_system" then
+					return test_helper.make_minion_unit_data_extension({ name = "chaos_daemonhost" })
+				end
+				return nil
+			end,
+		})
+
+		local blocked, reason, details = weapon_register.args[1].should_block_weapon_action_input(bot, "shoot_pressed")
+		local cleanup_blocked = weapon_register.args[1].should_block_weapon_action_input(bot, "unwield_to_previous")
+		non_aggroed = false
+		local aggroed_blocked = weapon_register.args[1].should_block_weapon_action_input(bot, "shoot_pressed")
+
+		rawset(_G, "ScriptUnit", saved_script_unit)
+		rawset(_G, "BLACKBOARDS", saved_blackboards)
+
+		assert.is_true(blocked)
+		assert.equals("daemonhost_avoidance", reason)
+		assert.matches("target=chaos_daemonhost", details)
+		assert.matches("stage=1", details)
+		assert.matches("aggro_state=passive", details)
+		assert.is_false(cleanup_blocked)
+		assert.is_false(aggroed_blocked)
+	end)
+
 	it("registers every hook_require path declared in BetterBots.lua", function()
 		local harness = make_bootstrap_harness()
 		harness:load()
