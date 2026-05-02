@@ -1015,8 +1015,7 @@ describe("sprint", function()
 			end, self_obj, bot, input, 0.016, _mock_time)
 
 			assert.equals(0, self_obj._move.x)
-			assert.is_true(self_obj._move.y < 1)
-			assert.is_true(self_obj._move.y > 0)
+			assert.is_true(self_obj._move.y <= 0)
 			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
 			assert.is_false(input.sprinting)
 		end)
@@ -1078,7 +1077,7 @@ describe("sprint", function()
 			for i = 1, #_debug_logs do
 				if _debug_logs[i].message:find("movement safety steered away from daemonhost", 1, true) then
 					movement_logs = movement_logs + 1
-					assert.is_truthy(_debug_logs[i].message:find("bucket=medium", 1, true))
+					assert.is_truthy(_debug_logs[i].message:find("bucket=firm", 1, true))
 				end
 			end
 
@@ -1113,7 +1112,7 @@ describe("sprint", function()
 			assert.is_false(input.sprinting)
 		end)
 
-		it("does not force movement away across the full daemonhost action keepout", function()
+		it("soft-steers across the full configured daemonhost action keepout", function()
 			local bot = "bot_outer_keepout"
 			local daemonhost = "daemonhost_outer_keepout"
 			local self_obj = make_self({
@@ -1136,8 +1135,8 @@ describe("sprint", function()
 			end, self_obj, bot, input, 0.016, _mock_time)
 
 			assert.equals(0, self_obj._move.x)
-			assert.equals(1, self_obj._move.y)
-			assert.is_nil(self_obj._bb_movement_safety_blocked)
+			assert.is_true(self_obj._move.y < 1)
+			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
 		end)
 
 		it("short-circuits and does not mutate input when follow_distance = 0", function()

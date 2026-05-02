@@ -13,7 +13,6 @@ local _logged_dh_avoidance_off = false
 
 local DEFAULT_SPRINT_FOLLOW_DISTANCE = 12
 local DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE = 14
-local DEFAULT_DAEMONHOST_STEER_DISTANCE = 10
 local DAEMONHOST_HARD_STEER_DISTANCE = 4
 local DAEMONHOST_MIN_STEER_STRENGTH = 0.05
 local DAEMONHOST_MAX_STEER_STRENGTH = 0.75
@@ -381,8 +380,7 @@ end
 local function _daemonhost_steer_range_sq()
 	local distance = _daemonhost_keepout_distance and _daemonhost_keepout_distance()
 		or DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE
-	distance = math.min(distance or DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE, DEFAULT_DAEMONHOST_STEER_DISTANCE)
-	distance = math.max(distance, 0)
+	distance = math.max(distance or DEFAULT_DAEMONHOST_KEEPOUT_DISTANCE, 0)
 
 	return distance * distance
 end
