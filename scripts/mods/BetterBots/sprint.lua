@@ -29,14 +29,10 @@ local _last_interesting_start_by_unit = setmetatable({}, { __mode = "k" })
 local _dh_nearest_dist_sq_by_unit = setmetatable({}, { __mode = "k" })
 local _dh_nearest_unit_by_unit = setmetatable({}, { __mode = "k" })
 local _dh_cache_t_by_unit = setmetatable({}, { __mode = "k" })
--- Cache key: (fixed_t, side_system, enemy_side_names). enemy_side_names is
--- compared by reference identity — vanilla Side:relation_side_names returns a
--- stable table from Side._relation_side_names, so same side ⇒ same reference
--- per frame. Including it prevents silent staleness if a future caller passes
--- a different relation list in the same tick (latent correctness hole).
+-- Cache key: (fixed_t, side). The side owns both ai_target_units and the
+-- broader relation_units("enemy") list.
 local _dh_units_cache_t = nil
-local _dh_units_cache_side_system = nil
-local _dh_units_cache_enemy_sides = nil
+local _dh_units_cache_side = nil
 local _dh_units_cache = {}
 local _side_system_warned = false
 
@@ -95,12 +91,36 @@ local function _normalized_flat(x, y)
 	return x / length, y / length
 end
 
-local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixed_t)
-	if
-		_dh_units_cache_t == fixed_t
-		and _dh_units_cache_side_system == side_system
-		and _dh_units_cache_enemy_sides == enemy_side_names
-	then
+local function _add_non_aggroed_daemonhost_units(units, seen)
+	if not units then
+		return
+	end
+
+	for i = 1, #units do
+		local enemy_unit = units[i]
+		if enemy_unit and not seen[enemy_unit] and _unit_is_alive(enemy_unit) then
+			seen[enemy_unit] = true
+			local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
+			if unit_data_ext then
+				local breed = unit_data_ext:breed()
+				if breed and DAEMONHOST_BREED_NAMES[breed.name] then
+					local is_non_aggroed = _is_non_aggroed_daemonhost and _is_non_aggroed_daemonhost(enemy_unit)
+					if is_non_aggroed == nil then
+						local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
+						local dh_perception = dh_bb and dh_bb.perception
+						is_non_aggroed = not (dh_perception and dh_perception.aggro_state == "aggroed")
+					end
+					if is_non_aggroed then
+						_dh_units_cache[#_dh_units_cache + 1] = enemy_unit
+					end
+				end
+			end
+		end
+	end
+end
+
+local function _non_aggroed_daemonhost_units(side, fixed_t)
+	if _dh_units_cache_t == fixed_t and _dh_units_cache_side == side then
 		return _dh_units_cache
 	end
 
@@ -108,36 +128,15 @@ local function _non_aggroed_daemonhost_units(side_system, enemy_side_names, fixe
 		_dh_units_cache[i] = nil
 	end
 
-	for _, enemy_side_name in ipairs(enemy_side_names) do
-		local enemy_side = side_system:get_side_from_name(enemy_side_name)
-		local ai_units = enemy_side and enemy_side.ai_target_units
-		if ai_units then
-			for i = 1, #ai_units do
-				local enemy_unit = ai_units[i]
-				if enemy_unit and _unit_is_alive(enemy_unit) then
-					local unit_data_ext = ScriptUnit.has_extension(enemy_unit, "unit_data_system")
-					if unit_data_ext then
-						local breed = unit_data_ext:breed()
-						if breed and DAEMONHOST_BREED_NAMES[breed.name] then
-							local is_non_aggroed = _is_non_aggroed_daemonhost and _is_non_aggroed_daemonhost(enemy_unit)
-							if is_non_aggroed == nil then
-								local dh_bb = BLACKBOARDS and BLACKBOARDS[enemy_unit]
-								local dh_perception = dh_bb and dh_bb.perception
-								is_non_aggroed = not (dh_perception and dh_perception.aggro_state == "aggroed")
-							end
-							if is_non_aggroed then
-								_dh_units_cache[#_dh_units_cache + 1] = enemy_unit
-							end
-						end
-					end
-				end
-			end
-		end
+	local seen = {}
+	_add_non_aggroed_daemonhost_units(side and side.ai_target_units, seen)
+	local relation_units = side and side.relation_units and side:relation_units("enemy") or nil
+	if relation_units ~= side.ai_target_units then
+		_add_non_aggroed_daemonhost_units(relation_units, seen)
 	end
 
 	_dh_units_cache_t = fixed_t
-	_dh_units_cache_side_system = side_system
-	_dh_units_cache_enemy_sides = enemy_side_names
+	_dh_units_cache_side = side
 
 	return _dh_units_cache
 end
@@ -149,28 +148,17 @@ end
 -- within a 5m radius — non-aggroed daemonhosts are invisible to that API.
 -- Skips aggroed daemonhosts (#17) — once fighting, suppression is
 -- pointless and bots should defend themselves.
-local function _nearest_daemonhost(unit)
+local function _nearest_daemonhost_from_position(unit, unit_position)
 	local fixed_t = _fixed_time()
-	if _dh_cache_t_by_unit[unit] == fixed_t then
-		return _dh_nearest_unit_by_unit[unit], _dh_nearest_dist_sq_by_unit[unit]
-	end
-
 	local nearest = math.huge
 	local nearest_unit = nil
 
-	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
 	if not unit_position then
-		_dh_cache_t_by_unit[unit] = fixed_t
-		_dh_nearest_dist_sq_by_unit[unit] = nearest
-		_dh_nearest_unit_by_unit[unit] = nil
 		return nil, nearest
 	end
 
 	local side_system = Managers and Managers.state and Managers.state.extension
 	if not side_system then
-		_dh_cache_t_by_unit[unit] = fixed_t
-		_dh_nearest_dist_sq_by_unit[unit] = nearest
-		_dh_nearest_unit_by_unit[unit] = nil
 		return nil, nearest
 	end
 
@@ -180,29 +168,15 @@ local function _nearest_daemonhost(unit)
 			_side_system_warned = true
 			_debug_log("dh_side_system_fail", 0, "daemonhost scan unavailable, sprint safety disabled", nil, "info")
 		end
-		_dh_cache_t_by_unit[unit] = fixed_t
-		_dh_nearest_dist_sq_by_unit[unit] = nearest
-		_dh_nearest_unit_by_unit[unit] = nil
 		return nil, nearest
 	end
 
 	local side = ss.side_by_unit and ss.side_by_unit[unit]
 	if not side then
-		_dh_cache_t_by_unit[unit] = fixed_t
-		_dh_nearest_dist_sq_by_unit[unit] = nearest
-		_dh_nearest_unit_by_unit[unit] = nil
 		return nil, nearest
 	end
 
-	local enemy_side_names = side:relation_side_names("enemy")
-	if not enemy_side_names then
-		_dh_cache_t_by_unit[unit] = fixed_t
-		_dh_nearest_dist_sq_by_unit[unit] = nearest
-		_dh_nearest_unit_by_unit[unit] = nil
-		return nil, nearest
-	end
-
-	local daemonhost_units = _non_aggroed_daemonhost_units(ss, enemy_side_names, fixed_t)
+	local daemonhost_units = _non_aggroed_daemonhost_units(side, fixed_t)
 	for i = 1, #daemonhost_units do
 		local enemy_unit = daemonhost_units[i]
 		local enemy_pos = POSITION_LOOKUP[enemy_unit]
@@ -214,6 +188,18 @@ local function _nearest_daemonhost(unit)
 			end
 		end
 	end
+
+	return nearest_unit, nearest
+end
+
+local function _nearest_daemonhost(unit)
+	local fixed_t = _fixed_time()
+	if _dh_cache_t_by_unit[unit] == fixed_t then
+		return _dh_nearest_unit_by_unit[unit], _dh_nearest_dist_sq_by_unit[unit]
+	end
+
+	local unit_position = POSITION_LOOKUP and POSITION_LOOKUP[unit] or nil
+	local nearest_unit, nearest = _nearest_daemonhost_from_position(unit, unit_position)
 
 	_dh_cache_t_by_unit[unit] = fixed_t
 	_dh_nearest_dist_sq_by_unit[unit] = nearest
@@ -239,6 +225,11 @@ end
 -- for the tighter 10m combat suppression radius).
 local function _is_near_daemonhost(unit, range_sq)
 	return _nearest_dh_dist_sq(unit) < (range_sq or DAEMONHOST_SAFE_RANGE_SQ)
+end
+
+local function _is_position_near_daemonhost(reference_unit, position, range_sq)
+	local _, dist_sq = _nearest_daemonhost_from_position(reference_unit, position)
+	return dist_sq < (range_sq or DAEMONHOST_SAFE_RANGE_SQ)
 end
 
 local function _daemonhost_avoidance_enabled()
@@ -465,8 +456,7 @@ Sprint.init = function(deps)
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	_is_non_aggroed_daemonhost = shared_rules.is_non_aggroed_daemonhost
 	_dh_units_cache_t = nil
-	_dh_units_cache_side_system = nil
-	_dh_units_cache_enemy_sides = nil
+	_dh_units_cache_side = nil
 	_dh_nearest_unit_by_unit = setmetatable({}, { __mode = "k" })
 	_dh_nearest_dist_sq_by_unit = setmetatable({}, { __mode = "k" })
 	_dh_cache_t_by_unit = setmetatable({}, { __mode = "k" })
@@ -490,6 +480,7 @@ Sprint._set_should_sprint_for_test = function(fn)
 	Sprint.should_sprint = _should_sprint
 end
 Sprint.is_near_daemonhost = _is_near_daemonhost
+Sprint.is_position_near_daemonhost = _is_position_near_daemonhost
 Sprint.DAEMONHOST_COMBAT_RANGE_SQ = DAEMONHOST_COMBAT_RANGE_SQ
 Sprint.daemonhost_keepout_range_sq = _daemonhost_keepout_range_sq
 

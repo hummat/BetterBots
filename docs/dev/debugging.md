@@ -128,7 +128,7 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `hazard_prop buffered threat` | BetterBots emitted an extra buffered AoE threat from the barrel `c_explosion` node when available (#107) |
 | `aoe_threat accepted` / `aoe_threat skipped` / `aoe_threat missed` | Vanilla `BotGroup.aoe_threat_created` result per bot. `accepted` means an escape direction was stored, `skipped` means an existing later threat won, and `missed` means vanilla did not store a usable escape direction (#107) |
 | `aoe_threat consumed` | `BotUnitInput._update_movement` actually consumed a stored AoE threat and wrote the movement vector; use this to separate threat creation from movement execution (#107) |
-| `movement safety blocked` | BetterBots cancelled a projected movement/dodge endpoint that failed nav continuity or dropped too far, used mainly for ledge safety (#107) |
+| `movement safety blocked` | BetterBots cancelled a pending dodge whose projected endpoint failed nav continuity or dropped too far, used mainly for ledge safety (#107). Ordinary movement fails open because stairs/downhill pathing can look like a ledge in the coarse endpoint probe. |
 | `movement safety steered away from daemonhost` | A bot inside the daemonhost keepout radius had movement redirected away from a non-aggroed daemonhost (#107/#17) |
 | `skipped ping for <target> (reason: recent_companion_tag)` | Generic pinging backed off because an Arbites bot had just issued a mastiff smart-tag on the same target; use this when checking remaining tag-spam reports |
 | `melee suppressed (daemonhost nearby)` / `ranged suppressed (daemonhost nearby)` | Close-range daemonhost safety gate fired; bot was inside the tight daemonhost combat radius and refused the attack (`#17`) |

@@ -82,7 +82,7 @@ Map + difficulty: targeted `/bb_scenario daemonhost_passive_near`
 - follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. Re-test should pass only if the next passive run shows `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true` and no damaging weapon/grenade release against the passive daemonhost.
 
 #107 hazard movement safety: code-complete after this failed run; live re-test pending
-- the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for bot movement/dodge output
+- the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for pending dodge output only. A 2026-05-02 retest showed generic movement endpoint blocking misclassified stairs/downhill traversal as `ledge_drop`, so normal movement now fails open.
 - re-test should check `/bb_scenario daemonhost_passive_near` plus a mission segment with barrels, floor hazards, and ledges
 - expected markers: `movement safety steered away from daemonhost`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
 ```

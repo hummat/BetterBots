@@ -59,6 +59,7 @@ function M.make_context(overrides)
 		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
+		target_is_near_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
 		target_daemonhost_stage = nil,
 		target_is_super_armor = false,

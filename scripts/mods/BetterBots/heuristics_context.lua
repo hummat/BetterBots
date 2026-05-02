@@ -8,6 +8,7 @@ local _debug_enabled
 local _daemonhost_breed_names
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_state
+local _is_position_near_daemonhost
 local _overlapping_liquids = {}
 local SHIELD_INTERACTION_TYPES = {
 	scanning = true,
@@ -410,6 +411,7 @@ local function build_context(unit, blackboard)
 		target_is_bomber = false,
 		target_is_monster = false,
 		target_is_dormant_daemonhost = false,
+		target_is_near_dormant_daemonhost = false,
 		target_daemonhost_aggro_state = nil,
 		target_daemonhost_stage = nil,
 		target_is_super_armor = false,
@@ -592,6 +594,15 @@ local function build_context(unit, blackboard)
 				context.target_daemonhost_aggro_state = aggro_state
 				context.target_daemonhost_stage = stage
 			end
+			if
+				context.target_enemy_position
+				and _is_daemonhost_avoidance_enabled
+				and _is_daemonhost_avoidance_enabled()
+				and _is_position_near_daemonhost
+			then
+				context.target_is_near_dormant_daemonhost =
+					_is_position_near_daemonhost(unit, context.target_enemy_position)
+			end
 		end
 	end
 
@@ -681,6 +692,7 @@ return {
 		_debug_enabled = deps.debug_enabled
 		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
 		_daemonhost_state = deps.shared_rules and deps.shared_rules.daemonhost_state
+		_is_position_near_daemonhost = deps.is_position_near_daemonhost
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
 			return true
 		end

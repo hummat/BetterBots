@@ -241,6 +241,9 @@ function M.load_and_init(ctx)
 		is_daemonhost_avoidance_enabled = function()
 			return Settings.is_feature_enabled("daemonhost_avoidance")
 		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
+		end,
 		warp_weapon_peril_threshold = Settings.warp_weapon_peril_threshold,
 		context_module = HeuristicsContext,
 		veteran_module = HeuristicsVeteran,

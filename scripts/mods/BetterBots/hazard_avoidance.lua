@@ -389,7 +389,7 @@ local function _unsafe_movement_endpoint(self, unit)
 	local ok, ray_can_go, projected_start, projected_end =
 		pcall(_NavQueries.ray_can_go, nav_world, position, endpoint, traverse_logic, NAV_CHECK_ABOVE, NAV_CHECK_BELOW)
 	if not ok or not projected_start or not projected_end then
-		return "ledge_projection_failed"
+		return nil
 	end
 	if not ray_can_go then
 		return "ledge_ray_blocked"
@@ -402,6 +402,13 @@ local function _unsafe_movement_endpoint(self, unit)
 end
 
 local function _apply_endpoint_safety(self, unit)
+	if not (self and self._dodge) then
+		if self and self._bb_movement_safety_blocked and tostring(self._bb_movement_safety_blocked):find("^ledge_") then
+			self._bb_movement_safety_blocked = nil
+		end
+		return
+	end
+
 	local reason = _unsafe_movement_endpoint(self, unit)
 	if not reason then
 		if self and self._bb_movement_safety_blocked and tostring(self._bb_movement_safety_blocked):find("^ledge_") then
@@ -410,11 +417,6 @@ local function _apply_endpoint_safety(self, unit)
 		return
 	end
 
-	local move = self and self._move
-	if move then
-		move.x = 0
-		move.y = 0
-	end
 	self._dodge = false
 	self._bb_movement_safety_blocked = reason
 

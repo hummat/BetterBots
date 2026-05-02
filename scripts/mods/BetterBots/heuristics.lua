@@ -93,6 +93,15 @@ local function _testing_profile_can_override_rule(rule)
 end
 
 local function _apply_behavior_profile(can_activate, rule, context, opts)
+	if
+		context
+		and context.target_is_near_dormant_daemonhost
+		and context.target_enemy
+		and not context.target_is_dormant_daemonhost
+	then
+		return false, "daemonhost_nearby_target"
+	end
+
 	if can_activate ~= false or not _testing_profile_active(opts) then
 		return can_activate, rule
 	end
@@ -400,6 +409,7 @@ return {
 			debug_enabled = deps.debug_enabled,
 			shared_rules = deps.shared_rules,
 			is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled,
+			is_position_near_daemonhost = deps.is_position_near_daemonhost,
 		})
 
 		if deps.psyker_module.init then

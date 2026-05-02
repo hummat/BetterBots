@@ -154,7 +154,7 @@ return {
 		en = "Avoid hazards and ledges",
 	},
 	enable_hazard_movement_avoidance_description = {
-		en = "Bots add extra movement safety around fused barrels, sleeping daemonhosts, and unsafe ledge endpoints.",
+		en = "Bots add extra movement safety around fused barrels, sleeping daemonhosts, and unsafe dodge endpoints.",
 	},
 	enable_target_type_hysteresis = {
 		en = "Reduce weapon swap thrashing",

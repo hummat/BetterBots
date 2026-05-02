@@ -145,6 +145,20 @@ describe("heuristics", function()
 			assert.matches("elite_special_gap", rule)
 		end)
 
+		it("blocks dashes into enemies standing near a dormant daemonhost", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 10,
+					target_is_elite_special = true,
+					target_is_near_dormant_daemonhost = true,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("daemonhost_nearby_target", rule)
+		end)
+
 		it("activates on combat gap close with multiple enemies", function()
 			local ok, rule = evaluate(
 				T,
@@ -4373,6 +4387,21 @@ describe("heuristics", function()
 					end
 				end)
 			end
+
+			it("refuses krak grenades into enemies standing near a dormant daemonhost", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"veteran_krak_grenade",
+					helper.make_context({
+						target_enemy = "executor_unit",
+						target_breed_name = "renegade_executor",
+						target_is_elite_special = true,
+						target_is_near_dormant_daemonhost = true,
+						target_enemy_distance = 10,
+					})
+				)
+				assert.is_false(result)
+				assert.matches("daemonhost_nearby_target", rule)
+			end)
 		end)
 
 		describe("adamant_stance monster_pressure", function()
