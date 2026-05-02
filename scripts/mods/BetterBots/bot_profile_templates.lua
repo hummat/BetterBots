@@ -44,14 +44,23 @@ local function _default_curio_entry()
 	}
 end
 
+local function _curio_entry(name, master_item_id, traits, perks)
+	return {
+		name = name,
+		master_item_id = master_item_id,
+		traits = traits,
+		perks = perks,
+	}
+end
+
 -- Raw profile templates — archetype as string, loadout as template ID strings.
 -- These get resolved to full item objects at hook time via MasterItems.
 --
 -- Current shipped lineup:
 --   veteran: Voice of Command + Focus Target + power sword + plasma gun
---   zealot:  Chorus + Blazing Piety + heavy eviscerator + boltgun
---   psyker:  Venting Shriek + Warp Siphon + duelling sword + voidblast staff
---   ogryn:   Indomitable + Heavy Hitter + latrine shovel + ripper gun
+--   zealot:  Redoubled Zeal + Martyrdom + thunder hammer + boltgun
+--   psyker:  Scrier's Gaze + Disrupt Destiny + force greatsword + recon lasgun
+--   ogryn:   Loyal Protector + Heavy Hitter + latrine shovel + kickback
 -- Experimental backlog picks once the profile UI/export surface widens past the
 -- core 4 classes:
 --   adamant: [Havoc 40 Meta] Hyper Carry Dog Build
@@ -148,8 +157,8 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 		gender = "female",
 		selected_voice = "zealot_female_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/chainsword_2h_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/bolter_p1_m2",
+			slot_primary = "content/items/weapons/player/melee/thunderhammer_2h_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/bolter_p1_m1",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/female_arms",
@@ -174,65 +183,84 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					_trait_override(_trait_id("chainsword_2h_p1", "toughness_recovery_on_multiple_hits")),
-					_trait_override(_trait_id("chainsword_2h_p1", "chained_hits_increases_crit_chance")),
+					_trait_override(_trait_id("thunderhammer_2h_p1", "increase_power_on_kill")),
+					_trait_override(_trait_id("thunderhammer_2h_p1", "power_bonus_based_on_charge_time")),
 				},
 				perks = {
-					_perk_override(_perk_id("melee_common", "wield_increase_armored_damage")),
-					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_resistant_damage")),
 				},
 			},
 			slot_secondary = {
 				traits = {
-					_trait_override(_trait_id("bolter_p1", "targets_receive_rending_debuff")),
-					_trait_override(_trait_id("bolter_p1", "bleed_on_ranged")),
+					_trait_override(_trait_id("bolter_p1", "bleed_on_ranged_hit")),
+					_trait_override(_trait_id("bolter_p1", "armor_rend_on_projectile_hit")),
 				},
 				perks = {
-					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
 					_perk_override(_perk_id("ranged_common", "wield_increase_resistant_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
 				},
 			},
 		},
 		curios = {
-			_default_curio_entry(),
-			_default_curio_entry(),
-			_default_curio_entry(),
+			_curio_entry("Redeemer's Gilded Hand (Caged)", "content/items/gadgets/defensive_gadget_6", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_health_segment", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_stamina_regeneration")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+			}),
+			_curio_entry("Laurel of the Just (Reliquary)", "content/items/gadgets/defensive_gadget_16", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_health_segment", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+			}),
+			_curio_entry("Guardian Gloriana (Casket)", "content/items/gadgets/defensive_gadget_22", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_revive_speed")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+			}),
 		},
-		-- Zealot now mirrors the requested Sister of Battle loadout: Chorus,
-		-- heavy eviscerator, boltgun, and Blazing Piety.
+		-- Dumped 2026-05-02 from Liz: Redoubled Zeal, Martyrdom,
+		-- thunder hammer, and boltgun.
 		talents = {
-			-- Combat ability, blitz, aura, keystone
-			zealot_bolstering_prayer = 1,
+			-- Blitz, aura, keystone, and dumped path nodes
 			zealot_flame_grenade = 1,
 			zealot_toughness_damage_reduction_coherency_improved = 1,
-			zealot_fanatic_rage = 1,
+			zealot_martyrdom = 1,
 			-- Class talents
-			zealot_crits_apply_bleed = 1,
+			zealot_resist_death = 1,
 			zealot_multi_hits_increase_damage = 1,
 			zealot_increased_damage_vs_resilient = 1,
-			zealot_increase_ranged_close_damage = 1,
+			zealot_hits_grant_stacking_damage = 1,
 			zealot_crits_reduce_toughness_damage = 1,
 			zealot_toughness_on_dodge = 1,
+			zealot_toughness_on_heavy_kills = 1,
 			zealot_increased_crit_and_weakspot_damage_after_dodge = 1,
-			zealot_ally_damage_taken_reduced = 1,
-			zealot_resist_death = 1,
-			zealot_channel_grants_damage = 1,
-			zealot_resist_death_healing = 1,
+			zealot_attack_speed_post_ability = 1,
+			zealot_additional_charge_of_ability = 1,
 			zealot_reduced_damage_after_dodge = 1,
-			zealot_toughness_in_melee = 1,
 			zealot_attack_speed = 1,
-			zealot_crits_grant_cd = 1,
-			zealot_fanatic_rage_toughness_on_max = 1,
-			zealot_fanatic_rage_improved = 1,
-			zealot_bled_enemies_take_more_damage = 1,
+			zealot_restore_stealth_cd_on_damage = 1,
+			zealot_additional_wounds = 1,
+			zealot_martyrdom_grants_toughness = 1,
+			zealot_martyrdom_grants_attack_speed = 1,
+			zealot_resist_death_healing = 1,
+			zealot_fotf_refund_cooldown = 1,
+			zealot_uninterruptible_no_slow_heavies = 1,
+			zealot_martyrdom_toughness_modifier = 1,
 			zealot_revive_speed = 1,
-			zealot_elite_kills_empowers = 1,
 			zealot_damage_vs_elites = 1,
+			zealot_offensive_vs_many = 1,
 			-- Stat nodes (names verified against zealot_tree.lua)
-			base_melee_damage_node_buff_medium_4 = 1,
-			base_toughness_node_buff_medium_2 = 1,
 			base_melee_damage_node_buff_medium_1 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_melee_damage_node_buff_medium_4 = 1,
+			base_toughness_node_buff_medium_2 = 1,
 		},
 	},
 	psyker = {
@@ -241,8 +269,8 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "psyker_male_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/combatsword_p3_m2",
-			slot_secondary = "content/items/weapons/player/ranged/forcestaff_p1_m1",
+			slot_primary = "content/items/weapons/player/melee/forcesword_2h_p1_m1",
+			slot_secondary = "content/items/weapons/player/ranged/lasgun_p3_m3",
 		},
 		cosmetic_overrides = {
 			slot_body_arms = "content/items/characters/player/human/attachment_base/male_arms",
@@ -267,66 +295,84 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					_trait_override(_trait_id("combatsword_p3", "windup_increases_power")),
-					_trait_override(_trait_id("combatsword_p3", "stacking_rending_on_weakspot")),
+					_trait_override(_trait_id("forcesword_2h_p1", "dodge_grants_crit_chance")),
+					_trait_override(_trait_id("forcesword_2h_p1", "warp_charge_power_bonus")),
 				},
 				perks = {
+					_perk_override(_perk_id("melee_common", "wield_increase_resistant_damage")),
 					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
-					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
 				},
 			},
 			slot_secondary = {
 				traits = {
-					_trait_override(_trait_id("forcestaff_p1", "warp_charge_critical_strike_chance_bonus")),
-					_trait_override(_trait_id("forcestaff_p1", "double_shot_on_crit")),
+					_trait_override(_trait_id("lasgun_p3", "burninating_on_crit")),
+					_trait_override(_trait_id("lasgun_p3", "consecutive_hits_increases_close_damage")),
 				},
 				perks = {
-					_perk_override(_perk_id("ranged_common", "wield_increase_super_armor_damage")),
-					_perk_override(_perk_id("ranged", "increase_crit_chance")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_crit_chance")),
 				},
 			},
 		},
 		curios = {
-			_default_curio_entry(),
-			_default_curio_entry(),
-			_default_curio_entry(),
+			_curio_entry("Herald's Seal (Reliquary)", "content/items/gadgets/defensive_gadget_14", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_revive_speed")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+			}),
+			_curio_entry("Mechanicus Icon Illustrious (Casket)", "content/items/gadgets/defensive_gadget_18", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+			}),
+			_curio_entry("Guardian of the Lost (Casket)", "content/items/gadgets/defensive_gadget_19", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_revive_speed")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+			}),
 		},
-		-- Psyker now mirrors the requested Karen Mode loadout: Venting Shriek,
-		-- Assail, duelling sword, and Voidblast staff.
+		-- Dumped 2026-05-02 from Leto: Scrier's Gaze, Brain Burst,
+		-- Disrupt Destiny, force greatsword, and recon lasgun.
 		talents = {
-			-- Combat ability, blitz, aura, keystone
-			psyker_shout_vent_warp_charge = 1,
-			psyker_grenade_throwing_knives = 1,
-			psyker_cooldown_aura_improved = 1,
-			psyker_passive_souls_from_elite_kills = 1,
+			-- Combat ability, aura, keystone, and dumped path nodes
+			psyker_combat_ability_stance = 1,
+			psyker_aura_crit_chance_aura = 1,
+			psyker_new_mark_passive = 1,
 			-- Class talents
-			psyker_toughness_on_warp_kill = 1,
+			psyker_toughness_on_vent = 1,
+			psyker_toughness_on_melee = 1,
 			psyker_crits_regen_toughness_movement_speed = 1,
 			psyker_elite_kills_add_warpfire = 1,
 			psyker_crits_empower_next_attack = 1,
-			psyker_throwing_knives_piercing = 1,
-			psyker_shout_reduces_warp_charge_generation = 1,
-			psyker_warpfire_on_shout = 1,
-			psyker_throwing_knives_cast_speed = 1,
-			psyker_spread_warpfire_on_kill = 1,
+			psyker_smite_on_hit = 1,
+			psyker_brain_burst_improved = 1,
+			psyker_overcharge_weakspot_kill_bonuses = 1,
+			psyker_overcharge_increased_movement_speed = 1,
 			psyker_2_tier_3_name_2 = 1,
 			psyker_warp_charge_reduces_toughness_damage_taken = 1,
-			psyker_increased_vent_speed = 1,
+			psyker_improved_dodge = 1,
 			psyker_damage_based_on_warp_charge = 1,
-			psyker_warpfire_generate_souls = 1,
-			psyker_increased_max_souls = 1,
-			psyker_killing_enemy_with_warpfire_boosts = 1,
-			psyker_warp_glass_cannon = 1,
-			psyker_warp_attacks_rending = 1,
+			psyker_block_costs_warp_charge = 1,
+			psyker_mark_increased_max_stacks = 1,
+			psyker_mark_weakspot_kills = 1,
+			psyker_melee_attack_speed = 1,
+			psyker_cleave_from_peril = 1,
 			psyker_damage_vs_ogryns_and_monsters = 1,
+			psyker_stat_mix = 1,
 			-- Stat nodes (names verified against psyker_tree.lua)
 			base_toughness_node_buff_medium_5 = 1,
+			base_melee_damage_node_buff_medium_4 = 1,
+			base_stamina_node_buff_low_1 = 1,
+			base_movement_speed_node_buff_low_1 = 1,
+			base_toughness_node_buff_medium_4 = 1,
 			base_toughness_damage_reduction_node_buff_medium_1 = 1,
 			base_crit_chance_node_buff_low_1 = 1,
-			base_toughness_node_buff_medium_4 = 1,
-			base_ranged_damage_node_buff_medium_4 = 1,
-			base_stamina_node_buff_low_1 = 1,
-			base_toughness_damage_reduction_node_buff_low_4 = 1,
 		},
 	},
 	ogryn = {
@@ -335,31 +381,31 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 		gender = "male",
 		selected_voice = "ogryn_a",
 		loadout = {
-			slot_primary = "content/items/weapons/player/melee/ogryn_club_p1_m1",
-			slot_secondary = "content/items/weapons/player/ranged/ogryn_rippergun_p1_m3",
+			slot_primary = "content/items/weapons/player/melee/ogryn_club_p1_m3",
+			slot_secondary = "content/items/weapons/player/ranged/ogryn_thumper_p1_m1",
 		},
-		-- Ogryn now mirrors the requested shovel/ripper build instead of the older
-		-- Point-Blank Barrage Kickback validation profile.
+		-- Dumped 2026-05-02 from Sumsi: Loyal Protector, Heavy Hitter,
+		-- latrine shovel, and kickback.
 		-- Trait IDs: internal mechanic names from decompiled weapon_traits_bespoke_*.lua.
 		weapon_overrides = {
 			slot_primary = {
 				traits = {
-					_trait_override(_trait_id("ogryn_club_p1", "staggered_targets_receive_increased_damage_debuff")),
-					_trait_override(_trait_id("ogryn_club_p1", "windup_increases_power")),
+					_trait_override(_trait_id("ogryn_club_p1", "power_bonus_based_on_charge_time")),
+					_trait_override(_trait_id("ogryn_club_p1", "infinite_melee_cleave_on_weakspot_kill")),
 				},
 				perks = {
-					{ id = "content/items/perks/melee_common/wield_increase_armored_damage", rarity = 4 },
-					{ id = "content/items/perks/melee_common/wield_increase_resistant_damage", rarity = 4 },
+					_perk_override(_perk_id("melee_common", "wield_increase_super_armor_damage")),
+					_perk_override(_perk_id("melee_common", "wield_increase_berserker_damage")),
 				},
 			},
 			slot_secondary = {
 				traits = {
-					_trait_override(_trait_id("ogryn_rippergun_p1", "toughness_on_continuous_fire")),
-					_trait_override(_trait_id("ogryn_rippergun_p1", "power_bonus_on_continuous_fire")),
+					_trait_override(_trait_id("thumper_p1", "allow_hipfire_while_sprinting")),
+					_trait_override(_trait_id("thumper_p1", "power_bonus_on_continuous_fire")),
 				},
 				perks = {
-					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
 					_perk_override(_perk_id("ranged_common", "wield_increase_berserker_damage")),
+					_perk_override(_perk_id("ranged_common", "wield_increase_armored_damage")),
 				},
 			},
 		},
@@ -384,15 +430,34 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 			ranged = "killshot",
 		},
 		curios = {
-			_default_curio_entry(),
-			_default_curio_entry(),
-			_default_curio_entry(),
+			_curio_entry("Laurel of the Righteous (Reliquary)", "content/items/gadgets/defensive_gadget_15", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+			}),
+			_curio_entry("Laurel of the Just (Reliquary)", "content/items/gadgets/defensive_gadget_16", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_toughness", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+			}),
+			_curio_entry("Herald's Seal (Reliquary)", "content/items/gadgets/defensive_gadget_14", {
+				{ id = "content/items/traits/gadget_inate_trait/trait_inate_gadget_health", rarity = 3 },
+			}, {
+				_perk_override(_perk_id("gadget_common", "trait_gadget_toughness_increase")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_dr_vs_gunners")),
+				_perk_override(_perk_id("gadget_common", "trait_gadget_cooldown")),
+			}),
 		},
-		-- Ogryn now mirrors the requested shovel/ripper Heavy Hitter build.
+		-- Dumped 2026-05-02 from Sumsi: taunt, frag bomb, Heavy Hitter,
+		-- latrine shovel, and kickback.
 		talents = {
 			-- Combat ability, blitz, aura, keystone
-			ogryn_longer_charge = 1,
-			ogryn_grenade_friend_rock = 1,
+			ogryn_taunt_shout = 1,
+			ogryn_grenade_frag = 1,
 			ogryn_melee_damage_coherency_improved = 1,
 			ogryn_passive_heavy_hitter = 1,
 			-- Class talents
@@ -401,29 +466,29 @@ M.DEFAULT_PROFILE_TEMPLATES = {
 			ogryn_ogryn_killer = 1,
 			ogryn_melee_stagger = 1,
 			ogryn_targets_recieve_damage_taken_increase_debuff = 1,
+			ogryn_fully_charged_attacks_gain_damage_and_stagger = 1,
 			ogryn_heavy_bleeds = 1,
 			ogryn_nearby_bleeds_reduce_damage_taken = 1,
-			ogryn_ally_elite_kills_grant_cooldown = 1,
-			ogryn_charge_toughness = 1,
-			ogryn_blocking_reduces_push_cost = 1,
-			ogryn_damage_taken_by_all_increases_strength_tdr = 1,
-			ogryn_replenish_rock_on_miss = 1,
-			ogryn_protect_allies = 1,
+			ogryn_windup_reduces_damage_taken = 1,
+			ogryn_windup_is_uninterruptible = 1,
+			ogryn_revenge_damage = 1,
+			ogryn_taunt_damage_taken_increase = 1,
+			ogryn_taunt_restore_toughness = 1,
 			ogryn_damage_reduction_on_high_stamina = 1,
-			ogryn_stacking_attack_speed = 1,
 			ogryn_melee_damage_after_heavy = 1,
-			ogryn_wield_speed_increase = 1,
+			ogryn_heavy_hitter_tdr = 1,
+			ogryn_ally_elite_kills_grant_cooldown = 1,
 			ogryn_weakspot_damage = 1,
 			-- Keystone/ability modifiers
 			ogryn_heavy_hitter_max_stacks_improves_attack_speed = 1,
 			ogryn_heavy_hitter_stagger = 1,
 			-- Stat nodes (names verified against ogryn_tree.lua)
 			base_toughness_node_buff_medium_2 = 1,
-			base_toughness_damage_reduction_node_buff_medium_1 = 1,
-			base_toughness_damage_reduction_node_buff_low_5 = 1,
 			base_armor_pen_node_buff_low_1 = 1,
+			base_toughness_damage_reduction_node_buff_medium_1 = 1,
+			base_toughness_node_buff_medium_1 = 1,
 			base_melee_damage_node_buff_medium_2 = 1,
-			base_toughness_node_buff_low_2 = 1,
+			base_toughness_damage_reduction_node_buff_low_5 = 1,
 		},
 	},
 }

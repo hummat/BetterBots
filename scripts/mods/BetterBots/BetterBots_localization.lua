@@ -466,13 +466,13 @@ return {
 		en = "Veteran - Plasma Gun + Power Sword",
 	},
 	bot_profile_zealot = {
-		en = "Zealot - Boltgun + Heavy Eviscerator",
+		en = "Zealot - Boltgun + Thunder Hammer",
 	},
 	bot_profile_psyker = {
-		en = "Psyker - Voidblast Staff + Duelling Sword",
+		en = "Psyker - Recon Lasgun + Force Greatsword",
 	},
 	bot_profile_ogryn = {
-		en = "Ogryn - Ripper Gun + Latrine Shovel",
+		en = "Ogryn - Kickback + Latrine Shovel",
 	},
 	bot_weapon_quality = {
 		en = "Bot weapon quality",
