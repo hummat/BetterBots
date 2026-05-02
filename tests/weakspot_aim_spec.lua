@@ -878,6 +878,58 @@ describe("weakspot_aim", function()
 	end)
 
 	describe("bulwark angle handling", function()
+		it("constructs flat vectors through Vector3 before normalization", function()
+			local strict_vec_mt = {}
+			strict_vec_mt.__index = strict_vec_mt
+			local function strict_vec(x, y, z)
+				return setmetatable({
+					x = x,
+					y = y,
+					z = z,
+					__strict_vector3 = true,
+				}, strict_vec_mt)
+			end
+
+			_G.Vector3 = setmetatable({
+				angle = function(a, b)
+					local dot = a.x * b.x + a.y * b.y + a.z * b.z
+					local length_a = math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z)
+					local length_b = math.sqrt(b.x * b.x + b.y * b.y + b.z * b.z)
+
+					return math.acos(dot / (length_a * length_b))
+				end,
+				normalize = function(v)
+					assert(v.__strict_vector3, "userdata expected")
+					local length = math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+
+					return strict_vec(v.x / length, v.y / length, v.z / length)
+				end,
+			}, {
+				__call = function(_, x, y, z)
+					return strict_vec(x, y, z)
+				end,
+			})
+			_G.Quaternion = {
+				forward = function(rotation)
+					return rotation.forward
+				end,
+			}
+			_G.Unit = {
+				local_rotation = function()
+					return { forward = strict_vec(0, 1, 0) }
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				target_unit = strict_vec(0, 0, 0),
+			}
+
+			local angle = WeakspotAim._target_forward_angle_to_bot("target_unit", {
+				first_person_component = { position = strict_vec(10, 0, 0) },
+			})
+
+			assert.near(math.pi / 2, angle, 0.0001)
+		end)
+
 		it("returns nil when the bot only differs in vertical position", function()
 			install_bulwark_math_globals()
 

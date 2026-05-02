@@ -68,11 +68,22 @@ local function flat_normalized_xy(x, y)
 		return nil
 	end
 
-	return Vector3.normalize({
+	local vector = nil
+	local vector3_meta = type(Vector3) == "table" and getmetatable(Vector3) or nil
+	if type(Vector3) == "function" or vector3_meta and vector3_meta.__call then
+		local ok, constructed = pcall(Vector3, x, y, 0)
+		if ok then
+			vector = constructed
+		end
+	end
+
+	vector = vector or {
 		x = x,
 		y = y,
 		z = 0,
-	})
+	}
+
+	return Vector3.normalize(vector)
 end
 
 local function target_forward_angle_to_bot(target_unit, scratchpad)
