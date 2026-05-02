@@ -140,10 +140,13 @@ This mod targets bot ability activation in three paths:
     - hook `BotUnitInput._update_movement`: sets `hold_to_sprint`/`sprinting` inputs after vanilla movement
     - sprint conditions: catch-up (>12m from follow target), ally rescue, traversal (no enemies)
     - hard suppression near daemonhosts (<20m) to avoid triggering anger via `sprint_flat_bonus`
-24a. Hazard avoidance diagnostics (#107, via `hazard_avoidance.lua`):
+24a. Movement safety / hazard avoidance (#107, via `hazard_avoidance.lua` and `sprint.lua`):
     - hook `HazardPropExtension.set_current_state`: when a hazard prop enters `triggered`, logs the vanilla threat origin (`POSITION_LOOKUP`), broadphase position, `c_explosion` position, radius, and timer so fused-barrel offset issues are visible in one log
+    - emits a buffered BetterBots AoE threat from the barrel `c_explosion` node when available, using the explosion template radius plus `hazard_avoidance_buffer`
     - hook `BotGroup.aoe_threat_created`: after vanilla evaluates the threat, logs per bot whether the AoE threat was accepted, skipped because an existing later threat won, or missed because vanilla did not store an escape direction
     - `sprint.lua` owns the existing `BotUnitInput._update_movement` hook and forwards post-vanilla movement state to `hazard_avoidance.lua`, which logs when `BotUnitInput` actually consumes an AoE threat for movement
+    - applies a conservative ledge endpoint guard after vanilla movement: projected short movement that fails nav continuity or drops too far is cancelled and any pending dodge is cleared
+    - daemonhost keepout steering remains in `sprint.lua` because it reuses the per-frame non-aggroed daemonhost scan; bots inside `daemonhost_keepout_distance` move away and suppress risky actions while sprint suppression still uses the wider 20m anti-aggro radius
 25. VFX/SFX bleed fix (#42, via `vfx_suppression.lua`):
     - hook `PlayerUnitAbilityExtension.init`: sets `is_local_unit = false` in the equipped ability effect scripts context for bot units
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
@@ -275,7 +278,7 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
 | `BotBehaviorExtension._verify_target_ally_aid_destination` | `ReviveAbility` human-revive priority | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
 | `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
-| `BotUnitInput._update_movement` | `Sprint`, `HazardAvoidance` diagnostics | `sprint.lua` hook forwards to `hazard_avoidance.lua` |
+| `BotUnitInput._update_movement` | `Sprint`, `HazardAvoidance` movement safety | `sprint.lua` hook forwards to `hazard_avoidance.lua` |
 | `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
 
 **Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
@@ -383,7 +386,7 @@ Analysis via `bb-log events [summary|rules|holds|items|scenarios|trace|raw]`. Se
 
 `scenario_harness.lua` registers `/bb_scenarios`, `/bb_scenario <name> [distance] [count]`, and `/bb_scenario_clear` for controlled live validation runs. The harness is only available while the local client is the server and `Managers.state.minion_spawn` is ready.
 
-It uses the same raw spawn path as Creature Spawner: `Managers.state.minion_spawn:spawn_minion(breed_name, position, rotation, side_id, spawn_params)`. Most scenarios spawn aggroed enemies with `optional_target_unit` set to the local player or first live bot; `poxburster_push` anchors on the first live bot when available so the burster targets a bot rather than the player. `daemonhost_passive_near` deliberately omits both `optional_aggro_state` and `optional_target_unit` so the daemonhost starts from the passive path, while `daemonhost_aggroed_control` forces the opposite control case. Scenario spawns can carry per-entry counts for mixed compositions; command-level repeat count is capped per scenario so mixed hordes cannot accidentally turn into very large stress tests.
+It uses the same raw spawn path as Creature Spawner: `Managers.state.minion_spawn:spawn_minion(breed_name, position, rotation, side_id, spawn_params)`. Most scenarios spawn aggroed enemies with `optional_target_unit` set to the local player or first live bot; `poxburster_push` anchors on the first live bot when available so the burster targets a bot rather than the player. `daemonhost_passive_near` passes `optional_aggro_state = "passive"` and omits `optional_target_unit` so the daemonhost starts from the passive path, while `daemonhost_aggroed_control` forces the opposite control case. Scenario spawns can carry per-entry counts for mixed compositions; command-level repeat count is capped per scenario so mixed hordes cannot accidentally turn into very large stress tests.
 
 Each run emits `scenario_start`, `scenario_spawn`, `scenario_spawn_failed`, `scenario_result`, and `scenario_clear` JSONL events. Inspect them with `bb-log events scenarios`.
 

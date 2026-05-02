@@ -120,6 +120,7 @@ describe("sprint", function()
 		_saved_globals.ALIVE = rawget(_G, "ALIVE")
 		_saved_globals.Unit = rawget(_G, "Unit")
 		_saved_globals.Vector3 = rawget(_G, "Vector3")
+		_saved_globals.Quaternion = rawget(_G, "Quaternion")
 		_saved_globals.BLACKBOARDS = rawget(_G, "BLACKBOARDS")
 		_saved_globals.Managers = rawget(_G, "Managers")
 
@@ -154,6 +155,15 @@ describe("sprint", function()
 				local dy = a.y - b.y
 				local dz = a.z - b.z
 				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+
+		_G.Quaternion = {
+			right = function()
+				return pos(1, 0, 0)
+			end,
+			forward = function()
+				return pos(0, 1, 0)
 			end,
 		}
 
@@ -792,6 +802,9 @@ describe("sprint", function()
 				sprint_follow_distance = function()
 					return 5
 				end,
+				daemonhost_keepout_distance = function()
+					return 14
+				end,
 				is_daemonhost_avoidance_enabled = function()
 					return true
 				end,
@@ -821,6 +834,33 @@ describe("sprint", function()
 
 			next_should = false
 			call()
+			assert.is_false(input.sprinting)
+		end)
+
+		it("steers away from non-aggroed daemonhosts inside the keepout radius", function()
+			local bot = "bot_keepout"
+			local daemonhost = "daemonhost_keepout"
+			local self_obj = make_self({
+				move = { x = 0, y = 1 },
+			})
+			self_obj._first_person_component = {
+				rotation = "rotation",
+			}
+
+			_positions[bot] = pos(0, 0, 0)
+			_positions[daemonhost] = pos(0, 8, 0)
+			_alive[daemonhost] = true
+			setup_breed(daemonhost, "chaos_daemonhost")
+			setup_side_system(bot, { daemonhost })
+
+			Sprint._on_update_movement(function()
+				self_obj._move.x = 0
+				self_obj._move.y = 1
+			end, self_obj, bot, input, 0.016, _mock_time)
+
+			assert.equals(0, self_obj._move.x)
+			assert.equals(-1, self_obj._move.y)
+			assert.equals("daemonhost_keepout", self_obj._bb_movement_safety_blocked)
 			assert.is_false(input.sprinting)
 		end)
 

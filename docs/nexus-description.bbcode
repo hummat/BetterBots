@@ -62,6 +62,7 @@ The terminal 1.x release. Bots now adapt to the build you give them instead of r
 [*]Ping elites and specials so you can see them
 [*]Push poxbursters at melee range instead of wasting ammo shooting them
 [*]Stay engaged in fights longer without wandering off to heal at 99%
+[*]Give barrels, ledges, and sleeping daemonhosts a wider berth
 [*]Pick appropriate melee attacks into hordes vs armor
 [*]Use several weapon specials on purpose instead of ignoring them: power swords, chain weapons, thunder hammers, force swords, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
 [*]Carry scriptures and tomes for the team
@@ -79,7 +80,7 @@ Everything new is toggleable or tunable. A few highlights:
 [*]Sprint distance, chase range, player-tag response, melee horde bias, rippergun bayonet/direct ranged bash range, warp-weapon max peril
 [*]Melee and ranged behavior toggles also cover supported weapon specials
 [*]Smart blitz targeting
-[*]Daemonhost avoidance
+[*]Daemonhost avoidance and hazard movement safety
 [*]Poxburster safety
 [*]Ammo reserve thresholds for bots and humans
 [*]Human-likeness timing and pressure profiles (manual or auto-by-difficulty)
@@ -113,7 +114,7 @@ Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font
 [size=3][b]Known issues[/b][/size]
 
 [list]
-[*]Daemonhost edge cases (dormant → aggro transitions, close-range suppression) still shake out. If a bot does something dumb near a DH, file an issue.
+[*]Daemonhost edge cases (dormant → aggro transitions, close-range suppression, keepout movement) still shake out. If a bot does something dumb near a DH, file an issue.
 [*]Mods get disabled after every Darktide patch — re-run the toggle/patch script to re-enable.
 [*]Hive Scum abilities and blitzes are implemented but unvalidated in-game. I don't own the DLC, so I rely on reports.
 [*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after a Darktide patch until the path is updated.

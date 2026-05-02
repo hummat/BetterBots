@@ -3,10 +3,17 @@ local M = {}
 local HAZARD_PROP_SENTINEL = "__bb_hazard_avoidance_prop_installed"
 local BOT_GROUP_SENTINEL = "__bb_hazard_avoidance_bot_group_installed"
 local TRIGGER_DURATION_S = 3
+local LEDGE_PROJECTION_DISTANCE = 1.75
+local LEDGE_DROP_TOLERANCE = 0.75
+local NAV_CHECK_ABOVE = 0.75
+local NAV_CHECK_BELOW = 1.5
 
 local _mod
 local _debug_log
 local _debug_enabled
+local _is_hazard_movement_avoidance_enabled
+local _hazard_avoidance_buffer
+local _NavQueries
 local _fixed_time = function()
 	return 0
 end
@@ -59,6 +66,40 @@ local function _flat_distance(a, b)
 	local dy = _vec_component(a, "y", 2) - _vec_component(b, "y", 2)
 
 	return math.sqrt(dx * dx + dy * dy)
+end
+
+local function _make_vector(x, y, z)
+	if Vector3 then
+		return Vector3(x, y, z)
+	end
+
+	return { x = x, y = y, z = z }
+end
+
+local function _normalized_flat(x, y)
+	local length = math.sqrt(x * x + y * y)
+	if length <= 0.001 then
+		return nil, nil
+	end
+
+	return x / length, y / length
+end
+
+local function _hazard_safety_enabled()
+	return not _is_hazard_movement_avoidance_enabled or _is_hazard_movement_avoidance_enabled()
+end
+
+local function _resolve_nav_queries(deps)
+	if deps and deps.nav_queries then
+		return deps.nav_queries
+	end
+
+	local ok, nav_queries = pcall(require, "scripts/utilities/nav_queries")
+	if ok then
+		return nav_queries
+	end
+
+	return rawget(_G, "NavQueries")
 end
 
 local function _unit_name(unit)
@@ -123,6 +164,13 @@ local function _radius_from_content(content)
 	local explosion_template = content and content.explosion_template
 
 	return explosion_template and explosion_template.radius or "unknown"
+end
+
+local function _numeric_radius_from_content(content)
+	local explosion_template = content and content.explosion_template
+	local radius = explosion_template and explosion_template.radius
+
+	return type(radius) == "number" and radius or nil
 end
 
 local function _broadphase_position(self)
@@ -226,6 +274,161 @@ local function _log_bot_group_results(self, before, shape, size, duration)
 	end
 end
 
+local function _emit_hazard_prop_threat(self)
+	if not _hazard_safety_enabled() then
+		return
+	end
+
+	local unit = self and (self._unit or self.unit)
+	local content = _content(self)
+	local radius = _numeric_radius_from_content(content)
+	local position = _explosion_position(unit) or POSITION_LOOKUP and unit and POSITION_LOOKUP[unit] or nil
+	if not (radius and position and Managers and Managers.state and Managers.state.extension and Quaternion) then
+		return
+	end
+
+	local extension_manager = Managers.state.extension
+	local ok_side, side_system = pcall(extension_manager.system, extension_manager, "side_system")
+	local ok_group, group_system = pcall(extension_manager.system, extension_manager, "group_system")
+	if not (ok_side and side_system and ok_group and group_system) then
+		return
+	end
+
+	local sides = side_system.sides and side_system:sides() or nil
+	local bot_groups = sides and group_system.bot_groups_from_sides and group_system:bot_groups_from_sides(sides) or nil
+	if not bot_groups then
+		return
+	end
+
+	local buffer = _hazard_avoidance_buffer and _hazard_avoidance_buffer() or 0
+	local size = radius + math.max(buffer or 0, 0)
+	for i = 1, #bot_groups do
+		local bot_group = bot_groups[i]
+		if bot_group and bot_group.aoe_threat_created then
+			bot_group:aoe_threat_created(position, "sphere", size, Quaternion.identity(), TRIGGER_DURATION_S)
+		end
+	end
+
+	if _is_debug_enabled() then
+		_debug_log(
+			"hazard_prop_buffered_threat:" .. tostring(unit),
+			_fixed_time(),
+			string.format(
+				"hazard_prop buffered threat unit=%s radius=%.2f buffer=%.2f duration=%.2f position=%s",
+				tostring(unit),
+				radius,
+				math.max(buffer or 0, 0),
+				TRIGGER_DURATION_S,
+				_fmt_vec(position)
+			),
+			nil,
+			"info"
+		)
+	end
+end
+
+local function _movement_world_direction(self, unit)
+	local move = self and self._move
+	if not move then
+		return nil
+	end
+
+	local move_x, move_y = move.x or 0, move.y or 0
+	if math.abs(move_x) + math.abs(move_y) <= 0.001 then
+		return nil
+	end
+
+	local rotation = self._first_person_component and self._first_person_component.rotation
+	if not rotation and Unit and Unit.local_rotation and unit then
+		local ok, unit_rotation = pcall(Unit.local_rotation, unit, 1)
+		if ok then
+			rotation = unit_rotation
+		end
+	end
+	if not (rotation and Quaternion and Quaternion.right and Quaternion.forward) then
+		return nil
+	end
+
+	local right = Quaternion.right(rotation)
+	local forward = Quaternion.forward(rotation)
+	local dir_x = _vec_component(right, "x", 1) * move_x + _vec_component(forward, "x", 1) * move_y
+	local dir_y = _vec_component(right, "y", 2) * move_x + _vec_component(forward, "y", 2) * move_y
+	local dir_z = _vec_component(right, "z", 3) * move_x + _vec_component(forward, "z", 3) * move_y
+	local flat_x, flat_y = _normalized_flat(dir_x, dir_y)
+	if not flat_x then
+		return nil
+	end
+
+	return flat_x, flat_y, dir_z
+end
+
+local function _unsafe_movement_endpoint(self, unit)
+	if not (_hazard_safety_enabled() and _NavQueries and _NavQueries.ray_can_go) then
+		return nil
+	end
+
+	local navigation_extension = self and self._navigation_extension
+	local nav_world = navigation_extension and navigation_extension._nav_world
+	local traverse_logic = navigation_extension and navigation_extension._traverse_logic
+	local position = POSITION_LOOKUP and unit and POSITION_LOOKUP[unit] or nil
+	if not (nav_world and traverse_logic and position) then
+		return nil
+	end
+
+	local dir_x, dir_y = _movement_world_direction(self, unit)
+	if not dir_x then
+		return nil
+	end
+
+	local endpoint = _make_vector(
+		_vec_component(position, "x", 1) + dir_x * LEDGE_PROJECTION_DISTANCE,
+		_vec_component(position, "y", 2) + dir_y * LEDGE_PROJECTION_DISTANCE,
+		_vec_component(position, "z", 3)
+	)
+
+	local ok, ray_can_go, projected_start, projected_end =
+		pcall(_NavQueries.ray_can_go, nav_world, position, endpoint, traverse_logic, NAV_CHECK_ABOVE, NAV_CHECK_BELOW)
+	if not ok or not projected_start or not projected_end then
+		return "ledge_projection_failed"
+	end
+	if not ray_can_go then
+		return "ledge_ray_blocked"
+	end
+	if _vec_component(projected_end, "z", 3) < _vec_component(projected_start, "z", 3) - LEDGE_DROP_TOLERANCE then
+		return "ledge_drop"
+	end
+
+	return nil
+end
+
+local function _apply_endpoint_safety(self, unit)
+	local reason = _unsafe_movement_endpoint(self, unit)
+	if not reason then
+		if self and self._bb_movement_safety_blocked and tostring(self._bb_movement_safety_blocked):find("^ledge_") then
+			self._bb_movement_safety_blocked = nil
+		end
+		return
+	end
+
+	local move = self and self._move
+	if move then
+		move.x = 0
+		move.y = 0
+	end
+	self._dodge = false
+	self._bb_movement_safety_blocked = reason
+
+	if _is_debug_enabled() then
+		_debug_log(
+			"movement_safety:" .. tostring(reason) .. ":" .. tostring(unit),
+			_fixed_time(),
+			"movement safety blocked unit=" .. _unit_name(unit) .. " reason=" .. tostring(reason),
+			0,
+			"info"
+		)
+	end
+end
+
 local function _group_threat(self)
 	local group_extension = self and self._group_extension
 	local bot_group_data = group_extension and group_extension.bot_group_data and group_extension:bot_group_data()
@@ -272,6 +475,9 @@ function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
+	_is_hazard_movement_avoidance_enabled = deps.is_hazard_movement_avoidance_enabled
+	_hazard_avoidance_buffer = deps.hazard_avoidance_buffer
+	_NavQueries = _resolve_nav_queries(deps)
 	_fixed_time = deps.fixed_time or _fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_last_consumed_key_by_input = setmetatable({}, { __mode = "k" })
@@ -290,6 +496,7 @@ function M.install_hazard_prop_hooks(HazardPropExtension)
 
 		if tostring(state) == "triggered" and tostring(previous_state) ~= "triggered" then
 			_log_hazard_prop_trigger(self)
+			_emit_hazard_prop_threat(self)
 		end
 
 		return result
@@ -318,6 +525,7 @@ end
 
 function M.on_bot_input_movement_updated(self, unit)
 	_log_consumed_threat(self, unit)
+	_apply_endpoint_safety(self, unit)
 end
 
 return M

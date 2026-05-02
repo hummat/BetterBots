@@ -150,6 +150,12 @@ return {
 	enable_daemonhost_avoidance_description = {
 		en = "Bots stop fighting and sprinting near a sleeping daemonhost. Turn this off for vanilla behavior.",
 	},
+	enable_hazard_movement_avoidance = {
+		en = "Avoid hazards and ledges",
+	},
+	enable_hazard_movement_avoidance_description = {
+		en = "Bots add extra movement safety around fused barrels, sleeping daemonhosts, and unsafe ledge endpoints.",
+	},
 	enable_target_type_hysteresis = {
 		en = "Reduce weapon swap thrashing",
 	},
@@ -332,6 +338,18 @@ return {
 	sprint_follow_distance_description = {
 		en = "Bots sprint when they fall this far behind the leader. "
 			.. "This also covers traversal and rescue sprints. Set to 0 to disable bot sprinting.",
+	},
+	daemonhost_keepout_distance = {
+		en = "Daemonhost keepout distance (m)",
+	},
+	daemonhost_keepout_distance_description = {
+		en = "Bots try to move away and suppress risky actions inside this distance from a sleeping daemonhost.",
+	},
+	hazard_avoidance_buffer = {
+		en = "Hazard avoidance buffer (m)",
+	},
+	hazard_avoidance_buffer_description = {
+		en = "Extra distance added around fused barrel explosion radii before bots dodge away.",
 	},
 	special_chase_penalty_range = {
 		en = "Stop chasing specials into melee at (m)",

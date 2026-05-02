@@ -298,6 +298,10 @@ function M.load_and_init(ctx)
 		debug_enabled = ctx.debug_enabled,
 		fixed_time = ctx.fixed_time,
 		bot_slot_for_unit = Debug.bot_slot_for_unit,
+		is_hazard_movement_avoidance_enabled = function()
+			return Settings.is_feature_enabled("hazard_movement_avoidance")
+		end,
+		hazard_avoidance_buffer = Settings.hazard_avoidance_buffer,
 	})
 
 	ChargeTracker.init({
@@ -355,6 +359,7 @@ function M.load_and_init(ctx)
 		perf = Perf,
 		shared_rules = SharedRules,
 		sprint_follow_distance = Settings.sprint_follow_distance,
+		daemonhost_keepout_distance = Settings.daemonhost_keepout_distance,
 		hazard_avoidance = HazardAvoidance,
 		is_daemonhost_avoidance_enabled = function()
 			return Settings.is_feature_enabled("daemonhost_avoidance")
