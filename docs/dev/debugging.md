@@ -166,6 +166,9 @@ bb-log events scenarios  # JSONL: /bb_scenario start/spawn/result rows
 bb-log events raw 'jq-filter'  # JSONL: raw jq passthrough
 ```
 
+For recurring "check for regressions" requests and major-release log reviews,
+use `docs/dev/core-regression-checks.md` as the checklist.
+
 **Manual grep recipes** (if bb-log unavailable):
 ```bash
 LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"

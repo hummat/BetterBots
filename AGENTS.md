@@ -321,6 +321,7 @@ Do not jump to web search first for Darktide mechanics or patch-impact questions
 | Write or modify ability heuristics | `docs/classes/<name>.md` + `docs/classes/<name>-tactics.md` for the class |
 | Analyze game logs | `docs/dev/debugging.md` (log patterns, grep recipes, file locations) |
 | Analyze logging code | `docs/dev/logging.md` (log format, throttle keys, output levels, JSONL event log) |
+| Check core combat/regression coverage | `docs/dev/core-regression-checks.md` + `docs/dev/debugging.md` |
 | Understand what vanilla bots can/cannot do | `docs/bot/vanilla-capabilities.md` |
 | Modify bot behavior (targeting, movement, weapons) | Relevant `docs/bot/*.md` file(s) |
 | Modify input queueing or action sequences | `docs/bot/input-system.md` |
