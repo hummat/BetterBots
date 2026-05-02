@@ -79,12 +79,12 @@ Map + difficulty: targeted `/bb_scenario daemonhost_passive_near`
   - `bot 5 pinged chaos_daemonhost (reason: target_enemy_focus_target_override)`
   - weapon/grenade actions followed against `target_breed=chaos_daemonhost` (`zoom`, `shoot_pressed`, Ogryn rock, Veteran krak, Assail, melee attacks)
 - no `dormant_daemonhost` skip/suppress marker appeared before the attacks
-- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. Re-test should pass only if the next passive run shows `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true` and no damaging weapon/grenade release against the passive daemonhost.
+- follow-up code fix adds a central `weapon_action` guard for current `target_enemy` = non-aggroed daemonhost. A later 2026-05-02 retest still lacked `daemonhost_nearby` / keepout markers while the player circled the passive DH, implying the side-list scan did not see the passive spawned DH early enough. Follow-up code now also scans `Managers.state.minion_spawn:spawned_minions()` and blocks ranged fire at non-daemonhost targets inside dormant DH keepout. Re-test should pass only if the next passive run shows `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `blocked foreign weapon action ... daemonhost_avoidance ... dormant=true`, or `daemonhost_nearby_target`, with no damaging weapon/grenade release against the passive daemonhost or enemies inside its keepout zone.
 
 #107 hazard movement safety: code-complete after this failed run; live re-test pending
 - the follow-up branch now adds daemonhost keepout steering, buffered fused-barrel AoE threats, and nav/drop endpoint blocking for pending dodge output only. A 2026-05-02 retest showed generic movement endpoint blocking misclassified stairs/downhill traversal as `ledge_drop`, so normal movement now fails open.
 - re-test should check `/bb_scenario daemonhost_passive_near` plus a mission segment with barrels, floor hazards, and ledges
-- expected markers: `movement safety steered away from daemonhost`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
+- expected markers: `movement safety steered away from daemonhost`, `ranged suppressed (target near dormant daemonhost)`, `daemonhost_nearby_target`, `hazard_prop buffered threat`, `aoe_threat consumed`, and `movement safety blocked`
 ```
 
 ### Run 2026-04-29-post-v1-validation-rollup

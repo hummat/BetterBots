@@ -135,6 +135,16 @@ local function _non_aggroed_daemonhost_units(side, fixed_t)
 		_add_non_aggroed_daemonhost_units(relation_units, seen)
 	end
 
+	local minion_spawn = Managers and Managers.state and Managers.state.minion_spawn
+	local spawned_minions = nil
+	if minion_spawn and minion_spawn.spawned_minions then
+		local ok, result = pcall(minion_spawn.spawned_minions, minion_spawn)
+		if ok then
+			spawned_minions = result
+		end
+	end
+	_add_non_aggroed_daemonhost_units(spawned_minions, seen)
+
 	_dh_units_cache_t = fixed_t
 	_dh_units_cache_side = side
 

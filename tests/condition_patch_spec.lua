@@ -12,6 +12,7 @@ local _fixed_time_value = 0
 local _game_object_ids = {}
 local _game_object_fields = {}
 local _is_near_daemonhost_result = false
+local _is_position_near_daemonhost_result = false
 local _saved_globals = {}
 local SharedRules
 local CombatAbilityIdentity
@@ -76,6 +77,7 @@ local function reset()
 	_debug_enabled_result = false
 	_fixed_time_value = 0
 	_is_near_daemonhost_result = false
+	_is_position_near_daemonhost_result = false
 end
 
 local function find_debug_log(pattern)
@@ -202,6 +204,9 @@ describe("condition_patch", function()
 			is_near_daemonhost = function()
 				return _is_near_daemonhost_result
 			end,
+			is_position_near_daemonhost = function()
+				return _is_position_near_daemonhost_result
+			end,
 			is_suppressed = function()
 				return false
 			end,
@@ -262,6 +267,9 @@ describe("condition_patch", function()
 			end,
 			is_near_daemonhost = function()
 				return _is_near_daemonhost_result
+			end,
+			is_position_near_daemonhost = function()
+				return _is_position_near_daemonhost_result
 			end,
 			is_suppressed = function()
 				return false
@@ -450,6 +458,31 @@ describe("condition_patch", function()
 			local result = conditions.bot_in_melee_range("bot1", bb, {}, {}, {}, false)
 			assert.is_false(result)
 			assert.is_false(melee_called)
+		end)
+
+		it("suppresses ranged against non-DH target standing inside dormant daemonhost keepout", function()
+			local target = "mauler_inside_dh_zone"
+			setup_breed(target, "renegade_executor")
+			_G.POSITION_LOOKUP[target] = { x = 3, y = 0, z = 0 }
+			_is_position_near_daemonhost_result = true
+
+			local bb = make_blackboard(target)
+			local ranged_called = false
+			local conditions = {
+				has_target_and_ammo_greater_than = function()
+					ranged_called = true
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			ConditionPatch._install_condition_patch(conditions, {}, "test_target_near_dh")
+
+			local result = conditions.has_target_and_ammo_greater_than("bot1", bb, {}, {}, {}, false)
+			assert.is_false(result)
+			assert.is_false(ranged_called)
 		end)
 
 		it("suppresses melee against dormant daemonhost target", function()

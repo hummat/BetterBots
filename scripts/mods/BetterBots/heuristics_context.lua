@@ -6,6 +6,7 @@ local _resolve_preset
 local _debug_log
 local _debug_enabled
 local _daemonhost_breed_names
+local _daemonhost_stage_aggroed
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_state
 local _is_position_near_daemonhost
@@ -362,7 +363,7 @@ local function normalize_grenade_context(unit, context, target_unit)
 			aggro_state = target_perception and target_perception.aggro_state or nil
 		end
 		aggro_state = aggro_state or "missing"
-		local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
+		local is_aggroed = stage ~= nil and stage == _daemonhost_stage_aggroed or aggro_state == "aggroed"
 		normalized.target_is_dormant_daemonhost = not is_aggroed
 		normalized.target_daemonhost_aggro_state = aggro_state
 		normalized.target_daemonhost_stage = stage
@@ -589,7 +590,7 @@ local function build_context(unit, blackboard)
 					aggro_state = target_perception and target_perception.aggro_state or nil
 				end
 				aggro_state = aggro_state or "missing"
-				local is_aggroed = stage ~= nil and stage == 6 or aggro_state == "aggroed"
+				local is_aggroed = stage ~= nil and stage == _daemonhost_stage_aggroed or aggro_state == "aggroed"
 				context.target_is_dormant_daemonhost = not is_aggroed
 				context.target_daemonhost_aggro_state = aggro_state
 				context.target_daemonhost_stage = stage
@@ -691,6 +692,7 @@ return {
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled
 		_daemonhost_breed_names = deps.shared_rules and deps.shared_rules.DAEMONHOST_BREED_NAMES
+		_daemonhost_stage_aggroed = deps.shared_rules and deps.shared_rules.DAEMONHOST_STAGE_AGGROED
 		_daemonhost_state = deps.shared_rules and deps.shared_rules.daemonhost_state
 		_is_position_near_daemonhost = deps.is_position_near_daemonhost
 		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()

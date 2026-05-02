@@ -33,6 +33,7 @@ local _bot_ranged_ammo_threshold
 local _is_non_aggroed_daemonhost
 local _daemonhost_state
 local _is_near_daemonhost
+local _is_position_near_daemonhost
 
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
@@ -67,6 +68,22 @@ end
 local function _is_close_to_dormant_daemonhost(unit)
 	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
 	return dh_avoidance and _is_near_daemonhost and _is_near_daemonhost(unit) or false
+end
+
+local function _is_target_near_dormant_daemonhost(unit, blackboard)
+	local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
+	if not (dh_avoidance and _is_position_near_daemonhost) then
+		return false
+	end
+
+	local perception = blackboard and blackboard.perception
+	local target_enemy = perception and perception.target_enemy
+	local target_position = target_enemy and POSITION_LOOKUP and POSITION_LOOKUP[target_enemy] or nil
+	if not (target_enemy and ALIVE[target_enemy] and target_position) then
+		return false
+	end
+
+	return _is_position_near_daemonhost(unit, target_position)
 end
 
 local function _daemonhost_target_details(blackboard, context)
@@ -585,6 +602,16 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 				end
 				return false
 			end
+			if _is_target_near_dormant_daemonhost(unit, blackboard) then
+				if _debug_enabled() then
+					_debug_log(
+						"dh_suppress_ranged_target_near:" .. tostring(unit),
+						_fixed_time(),
+						"ranged suppressed (target near dormant daemonhost)"
+					)
+				end
+				return false
+			end
 			local adjusted_args = _override_ranged_ammo_condition_args(unit, condition_args)
 			local result =
 				orig_has_target_and_ammo(unit, blackboard, scratchpad, adjusted_args, action_data, is_running)
@@ -710,6 +737,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled
 	_is_near_daemonhost = deps.is_near_daemonhost
+	_is_position_near_daemonhost = deps.is_position_near_daemonhost
 	local shared_rules = deps.shared_rules or {}
 	DAEMONHOST_BREED_NAMES = shared_rules.DAEMONHOST_BREED_NAMES or DAEMONHOST_BREED_NAMES
 	RESCUE_CHARGE_RULES = shared_rules.RESCUE_CHARGE_RULES or RESCUE_CHARGE_RULES

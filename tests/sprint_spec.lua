@@ -7,6 +7,7 @@ local _alive = {}
 local _unit_alive = {}
 local _saved_globals = {}
 local Sprint
+local _spawned_minions = {}
 
 -- Mock BLACKBOARDS for daemonhost aggro state detection (#17)
 local _blackboards = {}
@@ -136,6 +137,9 @@ local function reset()
 	for k in pairs(_blackboards) do
 		_blackboards[k] = nil
 	end
+	for k in pairs(_spawned_minions) do
+		_spawned_minions[k] = nil
+	end
 	_mock_side_system = nil
 	_mock_time = _mock_time + 1 -- bust per-frame DH distance cache
 end
@@ -208,6 +212,11 @@ describe("sprint", function()
 							return _mock_side_system
 						end
 						return nil
+					end,
+				},
+				minion_spawn = {
+					spawned_minions = function()
+						return _spawned_minions
 					end,
 				},
 			},
@@ -756,6 +765,19 @@ describe("sprint", function()
 			_alive[dh] = true
 			setup_breed(dh, "chaos_daemonhost")
 			setup_side_system_with_relation_only_daemonhost(unit, { dh })
+
+			assert.is_true(Sprint.is_near_daemonhost(unit))
+		end)
+
+		it("detects passive daemonhosts from the minion spawn manager when side lists omit them", function()
+			local unit = "bot1"
+			local dh = "dh_spawned_only"
+			_positions[unit] = pos(0, 0, 0)
+			_positions[dh] = pos(5, 0, 0)
+			_alive[dh] = true
+			setup_breed(dh, "chaos_daemonhost")
+			setup_side_system_with_relation_only_daemonhost(unit, {})
+			_spawned_minions[1] = dh
 
 			assert.is_true(Sprint.is_near_daemonhost(unit))
 		end)

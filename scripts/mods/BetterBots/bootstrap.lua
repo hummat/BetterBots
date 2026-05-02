@@ -529,6 +529,9 @@ function M.load_and_init(ctx)
 		is_near_daemonhost = function(unit)
 			return Sprint.is_near_daemonhost(unit, Sprint.DAEMONHOST_COMBAT_RANGE_SQ)
 		end,
+		is_position_near_daemonhost = function(unit, position)
+			return Sprint.is_position_near_daemonhost(unit, position, Sprint.daemonhost_keepout_range_sq())
+		end,
 	})
 
 	AbilityQueue.init({

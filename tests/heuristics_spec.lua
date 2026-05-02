@@ -2293,6 +2293,48 @@ describe("heuristics", function()
 			assert.matches("priority", rule)
 		end)
 
+		it("blocks grenades and blitzes against targets standing inside dormant daemonhost keepout", function()
+			local cases = {
+				{
+					template = "veteran_krak_grenade",
+					context = {
+						target_enemy = "mauler",
+						target_breed_name = "renegade_executor",
+						target_is_elite_special = true,
+						target_enemy_distance = 9,
+					},
+				},
+				{
+					template = "ogryn_grenade_frag",
+					context = {
+						target_enemy = "plague_ogryn",
+						target_is_monster = true,
+						monster_count = 1,
+						target_enemy_distance = 10,
+					},
+				},
+				{
+					template = "psyker_smite",
+					context = {
+						target_enemy = "crusher",
+						target_is_super_armor = true,
+						target_enemy_distance = 9,
+						peril_pct = 0.2,
+					},
+				},
+			}
+
+			for _, case in ipairs(cases) do
+				local local_ctx = helper.make_context(case.context)
+				local_ctx.target_is_near_dormant_daemonhost = true
+				local_ctx.target_is_dormant_daemonhost = false
+
+				local result, rule = Heuristics.evaluate_grenade_heuristic(case.template, local_ctx)
+				assert.is_false(result, case.template)
+				assert.matches("daemonhost_nearby_target", rule)
+			end
+		end)
+
 		it("holds krak grenades against non-armored specials so plasma can handle them", function()
 			local result, rule = Heuristics.evaluate_grenade_heuristic(
 				"veteran_krak_grenade",
@@ -3808,6 +3850,53 @@ describe("heuristics", function()
 			})
 
 			assert.is_true(context.target_is_dormant_daemonhost)
+		end)
+
+		it("uses the shared daemonhost aggro stage marker", function()
+			_G.ALIVE.target_enemy = true
+			script_unit_extensions = {
+				target_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_daemonhost",
+						tags = { monster = true },
+					}),
+				},
+			}
+
+			helper.init_split_heuristics(Heuristics, {
+				fixed_time = function()
+					return current_fixed_t
+				end,
+				decision_context_cache = {},
+				super_armor_breed_cache = {},
+				ARMOR_TYPE_SUPER_ARMOR = 6,
+				is_testing_profile = function()
+					return false
+				end,
+				combat_ability_identity = CombatAbilityIdentity,
+				shared_rules = {
+					DAEMONHOST_BREED_NAMES = {
+						chaos_daemonhost = true,
+					},
+					DAEMONHOST_STAGE_AGGROED = 42,
+					daemonhost_state = function(unit)
+						assert.equals("target_enemy", unit)
+						return "alerted", 42
+					end,
+				},
+				is_daemonhost_avoidance_enabled = function()
+					return true
+				end,
+			})
+
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_enemy = "target_enemy",
+				},
+			})
+
+			assert.is_false(context.target_is_dormant_daemonhost)
+			assert.equals(42, context.target_daemonhost_stage)
 		end)
 
 		it("counts grenadiers (no breed.ranged, game_object_type=minion_ranged) as ranged", function()
