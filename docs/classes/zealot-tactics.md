@@ -9,7 +9,7 @@
 ### USE WHEN
 - Toughness below 30% with enemies nearby and target at 3-20m — dash restores 50% toughness
 - Elite/special at 5-20m — guaranteed crit + 100% rending on first post-dash hit
-- Ally being disabled (`priority_target_enemy`) and target > 4m away
+- Ally being disabled (`priority_target_enemy`) and target > 4m away, or hard ally aid (`knocked_down`, `ledge`, `netted`, `hogtied`) with ally > 3m away
 - 3+ enemies in path — AoE impact damage in 3m radius during lunge
 
 ### DON'T USE WHEN
@@ -24,6 +24,7 @@ IF toughness_pct < 0.30 AND num_nearby > 0 AND target_dist > 3 AND target_dist <
 IF (target has "special" or "elite") AND target_dist > 5 AND target_dist < 20
    AND NOT target_has_super_armor THEN activate (MEDIUM)
 IF priority_target_enemy AND target_dist > 4 THEN activate (HIGH)
+IF target_ally_needs_aid AND need_type IN {knocked_down, ledge, netted, hogtied} AND ally_dist > 3 THEN activate (HIGH)
 BLOCK IF target_dist < 3
 BLOCK IF target_breed IN {chaos_ogryn_bulwark, chaos_ogryn_executor, chaos_plague_ogryn}
 ```

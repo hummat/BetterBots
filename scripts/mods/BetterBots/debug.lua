@@ -82,6 +82,7 @@ local function context_snapshot(context)
 		opportunity_target_enemy = enemy_unit_label(context.opportunity_target_enemy),
 		urgent_target_enemy = enemy_unit_label(context.urgent_target_enemy),
 		target_ally_needs_aid = context.target_ally_needs_aid,
+		target_ally_need_type = context.target_ally_need_type,
 		target_ally_distance = _json_safe_number(context.target_ally_distance),
 		target_is_elite_special = context.target_is_elite_special,
 		target_is_monster = context.target_is_monster,

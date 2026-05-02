@@ -179,11 +179,27 @@ describe("heuristics", function()
 					target_enemy = "unit",
 					target_enemy_distance = 8,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("holds soft ally aid at range", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 8,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("hold", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
@@ -673,11 +689,25 @@ describe("heuristics", function()
 				T,
 				ctx({
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("does not charge for soft ally aid during a lull", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("no_target", rule)
 		end)
 
 		it("blocks when ally too close for charge", function()
@@ -1097,11 +1127,26 @@ describe("heuristics", function()
 				ctx({
 					target_enemy_distance = 6,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 					target_ally_distance = 10,
 				})
 			)
 			assert.is_true(ok)
 			assert.matches("ally_aid", rule)
+		end)
+
+		it("does not charge for soft ally aid during a lull", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy_distance = 6,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 10,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("no_pressure", rule)
 		end)
 
 		it("blocks ally rescue when ally too close", function()
@@ -1268,11 +1313,45 @@ describe("heuristics", function()
 				assert.matches("voc_critical_toughness", rule)
 			end)
 
-			it("activates for ally aid", function()
+			it("activates for ally aid with pressure", function()
 				local ok, rule = evaluate(
 					T,
 					ctx({
+						num_nearby = 1,
 						target_ally_needs_aid = true,
+						target_ally_need_type = "in_need_of_heal",
+						target_ally_distance = 8,
+					}),
+					voc_opts()
+				)
+				assert.is_true(ok)
+				assert.matches("voc_ally_aid", rule)
+			end)
+
+			it("holds soft ally aid during a lull", function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 0,
+						toughness_pct = 0.90,
+						target_ally_needs_aid = true,
+						target_ally_need_type = "in_need_of_heal",
+						target_ally_distance = 8,
+					}),
+					voc_opts()
+				)
+				assert.is_false(ok)
+				assert.matches("voc_block_safe_state", rule)
+			end)
+
+			it("activates for knocked-down ally aid during a lull", function()
+				local ok, rule = evaluate(
+					T,
+					ctx({
+						num_nearby = 0,
+						toughness_pct = 0.90,
+						target_ally_needs_aid = true,
+						target_ally_need_type = "knocked_down",
 						target_ally_distance = 8,
 					}),
 					voc_opts()
@@ -1546,6 +1625,35 @@ describe("heuristics", function()
 				ctx({
 					num_nearby = 1,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
+				})
+			)
+			assert.is_true(ok)
+			assert.matches("ally_aid", rule)
+		end)
+
+		it("holds soft ally aid with only light pressure", function()
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 1,
+					toughness_pct = 0.95,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("safe", rule)
+		end)
+
+		it("activates soft ally aid with real pressure", function()
+			local ok, rule = eval_item(
+				"psyker_force_field",
+				ctx({
+					num_nearby = 2,
+					toughness_pct = 0.95,
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
 				})
 			)
 			assert.is_true(ok)
@@ -1598,6 +1706,7 @@ describe("heuristics", function()
 					num_nearby = 1,
 					toughness_pct = 0.95,
 					target_ally_needs_aid = true,
+					target_ally_need_type = "knocked_down",
 				})
 			)
 			assert.is_true(ok)
@@ -1983,6 +2092,7 @@ describe("heuristics", function()
 						target_enemy = "enemy",
 						target_enemy_distance = 10,
 						target_ally_needs_aid = true,
+						target_ally_need_type = "knocked_down",
 						target_ally_distance = 10,
 					})
 				)
@@ -3575,6 +3685,21 @@ describe("heuristics", function()
 
 			assert.is_true(ok)
 			assert.is_true(context.in_hazard)
+		end)
+
+		it("copies target ally need type from perception", function()
+			local context = Heuristics.build_context("hazard_bot", {
+				perception = {
+					target_ally_needs_aid = true,
+					target_ally_need_type = "in_need_of_heal",
+					target_ally_distance = 7,
+					target_ally = "ally_unit",
+				},
+			})
+
+			assert.is_true(context.target_ally_needs_aid)
+			assert.equals("in_need_of_heal", context.target_ally_need_type)
+			assert.equals(7, context.target_ally_distance)
 		end)
 
 		it("reuses the liquid overlap buffer across frames", function()

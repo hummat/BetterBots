@@ -20,6 +20,7 @@ local PERCEPTION_CACHE_FIELDS = {
 	"opportunity_target_enemy",
 	"urgent_target_enemy",
 	"target_ally_needs_aid",
+	"target_ally_need_type",
 	"target_ally_distance",
 	"target_ally",
 }

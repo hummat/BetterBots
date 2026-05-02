@@ -49,6 +49,7 @@ function M.make_context(overrides)
 		companion_unit = nil,
 		companion_position = nil,
 		target_ally_needs_aid = false,
+		target_ally_need_type = nil,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
 		target_is_elite = false,

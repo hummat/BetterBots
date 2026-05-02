@@ -21,7 +21,7 @@
 ### PROPOSED BOT RULES
 ```
 IF priority_target_enemy AND target_dist > 4 THEN activate (HIGH)
-IF target_ally_needs_aid AND ally_dist > 6 THEN activate (HIGH)
+IF target_ally_needs_aid AND need_type IN {knocked_down, ledge, netted, hogtied} AND ally_dist > 6 THEN activate (HIGH)
 IF opportunity_target AND target_dist >= 8 AND target_dist <= 18 THEN activate (MEDIUM)  -- 18m requires ogryn_charge_increased_distance talent (base: 12m)
 IF num_nearby >= 4 AND toughness_pct < 0.20 THEN activate (MEDIUM)
 BLOCK IF target_dist < 4

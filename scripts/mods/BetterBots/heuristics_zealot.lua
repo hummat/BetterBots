@@ -25,9 +25,20 @@ local ZEALOT_DASH_THRESHOLDS = {
 	},
 }
 
+local HARD_ALLY_AID_TYPES = {
+	knocked_down = true,
+	ledge = true,
+	netted = true,
+	hogtied = true,
+}
+
 local function _has_talent(context, talent_name)
 	local talents = context and context.talents
 	return talents and talents[talent_name] ~= nil or false
+end
+
+local function _target_ally_needs_hard_aid(context)
+	return context.target_ally_needs_aid == true and HARD_ALLY_AID_TYPES[context.target_ally_need_type] == true
 end
 
 local function _can_activate_zealot_dash(context, thresholds)
@@ -44,7 +55,7 @@ local function _can_activate_zealot_dash(context, thresholds)
 	if context.target_is_super_armor then
 		return false, "zealot_dash_block_super_armor"
 	end
-	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+	if _target_ally_needs_hard_aid(context) and (context.target_ally_distance or math.huge) > 3 then
 		return true, "zealot_dash_ally_aid"
 	end
 	if context.priority_target_enemy and target_distance and target_distance > 4 then

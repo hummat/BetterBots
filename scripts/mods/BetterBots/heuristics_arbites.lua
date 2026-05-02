@@ -30,6 +30,17 @@ local ADAMANT_STANCE_THRESHOLDS = {
 
 local _is_monster_signal_allowed
 
+local HARD_ALLY_AID_TYPES = {
+	knocked_down = true,
+	ledge = true,
+	netted = true,
+	hogtied = true,
+}
+
+local function _target_ally_needs_hard_aid(context)
+	return context.target_ally_needs_aid == true and HARD_ALLY_AID_TYPES[context.target_ally_need_type] == true
+end
+
 local function _can_activate_adamant_stance(context, thresholds)
 	local target_distance = context.target_enemy_distance
 	if context.toughness_pct < thresholds.low_toughness then
@@ -71,7 +82,7 @@ local function _can_activate_adamant_charge(context, thresholds)
 	if context.ally_interacting and (context.ally_interacting_distance or math.huge) <= 12 then
 		return false, "adamant_charge_block_protecting_interactor"
 	end
-	if context.target_ally_needs_aid and (context.target_ally_distance or math.huge) > 3 then
+	if _target_ally_needs_hard_aid(context) and (context.target_ally_distance or math.huge) > 3 then
 		return true, "adamant_charge_ally_aid"
 	end
 	if context.num_nearby == 0 and not context.priority_target_enemy and not context.target_is_elite_special then

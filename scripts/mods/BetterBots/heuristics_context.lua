@@ -278,6 +278,7 @@ local function _perception_cache_matches(entry, fixed_t, perception_component, c
 		and entry.opportunity_target_enemy == (perception_component and perception_component.opportunity_target_enemy or nil)
 		and entry.urgent_target_enemy == (perception_component and perception_component.urgent_target_enemy or nil)
 		and entry.target_ally_needs_aid == (perception_component and perception_component.target_ally_needs_aid or nil)
+		and entry.target_ally_need_type == (perception_component and perception_component.target_ally_need_type or nil)
 		and entry.target_ally_distance == (perception_component and perception_component.target_ally_distance or nil)
 		and entry.target_ally == (perception_component and perception_component.target_ally or nil)
 end
@@ -294,6 +295,7 @@ local function _store_context_cache(unit, fixed_t, perception_component, current
 		opportunity_target_enemy = perception_component and perception_component.opportunity_target_enemy or nil,
 		urgent_target_enemy = perception_component and perception_component.urgent_target_enemy or nil,
 		target_ally_needs_aid = perception_component and perception_component.target_ally_needs_aid or nil,
+		target_ally_need_type = perception_component and perception_component.target_ally_need_type or nil,
 		target_ally_distance = perception_component and perception_component.target_ally_distance or nil,
 		target_ally = perception_component and perception_component.target_ally or nil,
 	}
@@ -399,6 +401,7 @@ local function build_context(unit, blackboard)
 		companion_unit = nil,
 		companion_position = nil,
 		target_ally_needs_aid = false,
+		target_ally_need_type = nil,
 		target_ally_distance = nil,
 		target_ally_unit = nil,
 		target_is_elite = false,
@@ -454,6 +457,7 @@ local function build_context(unit, blackboard)
 		context.opportunity_target_enemy = _live_enemy_unit(perception_component.opportunity_target_enemy)
 		context.urgent_target_enemy = _live_enemy_unit(perception_component.urgent_target_enemy)
 		context.target_ally_needs_aid = perception_component.target_ally_needs_aid == true
+		context.target_ally_need_type = perception_component.target_ally_need_type
 		context.target_ally_distance = perception_component.target_ally_distance
 		context.target_ally_unit = perception_component.target_ally
 	end
