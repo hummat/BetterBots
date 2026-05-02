@@ -66,6 +66,21 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 - Debug logging: set_profile guard, record_charge, per-bot poxburster keys.
 - 579 unit tests via busted.
 
+### v0.9.1 (2026-04-07)
+- Hotfix for user-reported regressions: hook_require clobbering (#67), veteran class swap (#68), exception-safe shared state (#73), mastiff fixation (#69), whistle (#70), ogryn grenade (#71), configurable ammo (#72). Bot build overhaul. 632 tests.
+
+### v0.10.0 (2026-04-11)
+- "Team Coordination": ability cooldown staggering (#14), objective-aware abilities (#37), revive-with-ability (#7), companion-command smart tag (#49), expanded settings surface (#81, #83). 813 tests.
+
+### v0.11.0 (2026-04-15)
+- "Combat Execution": mule item pickup (#32), human-likeness tuning (#44), perf audit (#82), sustained fire (#87), grenade pickup (#89), target type hysteresis (#90), weakspot aim MVP (#91), grenade ballistic arc (#93). 1100+ tests.
+
+### v1.0.0 (2026-04-24)
+- "Bot Identity" terminal release: 6-sprint plan — talent-aware behavior (#38), navmesh charge validation (#13), close-range ranged classifier (#41), melee specials (#33), pocketable carry/deploy (#88), stim usage (#24), com-wheel response (#56), smart-tag item bridge (#96), non-book resource arbitration (#97), metadata hardening (#98), perf benchmark protocol (#99). 1324 tests.
+
+### v1.1.0 (2026-05-02)
+- Post-1.0 hardening: daemonhost avoidance hardened (#17), hazard movement safety (#107), pickup follow-through fixed, healing priority fixed, human revive priority (#108), non-veteran bot profile refresh, scenario harness expanded (#100), core regression checklist, perf cap verified (#106).
+
 ## Planned batches
 
 Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
