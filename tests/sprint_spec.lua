@@ -843,6 +843,55 @@ describe("sprint", function()
 			assert.is_truthy(joined:find("reason=aggroed", 1, true))
 		end)
 
+		it("logs each daemonhost scan source once even when enemy counts change", function()
+			Sprint.init({
+				mod = { echo = function() end },
+				debug_log = function(key, _fixed_t, message)
+					_debug_logs[#_debug_logs + 1] = {
+						key = key,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return _mock_time
+				end,
+				shared_rules = dofile("scripts/mods/BetterBots/shared_rules.lua"),
+			})
+
+			local unit = "bot_source_log"
+			local enemy1 = "enemy1"
+			local enemy2 = "enemy2"
+			local side = {
+				ai_target_units = { enemy1 },
+				relation_units = function(self)
+					return self.ai_target_units
+				end,
+			}
+			_positions[unit] = pos(0, 0, 0)
+			_mock_side_system = test_helper.make_side_system_double({
+				side_by_unit = {
+					[unit] = side,
+				},
+			})
+
+			assert.is_false(Sprint.is_near_daemonhost(unit))
+			_mock_time = _mock_time + 1
+			side.ai_target_units = { enemy1, enemy2 }
+			assert.is_false(Sprint.is_near_daemonhost(unit))
+
+			local source_logs = 0
+			for i = 1, #_debug_logs do
+				if _debug_logs[i].message:find("daemonhost scan source source=ai_target_units", 1, true) then
+					source_logs = source_logs + 1
+				end
+			end
+
+			assert.equals(1, source_logs)
+		end)
+
 		it("checks arbitrary positions against daemonhost danger range from the bot side", function()
 			local unit = "bot1"
 			local dh = "dh_near_target"

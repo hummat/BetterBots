@@ -487,6 +487,65 @@ describe("mule_pickup", function()
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
 	end)
 
+	it("materializes explicit tome pickup orders when vanilla leaves mule state empty", function()
+		local tome_unit = { pickup_type = "tome" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {
+					slot_pocketable = {
+						unit = tome_unit,
+						pickup_name = "tome",
+					},
+				},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[tome_unit] = { x = 4, y = 0, z = 0 },
+		}
+		_G.BLACKBOARDS[bot_unit] = {
+			follow = {
+				needs_destination_refresh = false,
+			},
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.equals(tome_unit, pickup_component.mule_pickup)
+		assert.equals(3, pickup_component.mule_pickup_distance)
+		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+		assert.is_truthy(find_debug_log("assigned ordered mule pickup for tome"))
+	end)
+
 	it("does not assign proactive pocketables when policy rejects the pickup", function()
 		pickups.by_name.medical_crate_pocketable = {
 			name = "medical_crate_pocketable",

@@ -20,6 +20,7 @@ end
 local _bot_slot_for_unit
 local _last_consumed_key_by_input = setmetatable({}, { __mode = "k" })
 local _logged_movement_safety_blocks = setmetatable({}, { __mode = "k" })
+local _hazard_prop_settings
 
 local function _is_debug_enabled()
 	return _debug_enabled and _debug_enabled()
@@ -161,14 +162,68 @@ local function _content(self)
 	return self and self._content or nil
 end
 
+local function _resolve_hazard_prop_settings()
+	if _hazard_prop_settings then
+		return _hazard_prop_settings
+	end
+
+	local ok, settings = pcall(require, "scripts/settings/hazard_prop/hazard_prop_settings")
+	if ok then
+		_hazard_prop_settings = settings
+	end
+
+	return _hazard_prop_settings
+end
+
+local function _matches_hazard_content(content, expected)
+	return content ~= nil and expected ~= nil and (content == expected or tostring(content) == tostring(expected))
+end
+
+local function _explosion_template_from_content(content)
+	if type(content) == "table" and content.explosion_template then
+		return content.explosion_template
+	end
+
+	local settings = _resolve_hazard_prop_settings()
+	if not (settings and content ~= nil) then
+		return nil
+	end
+
+	local hazard_content = settings.hazard_content or {}
+	if _matches_hazard_content(content, hazard_content.fire) then
+		local fire_settings = settings.fire_settings
+
+		return fire_settings and fire_settings.explosion_template or nil
+	end
+
+	if _matches_hazard_content(content, hazard_content.explosion) then
+		local explosion_settings = settings.explosion_settings
+
+		return explosion_settings and explosion_settings.explosion_template or nil
+	end
+
+	if _matches_hazard_content(content, hazard_content.gas) then
+		local gas_settings = settings.gas_settings
+		local explosion_settings = settings.explosion_settings
+
+		return gas_settings and gas_settings.explosion_template
+			or explosion_settings and explosion_settings.explosion_template
+			or nil
+	end
+
+	local explosion_settings = settings.explosion_settings
+
+	return explosion_settings and explosion_settings.explosion_template or nil
+end
+
 local function _radius_from_content(content)
-	local explosion_template = content and content.explosion_template
+	local explosion_template = _explosion_template_from_content(content)
 
 	return explosion_template and explosion_template.radius or "unknown"
 end
 
 local function _numeric_radius_from_content(content)
-	local explosion_template = content and content.explosion_template
+	local explosion_template = _explosion_template_from_content(content)
 	local radius = explosion_template and explosion_template.radius
 
 	return type(radius) == "number" and radius or nil

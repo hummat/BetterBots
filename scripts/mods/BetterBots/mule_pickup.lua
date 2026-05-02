@@ -371,6 +371,60 @@ local function _has_any_pickup_order(pickup_orders, available_mule_pickups)
 	return false
 end
 
+local function _assign_ordered_mule_pickups(bot_group, bot_data)
+	local available_mule_pickups = bot_group and bot_group._available_mule_pickups
+	if not available_mule_pickups then
+		return false
+	end
+
+	local assigned_pickups = {}
+	for _, data in pairs(bot_data) do
+		local pickup_component = data.pickup_component
+		local current_pickup = pickup_component and pickup_component.mule_pickup
+		if current_pickup then
+			assigned_pickups[current_pickup] = true
+		end
+	end
+
+	local changed = false
+	local position_lookup = POSITION_LOOKUP
+	for unit, data in pairs(bot_data) do
+		local pickup_component = data.pickup_component
+		if pickup_component and not pickup_component.mule_pickup and data.pickup_orders then
+			local bot_position = position_lookup and position_lookup[unit]
+
+			for slot_name, order in pairs(data.pickup_orders) do
+				local pickup_unit = order and order.unit
+				local slot_supported = available_mule_pickups[slot_name] ~= nil
+				local pickup_position = position_lookup and pickup_unit and position_lookup[pickup_unit]
+				local pickup_allowed = slot_supported
+					and pickup_unit
+					and not assigned_pickups[pickup_unit]
+					and bot_position
+					and pickup_position
+					and _pickup_allowed_for_bot(unit, pickup_unit, bot_group, data)
+
+				if pickup_allowed then
+					local distance_sq = _distance_squared(bot_position, pickup_position)
+					pickup_component.mule_pickup = pickup_unit
+					pickup_component.mule_pickup_distance = math.sqrt(distance_sq)
+					assigned_pickups[pickup_unit] = true
+					changed = true
+					_log(
+						"mule_pickup_assign_ordered:" .. tostring(unit),
+						"assigned ordered mule pickup for "
+							.. tostring(order.pickup_name or _unit_get_data(pickup_unit, "pickup_type"))
+					)
+					_mark_destination_refresh(unit)
+					break
+				end
+			end
+		end
+	end
+
+	return changed
+end
+
 local function _assign_proactive_mule_pickups(bot_group, bot_data)
 	local available_mule_pickups = bot_group and bot_group._available_mule_pickups
 	if not available_mule_pickups then
@@ -555,6 +609,10 @@ function M.sync_live_bot_group(bot_group)
 		if unit_changed and _mark_destination_refresh(unit) then
 			_log("mule_pickup_refresh:" .. tostring(unit), "refreshed destination after clearing mule state")
 		end
+	end
+
+	if _assign_ordered_mule_pickups(bot_group, bot_data) then
+		changed = true
 	end
 
 	if _assign_proactive_mule_pickups(bot_group, bot_data) then

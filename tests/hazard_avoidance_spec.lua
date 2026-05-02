@@ -55,6 +55,7 @@ describe("hazard_avoidance diagnostics", function()
 	local saved_managers
 	local saved_quaternion
 	local saved_vector3
+	local saved_hazard_settings
 
 	before_each(function()
 		saved_position_lookup = _G.POSITION_LOOKUP
@@ -62,6 +63,7 @@ describe("hazard_avoidance diagnostics", function()
 		saved_managers = _G.Managers
 		saved_quaternion = _G.Quaternion
 		saved_vector3 = _G.Vector3
+		saved_hazard_settings = package.loaded["scripts/settings/hazard_prop/hazard_prop_settings"]
 
 		_G.POSITION_LOOKUP = {}
 		_G.Unit = {
@@ -83,6 +85,7 @@ describe("hazard_avoidance diagnostics", function()
 		_G.Managers = saved_managers
 		_G.Quaternion = saved_quaternion
 		_G.Vector3 = saved_vector3
+		package.loaded["scripts/settings/hazard_prop/hazard_prop_settings"] = saved_hazard_settings
 	end)
 
 	it("logs fused barrel trigger positions and explosion radius", function()
@@ -137,9 +140,22 @@ describe("hazard_avoidance diagnostics", function()
 		}
 		local instance = {
 			_unit = unit,
-			_content = {
+			_content = "explosion",
+		}
+		package.loaded["scripts/settings/hazard_prop/hazard_prop_settings"] = {
+			hazard_content = {
+				explosion = "explosion",
+				fire = "fire",
+				gas = "gas",
+			},
+			explosion_settings = {
 				explosion_template = {
 					radius = 6,
+				},
+			},
+			fire_settings = {
+				explosion_template = {
+					radius = 4,
 				},
 			},
 		}

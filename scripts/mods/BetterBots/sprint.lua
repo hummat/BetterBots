@@ -101,7 +101,7 @@ local function _log_daemonhost_scan_source(source, units)
 	end
 
 	local count = _table_count(units)
-	local key = tostring(source) .. ":" .. tostring(count)
+	local key = tostring(source)
 	if _logged_dh_scan_sources[key] then
 		return
 	end
