@@ -10,13 +10,26 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 2. Tier 2 ability validation (`#1`)
 3. Tier 3 item-ability fallback validation (`#3`)
 4. Regression sanity checks (revive/rescue/navigation/basic combat)
-5. Post-v1.1.0 `needs-testing` issues: #13, #33, #38, #41, #43, #56, #88, #92, #97, #98, #101
+5. Post-v1.1.0 `needs-testing` issues: #8, #13, #43, #56, #88, #92, #97, #101
 
 ## Completed validation queues
 
 **v1.0.0 validation (Sprints 1-6)**: all sprint validation items are closed. See `docs/dev/status.md` for per-issue evidence.
 
 **Post-v1.0 validation (2026-04-29 / 2026-05-02)**: #17, #96, #100, #106, #107, #108 all closed with live log evidence. See `docs/dev/status.md` "Post-v1.0 validation" section.
+
+**Focused non-game closure (2026-05-03)**: #98 closed from targeted sparse-metadata regression evidence (`melee_meta_data_spec.lua`, `melee_attack_choice_spec.lua`, `ranged_meta_data_spec.lua`) because the issue is about malformed engine/template boundary behavior rather than an in-game validation trigger.
+
+**Recent-log evidence sweep (2026-05-03)**: May 2-3 console logs narrow #97 substantially but do not close it. Evidence found:
+- tiny ammo top-off: `console-2026-05-02-14.33.58...` has `ammo pickup success: small_clip (bot=4, ammo=98%->102%)`; `console-2026-05-02-13.41.45...` has `small_clip (bot=2, ammo=98%->110%)`; `console-2026-05-02-15.49.21...` has `large_clip (bot=4, ammo=96%->100%)` and `small_clip (bot=3, ammo=93%->100%)`.
+- world grenade pickup: `console-2026-05-02-13.41.45...` has `grenade pickup success: small_grenade (bot=5, charges=2->4/4)` and `(bot=2, charges=2->3/3)`; `console-2026-05-02-15.49.21...` has `(bot=5, charges=1->4/4)`; `console-2026-05-02-16.07.32...` has `(bot=5, charges=3->4/4)`.
+- medicae practical use: latest log shows `health station permitted: humans above reserve and bot not full`, then `shield (health_station) dist=2.6`, then `deferred health station because bot is already full`.
+- remaining #97 gaps: no `health_deployable` / medical-crate use completion marker found, and no clear ammo-driven grenade-refill-via-ammo-pickup marker. No May 1 console logs were present in the log directory.
+
+**Latest-run combat policy notes (2026-05-03)**: `console-2026-05-03-18.52.16...` keeps several interpretation notes from being rediscovered later:
+- Brain Burst uses the internal weapon/template name `psyker_smite`; frequent `grenade held psyker_smite` rows are mostly manual Brain Burst evaluation/holds, not proof of the `psyker_smite_on_hit` passive proc firing. The build did exercise the proc-cover suppression (`grenade_smite_block_proc_cover`) as well as melee/peril safety blocks (`grenade_smite_block_melee_range`, `grenade_smite_block_melee_pressure`, `grenade_smite_block_peril`). One manual Brain Burst attempt queued late (`19:04:17 grenade queued wield ... rule=grenade_smite_priority_target`, then `charge_power_sticky`) but lost the target before completion.
+- Manual Brain Burst is distance/pressure guarded by `SMITE_THRESHOLDS` and currently blocks at `context.peril_pct >= 0.85` in `heuristics_grenade.lua`, separate from the configurable shared warp weapon threshold default of 99%. Treat that as a tuning caveat, not a regression from this run.
+- Melee light/heavy/special selection looked coherent in the log: light attacks were chosen into unarmored packs/hordes, heavy attacks appeared for armored/high-value cases, and direct `special_action` queue evidence exists for force sword (`18:55:51.676 forcesword_2h_p1_m1 action=special_action`) and thunder hammer (`19:03:50.967 thunderhammer_2h_p1_m1 action=special_action`), with repeated power sword preludes. Thunder hammer also logged `melee special prelude queued before heavy_attack` in high-value/armor windows (`19:01:35`, `19:01:43`, `19:01:46`), but the latest log does not prove a full uninterrupted powered-heavy hit landed. For 2H force sword, code only proves `num_special_charges >= 10`; the log does not distinguish a full 20-charge release.
 
 ## Run Entry Template
 

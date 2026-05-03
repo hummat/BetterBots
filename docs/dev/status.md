@@ -189,6 +189,8 @@ All post-v1.0 validation items are closed with live evidence:
 - **Post-1.0 "Intelligence Architecture" (may never ship)**: #22 (utility scoring), #28 (profile management), #80 (grenade tactical evaluator), #84 (user-authored profiles), #86 (Tier 3 revive cover).
 - **Broad-scope cuts** (scope-exited under parent issues): broad #24, remaining broad #33, remaining broad #41, Crusher rig verification (#92), deeper keystone/build extensions.
 - **Validation-gated**: #8 (Hive Scum, DLC).
-- **`needs-testing`**: #13, #33, #38, #41, #43 (p1 voidblast), #56, #88, #92, #97, #98, #101 — implemented but awaiting further in-game proof.
+- **`needs-testing`**: #8, #13, #43 (p1 voidblast), #56, #88, #92, #97, #101 — implemented but awaiting further in-game proof.
+- **`#97` partial evidence**: May 2-3 logs validate tiny ammo top-off, world grenade pickups, and practical medicae use; keep open for med-crate / health-deployable use completion and clearer ammo-driven grenade refill evidence.
+- **Closed from focused non-game evidence**: #98 sparse metadata hardening, because the acceptance criteria are boundary guards plus sparse-shape regressions rather than a naturally reproducible gameplay trigger.
 
 See `docs/dev/roadmap.md` for full batch details.
