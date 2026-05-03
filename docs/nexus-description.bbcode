@@ -16,6 +16,13 @@ The result: bots throw grenades, pop stances, charge into revives, ping specials
 [*]Bot profiles give you class-diverse loadouts instead of four copy-pasted veterans
 [/list]
 
+[size=3][b]New in v1.1.1 — Hotfix[/b][/size]
+
+[list]
+[*][b]Fixed crash in public/Havoc games:[/b] the v1.1.0 hazard-prop hook could crash on dedicated-server clients where the bot group system isn't initialized. BetterBots only does anything in Solo Play, but it still loads in public games — and the hazard hook didn't account for that. Fixed.
+[*][b]Health station bot-priority deferral actually works now:[/b] the logic that defers a health station to a more injured bot was reading a field that doesn't exist in the engine. It silently did nothing. Now it reads the real bot roster.
+[/list]
+
 [size=3][b]New in v1.1.0 — Release Soak Fixes[/b][/size]
 
 This one is mostly hardening from live Solo Play testing. Less glamorous than v1.0.0, but important: the mod now spends a lot less time being clever in places where bots should just avoid ruining your run.

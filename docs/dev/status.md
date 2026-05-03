@@ -2,6 +2,9 @@
 
 ## What's shipped
 
+### v1.1.1 (2026-05-03)
+- **Hotfix**: hazard-prop hook crashed on dedicated-server clients (public/Havoc games) where `GroupSystem._bot_groups` is nil. Added `_is_server`/`_bot_groups` guard. Also fixed `healing_deferral` reading nonexistent `Side.valid_bot_units` — health station bot-priority deferral was dead code. Mock fidelity rule broadened to cover engine object fields and server-only initialization.
+
 ### v1.1.0 (2026-05-02)
 - **Post-1.0 hardening**: daemonhost avoidance now detects passive and awake-but-not-aggroed daemonhosts through side lists plus the minion-spawn fallback, suppresses ranged/grenade/blitz/ability paths near them, and uses softer keepout steering so narrow passages remain usable.
 - **Hazard movement safety**: fused barrels emit buffered AoE threats, AoE threat consumption is logged, and ledge safety blocks only dodge endpoints instead of ordinary stair/downhill movement.

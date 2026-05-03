@@ -78,6 +78,9 @@ Make Darktide bots as capable as VT2's modded bots (Grimalackt's Bot Improvement
 ### v1.0.0 (2026-04-24)
 - "Bot Identity" terminal release: 6-sprint plan — talent-aware behavior (#38), navmesh charge validation (#13), close-range ranged classifier (#41), melee specials (#33), pocketable carry/deploy (#88), stim usage (#24), com-wheel response (#56), smart-tag item bridge (#96), non-book resource arbitration (#97), metadata hardening (#98), perf benchmark protocol (#99). 1324 tests.
 
+### v1.1.1 (2026-05-03)
+- Hotfix: hazard-prop crash on dedicated-server clients, health station bot-priority deferral fix, mock fidelity hardening.
+
 ### v1.1.0 (2026-05-02)
 - Post-1.0 hardening: daemonhost avoidance hardened (#17), hazard movement safety (#107), pickup follow-through fixed, healing priority fixed, human revive priority (#108), non-veteran bot profile refresh, scenario harness expanded (#100), core regression checklist, perf cap verified (#106).
 
