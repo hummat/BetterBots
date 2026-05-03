@@ -115,13 +115,13 @@ describe("smart_tag_orders", function()
 							return nil
 						end
 
-						return {
+						return test_helper.make_side_system_double({
 							side_by_unit = {
 								[human_unit] = {
 									valid_player_units = side_units,
 								},
 							},
-						}
+						})
 					end,
 				},
 			},

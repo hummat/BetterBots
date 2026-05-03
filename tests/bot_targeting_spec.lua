@@ -1,3 +1,4 @@
+local test_helper = require("tests.test_helper")
 local saved_script_unit = rawget(_G, "ScriptUnit")
 local BotTargeting = dofile("scripts/mods/BetterBots/bot_targeting.lua")
 
@@ -75,13 +76,9 @@ describe("bot_targeting", function()
 	it("detects elite/special/monster tags", function()
 		_G.ScriptUnit = {
 			has_extension = function()
-				return {
-					breed = function()
-						return {
-							tags = { elite = true },
-						}
-					end,
-				}
+				return test_helper.make_minion_unit_data_extension({
+					tags = { elite = true },
+				})
 			end,
 		}
 

@@ -1,3 +1,5 @@
+local test_helper = require("tests.test_helper")
+
 local function load_module()
 	local ok, mod = pcall(dofile, "scripts/mods/BetterBots/melee_attack_choice.lua")
 	assert.is_true(ok, "melee_attack_choice.lua should load")
@@ -8,6 +10,18 @@ local ARMORED = 2
 local SUPER_ARMOR = 6
 local saved_script_unit = rawget(_G, "ScriptUnit")
 local saved_armor = rawget(_G, "Armor")
+
+local function install_player_unit_data_mock(components)
+	_G.ScriptUnit = {
+		has_extension = function(_, system_name)
+			if system_name and system_name ~= "unit_data_system" then
+				return nil
+			end
+
+			return test_helper.make_player_unit_data_extension(components)
+		end,
+	}
+end
 
 local function attack_meta(opts)
 	opts = opts or {}
@@ -33,21 +47,10 @@ local function install_enter_handler(MeleeAttackChoice)
 		end,
 	}
 
-	_G.ScriptUnit = {
-		has_extension = function()
-			return {
-				read_component = function(_, component_name)
-					if component_name == "inventory" then
-						return { wielded_slot = "slot_primary" }
-					end
-					if component_name == "slot_primary" then
-						return { special_active = false }
-					end
-					return nil
-				end,
-			}
-		end,
-	}
+	install_player_unit_data_mock({
+		inventory = { wielded_slot = "slot_primary" },
+		slot_primary = { special_active = false },
+	})
 
 	MeleeAttackChoice.init({
 		mod = stub_mod,
@@ -593,21 +596,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -1310,22 +1302,10 @@ describe("melee_attack_choice", function()
 		}
 		local slot_component = { special_active = false }
 
-		_G.ScriptUnit = {
-			has_extension = function(_, system_name)
-				assert.equals("unit_data_system", system_name)
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return slot_component
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = slot_component,
+		})
 		_G.Armor = {
 			armor_type = function()
 				return ARMORED
@@ -1487,22 +1467,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function(_, system_name)
-				assert.equals("unit_data_system", system_name)
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -1561,21 +1529,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -1770,21 +1727,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -2127,21 +2073,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -2427,18 +2362,9 @@ describe("melee_attack_choice", function()
 				return ARMORED
 			end,
 		}
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "weapon_action" then
-							return { template_name = "ogryn_club_p2_m3" }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			weapon_action = { template_name = "ogryn_club_p2_m3" },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -2538,18 +2464,9 @@ describe("melee_attack_choice", function()
 				return ARMORED
 			end,
 		}
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "weapon_action" then
-							return { template_name = "powermaul_p1_m1" }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			weapon_action = { template_name = "powermaul_p1_m1" },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -2884,21 +2801,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -2953,21 +2859,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false, num_special_charges = 4 }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false, num_special_charges = 4 },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,
@@ -3023,21 +2918,10 @@ describe("melee_attack_choice", function()
 			end,
 		}
 
-		_G.ScriptUnit = {
-			has_extension = function()
-				return {
-					read_component = function(_, component_name)
-						if component_name == "inventory" then
-							return { wielded_slot = "slot_primary" }
-						end
-						if component_name == "slot_primary" then
-							return { special_active = false }
-						end
-						return nil
-					end,
-				}
-			end,
-		}
+		install_player_unit_data_mock({
+			inventory = { wielded_slot = "slot_primary" },
+			slot_primary = { special_active = false },
+		})
 
 		MeleeAttackChoice.init({
 			mod = stub_mod,

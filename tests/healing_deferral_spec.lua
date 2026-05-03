@@ -435,7 +435,12 @@ describe("healing_deferral", function()
 				},
 				_side = {
 					valid_human_units = { "human1" },
-					valid_bot_units = { "bot1", "bot2" },
+				},
+				_bot_group = {
+					_bot_data = {
+						bot1 = {},
+						bot2 = {},
+					},
 				},
 			}
 
@@ -464,7 +469,12 @@ describe("healing_deferral", function()
 				},
 				_side = {
 					valid_human_units = { "human1" },
-					valid_bot_units = { "bot1", "bot2" },
+				},
+				_bot_group = {
+					_bot_data = {
+						bot1 = {},
+						bot2 = {},
+					},
 				},
 			}
 

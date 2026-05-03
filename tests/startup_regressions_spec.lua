@@ -1740,6 +1740,23 @@ describe("startup regressions", function()
 		assert.is_truthy(auto_dump:find("report%.bot_frames%s*<=%s*0", 1))
 	end)
 
+	it("guards vanilla bot_groups_from_sides calls behind server bot-group state", function()
+		local unsafe_paths = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+			if source:find("bot_groups_from_sides", 1, true) then
+				local has_server_guard = source:find("_is_server", 1, true) ~= nil
+				local has_bot_groups_guard = source:find("_bot_groups", 1, true) ~= nil
+				if not (has_server_guard and has_bot_groups_guard) then
+					unsafe_paths[#unsafe_paths + 1] = path
+				end
+			end
+		end)
+
+		assert.same({}, unsafe_paths)
+	end)
+
 	it("rejects duplicate hook_require targets across BetterBots source files", function()
 		local owners_by_target = {}
 		local duplicates = {}

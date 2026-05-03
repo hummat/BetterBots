@@ -13,6 +13,7 @@ local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
 local _last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
+local _bot_group_units_scratch = {}
 local BOT_GROUP_PATCH_SENTINEL = "__bb_healing_deferral_bot_group_installed"
 
 local MODE_SETTING_ID = "healing_deferral_mode"
@@ -220,6 +221,28 @@ local function _more_injured_bot_count(unit, bot_units, bot_health_pct, health_p
 	return more_injured_count
 end
 
+local function _collect_bot_group_units(bot_group, out)
+	for i = #out, 1, -1 do
+		out[i] = nil
+	end
+
+	if not bot_group then
+		return nil
+	end
+
+	local bot_data = bot_group.data and bot_group:data() or bot_group._bot_data
+
+	if not bot_data then
+		return nil
+	end
+
+	for bot_unit in pairs(bot_data) do
+		out[#out + 1] = bot_unit
+	end
+
+	return out
+end
+
 local function _should_defer_to_more_injured_bot(unit, bot_units, bot_health_pct, charge_amount, health_pct_fn)
 	local charges = tonumber(charge_amount) or 0
 
@@ -376,10 +399,12 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
+		local bot_units = _collect_bot_group_units(self._bot_group, _bot_group_units_scratch)
+
 		if
 			_should_defer_to_more_injured_bot(
 				unit,
-				self._side and self._side.valid_bot_units,
+				bot_units,
 				bot_health_pct,
 				charge_amount,
 				_health.current_health_percent

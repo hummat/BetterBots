@@ -349,6 +349,9 @@ local function _emit_hazard_prop_threat(self)
 	if not (ok_side and side_system and ok_group and group_system) then
 		return
 	end
+	if group_system._is_server == false or not group_system._bot_groups then
+		return
+	end
 
 	local sides = side_system.sides and side_system:sides() or nil
 	local bot_groups = sides and group_system.bot_groups_from_sides and group_system:bot_groups_from_sides(sides) or nil

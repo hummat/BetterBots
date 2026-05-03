@@ -45,13 +45,30 @@ Current status:
 
 | Surface | Real class/system | BetterBots-tested API | Decompiled proof | Notes |
 |---|---|---|---|---|
-| `side_system` | `SideSystem` + `Side` | `side_by_unit`, `get_side_from_name()`, `relation_side_names()` | `scripts/extension_systems/side/side_system.lua:21`, `:142`; `scripts/extension_systems/side/side.lua:273` | Sprint + heuristics tests |
+| `side_system` | `SideSystem` + `Side` | `side_by_unit`, `sides()`, `get_side_from_name()`, `relation_side_names()` | `scripts/extension_systems/side/side_system.lua:21`, `:130`, `:142`; `scripts/extension_systems/side/side.lua:273` | Sprint, heuristics, and hazard tests |
 | `liquid_area_system` | `LiquidAreaSystem` | `find_liquid_areas_in_position()`, `is_position_in_liquid()` | `scripts/extension_systems/liquid_area/liquid_area_system.lua:176`, `:162` | Hazard detection tests |
+| `group_system` | `GroupSystem` | `_is_server`, `_bot_groups`, `bot_groups_from_sides()` | `scripts/extension_systems/group/group_system.lua:37`, `:53`, `:217` | `_bot_groups` only initialized when `_is_server == true`; nil on dedicated-server clients |
+
+## Audited engine object fields
+
+| Object | Real class | Field/method | Decompiled proof | Server-only? | Notes |
+|---|---|---|---|---|---|
+| `Side` | `Side` | `valid_human_units` | `scripts/extension_systems/side/side.lua:36` | Init: both. Populated: both | |
+| `Side` | `Side` | `valid_player_units` | `scripts/extension_systems/side/side.lua:38` | Init: both. Populated: both | |
+| `Side` | `Side` | `ai_target_units` | `scripts/extension_systems/side/side.lua:47` | Init: both (`{}`). **Populated: server-only** (`_update_enemy_frame_tables` inside `_is_server` gate, `:486`) | Always empty on dedicated-server clients — not a crash but silent misbehavior |
+| `Side` | `Side` | ~~`valid_bot_units`~~ | **DOES NOT EXIST** | N/A | Former `healing_deferral.lua` test double bug, fixed 2026-05-03. `doc-check` now rejects this field in source and specs. |
+| `BotGroup` | `BotGroup` | `_bot_data` | `scripts/extension_systems/group/bot_group.lua:35` | Server-only (BotGroup instances only created server-side) | Dict keyed by unit |
+| `BotGroup` | `BotGroup` | `_side` | `scripts/extension_systems/group/bot_group.lua:34` | Server-only | |
+| `BotGroup` | `BotGroup` | `_broadphase_system` | `scripts/extension_systems/group/bot_group.lua:17` | Server-only | |
+| `BotGroup` | `BotGroup` | `_available_mule_pickups` | `scripts/extension_systems/group/bot_group.lua:32` | Server-only | |
+| `GroupSystem` | `GroupSystem` | `_bot_groups` | `scripts/extension_systems/group/group_system.lua:53` | **Yes** — only set inside `if is_server then` | Nil on dedicated-server clients; guard before access |
+| `GroupSystem` | `GroupSystem` | `_is_server` | Inherited from `ExtensionSystemBase` | Both | |
 
 ## Rules
 
 - Add new shared builders to `tests/test_helper.lua` before spreading a new extension family across specs.
 - If production code reads a private engine field, the audit must record the exact file and line where that field exists.
 - If decompiled source does not prove a method/field exists, do not mock it. Get an in-game dump first.
+- When mocking engine systems that have server-only initialization (e.g. `GroupSystem._bot_groups`), test both server and non-server paths if production code can reach both.
 - Audited shared builders in `tests/test_helper.lua` must reject unknown override keys at construction time. If a test needs a newly verified method, update this audit file and the builder allowlist in the same change.
 - `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above and for audited `Managers.state.extension:system(...)` doubles. Extend that check when a new audited family is added.

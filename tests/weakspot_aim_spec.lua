@@ -51,6 +51,18 @@ local function install_bulwark_math_globals()
 	}
 end
 
+local function install_minion_breed_mock(resolve_breed)
+	local resolver = type(resolve_breed) == "function" and resolve_breed or function()
+		return resolve_breed
+	end
+
+	_G.ScriptUnit = {
+		has_extension = function(unit)
+			return test_helper.make_minion_unit_data_extension(resolver(unit))
+		end,
+	}
+end
+
 describe("weakspot_aim", function()
 	after_each(function()
 		_G.ScriptUnit = saved_script_unit
@@ -72,15 +84,7 @@ describe("weakspot_aim", function()
 
 	describe("apply_override", function()
 		it("overrides aim_at_node and aim_at_node_charged for Mauler", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -96,15 +100,7 @@ describe("weakspot_aim", function()
 		end)
 
 		it("leaves scratchpad untouched for unknown breed", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "chaos_ogryn_gunner" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "chaos_ogryn_gunner" })
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -120,15 +116,7 @@ describe("weakspot_aim", function()
 		end)
 
 		it("is a no-op when the feature gate is disabled", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -166,15 +154,7 @@ describe("weakspot_aim", function()
 		end)
 
 		it("logs the override decision when debug is enabled", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -217,15 +197,7 @@ describe("weakspot_aim", function()
 		end)
 
 		it("logs once when a configured weakspot node is missing at runtime", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function()
 					return false
@@ -264,15 +236,9 @@ describe("weakspot_aim", function()
 			-- post-hook could run. Baseline must therefore be captured lazily on
 			-- the first apply_override call, before any mutation.
 			local breed_name = "renegade_executor"
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = breed_name }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock(function()
+				return { name = breed_name }
+			end)
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -297,15 +263,9 @@ describe("weakspot_aim", function()
 				gunner_unit = { name = "chaos_ogryn_gunner" },
 			}
 
-			_G.ScriptUnit = {
-				has_extension = function(unit)
-					return {
-						breed = function()
-							return breeds_by_unit[unit]
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock(function(unit)
+				return breeds_by_unit[unit]
+			end)
 			_G.Unit = {
 				has_node = function()
 					return true
@@ -328,15 +288,7 @@ describe("weakspot_aim", function()
 		end)
 
 		it("skips override when the target rig is missing the node", function()
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function(_unit, node)
 					return node == "j_head"
@@ -710,15 +662,7 @@ describe("weakspot_aim", function()
 				end,
 			})
 
-			_G.ScriptUnit = {
-				has_extension = function()
-					return {
-						breed = function()
-							return { name = "renegade_executor" }
-						end,
-					}
-				end,
-			}
+			install_minion_breed_mock({ name = "renegade_executor" })
 			_G.Unit = {
 				has_node = function()
 					return true

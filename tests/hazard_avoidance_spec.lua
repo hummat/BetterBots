@@ -1,3 +1,4 @@
+local test_helper = require("tests.test_helper")
 local HazardAvoidance = dofile("scripts/mods/BetterBots/hazard_avoidance.lua")
 
 local function make_hooking_mod()
@@ -170,16 +171,16 @@ describe("hazard_avoidance diagnostics", function()
 				extension = {
 					system = function(_, name)
 						if name == "side_system" then
-							return {
-								sides = function()
-									return { "heroes" }
-								end,
-							}
+							return test_helper.make_side_system_double({
+								side_list = { "heroes" },
+							})
 						elseif name == "group_system" then
-							return {
+							return test_helper.make_group_system_double({
+								_is_server = true,
+								_bot_groups = {},
 								bot_groups_from_sides = function(_, sides)
 									assert.equals("heroes", sides[1])
-									return {
+									local groups = {
 										{
 											aoe_threat_created = function(_, position, shape, size, rotation, duration)
 												calls[#calls + 1] = {
@@ -192,8 +193,9 @@ describe("hazard_avoidance diagnostics", function()
 											end,
 										},
 									}
+									return groups
 								end,
-							}
+							})
 						end
 						return nil
 					end,
@@ -213,6 +215,64 @@ describe("hazard_avoidance diagnostics", function()
 		assert.equals(7.5, calls[1].size)
 		assert.equals("identity", calls[1].rotation)
 		assert.equals(3, calls[1].duration)
+	end)
+
+	it("skips buffered hazard threats on non-server group systems", function()
+		local logs = {}
+		local unit = {
+			node_positions = {
+				c_explosion = vector(2, 0, 0),
+			},
+		}
+		local HazardPropExtension = {
+			set_current_state = function(self, state)
+				self.state = state
+			end,
+		}
+		local instance = {
+			_unit = unit,
+			_content = {
+				explosion_template = {
+					radius = 6,
+				},
+			},
+		}
+		_G.POSITION_LOOKUP[unit] = vector(0, 0, 0)
+		_G.Quaternion = {
+			identity = function()
+				return "identity"
+			end,
+		}
+		_G.Managers = {
+			state = {
+				extension = {
+					system = function(_, name)
+						if name == "side_system" then
+							return test_helper.make_side_system_double({
+								side_list = { "heroes" },
+							})
+						elseif name == "group_system" then
+							return test_helper.make_group_system_double({
+								_is_server = false,
+								bot_groups_from_sides = function(self)
+									local bot_groups = self._bot_groups
+
+									return bot_groups.heroes
+								end,
+							})
+						end
+						return nil
+					end,
+				},
+			},
+		}
+
+		init_module(logs, { debug_enabled = false })
+		HazardAvoidance.install_hazard_prop_hooks(HazardPropExtension)
+
+		assert.has_no.errors(function()
+			HazardPropExtension.set_current_state(instance, "triggered")
+		end)
 	end)
 
 	it("logs accepted, skipped, and missed vanilla AoE threats per bot", function()

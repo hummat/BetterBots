@@ -15,7 +15,7 @@ ok()   { echo "  ok:  $*"; }
 
 # ── 1. Heuristic function count ──────────────────────────────────────────────
 
-actual_heuristic_count=$(grep -h '^local function _can_activate_' scripts/mods/BetterBots/heuristics_*.lua | wc -l | tr -d ' ')
+actual_heuristic_count=$(grep -hc '^local function _can_activate_' scripts/mods/BetterBots/heuristics_*.lua | awk '{ total += $1 } END { print total + 0 }')
 
 for f in AGENTS.md docs/dev/debugging.md; do
   # Match lines like "18 per-template heuristic functions" or "18 `_can_activate_*` heuristic functions"
@@ -134,7 +134,7 @@ ok "test spec inventory: $actual_spec_count files (parity verified in AGENTS)"
 # ad-hoc table literals. This catches regressions where impossible engine APIs
 # get reintroduced into the suite.
 
-audited_extension_regex='unit_data_system|ability_system|action_input_system|perception_system|smart_tag_system|companion_spawner_system|coherency_system|talent_system|input_system|behavior_system'
+audited_extension_regex='unit_data_system|locomotion_system|ability_system|action_input_system|input_system|perception_system|smart_tag_system|companion_spawner_system|coherency_system|talent_system|buff_system|behavior_system'
 
 direct_assignment_matches=$(rg -nP "\b(${audited_extension_regex})\s*=\s*\{" tests/*_spec.lua 2>/dev/null || true)
 if [[ -n "$direct_assignment_matches" ]]; then
@@ -154,14 +154,22 @@ if [[ -n "$extension_return_matches" ]]; then
 $extension_return_matches"
 fi
 
+bare_unit_data_return_matches=$(rg -nUP "has_extension\\s*=\\s*function[^\\n]*\\n\\s*return\\s*\\{[\\s\\S]{0,160}(read_component\\s*=\\s*function|breed\\s*=\\s*function|faction_name\\s*=\\s*function|is_companion\\s*=\\s*function|breed_name\\s*=\\s*function)" tests/*_spec.lua 2>/dev/null || true)
+if [[ -n "$bare_unit_data_return_matches" ]]; then
+  err "bare ScriptUnit.has_extension mocks for unit_data-style APIs must use tests/test_helper.lua builders:
+$bare_unit_data_return_matches"
+fi
+
 ok "audited ScriptUnit extension mocks route through shared builders"
 
 # ── 5b. Manager-system doubles ───────────────────────────────────────────────
 
-audited_manager_regex='side_system|liquid_area_system'
+audited_manager_regex='side_system|liquid_area_system|group_system'
 
 manager_ad_hoc_matches=$(rg -nUP ":system\\(\"(${audited_manager_regex})\"\\)[^\\n]*\\n\\s*return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
 manager_variable_matches=$(rg -nP "\\b[[:alnum:]_]*(${audited_manager_regex})[[:alnum:]_]*\\s*=\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+manager_dynamic_return_matches=$(rg -nUP "(name|system_name)\\s*==\\s*\"(${audited_manager_regex})\"[\\s\\S]{0,220}return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
+manager_inverted_return_matches=$(rg -nUP "(name|system_name)\\s*~=\\s*\"(${audited_manager_regex})\"[\\s\\S]{0,220}return\\s*\\{" tests/*_spec.lua 2>/dev/null || true)
 
 manager_matches=""
 if [[ -n "$manager_ad_hoc_matches" ]]; then
@@ -173,6 +181,18 @@ if [[ -n "$manager_variable_matches" ]]; then
   fi
   manager_matches+="$manager_variable_matches"
 fi
+if [[ -n "$manager_dynamic_return_matches" ]]; then
+  if [[ -n "$manager_matches" ]]; then
+    manager_matches+=$'\n'
+  fi
+  manager_matches+="$manager_dynamic_return_matches"
+fi
+if [[ -n "$manager_inverted_return_matches" ]]; then
+  if [[ -n "$manager_matches" ]]; then
+    manager_matches+=$'\n'
+  fi
+  manager_matches+="$manager_inverted_return_matches"
+fi
 
 if [[ -n "$manager_matches" ]]; then
   err "audited Managers.state.extension:system(...) doubles must use tests/test_helper.lua builders:
@@ -180,6 +200,16 @@ $manager_matches"
 fi
 
 ok "audited manager-system doubles route through shared builders"
+
+# The Side API has valid_human_units and valid_player_units, but no
+# valid_bot_units. Keep this explicit because a previous test double invented
+# the field and masked dead production logic.
+valid_bot_units_matches=$(rg -n "valid_bot_units" scripts/mods/BetterBots tests 2>/dev/null || true)
+if [[ -n "$valid_bot_units_matches" ]]; then
+  err "Side.valid_bot_units does not exist in Darktide; use BotGroup._bot_data for bot peers:
+$valid_bot_units_matches"
+fi
+ok "no hallucinated Side.valid_bot_units field"
 
 # ── 6. Summary ───────────────────────────────────────────────────────────────
 

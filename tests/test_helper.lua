@@ -516,6 +516,9 @@ function M.make_side_system_double(opts)
 	opts = opts or {}
 	local ext = {
 		side_by_unit = opts.side_by_unit or {},
+		sides = opts.sides or function()
+			return opts.side_list
+		end,
 		get_side_from_name = opts.get_side_from_name or function()
 			return nil
 		end,
@@ -526,6 +529,7 @@ function M.make_side_system_double(opts)
 
 	_apply_audited_overrides("make_side_system_double", ext, opts.overrides, {
 		side_by_unit = true,
+		sides = true,
 		get_side_from_name = true,
 		relation_side_names = true,
 	})
@@ -547,6 +551,36 @@ function M.make_liquid_area_system_double(opts)
 	_apply_audited_overrides("make_liquid_area_system_double", ext, opts.overrides, {
 		find_liquid_areas_in_position = true,
 		is_position_in_liquid = true,
+	})
+
+	return ext
+end
+
+function M.make_group_system_double(opts)
+	opts = opts or {}
+	local bot_groups = opts.bot_groups or opts._bot_groups
+	local ext = {
+		_is_server = opts.is_server ~= nil and opts.is_server or opts._is_server,
+		_bot_groups = bot_groups,
+		bot_groups_from_sides = opts.bot_groups_from_sides or function(self, sides)
+			local groups = self._bot_groups
+			if not (groups and sides) then
+				return nil
+			end
+
+			local result = {}
+			for i = 1, #sides do
+				result[#result + 1] = groups[sides[i]]
+			end
+
+			return result
+		end,
+	}
+
+	_apply_audited_overrides("make_group_system_double", ext, opts.overrides, {
+		_is_server = true,
+		_bot_groups = true,
+		bot_groups_from_sides = true,
 	})
 
 	return ext

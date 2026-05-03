@@ -33,6 +33,11 @@ describe("test_helper audited builders", function()
 				})
 			end,
 			function()
+				test_helper.make_player_input_extension({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
 				test_helper.make_bot_perception_extension({
 					overrides = { invented_api = function() end },
 				})
@@ -54,7 +59,32 @@ describe("test_helper audited builders", function()
 				})
 			end,
 			function()
+				test_helper.make_player_buff_extension({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
 				test_helper.make_companion_spawner_extension({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
+				test_helper.make_bot_behavior_extension({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
+				test_helper.make_side_system_double({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
+				test_helper.make_liquid_area_system_double({
+					overrides = { invented_api = function() end },
+				})
+			end,
+			function()
+				test_helper.make_group_system_double({
 					overrides = { invented_api = function() end },
 				})
 			end,
@@ -82,5 +112,33 @@ describe("test_helper audited builders", function()
 		assert.same(breed, extension:breed())
 		assert.equals("chaos_traitor_gunner", extension:breed_name())
 		assert.is_false(extension:is_companion())
+	end)
+
+	it("allows current audited manager-system methods from decompiled source", function()
+		local side = { name = "heroes" }
+		local side_system = test_helper.make_side_system_double({
+			side_list = { side },
+			side_by_unit = { bot = side },
+			get_side_from_name = function(_, name)
+				return name == "heroes" and side or nil
+			end,
+			relation_side_names = function(_, relation)
+				return relation == "enemy" and { "villains" } or {}
+			end,
+		})
+
+		assert.same({ side }, side_system:sides())
+		assert.same(side, side_system.side_by_unit.bot)
+		assert.same(side, side_system:get_side_from_name("heroes"))
+		assert.same({ "villains" }, side_system:relation_side_names("enemy"))
+
+		local group = { name = "group" }
+		local group_system = test_helper.make_group_system_double({
+			is_server = true,
+			bot_groups = { [side] = group },
+		})
+
+		assert.is_true(group_system._is_server)
+		assert.same({ group }, group_system:bot_groups_from_sides({ side }))
 	end)
 end)
