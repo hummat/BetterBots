@@ -24,6 +24,7 @@ describe("smart_tag_orders", function()
 	local target_unit
 	local hook_require_callbacks
 	local hook_registrations
+	local host_singleplay
 
 	local function reset()
 		debug_logs = {}
@@ -41,6 +42,7 @@ describe("smart_tag_orders", function()
 		target_unit = { name = "target" }
 		hook_require_callbacks = {}
 		hook_registrations = {}
+		host_singleplay = true
 
 		package.loaded["scripts/settings/pickup/pickups"] = {
 			by_name = pickup_defs,
@@ -167,6 +169,9 @@ describe("smart_tag_orders", function()
 			is_enabled = function()
 				return true
 			end,
+			is_host_singleplay = function()
+				return host_singleplay
+			end,
 		})
 
 		SmartTagOrders.wire({
@@ -270,6 +275,43 @@ describe("smart_tag_orders", function()
 		assert.is_true(handled)
 		assert.equals(bot_two, selected_bot)
 		assert.equals(bot_two, pickup_orders[1].bot_unit)
+	end)
+
+	it("ignores public-match pickup tags before checking bot ammo", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		host_singleplay = false
+
+		SmartTagOrders.wire({
+			should_block_pickup_order = function()
+				return false
+			end,
+			needs_ammo_pickup = function()
+				error("ammo should not be checked outside host_singleplay")
+			end,
+		})
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("not_host_singleplay", reason)
+		assert.equals(0, #pickup_orders)
 	end)
 
 	it("keeps ammo smart-tags eligible for grenade refill bots with full reserve ammo", function()

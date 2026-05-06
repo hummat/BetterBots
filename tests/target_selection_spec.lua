@@ -36,6 +36,13 @@ describe("TargetSelection", function()
 				if name == "unit_data_system" and unit and unit._breed then
 					return test_helper.make_minion_unit_data_extension(unit._breed)
 				end
+				if name == "visual_loadout_system" and unit and not unit._no_visual_loadout then
+					return {
+						slot_configuration_by_type = function()
+							return {}
+						end,
+					}
+				end
 				return nil
 			end,
 		}
@@ -213,6 +220,28 @@ describe("TargetSelection", function()
 		local breed_special = { tags = { special = true } }
 
 		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
+		assert.are.equal(5, score)
+	end)
+
+	it("skips ammo lookup when unit lacks visual_loadout_system extension", function()
+		-- Defense-in-depth: BotPerceptionExtension is server-only, so this hook
+		-- is unreachable for husk bots on dedicated-server clients today. If
+		-- Fatshark ever extends bot perception to husks, the husk
+		-- visual_loadout extension lacks slot_configuration_by_type and the
+		-- inner Ammo.current_slot_percentage call would crash. Same class of
+		-- bug as the smart_tag_orders/mule_pickup public-match crash.
+		local ammo_called = false
+		package.loaded["scripts/utilities/ammo"].current_slot_percentage = function()
+			ammo_called = true
+			error("Ammo.current_slot_percentage must not run without visual_loadout extension")
+		end
+
+		local unit = { _no_visual_loadout = true }
+		local breed_special = { tags = { special = true } }
+
+		local score = _mod.handlers.slot_weight(original_slot_weight, unit, nil, 400, breed_special, nil)
+
+		assert.is_false(ammo_called)
 		assert.are.equal(5, score)
 	end)
 

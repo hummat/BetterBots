@@ -1,4 +1,10 @@
-# Status Snapshot (May 2, 2026)
+# Status Snapshot (May 6, 2026)
+
+## Current work
+
+### Unreleased (after v1.1.1)
+- **Hotfix pending**: smart-tag pickup routing and BetterBots pickup-order policy hooks now exit outside `host_singleplay` before touching bot pickup state. This fixes a Nexus report where marking ammo in public/Havoc could call `Ammo.reserve_ammo_is_full` on a dedicated-server client husk visual-loadout extension that lacks `slot_configuration_by_type`, and also hardens the adjacent `BotOrder.pickup` hook against the same public-match leakage class.
+- **Defense-in-depth**: `target_selection.slot_weight` now skips its `Ammo.current_slot_percentage("slot_secondary")` lookup when the unit lacks a player-side `visual_loadout_system` extension. The hook is unreachable for husks today (BotPerceptionExtension is `local_init`-only) but the guard removes the latent crash class so a future engine change cannot resurface it.
 
 ## What's shipped
 

@@ -664,6 +664,12 @@ function M.load_and_init(ctx)
 		is_enabled = function()
 			return Settings.is_feature_enabled("smart_tag_orders")
 		end,
+		is_host_singleplay = function()
+			local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
+			local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil
+
+			return settings and settings.host_singleplay == true or false
+		end,
 	})
 
 	MulePickup.init({
@@ -679,6 +685,12 @@ function M.load_and_init(ctx)
 		end,
 		should_allow_mule_pickup = PocketablePickup.should_allow_mule_pickup,
 		should_block_pickup_order = PocketablePickup.should_block_pickup_order,
+		is_host_singleplay = function()
+			local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
+			local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil
+
+			return settings and settings.host_singleplay == true or false
+		end,
 	})
 
 	SmartTagOrders.wire({

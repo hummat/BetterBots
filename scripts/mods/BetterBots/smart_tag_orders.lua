@@ -6,6 +6,7 @@ local _debug_enabled
 local _fixed_time
 local _bot_slot_for_unit
 local _is_enabled
+local _is_host_singleplay
 local _should_block_pickup_order
 local _needs_ammo_pickup
 
@@ -56,6 +57,23 @@ end
 
 local function _bot_order_module()
 	return require("scripts/utilities/bot_order")
+end
+
+local function _host_singleplay()
+	if _is_host_singleplay then
+		local ok, result = pcall(_is_host_singleplay)
+
+		return ok and result == true
+	end
+
+	local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
+	if not (game_mode_manager and game_mode_manager.settings) then
+		return false
+	end
+
+	local ok, settings = pcall(game_mode_manager.settings, game_mode_manager)
+
+	return ok and settings and settings.host_singleplay == true or false
 end
 
 local function _human_player_by_unit(unit)
@@ -273,6 +291,10 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 		return false, "feature_disabled"
 	end
 
+	if not _host_singleplay() then
+		return false, "not_host_singleplay"
+	end
+
 	if optional_alternate == "companion_order" then
 		return false, "companion_order"
 	end
@@ -341,6 +363,7 @@ function M.init(deps)
 	_fixed_time = deps.fixed_time
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_is_enabled = deps.is_enabled
+	_is_host_singleplay = deps.is_host_singleplay
 end
 
 function M.wire(refs)

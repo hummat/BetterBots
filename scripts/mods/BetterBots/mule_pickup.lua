@@ -13,6 +13,7 @@ local _write_blackboard_component
 local _bot_slot_for_unit
 local _should_allow_mule_pickup
 local _should_block_pickup_order
+local _is_host_singleplay
 local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
 local _blackboard_module
@@ -62,6 +63,23 @@ local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_nam
 		"mule_pickup_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
 		"mule pickup success: " .. tostring(pickup_name) .. " (bot=" .. tostring(bot_slot) .. ")"
 	)
+end
+
+local function _host_singleplay()
+	if _is_host_singleplay then
+		local ok, result = pcall(_is_host_singleplay)
+
+		return ok and result == true
+	end
+
+	local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
+	if not (game_mode_manager and game_mode_manager.settings) then
+		return false
+	end
+
+	local ok, settings = pcall(game_mode_manager.settings, game_mode_manager)
+
+	return ok and settings and settings.host_singleplay == true or false
 end
 
 function _pickups_registry()
@@ -252,6 +270,7 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_should_allow_mule_pickup = deps.should_allow_mule_pickup
 	_should_block_pickup_order = deps.should_block_pickup_order
+	_is_host_singleplay = deps.is_host_singleplay
 	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
 	_warned_group_system_lookup_failure = false
@@ -756,6 +775,10 @@ function M.register_hooks()
 		BotOrder[BOT_ORDER_PATCH_SENTINEL] = true
 
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
+			if not _host_singleplay() then
+				return func(bot_unit, pickup_unit, ordering_player)
+			end
+
 			local blocked, reason = M.should_block_pickup_order(pickup_unit)
 			if blocked then
 				_log(

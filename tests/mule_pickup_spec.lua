@@ -42,6 +42,7 @@ describe("mule_pickup", function()
 	local saved_position_lookup
 	local policy_allow_pickup
 	local policy_block_order
+	local host_singleplay
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -81,6 +82,7 @@ describe("mule_pickup", function()
 		live_bot_groups = nil
 		policy_allow_pickup = nil
 		policy_block_order = nil
+		host_singleplay = true
 		fake_mod = {
 			hook_require = function(_, _, callback)
 				callback({
@@ -145,6 +147,9 @@ describe("mule_pickup", function()
 				end
 
 				return false, nil
+			end,
+			is_host_singleplay = function()
+				return host_singleplay
 			end,
 			get_live_bot_groups = function()
 				return live_bot_groups
@@ -823,6 +828,45 @@ describe("mule_pickup", function()
 
 		assert.equals(1, pickup_hook_count)
 		assert.equals("picked", BotOrder.pickup("bot", "pickup", "player"))
+	end)
+
+	it("lets public-match BotOrder pickup calls reach vanilla without BetterBots policy", function()
+		local hook_require_callbacks = {}
+		fake_mod.hook_require = function(_, path, callback)
+			hook_require_callbacks[path] = callback
+		end
+		fake_mod.hook = function(_, target, method_name, handler)
+			local original = target[method_name]
+			target[method_name] = function(...)
+				return handler(original, ...)
+			end
+		end
+		host_singleplay = false
+		policy_block_order = function()
+			error("BetterBots pickup policy should not run outside host_singleplay")
+		end
+
+		MulePickup.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/utilities/bot_order"]
+		local BotOrder = {
+			pickup = function(bot_unit, pickup_unit, ordering_player)
+				return {
+					bot_unit = bot_unit,
+					pickup_unit = pickup_unit,
+					ordering_player = ordering_player,
+				}
+			end,
+		}
+		callback(BotOrder)
+
+		local result = BotOrder.pickup("bot", "pickup", "player")
+
+		assert.same({
+			bot_unit = "bot",
+			pickup_unit = "pickup",
+			ordering_player = "player",
+		}, result)
 	end)
 
 	it("logs actual tome pickup success after a successful pocketable interaction", function()

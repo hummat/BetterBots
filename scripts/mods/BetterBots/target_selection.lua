@@ -138,6 +138,16 @@ local function _slot_ammo_pct_cached(Ammo, unit, fixed_t)
 		return cached == false and nil or cached
 	end
 
+	-- Husk visual_loadout extensions on dedicated-server clients lack
+	-- slot_configuration_by_type. Bail before the underlying Ammo helper crashes.
+	local visual_loadout = ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "visual_loadout_system")
+	if not (visual_loadout and visual_loadout.slot_configuration_by_type) then
+		_cached_slot_ammo_pct[unit] = false
+		return nil
+	end
+
 	local value = Ammo.current_slot_percentage(unit, "slot_secondary")
 	_cached_slot_ammo_pct[unit] = value == nil and false or value
 
