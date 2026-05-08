@@ -211,7 +211,16 @@ $valid_bot_units_matches"
 fi
 ok "no hallucinated Side.valid_bot_units field"
 
-# ── 6. Summary ───────────────────────────────────────────────────────────────
+# ── 7. Profile authoring reference generator ────────────────────────────────
+
+if command -v python3 >/dev/null 2>&1; then
+  python3 scripts/profile-authoring-reference.py --self-test
+  ok "profile authoring reference generator self-test"
+else
+  err "python3 is required for scripts/profile-authoring-reference.py self-test"
+fi
+
+# ── 8. Summary ───────────────────────────────────────────────────────────────
 
 echo ""
 if ((errors > 0)); then

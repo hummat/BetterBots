@@ -2,6 +2,10 @@
 
 Comprehensive reference for how Darktide bots are configured, spawned, coordinated, and synchronized. Based on decompiled source (v1.10.7).
 
+For BetterBots' manual profile-editing workflow, see
+[`docs/bot/custom-profiles.md`](custom-profiles.md). Generated lookup tables for engine weapon paths, talent keys,
+perks, and blessings live in [`docs/bot/profile-authoring-reference.md`](profile-authoring-reference.md).
+
 ---
 
 ## 1. Bot Profile System

@@ -85,6 +85,7 @@ Verify in-game: start a Solo Play mission and look for `BetterBots loaded` in ch
 | `make doc-check` | Validate doc invariants (see `scripts/doc-check/`) |
 | `make patch-check` | Verify decompiled Darktide engine anchors against the current local checkout |
 | `make patch-check-refresh` | `git pull --ff-only` the decompiled checkout, then verify anchors |
+| `make profile-authoring-reference` | Refresh generated custom-profile lookup tables from [`hadrons-blessing`](https://github.com/hummat/hadrons-blessing) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | patch-check-refresh + check + package + tag + push + upload ZIP |
 | `make tool-info` | Print which tool binaries and fallbacks will run |
@@ -126,6 +127,12 @@ The mod ships with structured diagnostics for post-mission analysis:
 - **JSONL event log** — toggle in settings; authoritative for smite/assail/chain-grenade validation because bb-log's `consumes` view is profile-dependent.
 
 [`docs/dev/debugging.md`](docs/dev/debugging.md) and [`docs/dev/logging.md`](docs/dev/logging.md) have the full reference.
+
+### Custom bot profiles
+
+Manual profile edits are documented in [`docs/bot/custom-profiles.md`](docs/bot/custom-profiles.md). The generated
+lookup tables in [`docs/bot/profile-authoring-reference.md`](docs/bot/profile-authoring-reference.md) map in-game
+weapon, talent, perk, and blessing names to the exact engine strings used in `bot_profile_templates.lua`.
 
 ### Per-bot logging discipline
 
