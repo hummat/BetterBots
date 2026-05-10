@@ -231,7 +231,7 @@ describe("ranged_meta_data", function()
 			local cases = {
 				{
 					family = "plasmagun",
-					template = { name = "plasmagun_p1_m1", keywords = { "ranged", "plasmagun", "p1" } },
+					template = { name = "plasmagun_p1_m1", keywords = { "ranged", "plasma_rifle", "p1" } },
 					min_distance_sq = 100,
 				},
 				{

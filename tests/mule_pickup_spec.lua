@@ -43,6 +43,7 @@ describe("mule_pickup", function()
 	local policy_allow_pickup
 	local policy_block_order
 	local host_singleplay
+	local has_line_of_sight
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -83,6 +84,7 @@ describe("mule_pickup", function()
 		policy_allow_pickup = nil
 		policy_block_order = nil
 		host_singleplay = true
+		has_line_of_sight = nil
 		fake_mod = {
 			hook_require = function(_, _, callback)
 				callback({
@@ -150,6 +152,13 @@ describe("mule_pickup", function()
 			end,
 			is_host_singleplay = function()
 				return host_singleplay
+			end,
+			has_line_of_sight = function(...)
+				if has_line_of_sight then
+					return has_line_of_sight(...)
+				end
+
+				return true
 			end,
 			get_live_bot_groups = function()
 				return live_bot_groups
@@ -677,6 +686,61 @@ describe("mule_pickup", function()
 				_available_mule_pickups = {
 					slot_pocketable = {
 						[medical_unit] = 20,
+					},
+					slot_pocketable_small = {},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_false(changed)
+		assert.is_nil(pickup_component.mule_pickup)
+		assert.equals(math.huge, pickup_component.mule_pickup_distance)
+	end)
+
+	it("does not assign proactive mule pickups without line of sight", function()
+		local tome_unit = { pickup_type = "tome" }
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+		has_line_of_sight = function(unit, pickup_unit)
+			assert.equals(bot_unit, unit)
+			assert.equals(tome_unit, pickup_unit)
+			return false
+		end
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[tome_unit] = { x = 2, y = 0, z = 0 },
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[tome_unit] = 20,
 					},
 					slot_pocketable_small = {},
 				},

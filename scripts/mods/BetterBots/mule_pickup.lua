@@ -14,12 +14,15 @@ local _bot_slot_for_unit
 local _should_allow_mule_pickup
 local _should_block_pickup_order
 local _is_host_singleplay
+local _has_line_of_sight
+local _physics_world
 local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
 local _blackboard_module
 local _warned_group_system_lookup_failure
 local _warned_blackboard_module_lookup_failure
 local _pickups_registry
+local _default_has_line_of_sight
 local BOT_GROUP_PATCH_SENTINEL = "__bb_mule_pickup_bot_group_installed"
 local INTERACTION_PATCH_SENTINEL = "__bb_mule_pickup_interaction_installed"
 local BOT_ORDER_PATCH_SENTINEL = "__bb_mule_pickup_bot_order_installed"
@@ -27,6 +30,8 @@ local BOT_ORDER_PATCH_SENTINEL = "__bb_mule_pickup_bot_order_installed"
 local TOME_PICKUP_NAME = "tome"
 local GRIMOIRE_PICKUP_NAME = "grimoire"
 local MULE_PICKUP_MAX_DISTANCE_SQ = 400
+local PICKUP_LOS_HEIGHT = 0.5
+local PICKUP_LOS_FILTER = "filter_player_character_shooting_raycast_statics"
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -271,6 +276,8 @@ function M.init(deps)
 	_should_allow_mule_pickup = deps.should_allow_mule_pickup
 	_should_block_pickup_order = deps.should_block_pickup_order
 	_is_host_singleplay = deps.is_host_singleplay
+	_has_line_of_sight = deps.has_line_of_sight or _default_has_line_of_sight
+	_physics_world = nil
 	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
 	_warned_group_system_lookup_failure = false
@@ -278,6 +285,10 @@ function M.init(deps)
 
 	M.patch_pickups()
 	M.sync_live_bot_groups()
+end
+
+function M.set_physics_world(physics_world)
+	_physics_world = physics_world
 end
 
 function M.patch_pickups()
@@ -373,6 +384,56 @@ local function _distance_squared(a, b)
 	end
 
 	return Vector3.distance_squared(a, b)
+end
+
+local function _position_with_height(position, height)
+	if Vector3 and Vector3.up then
+		return position + Vector3.up() * height
+	end
+
+	return position
+end
+
+_default_has_line_of_sight = function(unit, pickup_unit)
+	local position_lookup = POSITION_LOOKUP
+	local bot_position = position_lookup and position_lookup[unit] or nil
+	local pickup_position = position_lookup and position_lookup[pickup_unit] or nil
+	local physics_world_api = rawget(_G, "PhysicsWorld")
+	if
+		not (
+			_physics_world
+			and physics_world_api
+			and physics_world_api.raycast
+			and Vector3
+			and bot_position
+			and pickup_position
+		)
+	then
+		return true
+	end
+
+	local from = _position_with_height(bot_position, PICKUP_LOS_HEIGHT)
+	local to = _position_with_height(pickup_position, PICKUP_LOS_HEIGHT)
+	local direction = to - from
+	local distance = Vector3.length and Vector3.length(direction) or 0
+	if distance <= 0 then
+		return true
+	end
+
+	local ok, hit = pcall(
+		physics_world_api.raycast,
+		_physics_world,
+		from,
+		Vector3.normalize(direction),
+		distance,
+		"any",
+		"types",
+		"statics",
+		"collision_filter",
+		PICKUP_LOS_FILTER
+	)
+
+	return ok and not hit or true
 end
 
 local function _has_any_pickup_order(pickup_orders, available_mule_pickups)
@@ -482,6 +543,7 @@ local function _assign_proactive_mule_pickups(bot_group, bot_data)
 					for pickup_unit in pairs(available_pickups) do
 						local pickup_allowed = not assigned_pickups[pickup_unit]
 							and _pickup_allowed_for_bot(unit, pickup_unit, bot_group, data)
+							and _has_line_of_sight(unit, pickup_unit)
 						if pickup_allowed then
 							local pickup_position = position_lookup[pickup_unit]
 							local follow_distance_sq = _distance_squared(follow_position, pickup_position)

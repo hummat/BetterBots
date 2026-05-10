@@ -891,6 +891,9 @@ mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", fu
 		"_init_blackboard_components",
 		function(func, self, blackboard, physics_world, gestalts_or_nil)
 			local unit = self._unit
+			if MulePickup.set_physics_world then
+				MulePickup.set_physics_world(physics_world)
+			end
 			local had_ranged = gestalts_or_nil and gestalts_or_nil.ranged ~= nil
 			local injected
 			gestalts_or_nil, injected = GestaltInjector.inject(gestalts_or_nil, unit)

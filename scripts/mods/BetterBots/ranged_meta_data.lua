@@ -409,7 +409,7 @@ local function anti_armor_ranged_policy(weapon_template)
 		return nil
 	end
 
-	if has_keyword(weapon_template, "plasmagun") then
+	if has_keyword(weapon_template, "plasmagun") or has_keyword(weapon_template, "plasma_rifle") then
 		return ANTI_ARMOR_RANGED_POLICIES.plasmagun
 	end
 
