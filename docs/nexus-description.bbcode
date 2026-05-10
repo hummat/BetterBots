@@ -1,147 +1,123 @@
-[size=4][b]BetterBots — Smarter Solo Play Bots for Darktide[/b][/size]
+[size=4][b]BetterBots — Smarter bots for Darktide Solo Play[/b][/size]
 
-Vanilla Solo Play bots don't use their career abilities. Turns out Fatshark wired up the whole ability activation system — behavior-tree node, condition guard, action-input queue — and then gated it behind a hardcoded whitelist that only allows two abilities. BetterBots lifts that cap and fills in the missing metadata so the rest of the infrastructure does its job.
+Vanilla Solo Play bots leave most of their tools unused. The game already gives them a way to fire abilities and use player-like inputs, but only a small part of that system is active by default.
 
-The result: bots throw grenades, pop stances, charge into revives, ping specials, carry tomes, and generally stop feeling like dead weight.
+BetterBots opens that system back up and adds the missing decision logic around it. The aim is simple: bots should use the abilities, grenades, blitzes, weapons, and pickups they already have in ways that make Solo Play less frustrating.
 
-[b]Solo Play only.[/b] Darktide uses dedicated servers, so gameplay mods only work when you host locally through [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]. This mod does [b]not[/b] affect public matchmaking.
+[b]Solo Play only.[/b] Darktide uses dedicated servers for public and matched games. Gameplay mods only affect locally hosted missions through [url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]. BetterBots does [b]not[/b] command bots in public matchmaking, public Havoc, or private duo lobbies with server-side bots.
 
-[size=3][b]Unreleased hotfix notes[/b][/size]
+[size=3][b]The short version[/b][/size]
 
 [list]
-[*][b]Fixed another public/Havoc warning:[/b] marking ammo in a public match could trip BetterBots' pickup-order code even though BetterBots cannot command dedicated-server bots. Those hooks now exit unless the game is locally hosted Solo Play.
+[*]Bots use combat abilities instead of holding them all mission.
+[*]Bots throw grenades and blitzes, including Psyker powers, Zealot knives, Arbites tools, and Ogryn rocks.
+[*]Bots revive more intelligently, protect allies doing objectives, and use defensive tools before committing to danger.
+[*]Bots ping elites and specials, push poxbursters, avoid sleeping daemonhosts, and stop chasing distant specials quite so eagerly.
+[*]Bots carry books, respond to tagged pickups and limited command-wheel calls, and leave scarce ammo and healing for humans first.
+[*]Bot profiles give you a class-diverse squad instead of the default all-veteran lineup.
+[*]Almost everything new can be toggled or tuned in the mod settings.
 [/list]
 
-[size=3][b]Why use this mod?[/b][/size]
+[size=3][b]What changes in-game[/b][/size]
+
+[b]Abilities and blitzes[/b]
+
+Bots can use the full combat-ability set for Veteran, Zealot, Psyker, Ogryn, Arbites, and Hive Scum. The same goes for the grenade/blitz slot: frags, kraks, smoke, fire, shock grenades, Ogryn rocks and clusters, Zealot knives, Psyker Assail/Smite/Chain Lightning, Arbites whistle/mine, and the Hive Scum tools.
+
+The important bit is that they do not just fire everything on cooldown. Abilities have per-class rules: shouts get used under pressure, charges are aimed toward useful targets or rescues, shields and relics are treated as defensive tools, and team cooldowns are staggered so three bots do not spend overlapping abilities at the same moment.
+
+[b]Combat behavior[/b]
+
+BetterBots also patches several smaller behaviors that matter in actual missions:
 
 [list]
-[*]Bots actually fire their career abilities instead of sitting on them all mission
-[*]Bots throw grenades and blitzes (19 templates across all six classes)
-[*]Bots pre-buff before reviving, ping elites, push poxbursters, and stop chasing specials two rooms away
-[*]Ammo, healing, and pickup policies defer to human players instead of hogging resources
-[*]Bot profiles give you class-diverse loadouts instead of four copy-pasted veterans
+[*]melee attacks are biased toward light/heavy/special choices that fit the target
+[*]many weapon specials are used deliberately, including power weapons, chain weapons, thunder hammers, force swords, Ogryn shovels/clubs/pickaxes, rippergun bayonets, and supported shotgun special shells
+[*]staff charged attacks, sustained-fire weapons, and close-range ranged weapons behave more sensibly
+[*]poxbursters are pushed at close range instead of being shot beside the player
+[*]daemonhosts, barrels, ledges, and hazards get extra safety handling
+[*]the Arbites Cyber-Mastiff gets smarter target tags
 [/list]
 
-[size=3][b]New in v1.1.1 — Hotfix[/b][/size]
+[b]Resources and team play[/b]
+
+Bots can carry tomes and scriptures, pick up tagged items, deploy crates when the team can actually use them, and defer healing/ammo to humans first. Limited command-wheel support is also in: [font=Courier New]Need Ammo[/font] and [font=Courier New]Need Health[/font] temporarily push resources toward the human player, while [font=Courier New]For the Emperor[/font] makes the bots a little more aggressive for a short window.
+
+This is conservative on purpose. I would rather have bots miss a marginal pickup than take the medicae charge you needed.
+
+[b]Bot profiles[/b]
+
+With [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url], BetterBots can run class-diverse bot squads with bot-optimized loadouts, talents, blessings, and curios. The built-in BetterBots profiles cover the original four classes; DLC-class bots come from your own Tertium 6 profiles. The defaults are meant to be durable, low-maintenance builds that bots can actually pilot.
+
+Advanced users can edit BetterBots profiles manually. The guide is here: [url=https://github.com/hummat/BetterBots/blob/main/docs/bot/custom-profiles.md]Custom Bot Profiles[/url]. It is source editing, not an in-game editor or preset browser, so copy exact strings from the reference tables if you go down that road.
+
+[size=3][b]Settings[/b][/size]
+
+BetterBots is not trying to decide the one correct way to play Solo Play. The settings let you tune the broad behavior of the bots and disable pieces you dislike.
 
 [list]
-[*][b]Fixed crash in public/Havoc games:[/b] the v1.1.0 hazard-prop hook could crash on dedicated-server clients where the bot group system isn't initialized. BetterBots only does anything in Solo Play, but it still loads in public games — and the hazard hook didn't account for that. Fixed.
-[*][b]Health station bot-priority deferral actually works now:[/b] the logic that defers a health station to a more injured bot was reading a field that doesn't exist in the engine. It silently did nothing. Now it reads the real bot roster.
+[*]behavior presets: Testing, Aggressive, Balanced, Conservative
+[*]toggles for ability groups, grenades/blitzes, melee/ranged behavior, weapon specials, daemonhost safety, poxburster safety, healing deferral, grimoire pickup, and debug logging
+[*]sliders for sprint range, chase range, ammo reserve rules, melee horde bias, player-tag response, peril thresholds, and human-likeness timing
+[*]profile options for bot class selection and weapon quality
 [/list]
 
-[size=3][b]New in v1.1.0 — Release Soak Fixes[/b][/size]
+[size=3][b]Latest update[/b][/size]
 
-This one is mostly hardening from live Solo Play testing. Less glamorous than v1.0.0, but important: the mod now spends a lot less time being clever in places where bots should just avoid ruining your run.
-
-[list]
-[*][b]Daemonhost avoidance hardened:[/b] bots now detect passive and waking daemonhosts more reliably, suppress ranged fire, grenades, blitzes, combat abilities, sprinting, and dash/charge launches near them, and steer away without blocking narrow stairs as aggressively
-[*][b]Barrel and hazard movement safety:[/b] fused barrels now emit buffered bot AoE threats from the explosion node when vanilla's origin is misleading, and ledge checks no longer block ordinary stairs/downhill movement
-[*][b]Pickup follow-through fixed:[/b] explicit smart-tag pickup orders now become real bot pickup state, stale pickup refs are cleared before vanilla update, and books/stims/ammo crates no longer get stuck behind stale orders
-[*][b]Healing priority fixed:[/b] scarce medicae charges now prefer the ally that needs the heal most, while still preserving Martyrdom Zealot wound stacks
-[*][b]Scenario harness expanded:[/b] added mixed horde and daemonhost scenarios for repeatable validation instead of waiting for mission RNG
-[*][b]Regression checklist added:[/b] the repo now has a release-soak checklist for abilities, blitzes, melee specials, ADS/hipfire, pickups, hazards, and performance
-[/list]
-
-[size=3][b]What bots can use[/b][/size]
-
-[b]Combat abilities[/b]
-[list]
-[*]Veteran: Executioner's Stance, Voice of Command, Infiltrate
-[*]Zealot: Fury of the Faithful, Shroudfield, relic
-[*]Psyker: Scrier's Gaze, Venting Shriek, Telekine Shield
-[*]Ogryn: Point-Blank Barrage, Bull Rush, Loyal Protector
-[*]Arbites: Castigator's Stance, Break the Line, Nuncio-Aquila
-[*]Hive Scum: Desperado (Focus), Rampage, Stimm Supply field — implemented but untested (I don't own the DLC)
-[/list]
-
-[b]Grenades and blitzes[/b]
-[list]
-[*]Standard grenades: frag, krak, smoke, fire, shock, cluster, rock
-[*]Zealot Throwing Knives
-[*]Psyker Assail, Smite, Chain Lightning
-[*]Arbites whistle and shock mine
-[*]Hive Scum Blinder, Chem, Boom Bringer — implemented but untested (DLC again)
-[/list]
-
-[size=3][b]What bots do better now[/b][/size]
+[b]v1.1.1 hotfix[/b]
 
 [list]
-[*]Fire abilities when a fight actually calls for them (18 per-template heuristics)
-[*]Pop defensive abilities before reviving a downed ally
-[*]Stagger team cooldowns instead of dumping everything in the same second
-[*]Guard allies doing objectives and pickups
-[*]Ping elites and specials so you can see them
-[*]Push poxbursters at melee range instead of wasting ammo shooting them
-[*]Stay engaged in fights longer without wandering off to heal at 99%
-[*]Give barrels, ledges, and sleeping daemonhosts a wider berth
-[*]Pick appropriate melee attacks into hordes vs armor
-[*]Use several weapon specials on purpose instead of ignoring them: power swords, chain weapons, thunder hammers, force swords, combat axes/swords/knives, power mauls, Ogryn shovels/clubs/pickaxes/combat blades, rippergun bayonets, direct ranged bashes/pistol whips, and supported shotgun special shells
-[*]Carry scriptures and tomes for the team
-[*]Hand healing items and ammo to humans first
-[*]Steer the Arbites Cyber-Mastiff onto higher-priority targets
-[/list]
-
-[size=3][b]Settings you can control[/b][/size]
-
-Everything new is toggleable or tunable. A few highlights:
-
-[list]
-[*]Aggression preset: Testing / Aggressive / Balanced / Conservative
-[*]Per-group ability toggles: stances, charges, shouts, stealth, deployables, grenades
-[*]Sprint distance, chase range, player-tag response, melee horde bias, rippergun bayonet/direct ranged bash range, warp-weapon max peril
-[*]Melee and ranged behavior toggles also cover supported weapon specials
-[*]Smart blitz targeting
-[*]Daemonhost avoidance and hazard movement safety
-[*]Poxburster safety
-[*]Ammo reserve thresholds for bots and humans
-[*]Human-likeness timing and pressure profiles (manual or auto-by-difficulty)
-[*]Healing deferral
-[*]Grimoire pickup (default off)
-[*]Bot profile class selection and weapon quality
-[*]Debug level, JSONL event log, and [font=Courier New]/bb_perf[/font] diagnostics
+[*]Fixed a public/Havoc crash path where BetterBots loaded outside Solo Play and touched dedicated-server bot state it cannot own.
+[*]Fixed health station bot-priority deferral. The old rule looked at a value the game never provides, so that specific priority rule silently did nothing.
 [/list]
 
 [size=3][b]Requirements[/b][/size]
+
 [list]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/19]Darktide Mod Loader[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/8]Darktide Mod Framework (DMF)[/url]
 [*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/176]Solo Play[/url]
-[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/183]Tertium 5[/url] or [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] for class-diverse bots based on player profiles
+[*][url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] is recommended for class-diverse bots
 [/list]
 
-[b]Note:[/b] Tertium 5 crashes on Arbites and Hive Scum archetypes. Switch to [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] if that hits you.
+[b]Tertium 5 note:[/b] Tertium 5 can crash on Arbites and Hive Scum profiles. Use [url=https://www.nexusmods.com/warhammer40kdarktide/mods/725]Tertium 6[/url] if you want all current classes.
+
+[size=3][b]Common questions[/b][/size]
+
+[b]Does this work in public matches, public Havoc, or private duo?[/b]
+No. Those bots run on Fatshark's dedicated servers, even when the lobby is private or starts with empty slots. BetterBots needs a locally hosted Solo Play mission.
+
+[b]Does this add rewards or progression to Solo Play?[/b]
+No. BetterBots changes bot behavior. Rewards, progression, and backend access are separate from this mod.
+
+[b]Do I need multiple leveled characters?[/b]
+No. BetterBots ships bot-optimized profiles for the original classes, and Tertium 6 can use your own characters as bots if you prefer that setup.
+
+[b]Can I get multiple built-in loadouts per class?[/b]
+Not through the in-game UI right now. Manual profile editing is documented, but a proper profile manager is future-work territory.
 
 [size=3][b]Install[/b][/size]
+
 [list=1]
-[*]Extract [font=Courier New]BetterBots.zip[/font] into your Darktide [font=Courier New]mods/[/font] folder
-[*]Add [font=Courier New]BetterBots[/font] to [font=Courier New]mods/mod_load_order.txt[/font] below [font=Courier New]dmf[/font]
-[*]Re-patch mods
+[*]Extract [font=Courier New]BetterBots.zip[/font] into your Darktide [font=Courier New]mods/[/font] folder.
+[*]Add [font=Courier New]BetterBots[/font] to [font=Courier New]mods/mod_load_order.txt[/font] below [font=Courier New]dmf[/font].
+[*]Re-patch mods.
+[*]Start a Solo Play mission and check for [font=Courier New]BetterBots loaded[/font] in chat.
 [/list]
 
-[size=3][b]Quick check[/b][/size]
+Darktide disables mods after game updates. If the mod suddenly stops loading after a patch, re-run the mod toggle/patch script first.
 
-Start a Solo Play mission and look for [font=Courier New]BetterBots loaded[/font] in chat.
-
-[size=3][b]Known issues[/b][/size]
+[size=3][b]Known limits[/b][/size]
 
 [list]
-[*]Mods get disabled after every Darktide patch — re-run the toggle/patch script to re-enable.
-[*]Hive Scum abilities and blitzes are implemented but unvalidated in-game. I don't own the DLC, so I rely on reports.
-[*]Item-based abilities (Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, Hive Scum Stimm Supply) use a wield/use/unwield sequence that can break after a Darktide patch until the path is updated.
+[*]Hive Scum support is implemented but not validated by me in-game because I do not own the DLC. Reports are useful.
+[*]Item-style abilities such as Zealot relic, Psyker Force Field, Arbites Cyber-Mastiff, and Hive Scum Stimm Supply use wield/use/unwield sequences. Darktide patches can break those paths until the mod is updated.
+[*]Bots are still bots. They do not animation-cancel, dodge, aim, or manage risk like a strong human player. The goal is better Solo Play support, not human-level play.
 [/list]
 
-[size=3][b]What I want to fix next[/b][/size]
+[size=3][b]Bug reports and source[/b][/size]
 
-[list]
-[*]Voidblast p1 live release proof / repair if the charged-release override still misses
-[*]Tier 3 revive cover (approach-phase architecture — the earlier enter-hook approach didn't survive engine state changes)
-[*]Broad give-to-ally / wound-cure pocketable distribution beyond the current self-use and crate-deploy policy
-[*]Remaining weapon special actions like shield specials, combat-sword parries, and hold/release ranged bashes
-[*]Rig-verified Crusher weakspot routing to replace the current provisional rear-head proxy
-[*]User-authored bot profiles and a utility-score architecture for target selection
-[/list]
+If something breaks, the most useful report is: what happened, your bot lineup, whether you were in Solo Play, and the relevant [font=Courier New]bb-log summary[/font] / [font=Courier New]bb-log warnings[/font] output if you can grab it.
 
-[size=3][b]Source & feedback[/b][/size]
-
-[url=https://github.com/hummat/BetterBots]GitHub[/url] — MIT License
-[url=https://github.com/hummat/BetterBots/issues]Issue tracker[/url] — bug reports and feature requests welcome
+[url=https://github.com/hummat/BetterBots]Source on GitHub[/url] — MIT License
+[url=https://github.com/hummat/BetterBots/issues]Issue tracker[/url] — bug reports and feature requests
