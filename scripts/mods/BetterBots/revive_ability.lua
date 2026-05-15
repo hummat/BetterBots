@@ -22,6 +22,7 @@ local _combat_ability_identity
 local INTERACT_ACTION_PATCH_SENTINEL = "__bb_revive_ability_installed"
 local _human_revive_priority_by_bot = setmetatable({}, { __mode = "k" })
 local _human_revive_owner_by_target = setmetatable({}, { __mode = "k" })
+local _rescue_disabler_priority_by_bot = setmetatable({}, { __mode = "k" })
 
 local RESCUE_INTERACTION_TYPES = {
 	revive = true,
@@ -35,6 +36,14 @@ local RESCUE_NEED_TYPES = {
 	netted = true,
 	ledge = true,
 	hogtied = true,
+}
+
+local ATTACK_RESCUE_DISABLING_TYPES = {
+	consumed = true,
+	grabbed = true,
+	mutant_charged = true,
+	pounced = true,
+	warp_grabbed = true,
 }
 
 local HUMAN_REVIVE_OWNER_LEASE = 3
@@ -136,31 +145,81 @@ local function _character_state(unit)
 		and unit_data_extension:read_component("character_state")
 end
 
-local function _is_knocked_down(unit)
-	local character_state_component = _character_state(unit)
-	return character_state_component and character_state_component.state_name == "knocked_down"
+local function _disabled_character_state(unit)
+	local unit_data_extension = ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "unit_data_system")
+	return unit_data_extension
+		and unit_data_extension.read_component
+		and unit_data_extension:read_component("disabled_character_state")
 end
 
-local function _select_downed_human(side, self_position)
-	local human_units = side and side.valid_human_units
-	if not human_units then
-		return nil, math.huge, 0
+local function _rescue_need_type(unit)
+	local character_state_component = _character_state(unit)
+	local state_name = character_state_component and character_state_component.state_name
+	if state_name == "knocked_down" then
+		return "knocked_down", nil
 	end
 
-	local best_unit, best_distance = nil, math.huge
-	local human_count = #human_units
+	if state_name == "ledge_hanging" then
+		return "ledge", nil
+	end
 
-	for i = 1, human_count do
-		local human_unit = human_units[i]
-		if _unit_alive(human_unit) and _is_knocked_down(human_unit) then
-			local distance = _distance(self_position, _unit_position(human_unit))
+	local disabled_character_state_component = _disabled_character_state(unit)
+	local disabling_type = disabled_character_state_component
+		and disabled_character_state_component.is_disabled
+		and disabled_character_state_component.disabling_type
+
+	if state_name == "netted" or disabling_type == "netted" then
+		return "netted", nil
+	end
+
+	if state_name == "hogtied" then
+		return "hogtied", nil
+	end
+
+	local disabling_unit = disabled_character_state_component and disabled_character_state_component.disabling_unit
+	if disabling_type and ATTACK_RESCUE_DISABLING_TYPES[disabling_type] and _unit_alive(disabling_unit) then
+		return disabling_type, disabling_unit
+	end
+
+	return nil, nil
+end
+
+local function _select_rescue_from_units(units, self_unit, self_position)
+	if not units then
+		return nil, nil, nil, math.huge, 0
+	end
+
+	local best_unit, best_need_type, best_disabler_unit, best_distance = nil, nil, nil, math.huge
+	local unit_count = #units
+
+	for i = 1, unit_count do
+		local ally_unit = units[i]
+		local need_type, disabler_unit
+		if ally_unit ~= self_unit and _unit_alive(ally_unit) then
+			need_type, disabler_unit = _rescue_need_type(ally_unit)
+		end
+		if need_type then
+			local distance = _distance(self_position, _unit_position(ally_unit))
 			if distance < best_distance then
-				best_unit, best_distance = human_unit, distance
+				best_unit, best_need_type, best_disabler_unit, best_distance =
+					ally_unit, need_type, disabler_unit, distance
 			end
 		end
 	end
 
-	return best_unit, best_distance, human_count
+	return best_unit, best_need_type, best_disabler_unit, best_distance, unit_count
+end
+
+local function _select_rescue_target(side, self_unit, self_position)
+	local target_unit, need_type, disabler_unit, distance, unit_count =
+		_select_rescue_from_units(side and side.valid_human_units, self_unit, self_position)
+	if target_unit then
+		return target_unit, need_type, disabler_unit, distance, unit_count, "human"
+	end
+
+	return _select_rescue_from_units(side and side.valid_player_units, self_unit, self_position)
 end
 
 local function _nearest_bot_to(target_unit, bot_group, fallback_unit)
@@ -170,7 +229,7 @@ local function _nearest_bot_to(target_unit, bot_group, fallback_unit)
 
 	if data then
 		for bot_unit, _ in pairs(data) do
-			if _unit_alive(bot_unit) then
+			if bot_unit ~= target_unit and _unit_alive(bot_unit) and not _rescue_need_type(bot_unit) then
 				local distance = _distance(_unit_position(bot_unit), target_position)
 				if distance < best_distance then
 					best_unit, best_distance = bot_unit, distance
@@ -186,11 +245,13 @@ end
 
 local function _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	local previous_target = _human_revive_priority_by_bot[unit]
+	local previous_disabler = _rescue_disabler_priority_by_bot[unit]
 	if not previous_target then
 		return false
 	end
 
 	_human_revive_priority_by_bot[unit] = nil
+	_rescue_disabler_priority_by_bot[unit] = nil
 	local lease = _human_revive_owner_by_target[previous_target]
 	if lease and lease.unit == unit then
 		_human_revive_owner_by_target[previous_target] = nil
@@ -203,6 +264,20 @@ local function _clear_human_revive_priority(unit, behavior_component, perception
 		perception_component.target_ally_distance = math.huge
 		perception_component.target_ally_needs_aid = false
 		perception_component.target_ally_need_type = "n/a"
+		if previous_disabler then
+			if perception_component.target_enemy == previous_disabler then
+				perception_component.target_enemy = nil
+			end
+			if perception_component.priority_target_enemy == previous_disabler then
+				perception_component.priority_target_enemy = nil
+			end
+			if perception_component.urgent_target_enemy == previous_disabler then
+				perception_component.urgent_target_enemy = nil
+			end
+			if perception_component.priority_target_disabled_ally == previous_target then
+				perception_component.priority_target_disabled_ally = nil
+			end
+		end
 	end
 	if follow_component then
 		follow_component.needs_destination_refresh = true
@@ -217,7 +292,7 @@ local function _active_human_revive_owner(target_human)
 		return nil
 	end
 
-	if not (_unit_alive(target_human) and _is_knocked_down(target_human)) then
+	if not (_unit_alive(target_human) and _rescue_need_type(target_human)) then
 		_human_revive_owner_by_target[target_human] = nil
 		return nil
 	end
@@ -254,54 +329,70 @@ function M.apply_human_revive_priority(self, unit)
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	end
 
-	local self_position = _unit_position(unit)
-	local target_human, distance, human_count = _select_downed_human(self and self._side, self_position)
-	if not target_human then
+	if _rescue_need_type(unit) then
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	end
 
-	local owner = _active_human_revive_owner(target_human)
+	local self_position = _unit_position(unit)
+	local target_ally, need_type, disabler_unit, distance, ally_count, target_kind =
+		_select_rescue_target(self and self._side, unit, self_position)
+	if not target_ally then
+		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
+	end
+
+	local owner = _active_human_revive_owner(target_ally)
 	if owner and owner ~= unit then
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	end
 
 	if not owner then
-		local nearest_bot = _nearest_bot_to(target_human, self and self._bot_group, unit)
+		local nearest_bot = _nearest_bot_to(target_ally, self and self._bot_group, unit)
 		if nearest_bot ~= unit then
 			return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 		end
 	end
 
-	perception_component.target_ally = target_human
+	perception_component.target_ally = target_ally
 	perception_component.target_ally_distance = distance
-	perception_component.target_ally_needs_aid = true
-	perception_component.target_ally_need_type = "knocked_down"
-	behavior_component.revive_with_urgent_target = true
-	if follow_component then
-		follow_component.needs_destination_refresh = true
+	perception_component.target_ally_need_type = need_type
+	if disabler_unit then
+		perception_component.target_ally_needs_aid = false
+		perception_component.target_enemy = disabler_unit
+		perception_component.priority_target_enemy = disabler_unit
+		perception_component.urgent_target_enemy = disabler_unit
+		perception_component.priority_target_disabled_ally = target_ally
+		behavior_component.revive_with_urgent_target = false
+	else
+		perception_component.target_ally_needs_aid = true
+		behavior_component.revive_with_urgent_target = true
+		if follow_component then
+			follow_component.needs_destination_refresh = true
+		end
+
+		local bot_group = self and self._bot_group
+		if bot_group and bot_group.register_ally_needs_aid_priority then
+			bot_group:register_ally_needs_aid_priority(unit, target_ally)
+		end
 	end
 
-	local bot_group = self and self._bot_group
-	if bot_group and bot_group.register_ally_needs_aid_priority then
-		bot_group:register_ally_needs_aid_priority(unit, target_human)
-	end
-
-	_human_revive_priority_by_bot[unit] = target_human
-	_claim_human_revive_owner(unit, target_human)
+	_human_revive_priority_by_bot[unit] = target_ally
+	_rescue_disabler_priority_by_bot[unit] = disabler_unit
+	_claim_human_revive_owner(unit, target_ally)
 
 	if _debug_enabled and _debug_enabled() then
-		local reason = human_count == 1 and "mission_critical" or "human_priority"
+		local reason = target_kind == "human" and ally_count == 1 and "mission_critical" or "ally_rescue"
 		_debug_log(
-			"human_revive_priority:" .. tostring(unit) .. ":" .. tostring(target_human),
+			"human_revive_priority:" .. tostring(unit) .. ":" .. tostring(target_ally),
 			_fixed_time(),
 			"["
 				.. _format_bot_id(unit)
-				.. "] human revive priority assigned: target="
-				.. tostring(target_human)
+				.. "] rescue priority assigned: target="
+				.. tostring(target_ally)
 				.. " reason="
 				.. reason
 				.. " distance="
 				.. tostring(distance)
+				.. (disabler_unit and " disabler=" .. tostring(disabler_unit) or "")
 		)
 	end
 

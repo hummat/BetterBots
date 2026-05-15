@@ -9,6 +9,7 @@ local _is_enabled
 local _is_host_singleplay
 local _should_block_pickup_order
 local _needs_ammo_pickup
+local _record_health_station_tag
 
 local SUPPORTED_SLOT_NAMES = {
 	slot_pocketable = true,
@@ -20,6 +21,8 @@ local EXPLICIT_SLOT_PICKUPS = {
 	grimoire = true,
 }
 local SMART_TAG_SYSTEM_SENTINEL = "__bb_smart_tag_orders_installed"
+local HEALTH_STATION_TAG_VALID_S = 20
+local _health_station_tagged_until = setmetatable({}, { __mode = "k" })
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -85,6 +88,13 @@ local function _human_player_by_unit(unit)
 	end
 
 	return player
+end
+
+local function _health_station_target(target_unit)
+	return target_unit
+		and ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(target_unit, "health_station_system") ~= nil
 end
 
 local function _side_player_units(unit)
@@ -287,10 +297,6 @@ local function _select_nearest_eligible_bot(interactor_unit, target_unit, descri
 end
 
 function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
-	if _is_enabled and not _is_enabled() then
-		return false, "feature_disabled"
-	end
-
 	if not _host_singleplay() then
 		return false, "not_host_singleplay"
 	end
@@ -302,6 +308,20 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 	local ordering_player = _human_player_by_unit(interactor_unit)
 	if not ordering_player then
 		return false, "interactor_not_human"
+	end
+
+	if _health_station_target(target_unit) then
+		local fixed_t = _fixed_time and _fixed_time() or 0
+		_health_station_tagged_until[target_unit] = fixed_t + HEALTH_STATION_TAG_VALID_S
+		if _record_health_station_tag then
+			_record_health_station_tag(target_unit)
+		end
+		_log("health_station_tag:" .. tostring(target_unit), "health station smart-tag recorded for bot use")
+		return false, "health_station_tag_recorded"
+	end
+
+	if _is_enabled and not _is_enabled() then
+		return false, "feature_disabled"
 	end
 
 	local descriptor, classify_reason = _classify_pickup_target(target_unit)
@@ -364,11 +384,29 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_is_enabled = deps.is_enabled
 	_is_host_singleplay = deps.is_host_singleplay
+	_health_station_tagged_until = setmetatable({}, { __mode = "k" })
 end
 
 function M.wire(refs)
 	_should_block_pickup_order = refs.should_block_pickup_order
 	_needs_ammo_pickup = refs.needs_ammo_pickup
+	_record_health_station_tag = refs.record_health_station_tag
+end
+
+function M.health_station_recently_tagged(target_unit)
+	local tagged_until = target_unit and _health_station_tagged_until[target_unit] or nil
+	if not tagged_until then
+		return false
+	end
+
+	local fixed_t = _fixed_time and _fixed_time() or 0
+	if fixed_t <= tagged_until then
+		return true
+	end
+
+	_health_station_tagged_until[target_unit] = nil
+
+	return false
 end
 
 local function _dispatch_from_hook(interactor_unit, target_unit, optional_alternate)

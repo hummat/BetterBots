@@ -25,6 +25,8 @@ describe("smart_tag_orders", function()
 	local hook_require_callbacks
 	local hook_registrations
 	local host_singleplay
+	local health_station_tags
+	local smart_tag_orders_enabled
 
 	local function reset()
 		debug_logs = {}
@@ -43,6 +45,8 @@ describe("smart_tag_orders", function()
 		hook_require_callbacks = {}
 		hook_registrations = {}
 		host_singleplay = true
+		health_station_tags = {}
+		smart_tag_orders_enabled = true
 
 		package.loaded["scripts/settings/pickup/pickups"] = {
 			by_name = pickup_defs,
@@ -64,6 +68,10 @@ describe("smart_tag_orders", function()
 
 		_G.ScriptUnit = {
 			has_extension = function(unit, system_name)
+				if system_name == "health_station_system" then
+					return unit.is_health_station and {} or nil
+				end
+
 				if system_name ~= "unit_data_system" then
 					return nil
 				end
@@ -167,7 +175,7 @@ describe("smart_tag_orders", function()
 				return 0
 			end,
 			is_enabled = function()
-				return true
+				return smart_tag_orders_enabled
 			end,
 			is_host_singleplay = function()
 				return host_singleplay
@@ -180,6 +188,9 @@ describe("smart_tag_orders", function()
 			end,
 			needs_ammo_pickup = function(unit)
 				return ammo_full_by_unit[unit] ~= true or grenade_refill_by_unit[unit] == true
+			end,
+			record_health_station_tag = function(unit)
+				health_station_tags[#health_station_tags + 1] = unit
 			end,
 		})
 	end
@@ -275,6 +286,39 @@ describe("smart_tag_orders", function()
 		assert.is_true(handled)
 		assert.equals(bot_two, selected_bot)
 		assert.equals(bot_two, pickup_orders[1].bot_unit)
+	end)
+
+	it("records health station smart-tags without routing them as pickup orders", function()
+		target_unit.is_health_station = true
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("health_station_tag_recorded", reason)
+		assert.same({ target_unit }, health_station_tags)
+		assert.equals(0, #pickup_orders)
+	end)
+
+	it("records health station smart-tags even when pickup-order routing is disabled", function()
+		target_unit.is_health_station = true
+		smart_tag_orders_enabled = false
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("health_station_tag_recorded", reason)
+		assert.same({ target_unit }, health_station_tags)
+		assert.equals(0, #pickup_orders)
 	end)
 
 	it("ignores public-match pickup tags before checking bot ammo", function()

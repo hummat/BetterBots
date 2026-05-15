@@ -151,6 +151,7 @@ M.DEFAULTS = {
 	healing_deferral_mode = "stations_and_deployables",
 	healing_deferral_human_threshold = 90,
 	healing_deferral_emergency_threshold = 25,
+	healing_deferral_require_station_tag = false,
 	bot_slot_1_profile = "zealot",
 	bot_slot_2_profile = "psyker",
 	bot_slot_3_profile = "ogryn",

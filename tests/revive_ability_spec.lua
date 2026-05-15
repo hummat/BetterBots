@@ -136,9 +136,17 @@ local function make_unit_data_ext(template_name, state_name)
 	})
 end
 
-local function setup_human_unit(unit, state_name)
+local function setup_human_unit(unit, state_name, disabling_type, disabling_unit)
 	_extensions[unit] = {
-		unit_data_system = make_unit_data_ext("none", state_name),
+		unit_data_system = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "none" },
+			character_state = { state_name = state_name or "walking" },
+			disabled_character_state = {
+				is_disabled = disabling_type ~= nil,
+				disabling_type = disabling_type or "none",
+				disabling_unit = disabling_unit,
+			},
+		}),
 	}
 end
 
@@ -567,7 +575,7 @@ describe("revive_ability", function()
 		end)
 	end)
 
-	describe("human revive priority", function()
+	describe("rescue priority", function()
 		local function vec(x, y, z)
 			return { x = x, y = y or 0, z = z or 0 }
 		end
@@ -632,6 +640,152 @@ describe("revive_ability", function()
 			assert.is_true(self._follow_component.needs_destination_refresh)
 			assert.equals(bot, registered().unit)
 			assert.equals(human, registered().target)
+		end)
+
+		it("assigns the nearest bot to a netted solo human and forces remove-net path refresh", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "walking", "netted")
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+
+			local self, registered = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.equals(human, self._perception_component.target_ally)
+			assert.equals("netted", self._perception_component.target_ally_need_type)
+			assert.is_true(self._perception_component.target_ally_needs_aid)
+			assert.is_true(self._behavior_component.revive_with_urgent_target)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.equals(bot, registered().unit)
+			assert.equals(human, registered().target)
+		end)
+
+		it("assigns the nearest available bot to a netted bot ally", function()
+			local rescuer = make_unit("bot_rescuer")
+			local disabled_bot = make_unit("bot_netted")
+			setup_human_unit(disabled_bot, "netted", "netted")
+			_G.POSITION_LOOKUP[rescuer] = vec(0)
+			_G.POSITION_LOOKUP[disabled_bot] = vec(3)
+
+			local self, registered = make_priority_self(rescuer, {
+				valid_human_units = {},
+				valid_player_units = { rescuer, disabled_bot },
+			}, {
+				[rescuer] = {},
+				[disabled_bot] = {},
+			})
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, rescuer)
+
+			assert.is_true(applied)
+			assert.equals(disabled_bot, self._perception_component.target_ally)
+			assert.equals("netted", self._perception_component.target_ally_need_type)
+			assert.is_true(self._perception_component.target_ally_needs_aid)
+			assert.is_true(self._behavior_component.revive_with_urgent_target)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.equals(rescuer, registered().unit)
+			assert.equals(disabled_bot, registered().target)
+		end)
+
+		it("prioritizes the disabler for pounced allies instead of forcing an unsupported interaction", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			local hound = make_unit("hound")
+			setup_human_unit(human, "pounced", "pounced", hound)
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+			_G.POSITION_LOOKUP[hound] = vec(4.5)
+
+			local self, registered = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.equals(human, self._perception_component.target_ally)
+			assert.equals("pounced", self._perception_component.target_ally_need_type)
+			assert.is_false(self._perception_component.target_ally_needs_aid)
+			assert.equals(hound, self._perception_component.target_enemy)
+			assert.equals(hound, self._perception_component.priority_target_enemy)
+			assert.equals(hound, self._perception_component.urgent_target_enemy)
+			assert.is_nil(registered())
+		end)
+
+		it("prioritizes disablers for hard-disabled allies that cannot be interact-rescued", function()
+			local cases = {
+				{ disabling_type = "pounced", enemy = "hound" },
+				{ disabling_type = "mutant_charged", enemy = "mutant" },
+				{ disabling_type = "grabbed", enemy = "chaos_spawn" },
+				{ disabling_type = "consumed", enemy = "beast_of_nurgle" },
+				{ disabling_type = "warp_grabbed", enemy = "daemonhost" },
+			}
+
+			for i, case in ipairs(cases) do
+				init_module()
+				local bot = make_unit("bot_" .. i)
+				local human = make_unit("human_" .. i)
+				local disabler = make_unit(case.enemy .. "_" .. i)
+				setup_human_unit(human, case.disabling_type, case.disabling_type, disabler)
+				_G.POSITION_LOOKUP[bot] = vec(0)
+				_G.POSITION_LOOKUP[human] = vec(4)
+				_G.POSITION_LOOKUP[disabler] = vec(4.5)
+
+				local self = make_priority_self(bot, { valid_human_units = { human } })
+
+				assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot), case.disabling_type)
+				assert.equals(human, self._perception_component.target_ally)
+				assert.equals(case.disabling_type, self._perception_component.target_ally_need_type)
+				assert.is_false(self._perception_component.target_ally_needs_aid)
+				assert.is_false(self._behavior_component.revive_with_urgent_target)
+				assert.equals(disabler, self._perception_component.target_enemy)
+				assert.equals(disabler, self._perception_component.priority_target_enemy)
+				assert.equals(disabler, self._perception_component.urgent_target_enemy)
+			end
+		end)
+
+		it("prefers a disabled human over a closer disabled bot", function()
+			local rescuer = make_unit("bot_rescuer")
+			local disabled_bot = make_unit("bot_netted")
+			local disabled_human = make_unit("human_netted")
+			setup_human_unit(disabled_bot, "netted", "netted")
+			setup_human_unit(disabled_human, "netted", "netted")
+			_G.POSITION_LOOKUP[rescuer] = vec(0)
+			_G.POSITION_LOOKUP[disabled_bot] = vec(2)
+			_G.POSITION_LOOKUP[disabled_human] = vec(10)
+
+			local self = make_priority_self(rescuer, {
+				valid_human_units = { disabled_human },
+				valid_player_units = { rescuer, disabled_bot, disabled_human },
+			}, {
+				[rescuer] = {},
+				[disabled_bot] = {},
+			})
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, rescuer)
+
+			assert.is_true(applied)
+			assert.equals(disabled_human, self._perception_component.target_ally)
+			assert.equals("netted", self._perception_component.target_ally_need_type)
+			assert.is_true(self._perception_component.target_ally_needs_aid)
+		end)
+
+		it("does not assign a disabled bot as the rescuer", function()
+			local disabled_rescuer = make_unit("bot_disabled")
+			local human = make_unit("human_downed")
+			setup_human_unit(disabled_rescuer, "pounced", "pounced", make_unit("hound"))
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[disabled_rescuer] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+
+			local self = make_priority_self(disabled_rescuer, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, disabled_rescuer)
+
+			assert.is_false(applied)
+			assert.is_nil(self._perception_component.target_ally)
+			assert.is_false(self._behavior_component.revive_with_urgent_target)
 		end)
 
 		it("leaves non-nearest bots unassigned when multiple bots can reach the downed human", function()

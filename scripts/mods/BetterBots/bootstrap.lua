@@ -617,6 +617,7 @@ function M.load_and_init(ctx)
 		fixed_time = ctx.fixed_time,
 		perf = Perf,
 		com_wheel = ComWheelResponse,
+		health_station_recently_tagged = SmartTagOrders.health_station_recently_tagged,
 	})
 
 	AmmoPolicy.init({

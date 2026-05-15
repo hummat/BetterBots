@@ -14,7 +14,7 @@
 ### v1.1.0 (2026-05-02)
 - **Post-1.0 hardening**: daemonhost avoidance now detects passive and awake-but-not-aggroed daemonhosts through side lists plus the minion-spawn fallback, suppresses ranged/grenade/blitz/ability paths near them, and uses softer keepout steering so narrow passages remain usable.
 - **Hazard movement safety**: fused barrels emit buffered AoE threats, AoE threat consumption is logged, and ledge safety blocks only dodge endpoints instead of ordinary stair/downhill movement.
-- **Pickup and healing repairs**: explicit smart-tag pickup orders are materialized into mule pickup state, stale pickup refs are cleared before vanilla update, and scarce healing stations prefer the bot/human that actually needs the charge most while preserving Martyrdom wounds.
+- **Pickup and healing repairs**: explicit smart-tag pickup orders are materialized into mule pickup state, stale pickup refs are cleared before vanilla update, scarce healing stations prefer the bot/human that actually needs the charge most while preserving Martyrdom wounds, and an optional ping-only mode blocks bot health-station use until a human tags the station.
 - **Release regression surface**: scenario library expansion, core regression checklist, and log cleanup for repeated daemonhost/charge-path diagnostics.
 - **Validation**: latest release-candidate log `console-2026-05-02-16.44.02...` has zero BetterBots warnings/errors and shows daemonhost detection, soft/medium steering, ranged/grenade/ability suppression while passive, and normal combat only after aggro.
 
@@ -106,7 +106,7 @@ In-game validation: 2026-03-11, commit 8cce4bd.
 | #18 | Boss engagement refinement | Add "boss targeting this bot" self-defense exception to vanilla monster weight | Implemented, validated in-game |
 | #48 | Player-tag smart-target response | Add a small score bonus for enemies tagged by a human player | Implemented, validated in-game |
 | #21 | Hazard-aware abilities | USE defensive abilities (relic, shout) in hazards; suppress movement-locking stances | Implemented, validated in-game |
-| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25% | Implemented, awaiting in-game trigger |
+| #39 | Healing deferral | Bots defer health stations, med-crates, pickups to human players; emergency override at <25%; optional ping-only health-station use | Implemented, awaiting in-game trigger |
 | #4 | Grenade heuristics + psyker blitz | Per-grenade heuristics (elite/horde/CC/mine/whistle); psyker Assail/Smite/Chain Lightning support | Implemented, validated in-game |
 
 **Unit tests**: 418 tests via busted.
@@ -183,7 +183,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 All post-v1.0 validation items are closed with live evidence:
 
-- `#108` human revive priority — closed from `console-2026-04-29-17.10.48...`
+- `#108` rescue priority — closed from `console-2026-04-29-17.10.48...`; later hardened so the forced nearest-bot path covers netted bot allies and disabler-target rescues while keeping humans ahead of bots.
 - `#17` daemonhost avoidance — closed from `console-2026-05-02-14.33.58...`
 - `#106` perf cap — closed from April 29 runs (median 95.7 us/bot/frame)
 - `#100` scenario harness — closed from April 29 live scenario rows

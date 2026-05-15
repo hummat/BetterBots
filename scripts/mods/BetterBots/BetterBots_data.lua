@@ -246,17 +246,22 @@ return {
 							{
 								text = "healing_deferral_mode_stations_only",
 								value = "stations_only",
-								show_widgets = { 1, 2 },
+								show_widgets = { 1, 2, 3 },
 							},
 							{
 								text = "healing_deferral_mode_stations_and_deployables",
 								value = "stations_and_deployables",
-								show_widgets = { 1, 2 },
+								show_widgets = { 1, 2, 3 },
 							},
 						},
 						sub_widgets = {
 							make_numeric("healing_deferral_human_threshold", { 50, 100 }, 5),
 							make_numeric("healing_deferral_emergency_threshold", { 0, 50 }, 5),
+							{
+								setting_id = "healing_deferral_require_station_tag",
+								type = "checkbox",
+								default_value = DEFAULTS.healing_deferral_require_station_tag,
+							},
 						},
 					},
 				},

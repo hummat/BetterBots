@@ -11,7 +11,7 @@ BetterBots opens that system back up and adds the missing decision logic around 
 [list]
 [*]Bots use combat abilities instead of holding them all mission.
 [*]Bots throw grenades and blitzes, including Psyker powers, Zealot knives, Arbites tools, and Ogryn rocks.
-[*]Bots revive more intelligently, protect allies doing objectives, and use defensive tools before committing to danger.
+[*]Bots revive more intelligently, free netted allies, prioritize disablers when someone is pinned or grabbed, and use defensive tools before committing to danger.
 [*]Bots ping elites and specials, push poxbursters, avoid sleeping daemonhosts, and stop chasing distant specials quite so eagerly.
 [*]Bots carry books, respond to tagged pickups and limited command-wheel calls, and leave scarce ammo and healing for humans first.
 [*]Bot profiles give you a class-diverse squad instead of the default all-veteran lineup.
@@ -41,7 +41,7 @@ BetterBots also patches several smaller behaviors that matter in actual missions
 
 [b]Resources and team play[/b]
 
-Bots can carry tomes and scriptures, pick up tagged items, deploy crates when the team can actually use them, and defer healing/ammo to humans first. Limited command-wheel support is also in: [font=Courier New]Need Ammo[/font] and [font=Courier New]Need Health[/font] temporarily push resources toward the human player, while [font=Courier New]For the Emperor[/font] makes the bots a little more aggressive for a short window.
+Bots can carry tomes and scriptures, pick up tagged items, deploy crates when the team can actually use them, and defer healing/ammo to humans first. If you want stricter medicae behavior, there is also a setting that lets bots use health stations only after a human tags the station. Limited command-wheel support is also in: [font=Courier New]Need Ammo[/font] and [font=Courier New]Need Health[/font] temporarily push resources toward the human player, while [font=Courier New]For the Emperor[/font] makes the bots a little more aggressive for a short window.
 
 This is conservative on purpose. I would rather have bots miss a marginal pickup than take the medicae charge you needed.
 
@@ -57,7 +57,7 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [list]
 [*]behavior presets: Testing, Aggressive, Balanced, Conservative
-[*]toggles for ability groups, grenades/blitzes, melee/ranged behavior, weapon specials, daemonhost safety, poxburster safety, healing deferral, grimoire pickup, and debug logging
+[*]toggles for ability groups, grenades/blitzes, melee/ranged behavior, weapon specials, daemonhost safety, poxburster safety, healing deferral, ping-only health-station use, grimoire pickup, and debug logging
 [*]sliders for sprint range, chase range, ammo reserve rules, melee horde bias, player-tag response, peril thresholds, and human-likeness timing
 [*]profile options for bot class selection and weapon quality
 [/list]

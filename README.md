@@ -236,14 +236,14 @@ scripts/mods/BetterBots/          # Mod source
   poxburster.lua                  #   Poxburster targeting + close-range suppression
   human_likeness.lua              #   Tier A teammate-feel tuning
   engagement_leash.lua            #   Coherency-anchored melee engagement range
-  healing_deferral.lua            #   Defer health stations/med-crates to humans
+  healing_deferral.lua            #   Defer health stations/med-crates to humans; optional ping-only station use
   ammo_policy.lua                 #   Bot ammo + grenade pickup policy
   com_wheel_response.lua          #   Communication-wheel aggression/resource overrides
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
-  smart_tag_orders.lua            #   Explicit smart-tag pickup-order bridge
+  smart_tag_orders.lua            #   Explicit smart-tag pickup orders + health-station permission pings
   team_cooldown.lua               #   Team-level ability cooldown staggering
-  revive_ability.lua              #   Pre-revive defensive ability activation + human-revive priority
+  revive_ability.lua              #   Pre-revive defensive ability activation + rescue priority
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
   animation_guard.lua             #   Animation crash guard for bot-only item paths
   airlock_guard.lua               #   Airlock teleport crash guard

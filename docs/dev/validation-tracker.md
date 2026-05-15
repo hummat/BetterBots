@@ -159,7 +159,7 @@ Regression checks:
 - BetterBots warnings: no in latest checked run (`./bb-log warnings` = none)
 - Lua errors: no in latest checked run (`./bb-log errors` = none)
 
-#108 human revive priority:
+#108 rescue priority:
 - PASS
   - key lines / timestamps: `17:14:31.929 ... [bot=2] human revive priority assigned ... reason=mission_critical distance=4.1089`
   - follow-up pathing/interaction: `17:14:32.034 ... sprint START (ally_rescue)`, `17:14:33.178 ... shield (revive) dist=10.9`, and `17:14:33.289 ... grenade blocked: interacting with [Unit '#ID[f888cbd0f5a35360]']`

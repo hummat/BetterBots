@@ -50,6 +50,7 @@ describe("healing_deferral", function()
 			assert.are.equal("stations_and_deployables", settings.mode)
 			assert.are.equal(0.9, settings.human_threshold)
 			assert.are.equal(0.25, settings.emergency_threshold)
+			assert.is_false(settings.require_station_tag)
 		end)
 
 		it("supports strict no-override mode", function()
@@ -65,6 +66,9 @@ describe("healing_deferral", function()
 						if setting_id == "healing_deferral_emergency_threshold" then
 							return 0
 						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return true
+						end
 					end,
 				},
 			})
@@ -74,6 +78,7 @@ describe("healing_deferral", function()
 			assert.are.equal("stations_only", settings.mode)
 			assert.are.equal(1.0, settings.human_threshold)
 			assert.are.equal(0, settings.emergency_threshold)
+			assert.is_true(settings.require_station_tag)
 		end)
 
 		it("supports disabling the feature entirely", function()
@@ -145,13 +150,13 @@ describe("healing_deferral", function()
 			local settings_a = HealingDeferral.resolve_settings()
 			local settings_b = HealingDeferral.resolve_settings()
 
-			assert.are.equal(3, get_calls)
+			assert.are.equal(4, get_calls)
 			assert.are.equal(settings_a, settings_b)
 
 			current_t = 11
 			local settings_c = HealingDeferral.resolve_settings()
 
-			assert.are.equal(6, get_calls)
+			assert.are.equal(8, get_calls)
 			assert.are_not.equal(settings_a, settings_c)
 			assert.are.equal("stations_only", settings_c.mode)
 			assert.are.equal(0.75, settings_c.human_threshold)
@@ -325,6 +330,9 @@ describe("healing_deferral", function()
 						if setting_id == "healing_deferral_emergency_threshold" then
 							return 25
 						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return opts.require_station_tag == true
+						end
 					end,
 					hook_safe = function(_, _, method_name, fn)
 						if method_name == "_update_health_stations" then
@@ -354,6 +362,7 @@ describe("healing_deferral", function()
 				fixed_time = function()
 					return 0
 				end,
+				health_station_recently_tagged = opts.health_station_recently_tagged,
 			})
 
 			HealingDeferral.install_behavior_ext_hooks({})
@@ -475,6 +484,66 @@ describe("healing_deferral", function()
 						bot1 = {},
 						bot2 = {},
 					},
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("blocks bot health-station demand when ping-only mode is enabled and the station was not tagged", function()
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function()
+					return false
+				end,
+			})
+			local self = {
+				_health_station_component = {
+					needs_health = true,
+					needs_health_queue_number = 1,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("allows normal health-station priority when ping-only mode is enabled and the station was tagged", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
 				},
 			}
 

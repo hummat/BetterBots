@@ -121,6 +121,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `battle cry request noted` / `need ammo request noted` / `need health request noted` | Communication-wheel bridge cached a short-lived aggressive override or human-priority resource request |
 | `smart-tag pickup routed` / `smart-tag pickup ignored` | Explicit item tag was accepted or rejected after BetterBots reused its normal pickup policy gates; `reason=no_eligible_bot` lines can now include per-bot `detail=bot=<slot>:<reason>` suffixes |
+| `health station smart-tag recorded for bot use` | A human tagged a health station; when ping-only health-station use is enabled, bots may use that station for the next short permission window. |
+| `deferred health station until a human smart-tags it` | Ping-only health-station use is enabled and the current station has no recent human tag, so BetterBots cleared the bot's station demand. |
 | `queued pocketable wield` / `queued pocketable input` | Carried pocketable state machine advanced into wield/use |
 | `pocketable use completed` / `pocketable ended without confirmation` / `pocketable timed out waiting for consume|wield` | Pocketable follow-through either finished, ended ambiguously, or stalled |
 | `sprint START/STOP` | Bot sprint state change — only logged for catch_up, ally_rescue, daemonhost_nearby (#36) |
@@ -211,7 +213,7 @@ These are implemented and intended for targeted diagnostics, not constant spam.
 2. `/bb_decide`
    - Shows whether each alive bot would use its ability right now, without actually triggering it.
    - Includes the current decision (`true/false`) and rule for each bot.
-   - Context snapshots include `target_ally_need_type`, which separates hard disables (`knocked_down`, `ledge`, `netted`, `hogtied`) from soft heal/attention states. Rescue movement and support rules should not spend cooldowns on soft aid alone.
+   - Context snapshots include `target_ally_need_type`, which separates direct interaction rescues (`knocked_down`, `ledge`, `netted`, `hogtied`) and disabler-target rescues (`pounced`, `mutant_charged`, `grabbed`, `consumed`, `warp_grabbed`) from soft heal/attention states. Rescue movement and support rules should not spend cooldowns on soft aid alone.
    - Best for threshold tuning or "why didn't it cast?" questions.
    - Do **not** run after every successful cast; run around suspected misses or surprising behavior.
 3. `/bb_brain`

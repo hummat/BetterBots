@@ -327,10 +327,11 @@ return {
 		en = "Battle-cry and need-ammo/health calls temporarily bias bot behavior toward the player's request.",
 	},
 	enable_human_revive_priority = {
-		en = "Prioritize player revives",
+		en = "Prioritize rescues",
 	},
 	enable_human_revive_priority_description = {
-		en = "When a human player is down, the nearest bot treats the revive as urgent even if enemies are drawing aggro.",
+		en = "Bots treat downed, netted, ledge-hanging, and captured allies as urgent. "
+			.. "Human players are handled before bot allies.",
 	},
 	sprint_follow_distance = {
 		en = "Sprint to catch up at (m)",
@@ -440,6 +441,12 @@ return {
 	},
 	healing_deferral_emergency_threshold_description = {
 		en = "Bots ignore the rule above and heal themselves below this. Set to 0 to never override.",
+	},
+	healing_deferral_require_station_tag = {
+		en = "Health stations require ping",
+	},
+	healing_deferral_require_station_tag_description = {
+		en = "Bots use health stations only after a human smart-tags the station. Med-crates and stims are unchanged.",
 	},
 	-- Bot profiles
 	bot_slot_1_profile = {

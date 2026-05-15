@@ -9,6 +9,7 @@ local _fixed_time
 local _health
 local _perf
 local _com_wheel
+local _health_station_recently_tagged
 local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
@@ -19,6 +20,7 @@ local BOT_GROUP_PATCH_SENTINEL = "__bb_healing_deferral_bot_group_installed"
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
 local EMERGENCY_THRESHOLD_SETTING_ID = "healing_deferral_emergency_threshold"
+local REQUIRE_STATION_TAG_SETTING_ID = "healing_deferral_require_station_tag"
 local DEFAULT_MODE = "stations_and_deployables"
 local DEFERRAL_THRESHOLD = 0.9
 local EMERGENCY_THRESHOLD = 0.25
@@ -85,6 +87,19 @@ local function _read_emergency_threshold_setting()
 	return _read_percent_setting(EMERGENCY_THRESHOLD_SETTING_ID, EMERGENCY_THRESHOLD, 0, 50)
 end
 
+local function _read_bool_setting(setting_id, default_value)
+	if not _mod then
+		return default_value
+	end
+
+	local raw_value = _mod:get(setting_id)
+	if raw_value == true or raw_value == false then
+		return raw_value
+	end
+
+	return default_value
+end
+
 local function _resolve_settings()
 	local fixed_t = _fixed_time and _fixed_time() or nil
 	if _cached_settings and _cached_settings_fixed_t == fixed_t then
@@ -95,6 +110,7 @@ local function _resolve_settings()
 		mode = _read_mode_setting(),
 		human_threshold = _read_human_threshold_setting(),
 		emergency_threshold = _read_emergency_threshold_setting(),
+		require_station_tag = _read_bool_setting(REQUIRE_STATION_TAG_SETTING_ID, false),
 	}
 	_cached_settings_fixed_t = fixed_t
 
@@ -281,6 +297,7 @@ function M.init(deps)
 	end
 	_perf = deps.perf
 	_com_wheel = deps.com_wheel
+	_health_station_recently_tagged = deps.health_station_recently_tagged
 end
 
 local function _warn_missing_health_once()
@@ -354,6 +371,20 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			_apply_health_station_deferral(health_station_component)
 			if skip_reason == "full_health" and _health_station_log_state_changed(unit, "full_health") then
 				_log("healing_station:" .. tostring(unit), "deferred health station because bot is already full")
+			end
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
+
+		if
+			settings.require_station_tag
+			and not (_health_station_recently_tagged and _health_station_recently_tagged(target_level_unit))
+		then
+			_apply_health_station_deferral(health_station_component)
+			if _health_station_log_state_changed(unit, "station_tag_required") then
+				_log("healing_station:" .. tostring(unit), "deferred health station until a human smart-tags it")
 			end
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
