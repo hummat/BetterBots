@@ -613,19 +613,34 @@ describe("revive_ability", function()
 
 		local function make_priority_self(bot_unit, side, bot_data)
 			local registered
+			local aid_destination = {
+				value = nil,
+				store = function(self, value)
+					self.value = value
+				end,
+				unbox = function(self)
+					return self.value
+				end,
+			}
 			local self = {
 				_unit = bot_unit,
 				_side = side,
 				_behavior_component = {
 					revive_with_urgent_target = false,
+					interaction_unit = nil,
+					target_ally_aid_destination = aid_destination,
 				},
 				_perception_component = {
 					target_enemy = "priority_enemy",
+					target_enemy_distance = 8,
+					opportunity_target_enemy = "opportunity_enemy",
 					priority_target_enemy = "priority_enemy",
+					urgent_target_enemy = "urgent_enemy",
 					target_ally = nil,
 					target_ally_distance = math.huge,
 					target_ally_needs_aid = false,
 					target_ally_need_type = "n/a",
+					force_aid = false,
 				},
 				_follow_component = {
 					needs_destination_refresh = false,
@@ -642,7 +657,7 @@ describe("revive_ability", function()
 
 			return self, function()
 				return registered
-			end
+			end, aid_destination
 		end
 
 		before_each(function()
@@ -669,8 +684,40 @@ describe("revive_ability", function()
 			assert.is_true(self._perception_component.target_ally_needs_aid)
 			assert.is_true(self._behavior_component.revive_with_urgent_target)
 			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.is_true(self._perception_component.force_aid)
+			assert.is_nil(self._perception_component.target_enemy)
+			assert.is_nil(self._perception_component.opportunity_target_enemy)
+			assert.is_nil(self._perception_component.priority_target_enemy)
+			assert.is_nil(self._perception_component.urgent_target_enemy)
+			assert.equals(math.huge, self._perception_component.target_enemy_distance)
 			assert.equals(bot, registered().unit)
 			assert.equals(human, registered().target)
+		end)
+
+		it("opens the vanilla revive condition when the assigned rescuer can already interact", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			local can_interact_args
+			setup_human_unit(human, "knocked_down")
+			_extensions[bot] = {
+				interactor_system = test_helper.make_interactor_extension({
+					can_interact = function(_, target, interaction_type)
+						can_interact_args = { target = target, interaction_type = interaction_type }
+						return true
+					end,
+				}),
+			}
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(0.9)
+
+			local self, _, aid_destination = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.same({ target = human, interaction_type = "revive" }, can_interact_args)
+			assert.equals(human, self._behavior_component.interaction_unit)
+			assert.equals(_G.POSITION_LOOKUP[bot], aid_destination.value)
 		end)
 
 		it("assigns the nearest bot to a netted solo human and forces remove-net path refresh", function()
@@ -742,6 +789,7 @@ describe("revive_ability", function()
 			assert.equals(hound, self._perception_component.target_enemy)
 			assert.equals(hound, self._perception_component.priority_target_enemy)
 			assert.equals(hound, self._perception_component.urgent_target_enemy)
+			assert.is_false(self._perception_component.force_aid)
 			assert.truthy(
 				string.find(_debug_logs[1].message, "need_type=pounced mode=disabler target_kind=human", 1, true)
 			)
@@ -900,6 +948,39 @@ describe("revive_ability", function()
 			assert.is_true(second_self._behavior_component.revive_with_urgent_target)
 		end)
 
+		it("releases the current owner when another bot becomes much closer", function()
+			local first_bot = make_unit("bot_first")
+			local second_bot = make_unit("bot_second")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_G.POSITION_LOOKUP[first_bot] = vec(0)
+			_G.POSITION_LOOKUP[second_bot] = vec(8)
+			_G.POSITION_LOOKUP[human] = vec(1)
+
+			local bot_data = {
+				[first_bot] = {},
+				[second_bot] = {},
+			}
+			local first_self = make_priority_self(first_bot, { valid_human_units = { human } }, bot_data)
+			local second_self = make_priority_self(second_bot, { valid_human_units = { human } }, bot_data)
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+
+			_fixed_t = 101
+			_G.POSITION_LOOKUP[first_bot] = vec(8)
+			_G.POSITION_LOOKUP[second_bot] = vec(1.2)
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+			assert.is_nil(first_self._perception_component.target_ally)
+			assert.is_false(first_self._behavior_component.revive_with_urgent_target)
+			assert.is_true(ReviveAbility.apply_human_revive_priority(second_self, second_bot))
+			assert.equals(human, second_self._perception_component.target_ally)
+			assert.is_true(second_self._behavior_component.revive_with_urgent_target)
+			assert.is_false(ReviveAbility.apply_human_revive_priority(first_self, first_bot))
+			assert.is_nil(first_self._perception_component.target_ally)
+			assert.is_false(first_self._behavior_component.revive_with_urgent_target)
+		end)
+
 		it("still prioritizes a downed human over bot or enemy targets when another human is active", function()
 			local bot = make_unit("bot_1")
 			local downed_human = make_unit("human_downed")
@@ -946,6 +1027,7 @@ describe("revive_ability", function()
 
 			local self = make_priority_self(bot, { valid_human_units = { human } })
 			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+			self._behavior_component.interaction_unit = human
 
 			setup_human_unit(human, "walking")
 			local cleared = ReviveAbility.apply_human_revive_priority(self, bot)
@@ -954,7 +1036,9 @@ describe("revive_ability", function()
 			assert.is_nil(self._perception_component.target_ally)
 			assert.equals("n/a", self._perception_component.target_ally_need_type)
 			assert.is_false(self._perception_component.target_ally_needs_aid)
+			assert.is_false(self._perception_component.force_aid)
 			assert.is_false(self._behavior_component.revive_with_urgent_target)
+			assert.is_nil(self._behavior_component.interaction_unit)
 			assert.is_true(self._follow_component.needs_destination_refresh)
 		end)
 

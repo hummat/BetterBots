@@ -38,6 +38,13 @@ local RESCUE_NEED_TYPES = {
 	hogtied = true,
 }
 
+local RESCUE_INTERACTION_BY_NEED_TYPE = {
+	knocked_down = "revive",
+	netted = "remove_net",
+	ledge = "pull_up",
+	hogtied = "rescue",
+}
+
 local ATTACK_RESCUE_DISABLING_TYPES = {
 	consumed = true,
 	grabbed = true,
@@ -47,6 +54,7 @@ local ATTACK_RESCUE_DISABLING_TYPES = {
 }
 
 local HUMAN_REVIVE_OWNER_LEASE = 3
+local HUMAN_REVIVE_TAKEOVER_DISTANCE_MARGIN = 3
 
 local M = {}
 
@@ -281,12 +289,16 @@ local function _clear_human_revive_priority(unit, behavior_component, perception
 	end
 	if behavior_component then
 		behavior_component.revive_with_urgent_target = false
+		if behavior_component.interaction_unit == previous_target then
+			behavior_component.interaction_unit = nil
+		end
 	end
 	if perception_component and perception_component.target_ally == previous_target then
 		perception_component.target_ally = nil
 		perception_component.target_ally_distance = math.huge
 		perception_component.target_ally_needs_aid = false
 		perception_component.target_ally_need_type = "n/a"
+		perception_component.force_aid = false
 		if previous_disabler then
 			if perception_component.target_enemy == previous_disabler then
 				perception_component.target_enemy = nil
@@ -340,6 +352,60 @@ local function _claim_human_revive_owner(unit, target_human)
 	}
 end
 
+local function _suppress_combat_targets_for_rescue(perception_component)
+	perception_component.target_enemy = nil
+	perception_component.target_enemy_distance = math.huge
+	perception_component.opportunity_target_enemy = nil
+	perception_component.priority_target_enemy = nil
+	perception_component.urgent_target_enemy = nil
+end
+
+local function _open_reachable_rescue_interaction(unit, behavior_component, target_ally, need_type)
+	if not (unit and behavior_component and target_ally and RESCUE_NEED_TYPES[need_type]) then
+		return false
+	end
+
+	local interaction_type = RESCUE_INTERACTION_BY_NEED_TYPE[need_type]
+	local interactor_extension = ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "interactor_system")
+	if not (interaction_type and interactor_extension and interactor_extension.can_interact) then
+		return false
+	end
+
+	local ok, can_interact =
+		pcall(interactor_extension.can_interact, interactor_extension, target_ally, interaction_type)
+	if not ok or not can_interact then
+		return false
+	end
+
+	local target_ally_aid_destination = behavior_component.target_ally_aid_destination
+	local self_position = _unit_position(unit)
+	if not (target_ally_aid_destination and target_ally_aid_destination.store and self_position) then
+		return false
+	end
+
+	behavior_component.interaction_unit = target_ally
+	target_ally_aid_destination:store(self_position)
+
+	if _debug_enabled and _debug_enabled() then
+		_debug_log(
+			"human_revive_interact_ready:" .. tostring(unit) .. ":" .. tostring(target_ally),
+			_fixed_time(),
+			"["
+				.. _format_bot_id(unit)
+				.. "] rescue interaction opened: target="
+				.. tostring(target_ally)
+				.. " need_type="
+				.. tostring(need_type)
+				.. " interaction="
+				.. tostring(interaction_type)
+		)
+	end
+
+	return true
+end
+
 function M.apply_human_revive_priority(self, unit)
 	local behavior_component = self and self._behavior_component
 	local perception_component = self and self._perception_component
@@ -368,9 +434,11 @@ function M.apply_human_revive_priority(self, unit)
 		return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	end
 
-	if not owner then
-		local nearest_bot = _nearest_bot_to(target_ally, self and self._bot_group, unit)
-		if nearest_bot ~= unit then
+	local nearest_bot, nearest_distance = _nearest_bot_to(target_ally, self and self._bot_group, unit)
+	if nearest_bot ~= unit then
+		local should_release_to_nearer_bot = owner == unit
+			and nearest_distance + HUMAN_REVIVE_TAKEOVER_DISTANCE_MARGIN < distance
+		if not owner or should_release_to_nearer_bot then
 			return _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 		end
 	end
@@ -387,6 +455,8 @@ function M.apply_human_revive_priority(self, unit)
 		behavior_component.revive_with_urgent_target = false
 	else
 		perception_component.target_ally_needs_aid = true
+		perception_component.force_aid = true
+		_suppress_combat_targets_for_rescue(perception_component)
 		behavior_component.revive_with_urgent_target = true
 		if follow_component then
 			follow_component.needs_destination_refresh = true
@@ -396,6 +466,8 @@ function M.apply_human_revive_priority(self, unit)
 		if bot_group and bot_group.register_ally_needs_aid_priority then
 			bot_group:register_ally_needs_aid_priority(unit, target_ally)
 		end
+
+		_open_reachable_rescue_interaction(unit, behavior_component, target_ally, need_type)
 	end
 
 	_human_revive_priority_by_bot[unit] = target_ally

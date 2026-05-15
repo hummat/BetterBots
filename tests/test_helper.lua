@@ -385,6 +385,22 @@ function M.make_bot_behavior_extension(opts)
 	return ext
 end
 
+function M.make_interactor_extension(opts)
+	opts = opts or {}
+	local can_interact = opts.can_interact
+	local ext = {
+		can_interact = type(can_interact) == "function" and can_interact or function()
+			return can_interact ~= false
+		end,
+	}
+
+	_apply_audited_overrides("make_interactor_extension", ext, opts.overrides, {
+		can_interact = true,
+	})
+
+	return ext
+end
+
 function M.make_minion_perception_extension(opts)
 	opts = opts or {}
 	local has_line_of_sight = opts.has_line_of_sight
