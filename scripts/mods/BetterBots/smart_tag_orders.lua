@@ -37,6 +37,16 @@ local function _log(key, message)
 	_debug_log(key, _fixed_time and _fixed_time() or 0, message)
 end
 
+local function _unit_data(unit, field_name)
+	if not (unit and Unit and Unit.get_data) then
+		return nil
+	end
+
+	local ok, value = pcall(Unit.get_data, unit, field_name)
+
+	return ok and value or nil
+end
+
 local function _distance_squared(a, b)
 	if Vector3 and Vector3.distance_squared then
 		return Vector3.distance_squared(a, b)
@@ -84,9 +94,27 @@ local function _host_singleplay()
 	return ok and settings and settings.host_singleplay == true or false
 end
 
-local function _human_player_by_unit(unit)
+local function _player_by_unit(unit)
 	local player_manager = Managers and Managers.player
 	local player = player_manager and player_manager.player_by_unit and player_manager:player_by_unit(unit)
+
+	if player then
+		return player
+	end
+
+	local player_unit_spawn = Managers and Managers.state and Managers.state.player_unit_spawn
+	if player_unit_spawn and player_unit_spawn.owner then
+		local ok, owner = pcall(player_unit_spawn.owner, player_unit_spawn, unit)
+		if ok then
+			return owner
+		end
+	end
+
+	return nil
+end
+
+local function _human_player_by_unit(unit)
+	local player = _player_by_unit(unit)
 
 	if not (player and player.is_human_controlled and player:is_human_controlled()) then
 		return nil
@@ -132,7 +160,7 @@ local function _record_tag_permission(tagger_unit, target_unit)
 		return true, "health_station"
 	end
 
-	local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type") or nil
+	local pickup_name = _unit_data(target_unit, "pickup_type")
 	_record_pickup_tag(target_unit, pickup_name)
 
 	return pickup_name ~= nil, pickup_name
@@ -164,7 +192,7 @@ local function _bot_inventory_slot_open(unit, slot_name)
 end
 
 local function _classify_pickup_target(target_unit)
-	local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type") or nil
+	local pickup_name = _unit_data(target_unit, "pickup_type")
 	if not pickup_name then
 		return nil, "no_pickup_type"
 	end
@@ -254,7 +282,7 @@ local function _bot_is_alive(unit, player)
 end
 
 local function _eligible_bot_for_family(bot_unit, descriptor)
-	local player = Managers and Managers.player and Managers.player:player_by_unit(bot_unit)
+	local player = _player_by_unit(bot_unit)
 	if not player or (player.is_human_controlled and player:is_human_controlled()) then
 		return false, "not_bot"
 	end
@@ -510,10 +538,50 @@ function M.pickup_recently_tagged(target_unit)
 	return false
 end
 
-local function _dispatch_from_hook(interactor_unit, target_unit, optional_alternate)
-	local ok, err = pcall(M.try_dispatch, interactor_unit, target_unit, optional_alternate)
+local function _log_hook_skip(hook_source, interactor_unit, target_unit, optional_alternate, reason, template_name)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local pickup_name = _unit_data(target_unit, "pickup_type")
+	local smart_tag_target_type = _unit_data(target_unit, "smart_tag_target_type")
+	local human_resolved = _human_player_by_unit(interactor_unit) ~= nil
+	local key = "smart_tag_order_skip:"
+		.. tostring(hook_source)
+		.. ":"
+		.. tostring(reason)
+		.. ":"
+		.. tostring(target_unit)
+
+	_log(
+		key,
+		"smart-tag pickup hook skipped"
+			.. " (source="
+			.. tostring(hook_source)
+			.. ", reason="
+			.. tostring(reason)
+			.. ", template="
+			.. tostring(template_name)
+			.. ", target="
+			.. tostring(target_unit)
+			.. ", pickup="
+			.. tostring(pickup_name)
+			.. ", smart_tag_target="
+			.. tostring(smart_tag_target_type)
+			.. ", human="
+			.. tostring(human_resolved)
+			.. ", alternate="
+			.. tostring(optional_alternate)
+			.. ")"
+	)
+end
+
+local function _dispatch_from_hook(interactor_unit, target_unit, optional_alternate, hook_source, template_name)
+	local ok, handled, detail = pcall(M.try_dispatch, interactor_unit, target_unit, optional_alternate)
 	if not ok and _mod and _mod.warning then
-		_mod:warning("BetterBots: smart-tag pickup routing failed: " .. tostring(err))
+		_mod:warning("BetterBots: smart-tag pickup routing failed: " .. tostring(handled))
+	elseif not handled then
+		_log_hook_skip(hook_source, interactor_unit, target_unit, optional_alternate, detail, template_name)
 	end
 end
 
@@ -549,7 +617,7 @@ function M.register_hooks()
 					if _set_tag_dispatch_suppression > 0 then
 						_record_tag_permission(tagger_unit, target_unit)
 					else
-						_dispatch_from_hook(tagger_unit, target_unit, nil)
+						_dispatch_from_hook(tagger_unit, target_unit, nil, "set_tag", template_name)
 					end
 
 					return result
@@ -566,7 +634,7 @@ function M.register_hooks()
 						return func(self, tagger_unit, target_unit, alternate)
 					end)
 
-					_dispatch_from_hook(tagger_unit, target_unit, alternate)
+					_dispatch_from_hook(tagger_unit, target_unit, alternate, "set_contextual_unit_tag", nil)
 
 					return result
 				end
@@ -583,7 +651,13 @@ function M.register_hooks()
 						return func(self, tag_id, interactor_unit, target_unit, optional_alternate)
 					end)
 
-					_dispatch_from_hook(interactor_unit, dispatch_target_unit, optional_alternate)
+					_dispatch_from_hook(
+						interactor_unit,
+						dispatch_target_unit,
+						optional_alternate,
+						"trigger_tag_interaction",
+						nil
+					)
 
 					return result
 				end

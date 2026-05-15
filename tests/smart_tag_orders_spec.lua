@@ -19,6 +19,7 @@ describe("smart_tag_orders", function()
 	local players_by_unit
 	local inventories_by_unit
 	local side_units
+	local spawn_owner_by_unit
 	local human_unit
 	local bot_one
 	local bot_two
@@ -61,6 +62,7 @@ describe("smart_tag_orders", function()
 		players_by_unit = {}
 		inventories_by_unit = {}
 		side_units = {}
+		spawn_owner_by_unit = {}
 		human_unit = { name = "human" }
 		bot_one = { name = "bot_one" }
 		bot_two = { name = "bot_two" }
@@ -143,6 +145,11 @@ describe("smart_tag_orders", function()
 				end,
 			},
 			state = {
+				player_unit_spawn = {
+					owner = function(_, unit)
+						return spawn_owner_by_unit[unit]
+					end,
+				},
 				extension = {
 					system = function(_, system_name)
 						if system_name ~= "side_system" then
@@ -321,6 +328,39 @@ describe("smart_tag_orders", function()
 		assert.is_true(handled)
 		assert.equals(bot_two, selected_bot)
 		assert.equals(bot_two, pickup_orders[1].bot_unit)
+	end)
+
+	it("uses player_unit_spawn ownership when player_by_unit has no entry for smart-tag units", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		local human_player = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		local bot_player = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		spawn_owner_by_unit[human_unit] = human_player
+		spawn_owner_by_unit[bot_one] = bot_player
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.same({
+			bot_unit = bot_one,
+			pickup_unit = target_unit,
+			ordering_player = human_player,
+		}, pickup_orders[1])
 	end)
 
 	it("records health station smart-tags without routing them as pickup orders", function()
@@ -923,6 +963,45 @@ describe("smart_tag_orders", function()
 		assert.is_true(SmartTagOrders.pickup_recently_tagged(target_unit))
 		assert.equals(1, #pickup_orders)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("logs why direct set_tag hooks do not become pickup permissions", function()
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {
+			set_tag = function(_self, template_name, tagger_unit, tagged_unit, target_location)
+				return {
+					template_name = template_name,
+					tagger_unit = tagger_unit,
+					tagged_unit = tagged_unit,
+					target_location = target_location,
+				}
+			end,
+		}
+
+		callback(smart_tag_class)
+
+		local handler = assert(hook_handler("set_tag"))
+
+		handler(smart_tag_class.set_tag, smart_tag_class, "location_ping", human_unit, nil, { x = 1, y = 2, z = 3 })
+
+		local log = find_debug_log("smart-tag pickup hook skipped")
+
+		assert.is_truthy(log)
+		assert.is_truthy(log.message:find("source=set_tag", 1, true))
+		assert.is_truthy(log.message:find("reason=no_pickup_type", 1, true))
+		assert.is_truthy(log.message:find("template=location_ping", 1, true))
+		assert.is_truthy(log.message:find("target=nil", 1, true))
+		assert.is_truthy(log.message:find("pickup=nil", 1, true))
+		assert.is_truthy(log.message:find("smart_tag_target=nil", 1, true))
+		assert.is_truthy(log.message:find("human=true", 1, true))
 	end)
 
 	it("resolves already-tagged marker interactions from tag id when target unit is omitted", function()
