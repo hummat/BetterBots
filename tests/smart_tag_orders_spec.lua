@@ -39,6 +39,16 @@ describe("smart_tag_orders", function()
 		return nil
 	end
 
+	local function hook_handler(method_name)
+		for i = 1, #hook_registrations do
+			if hook_registrations[i].method == method_name then
+				return hook_registrations[i].handler
+			end
+		end
+
+		return nil
+	end
+
 	local function reset()
 		debug_logs = {}
 		pickup_orders = {}
@@ -772,16 +782,8 @@ describe("smart_tag_orders", function()
 
 		callback(smart_tag_class)
 
-		assert.equals(1, #hook_registrations)
-		assert.equals("set_contextual_unit_tag", hook_registrations[1].method)
-
-		local result = hook_registrations[1].handler(
-			smart_tag_class.set_contextual_unit_tag,
-			smart_tag_class,
-			human_unit,
-			target_unit,
-			nil
-		)
+		local handler = assert(hook_handler("set_contextual_unit_tag"))
+		local result = handler(smart_tag_class.set_contextual_unit_tag, smart_tag_class, human_unit, target_unit, nil)
 
 		assert.same({
 			tagger_unit = human_unit,
@@ -816,6 +818,7 @@ describe("smart_tag_orders", function()
 
 		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
 		local smart_tag_class = {
+			set_tag = function() end,
 			set_contextual_unit_tag = function() end,
 			trigger_tag_interaction = function(_self, tag_id, interactor_unit, tagged_unit, alternate)
 				return {
@@ -829,19 +832,113 @@ describe("smart_tag_orders", function()
 
 		callback(smart_tag_class)
 
-		local result = hook_registrations[2].handler(
-			smart_tag_class.trigger_tag_interaction,
-			smart_tag_class,
-			77,
-			human_unit,
-			target_unit,
-			nil
-		)
+		local handler = assert(hook_handler("trigger_tag_interaction"))
+		local result =
+			handler(smart_tag_class.trigger_tag_interaction, smart_tag_class, 77, human_unit, target_unit, nil)
 
 		assert.same({
 			tag_id = 77,
 			interactor_unit = human_unit,
 			tagged_unit = target_unit,
+			alternate = nil,
+		}, result)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
+	end)
+
+	it("records direct set_tag pickup tags for strict pickup mode", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {
+			set_tag = function(_self, template_name, tagger_unit, tagged_unit, target_location)
+				return {
+					template_name = template_name,
+					tagger_unit = tagger_unit,
+					tagged_unit = tagged_unit,
+					target_location = target_location,
+				}
+			end,
+		}
+
+		callback(smart_tag_class)
+
+		local handler = assert(hook_handler("set_tag"))
+		local result =
+			handler(smart_tag_class.set_tag, smart_tag_class, "ammo_pickup_over_here", human_unit, target_unit, nil)
+
+		assert.same({
+			template_name = "ammo_pickup_over_here",
+			tagger_unit = human_unit,
+			tagged_unit = target_unit,
+			target_location = nil,
+		}, result)
+		assert.is_true(SmartTagOrders.pickup_recently_tagged(target_unit))
+	end)
+
+	it("resolves already-tagged marker interactions from tag id when target unit is omitted", function()
+		target_unit.pickup_type = "syringe_corruption_pocketable"
+		pickup_defs.syringe_corruption_pocketable = {
+			slot_name = "slot_pocketable_small",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		inventories_by_unit[bot_one] = { slot_pocketable_small = "not_equipped" }
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+
+		SmartTagOrders.register_hooks()
+
+		local callback = hook_require_callbacks["scripts/extension_systems/smart_tag/smart_tag_system"]
+		local smart_tag_class = {
+			set_tag = function() end,
+			set_contextual_unit_tag = function() end,
+			tag_by_id = function(_, tag_id)
+				assert.equals(77, tag_id)
+				return {
+					target_unit = function()
+						return target_unit
+					end,
+				}
+			end,
+			trigger_tag_interaction = function(_self, tag_id, interactor_unit, tagged_unit, alternate)
+				return {
+					tag_id = tag_id,
+					interactor_unit = interactor_unit,
+					tagged_unit = tagged_unit,
+					alternate = alternate,
+				}
+			end,
+		}
+
+		callback(smart_tag_class)
+
+		local handler = assert(hook_handler("trigger_tag_interaction"))
+		local result = handler(smart_tag_class.trigger_tag_interaction, smart_tag_class, 77, human_unit, nil, nil)
+
+		assert.same({
+			tag_id = 77,
+			interactor_unit = human_unit,
+			tagged_unit = nil,
 			alternate = nil,
 		}, result)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)

@@ -109,6 +109,32 @@ local function _record_pickup_tag(target_unit, pickup_name)
 	_log("pickup_tag:" .. tostring(target_unit), "pickup smart-tag recorded for bot use: " .. tostring(pickup_name))
 end
 
+local function _record_tag_permission(tagger_unit, target_unit)
+	if not _host_singleplay() then
+		return false, "not_host_singleplay"
+	end
+
+	local ordering_player = _human_player_by_unit(tagger_unit)
+	if not ordering_player then
+		return false, "interactor_not_human"
+	end
+
+	if _health_station_target(target_unit) then
+		local fixed_t = _fixed_time and _fixed_time() or 0
+		_health_station_tagged_until[target_unit] = fixed_t + HEALTH_STATION_TAG_VALID_S
+		if _record_health_station_tag then
+			_record_health_station_tag(target_unit)
+		end
+		_log("health_station_tag:" .. tostring(target_unit), "health station smart-tag recorded for bot use")
+		return true, "health_station"
+	end
+
+	local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type") or nil
+	_record_pickup_tag(target_unit, pickup_name)
+
+	return pickup_name ~= nil, pickup_name
+end
+
 local function _side_player_units(unit)
 	local extension_manager = Managers and Managers.state and Managers.state.extension
 	local side_system = extension_manager and extension_manager:system("side_system")
@@ -309,31 +335,23 @@ local function _select_nearest_eligible_bot(interactor_unit, target_unit, descri
 end
 
 function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
-	if not _host_singleplay() then
-		return false, "not_host_singleplay"
-	end
-
 	if optional_alternate == "companion_order" then
 		return false, "companion_order"
 	end
 
+	local recorded, record_reason = _record_tag_permission(interactor_unit, target_unit)
 	local ordering_player = _human_player_by_unit(interactor_unit)
 	if not ordering_player then
 		return false, "interactor_not_human"
 	end
 
-	if _health_station_target(target_unit) then
-		local fixed_t = _fixed_time and _fixed_time() or 0
-		_health_station_tagged_until[target_unit] = fixed_t + HEALTH_STATION_TAG_VALID_S
-		if _record_health_station_tag then
-			_record_health_station_tag(target_unit)
-		end
-		_log("health_station_tag:" .. tostring(target_unit), "health station smart-tag recorded for bot use")
-		return false, "health_station_tag_recorded"
+	if record_reason == "not_host_singleplay" then
+		return false, record_reason
 	end
 
-	local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type") or nil
-	_record_pickup_tag(target_unit, pickup_name)
+	if recorded and record_reason == "health_station" then
+		return false, "health_station_tag_recorded"
+	end
 
 	if _is_enabled and not _is_enabled() then
 		return false, "feature_disabled"
@@ -389,6 +407,21 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 	)
 
 	return true, bot_unit
+end
+
+local function _target_unit_by_tag_id(smart_tag_system, tag_id)
+	if not (smart_tag_system and tag_id and smart_tag_system.tag_by_id) then
+		return nil
+	end
+
+	local ok, tag = pcall(smart_tag_system.tag_by_id, smart_tag_system, tag_id)
+	if not ok or not tag or not tag.target_unit then
+		return nil
+	end
+
+	local target_ok, target_unit = pcall(tag.target_unit, tag)
+
+	return target_ok and target_unit or nil
 end
 
 function M.init(deps)
@@ -456,6 +489,20 @@ function M.register_hooks()
 
 		SmartTagSystem[SMART_TAG_SYSTEM_SENTINEL] = true
 
+		if type(SmartTagSystem.set_tag) == "function" then
+			_mod:hook(
+				SmartTagSystem,
+				"set_tag",
+				function(func, self, template_name, tagger_unit, target_unit, target_location)
+					local result = func(self, template_name, tagger_unit, target_unit, target_location)
+
+					_record_tag_permission(tagger_unit, target_unit)
+
+					return result
+				end
+			)
+		end
+
 		if type(SmartTagSystem.set_contextual_unit_tag) == "function" then
 			_mod:hook(
 				SmartTagSystem,
@@ -475,9 +522,10 @@ function M.register_hooks()
 				SmartTagSystem,
 				"trigger_tag_interaction",
 				function(func, self, tag_id, interactor_unit, target_unit, optional_alternate)
+					local dispatch_target_unit = target_unit or _target_unit_by_tag_id(self, tag_id)
 					local result = func(self, tag_id, interactor_unit, target_unit, optional_alternate)
 
-					_dispatch_from_hook(interactor_unit, target_unit, optional_alternate)
+					_dispatch_from_hook(interactor_unit, dispatch_target_unit, optional_alternate)
 
 					return result
 				end
