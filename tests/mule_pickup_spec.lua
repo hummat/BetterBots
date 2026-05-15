@@ -44,6 +44,8 @@ describe("mule_pickup", function()
 	local policy_block_order
 	local host_singleplay
 	local has_line_of_sight
+	local require_pickup_tag
+	local tagged_pickups
 
 	local function find_debug_log(fragment)
 		for i = 1, #debug_logs do
@@ -85,6 +87,8 @@ describe("mule_pickup", function()
 		policy_block_order = nil
 		host_singleplay = true
 		has_line_of_sight = nil
+		require_pickup_tag = false
+		tagged_pickups = {}
 		fake_mod = {
 			hook_require = function(_, _, callback)
 				callback({
@@ -149,6 +153,12 @@ describe("mule_pickup", function()
 				end
 
 				return false, nil
+			end,
+			pickups_require_tag = function()
+				return require_pickup_tag
+			end,
+			pickup_recently_tagged = function(pickup_unit)
+				return tagged_pickups[pickup_unit] == true
 			end,
 			is_host_singleplay = function()
 				return host_singleplay
@@ -581,6 +591,109 @@ describe("mule_pickup", function()
 		assert.equals(tome_unit, pickup_component.mule_pickup)
 		assert.equals(1, pickup_component.mule_pickup_distance)
 		assert.is_true(_G.BLACKBOARDS[bot_unit].follow.needs_destination_refresh)
+	end)
+
+	it(
+		"does not assign proactive mule pickups when strict pickup tags are required and the pickup is untagged",
+		function()
+			require_pickup_tag = true
+			local tome_unit = { pickup_type = "tome" }
+			local bot_unit = "bot_1"
+			local pickup_component = {
+				mule_pickup = nil,
+				mule_pickup_distance = math.huge,
+			}
+			local bot_data = {
+				[bot_unit] = {
+					pickup_component = pickup_component,
+					pickup_orders = {},
+					behavior_component = {},
+					follow_position = { x = 0, y = 0, z = 0 },
+				},
+			}
+
+			_G.Vector3 = {
+				distance_squared = function(a, b)
+					local dx = (a.x or 0) - (b.x or 0)
+					local dy = (a.y or 0) - (b.y or 0)
+					local dz = (a.z or 0) - (b.z or 0)
+
+					return dx * dx + dy * dy + dz * dz
+				end,
+			}
+			_G.POSITION_LOOKUP = {
+				[bot_unit] = { x = 1, y = 0, z = 0 },
+				[tome_unit] = { x = 2, y = 0, z = 0 },
+			}
+			live_bot_groups = {
+				side_a = {
+					_available_mule_pickups = {
+						slot_pocketable = {
+							[tome_unit] = 20,
+						},
+					},
+					data = function()
+						return bot_data
+					end,
+				},
+			}
+
+			MulePickup.sync_live_bot_groups()
+
+			assert.is_nil(pickup_component.mule_pickup)
+			assert.equals(math.huge, pickup_component.mule_pickup_distance)
+		end
+	)
+
+	it("assigns proactive mule pickups when strict pickup tags are required and the pickup is tagged", function()
+		require_pickup_tag = true
+		local tome_unit = { pickup_type = "tome" }
+		tagged_pickups[tome_unit] = true
+		local bot_unit = "bot_1"
+		local pickup_component = {
+			mule_pickup = nil,
+			mule_pickup_distance = math.huge,
+		}
+		local bot_data = {
+			[bot_unit] = {
+				pickup_component = pickup_component,
+				pickup_orders = {},
+				behavior_component = {},
+				follow_position = { x = 0, y = 0, z = 0 },
+			},
+		}
+
+		_G.Vector3 = {
+			distance_squared = function(a, b)
+				local dx = (a.x or 0) - (b.x or 0)
+				local dy = (a.y or 0) - (b.y or 0)
+				local dz = (a.z or 0) - (b.z or 0)
+
+				return dx * dx + dy * dy + dz * dz
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			[bot_unit] = { x = 1, y = 0, z = 0 },
+			[tome_unit] = { x = 2, y = 0, z = 0 },
+		}
+		live_bot_groups = {
+			side_a = {
+				_available_mule_pickups = {
+					slot_pocketable = {
+						[tome_unit] = 20,
+					},
+				},
+				data = function()
+					return bot_data
+				end,
+			},
+		}
+
+		local changed = MulePickup.sync_live_bot_groups()
+
+		assert.is_true(changed)
+		assert.equals(tome_unit, pickup_component.mule_pickup)
+		assert.equals(1, pickup_component.mule_pickup_distance)
 	end)
 
 	it("materializes explicit tome pickup orders when vanilla leaves mule state empty", function()

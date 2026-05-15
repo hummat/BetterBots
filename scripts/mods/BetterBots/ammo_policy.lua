@@ -12,6 +12,7 @@ local _ability_extension
 local _bot_slot_for_unit
 local _nearby_grenade_pickups
 local _is_enabled
+local _pickup_recently_tagged
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
 local _last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
@@ -118,6 +119,28 @@ end
 local function _human_grenade_threshold()
 	return (_Settings and _Settings.human_grenade_reserve_threshold and _Settings.human_grenade_reserve_threshold())
 		or 1
+end
+
+local function _pickups_require_tag()
+	return _Settings and _Settings.pickups_require_tag and _Settings.pickups_require_tag() == true or false
+end
+
+local function _pickup_has_required_tag(pickup_unit)
+	if not _pickups_require_tag() then
+		return true
+	end
+
+	return pickup_unit ~= nil and _pickup_recently_tagged and _pickup_recently_tagged(pickup_unit) == true
+end
+
+local function _clear_ammo_pickup_target(pickup_component)
+	if not pickup_component then
+		return
+	end
+
+	pickup_component.ammo_pickup = nil
+	pickup_component.ammo_pickup_distance = math.huge
+	pickup_component.ammo_pickup_valid_until = -math.huge
 end
 
 local function _all_eligible_humans_above_threshold(human_units, threshold)
@@ -456,6 +479,7 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_nearby_grenade_pickups = deps.nearby_grenade_pickups
 	_is_enabled = deps.is_enabled
+	_pickup_recently_tagged = deps.pickup_recently_tagged
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
 	_last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
@@ -569,7 +593,16 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			or false
 		local bot_ammo_percentage = _current_ammo_percentage(unit)
 		local bot_needs_grenade_refill = _needs_ammo_pickup_for_grenade_refill(unit)
-		local bot_needs_ammo = (bot_ammo_percentage ~= nil and bot_ammo_percentage < 1) or bot_needs_grenade_refill
+		local bot_needs_regular_ammo = bot_ammo_percentage ~= nil and bot_ammo_percentage < 1
+		if bot_needs_regular_ammo and not _pickup_has_required_tag(pickup_component.ammo_pickup) then
+			bot_needs_regular_ammo = false
+			pickup_component.needs_ammo = false
+			_clear_ammo_pickup_target(pickup_component)
+			if _ammo_pickup_log_state_changed(unit, "tag_required") then
+				_log("ammo_pickup_tag_required:" .. tostring(unit), "ammo pickup deferred until a human smart-tags it")
+			end
+		end
+		local bot_needs_ammo = bot_needs_regular_ammo or bot_needs_grenade_refill
 		local humans_ok = not human_request_active
 			and _all_eligible_humans_above_threshold(human_units, _human_threshold())
 
@@ -630,9 +663,24 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			end
 
 			if grenade_pickup then
-				local humans_ok_for_grenade = not human_request_active
+				if not _pickup_has_required_tag(grenade_pickup) then
+					if _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup) then
+						_clear_grenade_pickup_log_state(unit)
+					end
+					if not bot_needs_regular_ammo then
+						pickup_component.needs_ammo = false
+					end
+					local pickup_state = "tag_required:" .. tostring(grenade_pickup)
+					if _grenade_pickup_log_state_changed(unit, pickup_state) then
+						_log(
+							"grenade_pickup_tag_required:" .. tostring(unit),
+							"grenade pickup deferred until a human smart-tags it"
+						)
+					end
+				elseif
+					not human_request_active
 					and _all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
-				if humans_ok_for_grenade then
+				then
 					_reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance)
 					pickup_component.needs_ammo = true
 					local pickup_state = "reserved:" .. tostring(grenade_pickup)

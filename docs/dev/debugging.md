@@ -106,9 +106,11 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `bt_bot_shoot_action hook_require resolved nil` | Abnormal delayed-hook install failure for `BtBotShootAction`; shoot-action diagnostics/hooks are suspect until this is explained |
 | `ammo utility unavailable; dead-zone ranged fire detection disabled` | `scripts/utilities/ammo` failed to load, so the dead-zone ranged-fire confirmation log for `#51` is unavailable in this session |
 | `ammo pickup success` | Actual pickup interaction completed and bot ammo reserve increased; stronger than `ammo pickup permitted` |
+| `ammo pickup deferred until a human smart-tags it` | Strict pickup-tag mode is enabled and the current ammo pickup target has no recent human smart-tag |
 | `grenade pickup permitted: all eligible humans above reserve` | BetterBots reserved a world grenade pickup for the bot because no eligible human grenade user was below reserve; one-shot per bot+pickup reservation episode |
 | `grenade pickup bound into ammo slot` | BetterBots attached the reserved world grenade pickup to the ammo-pickup fields so vanilla interaction code can collect it; one-shot per bot+pickup reservation episode |
 | `grenade pickup deferred to human reserve` | Bot yielded a nearby world grenade pickup because at least one eligible human grenade user was below reserve; one-shot per bot+pickup defer episode |
+| `grenade pickup deferred until a human smart-tags it` | Strict pickup-tag mode is enabled and the nearby grenade refill has no recent human smart-tag |
 | `grenade pickup skipped: ability does not use grenade pickups` | Equipped blitz replenishes via cooldown/passive logic instead of world grenade pickups; one-shot per bot+equipped ability state |
 | `grenade pickup skipped: cooldown-based blitz` | Blitz has no grenade charges at all, so world grenade pickup logic does not apply; one-shot per bot+equipped ability state |
 | `grenade pickup skipped: no ability extension` | Grenade refill logic could not resolve the bot's `ability_system`; grenade reserve policy did not run |
@@ -121,6 +123,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `blackboard utility unavailable; mule pickup destination refresh skipped` | Mule live-destination refresh could not load the blackboard helper; reservation metadata patching still ran, but destination refresh became a no-op for that session |
 | `battle cry request noted` / `need ammo request noted` / `need health request noted` | Communication-wheel bridge cached a short-lived aggressive override or human-priority resource request |
 | `smart-tag pickup routed` / `smart-tag pickup ignored` | Explicit item tag was accepted or rejected after BetterBots reused its normal pickup policy gates; `reason=no_eligible_bot` lines can now include per-bot `detail=bot=<slot>:<reason>` suffixes |
+| `pickup smart-tag recorded for bot use` | A human tagged a pickup; when strict pickup-tag mode is enabled, proactive bot pickup claims may use that pickup for the next short permission window |
+| `blocked mule pickup until a human smart-tags it` | Strict pickup-tag mode is enabled and a proactive book/crate/stim mule pickup target has no recent human smart-tag |
 | `health station smart-tag recorded for bot use` | A human tagged a health station; when ping-only health-station use is enabled, bots may use that station for the next short permission window. |
 | `deferred health station until a human smart-tags it` | Ping-only health-station use is enabled and the current station has no recent human tag, so BetterBots cleared the bot's station demand. |
 | `queued pocketable wield` / `queued pocketable input` | Carried pocketable state machine advanced into wield/use |

@@ -629,6 +629,7 @@ function M.load_and_init(ctx)
 		bot_slot_for_unit = Debug.bot_slot_for_unit,
 		settings = Settings,
 		com_wheel = ComWheelResponse,
+		pickup_recently_tagged = SmartTagOrders.pickup_recently_tagged,
 		is_enabled = function()
 			return Settings.is_feature_enabled("ammo_policy")
 		end,
@@ -686,6 +687,8 @@ function M.load_and_init(ctx)
 		end,
 		should_allow_mule_pickup = PocketablePickup.should_allow_mule_pickup,
 		should_block_pickup_order = PocketablePickup.should_block_pickup_order,
+		pickups_require_tag = Settings.pickups_require_tag,
+		pickup_recently_tagged = SmartTagOrders.pickup_recently_tagged,
 		is_host_singleplay = function()
 			local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
 			local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil

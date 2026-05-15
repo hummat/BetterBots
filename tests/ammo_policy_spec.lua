@@ -54,6 +54,7 @@ describe("ammo_policy", function()
 			settings = overrides and overrides.settings,
 			com_wheel = overrides and overrides.com_wheel,
 			is_enabled = overrides and overrides.is_enabled,
+			pickup_recently_tagged = overrides and overrides.pickup_recently_tagged,
 		})
 	end
 
@@ -477,6 +478,103 @@ describe("ammo_policy", function()
 		update_hook(self, "bot1")
 
 		assert.is_true(self._pickup_component.needs_ammo)
+	end)
+
+	it("blocks proactive ammo pickup when strict pickup tags are required and the pickup is untagged", function()
+		local ammo_pickup = "ammo_pickup"
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.50 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				pickups_require_tag = function()
+					return true
+				end,
+			},
+			pickup_recently_tagged = function(unit)
+				assert.equals(ammo_pickup, unit)
+				return false
+			end,
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = true,
+				ammo_pickup = ammo_pickup,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_false(self._pickup_component.needs_ammo)
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.equals(math.huge, self._pickup_component.ammo_pickup_distance)
+	end)
+
+	it("allows proactive ammo pickup when strict pickup tags are required and the pickup is tagged", function()
+		local ammo_pickup = "ammo_pickup"
+		install_module({
+			ammo_module = {
+				current_total_percentage = function(unit)
+					return unit == "bot1" and 0.50 or 0.95
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				pickups_require_tag = function()
+					return true
+				end,
+			},
+			pickup_recently_tagged = function(unit)
+				assert.equals(ammo_pickup, unit)
+				return true
+			end,
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = {
+				ammo_pickup_order_unit = function()
+					return nil
+				end,
+			},
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = ammo_pickup,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_true(self._pickup_component.needs_ammo)
+		assert.equals(ammo_pickup, self._pickup_component.ammo_pickup)
 	end)
 
 	it("reuses human ammo scan for bots on the same side in the same frame", function()
@@ -1036,6 +1134,95 @@ describe("ammo_policy", function()
 		assert.equals(math.huge, self._pickup_component.ammo_pickup_valid_until)
 		assert.is_true(self._pickup_component.needs_ammo)
 		assert.equals("small_grenade_pickup", bot_group._bot_data.bot1.ammo_pickup_order_unit)
+	end)
+
+	it("blocks nearby grenade pickup when strict pickup tags are required and the pickup is untagged", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 0
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 3
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+				pickups_require_tag = function()
+					return true
+				end,
+			},
+			pickup_recently_tagged = function()
+				return false
+			end,
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local bot_group = {
+			_bot_data = {
+				bot1 = {
+					ammo_pickup_order_unit = nil,
+				},
+			},
+			ammo_pickup_order_unit = function(self, unit)
+				return self._bot_data[unit].ammo_pickup_order_unit
+			end,
+		}
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = bot_group,
+			_pickup_component = {
+				needs_ammo = true,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup)
+		assert.is_false(self._pickup_component.needs_ammo)
+		assert.is_nil(bot_group._bot_data.bot1.ammo_pickup_order_unit)
 	end)
 
 	it("binds nearby grenade pickup when humans are above reserve and bot is not full", function()

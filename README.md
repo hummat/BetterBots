@@ -241,7 +241,7 @@ scripts/mods/BetterBots/          # Mod source
   com_wheel_response.lua          #   Communication-wheel aggression/resource overrides
   mule_pickup.lua                 #   Book mule pickup + grimoire opt-in guard
   pocketable_pickup.lua           #   Pocketable carry policy + stim/crate use/deploy
-  smart_tag_orders.lua            #   Explicit smart-tag pickup orders + health-station permission pings
+  smart_tag_orders.lua            #   Explicit smart-tag pickup orders + resource permission pings
   team_cooldown.lua               #   Team-level ability cooldown staggering
   revive_ability.lua              #   Pre-revive defensive ability activation + rescue priority
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression

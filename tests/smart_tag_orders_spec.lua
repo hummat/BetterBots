@@ -27,6 +27,17 @@ describe("smart_tag_orders", function()
 	local host_singleplay
 	local health_station_tags
 	local smart_tag_orders_enabled
+	local fixed_time
+
+	local function find_debug_log(fragment)
+		for i = 1, #debug_logs do
+			if debug_logs[i].message:find(fragment, 1, true) then
+				return debug_logs[i]
+			end
+		end
+
+		return nil
+	end
 
 	local function reset()
 		debug_logs = {}
@@ -47,6 +58,7 @@ describe("smart_tag_orders", function()
 		host_singleplay = true
 		health_station_tags = {}
 		smart_tag_orders_enabled = true
+		fixed_time = 10
 
 		package.loaded["scripts/settings/pickup/pickups"] = {
 			by_name = pickup_defs,
@@ -161,7 +173,7 @@ describe("smart_tag_orders", function()
 				return true
 			end,
 			fixed_time = function()
-				return 10
+				return fixed_time
 			end,
 			bot_slot_for_unit = function(unit)
 				if unit == bot_one then
@@ -321,6 +333,37 @@ describe("smart_tag_orders", function()
 		assert.equals(0, #pickup_orders)
 	end)
 
+	it("records pickup smart-tags even when pickup-order routing is disabled", function()
+		target_unit.pickup_type = "small_grenade"
+		smart_tag_orders_enabled = false
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_false(handled)
+		assert.equals("feature_disabled", reason)
+		assert.is_true(SmartTagOrders.pickup_recently_tagged(target_unit))
+		assert.equals(0, #pickup_orders)
+	end)
+
+	it("expires recorded pickup smart-tags", function()
+		target_unit.pickup_type = "small_grenade"
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+
+		SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+		fixed_time = 31
+
+		assert.is_false(SmartTagOrders.pickup_recently_tagged(target_unit))
+	end)
+
 	it("ignores public-match pickup tags before checking bot ammo", function()
 		target_unit.pickup_type = "large_clip"
 		pickup_defs.large_clip = {
@@ -432,7 +475,7 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("unsupported_pocketable", reason)
 		assert.equals(0, #pickup_orders)
-		assert.is_truthy(debug_logs[1].message:find("unsupported_pocketable", 1, true))
+		assert.is_truthy(find_debug_log("unsupported_pocketable"))
 	end)
 
 	it("logs per-bot reasons when no bot is eligible for a slot pickup", function()
@@ -461,7 +504,7 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("no_eligible_bot", reason)
 		assert.equals(0, #pickup_orders)
-		assert.is_truthy(debug_logs[1].message:find("slot_full", 1, true))
+		assert.is_truthy(find_debug_log("slot_full"))
 	end)
 
 	it("falls back to player liveness when ALIVE is missing for a live bot", function()
@@ -527,7 +570,7 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("no_eligible_bot", reason)
 		assert.equals(0, #pickup_orders)
-		assert.is_truthy(debug_logs[1].message:find("bot_dead", 1, true))
+		assert.is_truthy(find_debug_log("bot_dead"))
 	end)
 
 	it("does not reject live bots when ALIVE is stale false", function()
@@ -592,7 +635,7 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("no_eligible_bot", reason)
 		assert.equals(0, #pickup_orders)
-		assert.is_truthy(debug_logs[1].message:find("bot_dead", 1, true))
+		assert.is_truthy(find_debug_log("bot_dead"))
 	end)
 
 	it("accumulates distinct rejection reasons across multiple bots", function()
@@ -629,7 +672,7 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("no_eligible_bot", reason)
 		assert.equals(0, #pickup_orders)
-		local message = debug_logs[1].message
+		local message = find_debug_log("bot=1:slot_full").message
 		assert.is_truthy(message:find("bot=1:slot_full", 1, true), "bot_one must report slot_full")
 		assert.is_truthy(message:find("bot=2:bot_dead", 1, true), "bot_two must report bot_dead")
 		-- Order preserved: bot_one comes before bot_two in side_units, so its detail is listed first.
@@ -670,9 +713,10 @@ describe("smart_tag_orders", function()
 
 		assert.is_false(handled)
 		assert.equals("no_eligible_bot", reason)
-		assert.is_truthy(debug_logs[1].message:find("bot=1:slot_full", 1, true))
-		assert.is_nil(debug_logs[1].message:find("bot=0", 1, true))
-		assert.is_nil(debug_logs[1].message:find("bot_dead", 1, true))
+		local message = find_debug_log("bot=1:slot_full").message
+		assert.is_truthy(message:find("bot=1:slot_full", 1, true))
+		assert.is_nil(message:find("bot=0", 1, true))
+		assert.is_nil(message:find("bot_dead", 1, true))
 	end)
 
 	it("ignores companion-order interactions", function()

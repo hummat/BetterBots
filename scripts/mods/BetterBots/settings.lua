@@ -136,6 +136,7 @@ M.DEFAULTS = {
 	pressure_leash_scale_percent = 65,
 	pressure_leash_floor_m = 7,
 	enable_bot_grimoire_pickup = false,
+	pickup_require_tag = false,
 	sprint_follow_distance = 12,
 	daemonhost_keepout_distance = 14,
 	hazard_avoidance_buffer = 1.5,
@@ -434,6 +435,19 @@ function M.human_grenade_reserve_threshold()
 		0,
 		100
 	)
+end
+
+function M.pickups_require_tag()
+	if not _mod then
+		return M.DEFAULTS.pickup_require_tag
+	end
+
+	local value = _mod:get("pickup_require_tag")
+	if value == nil then
+		return M.DEFAULTS.pickup_require_tag
+	end
+
+	return value == true
 end
 
 function M.warp_weapon_peril_threshold()

@@ -300,6 +300,13 @@ return {
 	enable_bot_tome_pickup_description = {
 		en = "Lets bots carry tomes as mules. Tomes block only one curio slot and can be recovered by dropping.",
 	},
+	pickup_require_tag = {
+		en = "Pickups require ping",
+	},
+	pickup_require_tag_description = {
+		en = "Bots only take ammo, grenade refills, books, crates, and stims after a human smart-tags the pickup. "
+			.. "Explicit smart-tag orders still use the normal pickup rules.",
+	},
 	enable_ammo_policy = {
 		en = "Bot ammo/grenade pickup policy",
 	},

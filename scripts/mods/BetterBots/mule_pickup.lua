@@ -15,6 +15,8 @@ local _should_allow_mule_pickup
 local _should_block_pickup_order
 local _is_host_singleplay
 local _has_line_of_sight
+local _pickups_require_tag
+local _pickup_recently_tagged
 local _physics_world
 local _last_tome_patch_enabled
 local _last_grimoire_patch_enabled
@@ -32,6 +34,7 @@ local GRIMOIRE_PICKUP_NAME = "grimoire"
 local MULE_PICKUP_MAX_DISTANCE_SQ = 400
 local PICKUP_LOS_HEIGHT = 0.5
 local PICKUP_LOS_FILTER = "filter_player_character_shooting_raycast_statics"
+local _pickup_has_required_tag
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -245,6 +248,10 @@ local function _pickup_allowed_for_bot(unit, pickup_unit, bot_group, data)
 		end
 	end
 
+	if _pickup_has_required_tag and not _pickup_has_required_tag(pickup_unit, data) then
+		return false, "tag_required"
+	end
+
 	return true, nil
 end
 
@@ -277,6 +284,8 @@ function M.init(deps)
 	_should_block_pickup_order = deps.should_block_pickup_order
 	_is_host_singleplay = deps.is_host_singleplay
 	_has_line_of_sight = deps.has_line_of_sight or _default_has_line_of_sight
+	_pickups_require_tag = deps.pickups_require_tag
+	_pickup_recently_tagged = deps.pickup_recently_tagged
 	_physics_world = nil
 	_last_tome_patch_enabled = nil
 	_last_grimoire_patch_enabled = nil
@@ -357,6 +366,8 @@ function M.sanitize_mule_pickup(pickup_component, unit, bot_group, data)
 			"mule_pickup_block_policy:" .. tostring(unit),
 			"blocked pocketable mule pickup because pocketable support is disabled"
 		)
+	elseif reason == "tag_required" then
+		_log("mule_pickup_block_policy:" .. tostring(unit), "blocked mule pickup until a human smart-tags it")
 	end
 
 	return true
@@ -448,6 +459,32 @@ local function _has_any_pickup_order(pickup_orders, available_mule_pickups)
 	end
 
 	return false
+end
+
+local function _has_pickup_order_for_unit(pickup_orders, pickup_unit)
+	if not (pickup_orders and pickup_unit) then
+		return false
+	end
+
+	for _, order in pairs(pickup_orders) do
+		if order and order.unit == pickup_unit then
+			return true
+		end
+	end
+
+	return false
+end
+
+_pickup_has_required_tag = function(pickup_unit, data)
+	if not (_pickups_require_tag and _pickups_require_tag()) then
+		return true
+	end
+
+	if _has_pickup_order_for_unit(data and data.pickup_orders, pickup_unit) then
+		return true
+	end
+
+	return pickup_unit ~= nil and _pickup_recently_tagged and _pickup_recently_tagged(pickup_unit) == true
 end
 
 local function _assign_ordered_mule_pickups(bot_group, bot_data)

@@ -208,6 +208,11 @@ return {
 						type = "checkbox",
 						default_value = DEFAULTS.enable_bot_tome_pickup,
 					},
+					{
+						setting_id = "pickup_require_tag",
+						type = "checkbox",
+						default_value = DEFAULTS.pickup_require_tag,
+					},
 				},
 			},
 			{

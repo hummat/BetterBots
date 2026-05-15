@@ -22,7 +22,9 @@ local EXPLICIT_SLOT_PICKUPS = {
 }
 local SMART_TAG_SYSTEM_SENTINEL = "__bb_smart_tag_orders_installed"
 local HEALTH_STATION_TAG_VALID_S = 20
+local PICKUP_TAG_VALID_S = 20
 local _health_station_tagged_until = setmetatable({}, { __mode = "k" })
+local _pickup_tagged_until = setmetatable({}, { __mode = "k" })
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -95,6 +97,16 @@ local function _health_station_target(target_unit)
 		and ScriptUnit
 		and ScriptUnit.has_extension
 		and ScriptUnit.has_extension(target_unit, "health_station_system") ~= nil
+end
+
+local function _record_pickup_tag(target_unit, pickup_name)
+	if not (target_unit and pickup_name) then
+		return
+	end
+
+	local fixed_t = _fixed_time and _fixed_time() or 0
+	_pickup_tagged_until[target_unit] = fixed_t + PICKUP_TAG_VALID_S
+	_log("pickup_tag:" .. tostring(target_unit), "pickup smart-tag recorded for bot use: " .. tostring(pickup_name))
 end
 
 local function _side_player_units(unit)
@@ -320,6 +332,9 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 		return false, "health_station_tag_recorded"
 	end
 
+	local pickup_name = target_unit and Unit and Unit.get_data and Unit.get_data(target_unit, "pickup_type") or nil
+	_record_pickup_tag(target_unit, pickup_name)
+
 	if _is_enabled and not _is_enabled() then
 		return false, "feature_disabled"
 	end
@@ -385,6 +400,7 @@ function M.init(deps)
 	_is_enabled = deps.is_enabled
 	_is_host_singleplay = deps.is_host_singleplay
 	_health_station_tagged_until = setmetatable({}, { __mode = "k" })
+	_pickup_tagged_until = setmetatable({}, { __mode = "k" })
 end
 
 function M.wire(refs)
@@ -405,6 +421,22 @@ function M.health_station_recently_tagged(target_unit)
 	end
 
 	_health_station_tagged_until[target_unit] = nil
+
+	return false
+end
+
+function M.pickup_recently_tagged(target_unit)
+	local tagged_until = target_unit and _pickup_tagged_until[target_unit] or nil
+	if not tagged_until then
+		return false
+	end
+
+	local fixed_t = _fixed_time and _fixed_time() or 0
+	if fixed_t <= tagged_until then
+		return true
+	end
+
+	_pickup_tagged_until[target_unit] = nil
 
 	return false
 end
