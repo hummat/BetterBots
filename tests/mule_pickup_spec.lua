@@ -43,6 +43,7 @@ describe("mule_pickup", function()
 	local policy_allow_pickup
 	local policy_block_order
 	local host_singleplay
+	local host_type
 	local has_line_of_sight
 	local require_pickup_tag
 	local tagged_pickups
@@ -86,6 +87,7 @@ describe("mule_pickup", function()
 		policy_allow_pickup = nil
 		policy_block_order = nil
 		host_singleplay = true
+		host_type = nil
 		has_line_of_sight = nil
 		require_pickup_tag = false
 		tagged_pickups = {}
@@ -1045,6 +1047,59 @@ describe("mule_pickup", function()
 			ordering_player = "player",
 		}, result)
 	end)
+
+	it(
+		"applies BotOrder pickup policy in singleplayer host-type sessions when the game-mode host flag is false",
+		function()
+			local hook_require_callbacks = {}
+			local policy_checked = false
+			fake_mod.hook_require = function(_, path, callback)
+				hook_require_callbacks[path] = callback
+			end
+			fake_mod.hook = function(_, target, method_name, handler)
+				local original = target[method_name]
+				target[method_name] = function(...)
+					return handler(original, ...)
+				end
+			end
+			host_singleplay = false
+			host_type = "singleplay"
+			_G.Managers = {
+				multiplayer_session = {
+					host_type = function()
+						return host_type
+					end,
+				},
+			}
+			policy_block_order = function()
+				policy_checked = true
+				return false, nil
+			end
+
+			MulePickup.register_hooks()
+
+			local callback = hook_require_callbacks["scripts/utilities/bot_order"]
+			local BotOrder = {
+				pickup = function(bot_unit, pickup_unit, ordering_player)
+					return {
+						bot_unit = bot_unit,
+						pickup_unit = pickup_unit,
+						ordering_player = ordering_player,
+					}
+				end,
+			}
+			callback(BotOrder)
+
+			local result = BotOrder.pickup("bot", "pickup", "player")
+
+			assert.is_true(policy_checked)
+			assert.same({
+				bot_unit = "bot",
+				pickup_unit = "pickup",
+				ordering_player = "player",
+			}, result)
+		end
+	)
 
 	it("logs actual tome pickup success after a successful pocketable interaction", function()
 		local PocketableInteraction = {

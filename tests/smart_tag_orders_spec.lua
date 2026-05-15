@@ -5,6 +5,7 @@ describe("smart_tag_orders", function()
 	local saved_script_unit = rawget(_G, "ScriptUnit")
 	local saved_unit = rawget(_G, "Unit")
 	local saved_managers = rawget(_G, "Managers")
+	local saved_get_mod = rawget(_G, "get_mod")
 	local saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
 	local saved_alive = rawget(_G, "ALIVE")
 	local saved_health_alive = rawget(_G, "HEALTH_ALIVE")
@@ -27,6 +28,8 @@ describe("smart_tag_orders", function()
 	local hook_require_callbacks
 	local hook_registrations
 	local host_singleplay
+	local host_type
+	local solo_play_active
 	local health_station_tags
 	local smart_tag_orders_enabled
 	local fixed_time
@@ -70,6 +73,8 @@ describe("smart_tag_orders", function()
 		hook_require_callbacks = {}
 		hook_registrations = {}
 		host_singleplay = true
+		host_type = nil
+		solo_play_active = false
 		health_station_tags = {}
 		smart_tag_orders_enabled = true
 		fixed_time = 10
@@ -139,6 +144,11 @@ describe("smart_tag_orders", function()
 		_G.ALIVE = {}
 		_G.HEALTH_ALIVE = {}
 		_G.Managers = {
+			multiplayer_session = {
+				host_type = function()
+					return host_type
+				end,
+			},
 			player = {
 				player_by_unit = function(_, unit)
 					return players_by_unit[unit]
@@ -212,6 +222,17 @@ describe("smart_tag_orders", function()
 				return host_singleplay
 			end,
 		})
+		_G.get_mod = function(mod_name)
+			if mod_name ~= "SoloPlay" then
+				return nil
+			end
+
+			return {
+				is_soloplay = function()
+					return solo_play_active
+				end,
+			}
+		end
 
 		SmartTagOrders.wire({
 			should_block_pickup_order = function()
@@ -248,6 +269,7 @@ describe("smart_tag_orders", function()
 		_G.ScriptUnit = saved_script_unit
 		_G.Unit = saved_unit
 		_G.Managers = saved_managers
+		_G.get_mod = saved_get_mod
 		_G.POSITION_LOOKUP = saved_position_lookup
 		_G.ALIVE = saved_alive
 		_G.HEALTH_ALIVE = saved_health_alive
@@ -462,6 +484,64 @@ describe("smart_tag_orders", function()
 		assert.is_false(handled)
 		assert.equals("not_host_singleplay", reason)
 		assert.equals(0, #pickup_orders)
+	end)
+
+	it("accepts SoloPlay pickup tags when the game-mode host flag is false", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		host_singleplay = false
+		solo_play_active = true
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.equals(1, #pickup_orders)
+	end)
+
+	it("accepts singleplayer host-type pickup tags when the game-mode host flag is false", function()
+		target_unit.pickup_type = "large_clip"
+		pickup_defs.large_clip = {
+			group = "ammo",
+		}
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
+		host_singleplay = false
+		host_type = "singleplay"
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.equals(1, #pickup_orders)
 	end)
 
 	it("keeps ammo smart-tags eligible for grenade refill bots with full reserve ammo", function()

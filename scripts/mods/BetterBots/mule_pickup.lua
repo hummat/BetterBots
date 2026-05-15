@@ -73,11 +73,44 @@ local function _log_mule_pickup_success(interactor_unit, target_unit, pickup_nam
 	)
 end
 
+local function _solo_play_mod_active()
+	local get_mod = rawget(_G, "get_mod")
+	if not get_mod then
+		return false
+	end
+
+	local ok, solo_play_mod = pcall(get_mod, "SoloPlay")
+	if not (ok and solo_play_mod and solo_play_mod.is_soloplay) then
+		return false
+	end
+
+	local active_ok, active = pcall(solo_play_mod.is_soloplay)
+
+	return active_ok and active == true
+end
+
+local function _singleplay_host_type()
+	local multiplayer_session = Managers and Managers.multiplayer_session
+	if not (multiplayer_session and multiplayer_session.host_type) then
+		return false
+	end
+
+	local ok, host_type = pcall(multiplayer_session.host_type, multiplayer_session)
+
+	return ok and (host_type == "singleplay" or host_type == "singleplay_backend_session")
+end
+
 local function _host_singleplay()
 	if _is_host_singleplay then
 		local ok, result = pcall(_is_host_singleplay)
 
-		return ok and result == true
+		if ok and result == true then
+			return true
+		end
+	end
+
+	if _solo_play_mod_active() or _singleplay_host_type() then
+		return true
 	end
 
 	local game_mode_manager = Managers and Managers.state and Managers.state.game_mode

@@ -11,6 +11,44 @@ local function load_module(mod, filename)
 	return module
 end
 
+local function solo_play_mod_active()
+	local get_mod = rawget(_G, "get_mod")
+	if not get_mod then
+		return false
+	end
+
+	local ok, solo_play_mod = pcall(get_mod, "SoloPlay")
+	if not (ok and solo_play_mod and solo_play_mod.is_soloplay) then
+		return false
+	end
+
+	local active_ok, active = pcall(solo_play_mod.is_soloplay)
+
+	return active_ok and active == true
+end
+
+local function singleplay_host_type()
+	local multiplayer_session = Managers and Managers.multiplayer_session
+	if not (multiplayer_session and multiplayer_session.host_type) then
+		return false
+	end
+
+	local ok, host_type = pcall(multiplayer_session.host_type, multiplayer_session)
+
+	return ok and (host_type == "singleplay" or host_type == "singleplay_backend_session")
+end
+
+local function local_solo_session()
+	if solo_play_mod_active() or singleplay_host_type() then
+		return true
+	end
+
+	local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
+	local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil
+
+	return settings and settings.host_singleplay == true or false
+end
+
 function M.load_and_init(ctx)
 	local mod = ctx.mod
 	local modules = {
@@ -667,10 +705,7 @@ function M.load_and_init(ctx)
 			return Settings.is_feature_enabled("smart_tag_orders")
 		end,
 		is_host_singleplay = function()
-			local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
-			local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil
-
-			return settings and settings.host_singleplay == true or false
+			return local_solo_session()
 		end,
 	})
 
@@ -690,10 +725,7 @@ function M.load_and_init(ctx)
 		pickups_require_tag = Settings.pickups_require_tag,
 		pickup_recently_tagged = SmartTagOrders.pickup_recently_tagged,
 		is_host_singleplay = function()
-			local game_mode_manager = Managers and Managers.state and Managers.state.game_mode
-			local settings = game_mode_manager and game_mode_manager.settings and game_mode_manager:settings() or nil
-
-			return settings and settings.host_singleplay == true or false
+			return local_solo_session()
 		end,
 	})
 

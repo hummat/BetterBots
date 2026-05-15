@@ -3,7 +3,7 @@
 ## Current work
 
 ### Unreleased (after v1.1.1)
-- **Hotfix pending**: smart-tag pickup routing and BetterBots pickup-order policy hooks now exit outside `host_singleplay` before touching bot pickup state. This fixes a Nexus report where marking ammo in public/Havoc could call `Ammo.reserve_ammo_is_full` on a dedicated-server client husk visual-loadout extension that lacks `slot_configuration_by_type`, and also hardens the adjacent `BotOrder.pickup` hook against the same public-match leakage class.
+- **Hotfix pending**: smart-tag pickup routing and BetterBots pickup-order policy hooks now exit outside local SoloPlay before touching bot pickup state. The local-session guard consumes SoloPlay's `is_soloplay()` helper and Darktide's `Managers.multiplayer_session:host_type()` (`singleplay` / `singleplay_backend_session`), with `host_singleplay` only as a fallback because real SoloPlay mission logs can leave that game-mode flag false. This fixes a Nexus report where marking ammo in public/Havoc could call `Ammo.reserve_ammo_is_full` on a dedicated-server client husk visual-loadout extension that lacks `slot_configuration_by_type`, and also hardens the adjacent `BotOrder.pickup` hook against the same public-match leakage class.
 - **Defense-in-depth**: `target_selection.slot_weight` now skips its `Ammo.current_slot_percentage("slot_secondary")` lookup when the unit lacks a player-side `visual_loadout_system` extension. The hook is unreachable for husks today (BotPerceptionExtension is `local_init`-only) but the guard removes the latent crash class so a future engine change cannot resurface it.
 
 ## What's shipped
