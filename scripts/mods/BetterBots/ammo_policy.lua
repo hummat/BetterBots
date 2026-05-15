@@ -13,6 +13,8 @@ local _bot_slot_for_unit
 local _nearby_grenade_pickups
 local _is_enabled
 local _pickup_recently_tagged
+local _bot_group_for_unit
+local _write_blackboard_component
 local _human_ammo_scan_cache = {}
 local _human_grenade_scan_cache = {}
 local _last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
@@ -20,6 +22,8 @@ local _last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 local INTERACTION_PATCH_SENTINEL = "__bb_ammo_policy_stop_installed"
 local BEHAVIOR_EXT_PATCH_SENTINEL = "__bb_ammo_policy_behavior_installed"
+local _blackboard_module
+local _warned_blackboard_module_lookup_failure
 
 local PICKUP_BROADPHASE_CATEGORY = {
 	"pickups",
@@ -131,6 +135,50 @@ local function _pickup_has_required_tag(pickup_unit)
 	end
 
 	return pickup_unit ~= nil and _pickup_recently_tagged and _pickup_recently_tagged(pickup_unit) == true
+end
+
+local function _default_bot_group_for_unit(unit)
+	local group_extension = ScriptUnit and ScriptUnit.has_extension and ScriptUnit.has_extension(unit, "group_system")
+	if not (group_extension and group_extension.bot_group) then
+		return nil
+	end
+
+	local ok, bot_group = pcall(group_extension.bot_group, group_extension)
+
+	return ok and bot_group or nil
+end
+
+local function _default_write_blackboard_component(blackboard, component_name)
+	if _blackboard_module == nil then
+		local ok, blackboard_module = pcall(require, "scripts/extension_systems/blackboard/utilities/blackboard")
+		if ok then
+			_blackboard_module = blackboard_module
+		else
+			if not _warned_blackboard_module_lookup_failure and _mod and _mod.warning then
+				_warned_blackboard_module_lookup_failure = true
+				_mod:warning("BetterBots: blackboard utility unavailable; grenade pickup order refresh skipped")
+			end
+			return nil
+		end
+	end
+
+	if _blackboard_module and type(_blackboard_module.write_component) == "function" then
+		return _blackboard_module.write_component(blackboard, component_name)
+	end
+
+	return nil
+end
+
+local function _mark_destination_refresh(unit)
+	local blackboard = BLACKBOARDS and unit and BLACKBOARDS[unit]
+	if not (blackboard and _write_blackboard_component) then
+		return
+	end
+
+	local follow_component = _write_blackboard_component(blackboard, "follow")
+	if follow_component then
+		follow_component.needs_destination_refresh = true
+	end
 end
 
 local function _clear_ammo_pickup_target(pickup_component)
@@ -259,13 +307,21 @@ local function _reserved_grenade_pickup(bot_group, unit)
 
 	if reserved_pickup and bot_data.ammo_pickup_order_unit ~= reserved_pickup then
 		bot_data._bb_reserved_grenade_pickup = nil
+		bot_data._bb_reserved_grenade_pickup_explicit = nil
 		return nil
 	end
 
 	return reserved_pickup
 end
 
-local function _reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance)
+local function _reserve_grenade_pickup(
+	bot_group,
+	unit,
+	pickup_component,
+	grenade_pickup,
+	grenade_distance,
+	explicit_order
+)
 	if not (pickup_component and grenade_pickup) then
 		return
 	end
@@ -278,6 +334,7 @@ local function _reserve_grenade_pickup(bot_group, unit, pickup_component, grenad
 	if bot_data then
 		bot_data.ammo_pickup_order_unit = grenade_pickup
 		bot_data._bb_reserved_grenade_pickup = grenade_pickup
+		bot_data._bb_reserved_grenade_pickup_explicit = explicit_order == true or nil
 	end
 end
 
@@ -299,6 +356,7 @@ local function _clear_reserved_grenade_pickup(bot_group, unit, pickup_component,
 			bot_data.ammo_pickup_order_unit = nil
 		end
 		bot_data._bb_reserved_grenade_pickup = nil
+		bot_data._bb_reserved_grenade_pickup_explicit = nil
 		cleared = true
 	end
 
@@ -326,7 +384,17 @@ local function _clear_reserved_grenade_pickup_if_present(bot_group, unit, pickup
 	return _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup)
 end
 
-local function _reserved_grenade_pickup_still_in_range(pickup_component)
+local function _reserved_grenade_pickup_is_explicit(bot_group, unit)
+	local bot_data = _bot_group_data(bot_group, unit)
+
+	return bot_data and bot_data._bb_reserved_grenade_pickup_explicit == true or false
+end
+
+local function _reserved_grenade_pickup_still_in_range(bot_group, unit, pickup_component)
+	if _reserved_grenade_pickup_is_explicit(bot_group, unit) then
+		return true
+	end
+
 	local pickup_distance = pickup_component and pickup_component.ammo_pickup_distance or math.huge
 
 	return pickup_distance < PICKUP_MAX_FOLLOW_DISTANCE
@@ -480,11 +548,15 @@ function M.init(deps)
 	_nearby_grenade_pickups = deps.nearby_grenade_pickups
 	_is_enabled = deps.is_enabled
 	_pickup_recently_tagged = deps.pickup_recently_tagged
+	_bot_group_for_unit = deps.bot_group_for_unit or _default_bot_group_for_unit
+	_write_blackboard_component = deps.blackboard_write_component or _default_write_blackboard_component
 	_human_ammo_scan_cache = {}
 	_human_grenade_scan_cache = {}
 	_last_ammo_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
 	_last_grenade_skip_log_state_by_unit = setmetatable({}, { __mode = "k" })
 	_last_grenade_pickup_log_state_by_unit = setmetatable({}, { __mode = "k" })
+	_blackboard_module = nil
+	_warned_blackboard_module_lookup_failure = false
 end
 
 function M.install_interaction_hooks(AmmunitionInteraction)
@@ -650,7 +722,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		if grenade_eligible and grenade_current < grenade_max then
 			local grenade_pickup, grenade_distance = _best_nearby_grenade_pickup(bot_group, unit)
 			if not grenade_pickup and reserved_grenade_pickup then
-				if _reserved_grenade_pickup_still_in_range(pickup_component) then
+				if _reserved_grenade_pickup_still_in_range(bot_group, unit, pickup_component) then
 					grenade_pickup = reserved_grenade_pickup
 					grenade_distance = pickup_component.ammo_pickup_distance
 				elseif _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, reserved_grenade_pickup) then
@@ -738,5 +810,53 @@ end
 
 M.all_eligible_humans_above_threshold = _all_eligible_humans_above_threshold
 M.needs_ammo_pickup_for_grenade_refill = _needs_ammo_pickup_for_grenade_refill
+
+function M.can_reserve_grenade_pickup(unit, pickup_unit)
+	if
+		not (pickup_unit and Unit and Unit.get_data and Unit.get_data(pickup_unit, "pickup_type") == "small_grenade")
+	then
+		return false, "not_grenade_pickup"
+	end
+
+	local eligible, current, max, reason = _eligible_for_grenade_pickup(unit)
+	if not eligible then
+		return false, reason
+	end
+
+	if current >= max then
+		return false, "grenade_full"
+	end
+
+	return true, nil
+end
+
+function M.reserve_tagged_grenade_pickup(unit, pickup_unit)
+	local can_reserve, reason = M.can_reserve_grenade_pickup(unit, pickup_unit)
+	if not can_reserve then
+		return false, reason
+	end
+
+	local bot_group = _bot_group_for_unit and _bot_group_for_unit(unit) or nil
+	local bot_data = _bot_group_data(bot_group, unit)
+	local pickup_component = bot_data and bot_data.pickup_component or nil
+	if not pickup_component then
+		return false, "missing_pickup_component"
+	end
+
+	local bot_position = POSITION_LOOKUP and POSITION_LOOKUP[unit]
+	local pickup_position = POSITION_LOOKUP and POSITION_LOOKUP[pickup_unit]
+	local pickup_distance = bot_position
+			and pickup_position
+			and Vector3
+			and Vector3.distance
+			and Vector3.distance(bot_position, pickup_position)
+		or 0
+
+	_reserve_grenade_pickup(bot_group, unit, pickup_component, pickup_unit, pickup_distance, true)
+	pickup_component.needs_ammo = true
+	_mark_destination_refresh(unit)
+
+	return true, nil
+end
 
 return M

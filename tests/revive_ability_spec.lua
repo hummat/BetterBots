@@ -10,6 +10,7 @@ local _suppressed_reason = nil
 local _combat_template_enabled = true
 local _hook_require_callbacks = {}
 local _hook_safe_calls = {}
+local _hook_calls = {}
 local _saved_globals = {}
 
 local _orig_require = require
@@ -141,17 +142,19 @@ local function make_unit_data_ext(template_name, state_name)
 end
 
 local function setup_human_unit(unit, state_name, disabling_type, disabling_unit)
-	_extensions[unit] = {
-		unit_data_system = test_helper.make_player_unit_data_extension({
-			combat_ability_action = { template_name = "none" },
-			character_state = { state_name = state_name or "walking" },
-			disabled_character_state = {
-				is_disabled = disabling_type ~= nil,
-				disabling_type = disabling_type or "none",
-				disabling_unit = disabling_unit,
-			},
-		}),
+	local components = {
+		combat_ability_action = { template_name = "none" },
+		character_state = { state_name = state_name or "walking" },
+		disabled_character_state = {
+			is_disabled = disabling_type ~= nil,
+			disabling_type = disabling_type or "none",
+			disabling_unit = disabling_unit,
+		},
 	}
+	_extensions[unit] = {
+		unit_data_system = test_helper.make_player_unit_data_extension(components),
+	}
+	return components
 end
 
 local _perception_enemy_count = 3
@@ -267,6 +270,9 @@ end
 describe("revive_ability", function()
 	before_each(function()
 		_extensions = {}
+		_hook_require_callbacks = {}
+		_hook_safe_calls = {}
+		_hook_calls = {}
 		init_module()
 	end)
 
@@ -796,6 +802,29 @@ describe("revive_ability", function()
 			assert.is_nil(registered())
 		end)
 
+		it("logs when a disabler rescue clears the disabled ally state", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			local hound = make_unit("hound")
+			local components = setup_human_unit(human, "pounced", "pounced", hound)
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(4)
+			_G.POSITION_LOOKUP[hound] = vec(4.5)
+			_debug_on = true
+
+			local self = make_priority_self(bot, { valid_human_units = { human } })
+
+			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+			components.character_state.state_name = "walking"
+			components.disabled_character_state.is_disabled = false
+			components.disabled_character_state.disabling_type = "none"
+			components.disabled_character_state.disabling_unit = nil
+			assert.is_true(ReviveAbility.apply_human_revive_priority(self, bot))
+
+			assert.matches("rescue disabled state cleared", _debug_logs[#_debug_logs].message)
+			assert.matches("need_type=pounced", _debug_logs[#_debug_logs].message)
+		end)
+
 		it("prioritizes disablers for hard-disabled allies that cannot be interact-rescued", function()
 			local cases = {
 				{ disabling_type = "pounced", enemy = "hound" },
@@ -1062,12 +1091,16 @@ describe("revive_ability", function()
 	end)
 
 	describe("register_hooks", function()
-		it("wraps BtBotInteractAction.enter and runs pre-revive logic", function()
-			local unit = make_unit("bot_1")
-			local blackboard = make_blackboard()
-			local fake_mod = {
+		local function make_hooking_mod()
+			return {
 				echo = function() end,
-				hook = function() end,
+				hook = function(_, target, method, handler)
+					_hook_calls[#_hook_calls + 1] = { target = target, method = method, handler = handler }
+					local original = target[method]
+					target[method] = function(self, ...)
+						return handler(original, self, ...)
+					end
+				end,
 				hook_safe = function(_, target, method, handler)
 					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
 				end,
@@ -1075,7 +1108,9 @@ describe("revive_ability", function()
 					_hook_require_callbacks[path] = callback
 				end,
 			}
+		end
 
+		local function init_with_mod(fake_mod, opts)
 			ReviveAbility.init({
 				mod = fake_mod,
 				debug_log = function(key, fixed_t, message)
@@ -1107,6 +1142,9 @@ describe("revive_ability", function()
 				},
 				Debug = {
 					bot_slot_for_unit = function()
+						if opts and opts.bot_slot_for_unit then
+							return opts.bot_slot_for_unit()
+						end
 						return 1
 					end,
 				},
@@ -1114,6 +1152,14 @@ describe("revive_ability", function()
 					return true
 				end,
 			})
+		end
+
+		it("wraps BtBotInteractAction.enter and runs pre-revive logic", function()
+			local unit = make_unit("bot_1")
+			local blackboard = make_blackboard()
+			local fake_mod = make_hooking_mod()
+
+			init_with_mod(fake_mod)
 			setup_unit(unit, "ogryn_taunt_shout")
 			_ability_templates.ogryn_taunt_shout = {
 				ability_meta_data = {
@@ -1146,55 +1192,9 @@ describe("revive_ability", function()
 		end)
 
 		it("does not register a BotBehaviorExtension hook_require via register_hooks", function()
-			local fake_mod = {
-				echo = function() end,
-				hook = function() end,
-				hook_safe = function(_, target, method, handler)
-					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
-				end,
-				hook_require = function(_, path, callback)
-					_hook_require_callbacks[path] = callback
-				end,
-			}
+			local fake_mod = make_hooking_mod()
 
-			ReviveAbility.init({
-				mod = fake_mod,
-				debug_log = function(key, fixed_t, message)
-					_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
-				end,
-				debug_enabled = function()
-					return true
-				end,
-				fixed_time = function()
-					return 100
-				end,
-				is_suppressed = function()
-					return false
-				end,
-				equipped_combat_ability_name = function()
-					return "test_ability"
-				end,
-				fallback_state_by_unit = _fallback_state,
-				perf = nil,
-				shared_rules = SharedRules,
-				combat_ability_identity = CombatAbilityIdentity,
-			})
-			ReviveAbility.wire({
-				MetaData = { inject = function() end },
-				EventLog = {
-					is_enabled = function()
-						return false
-					end,
-				},
-				Debug = {
-					bot_slot_for_unit = function()
-						return 1
-					end,
-				},
-				is_combat_template_enabled = function()
-					return true
-				end,
-			})
+			init_with_mod(fake_mod)
 
 			ReviveAbility.register_hooks()
 
@@ -1202,58 +1202,32 @@ describe("revive_ability", function()
 			assert.is_function(ReviveAbility.on_refresh_destination)
 		end)
 
+		it("registers source-backed success hooks for every direct rescue interaction", function()
+			local fake_mod = make_hooking_mod()
+			init_with_mod(fake_mod)
+
+			ReviveAbility.register_hooks()
+
+			assert.is_function(
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/revive_interaction"]
+			)
+			assert.is_function(
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/remove_net_interaction"]
+			)
+			assert.is_function(
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/pull_up_interaction"]
+			)
+			assert.is_function(
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/rescue_interaction"]
+			)
+		end)
+
 		it("is idempotent when the hook_require callback fires twice on the same BtBotInteractAction", function()
 			local unit = make_unit("bot_1")
 			local blackboard = make_blackboard()
-			local fake_mod = {
-				echo = function() end,
-				hook = function() end,
-				hook_safe = function(_, target, method, handler)
-					_hook_safe_calls[#_hook_safe_calls + 1] = { target = target, method = method, handler = handler }
-				end,
-				hook_require = function(_, path, callback)
-					_hook_require_callbacks[path] = callback
-				end,
-			}
+			local fake_mod = make_hooking_mod()
 
-			ReviveAbility.init({
-				mod = fake_mod,
-				debug_log = function(key, fixed_t, message)
-					_debug_logs[#_debug_logs + 1] = { key = key, fixed_t = fixed_t, message = message }
-				end,
-				debug_enabled = function()
-					return true
-				end,
-				fixed_time = function()
-					return 100
-				end,
-				is_suppressed = function()
-					return false
-				end,
-				equipped_combat_ability_name = function()
-					return "test_ability"
-				end,
-				fallback_state_by_unit = _fallback_state,
-				perf = nil,
-				shared_rules = SharedRules,
-				combat_ability_identity = CombatAbilityIdentity,
-			})
-			ReviveAbility.wire({
-				MetaData = { inject = function() end },
-				EventLog = {
-					is_enabled = function()
-						return false
-					end,
-				},
-				Debug = {
-					bot_slot_for_unit = function()
-						return 1
-					end,
-				},
-				is_combat_template_enabled = function()
-					return true
-				end,
-			})
+			init_with_mod(fake_mod)
 			setup_unit(unit, "ogryn_taunt_shout")
 			_ability_templates.ogryn_taunt_shout = {
 				ability_meta_data = {
@@ -1277,6 +1251,99 @@ describe("revive_ability", function()
 			fake_action.enter(fake_action, unit, nil, blackboard, {}, { interaction_type = "revive" }, 0)
 
 			assert.equals(1, #_recorded_inputs)
+		end)
+
+		it("logs successful rescue interactions from the interaction stop hook", function()
+			local fake_mod = make_hooking_mod()
+			local bot = make_unit("bot_1")
+			local target = make_unit("human_1")
+			init_with_mod(fake_mod)
+
+			ReviveAbility.register_hooks()
+			local revive_require =
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/revive_interaction"]
+			assert.is_not_nil(revive_require)
+
+			local stop_called = 0
+			local fake_interaction = {
+				stop = function(_self, _world, interactor_unit, component, _t, result, is_server)
+					stop_called = stop_called + 1
+					assert.equals(bot, interactor_unit)
+					assert.equals(target, component.target_unit)
+					assert.equals("success", result)
+					assert.is_true(is_server)
+					return "orig_stop"
+				end,
+			}
+			revive_require(fake_interaction)
+
+			local result =
+				fake_interaction.stop(fake_interaction, nil, bot, { target_unit = target }, 123, "success", true)
+
+			assert.equals("orig_stop", result)
+			assert.equals(1, stop_called)
+			assert.equals(1, #_hook_calls)
+			assert.equals("stop", _hook_calls[1].method)
+			assert.equals(1, #_debug_logs)
+			assert.matches("rescue interaction succeeded", _debug_logs[1].message)
+			assert.matches("interaction=revive", _debug_logs[1].message)
+		end)
+
+		it("does not log rescue success for cancelled interactions", function()
+			local fake_mod = make_hooking_mod()
+			local bot = make_unit("bot_1")
+			local target = make_unit("human_1")
+			init_with_mod(fake_mod)
+
+			ReviveAbility.register_hooks()
+			local revive_require =
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/revive_interaction"]
+			local fake_interaction = {
+				stop = function()
+					return "orig_stop"
+				end,
+			}
+			revive_require(fake_interaction)
+
+			local result = fake_interaction.stop(
+				fake_interaction,
+				nil,
+				bot,
+				{ target_unit = target },
+				123,
+				"interaction_cancelled",
+				true
+			)
+
+			assert.equals("orig_stop", result)
+			assert.equals(0, #_debug_logs)
+		end)
+
+		it("does not log rescue success for human interactors", function()
+			local fake_mod = make_hooking_mod()
+			local human = make_unit("human_rescuer")
+			local target = make_unit("human_1")
+			init_with_mod(fake_mod, {
+				bot_slot_for_unit = function()
+					return nil
+				end,
+			})
+
+			ReviveAbility.register_hooks()
+			local revive_require =
+				_hook_require_callbacks["scripts/extension_systems/interaction/interactions/revive_interaction"]
+			local fake_interaction = {
+				stop = function()
+					return "orig_stop"
+				end,
+			}
+			revive_require(fake_interaction)
+
+			local result =
+				fake_interaction.stop(fake_interaction, nil, human, { target_unit = target }, 123, "success", true)
+
+			assert.equals("orig_stop", result)
+			assert.equals(0, #_debug_logs)
 		end)
 	end)
 end)

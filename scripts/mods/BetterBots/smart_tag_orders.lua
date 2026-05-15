@@ -10,6 +10,8 @@ local _is_host_singleplay
 local _should_block_pickup_order
 local _needs_ammo_pickup
 local _record_health_station_tag
+local _can_reserve_grenade_pickup
+local _reserve_grenade_pickup
 
 local SUPPORTED_SLOT_NAMES = {
 	slot_pocketable = true,
@@ -25,6 +27,7 @@ local HEALTH_STATION_TAG_VALID_S = 20
 local PICKUP_TAG_VALID_S = 20
 local _health_station_tagged_until = setmetatable({}, { __mode = "k" })
 local _pickup_tagged_until = setmetatable({}, { __mode = "k" })
+local _set_tag_dispatch_suppression = 0
 
 local function _log(key, message)
 	if not (_debug_enabled and _debug_enabled()) then
@@ -167,7 +170,10 @@ local function _classify_pickup_target(target_unit)
 	end
 
 	if pickup_name == "small_grenade" then
-		return nil, "unsupported_grenade_pickup"
+		return {
+			family = "grenade",
+			pickup_name = pickup_name,
+		}
 	end
 
 	local pickup_settings = _pickups_registry().by_name[pickup_name]
@@ -280,6 +286,14 @@ local function _eligible_bot_for_family(bot_unit, descriptor)
 		return true, nil
 	end
 
+	if descriptor.family == "grenade" then
+		if not _can_reserve_grenade_pickup then
+			return false, "grenade_reservation_unavailable"
+		end
+
+		return _can_reserve_grenade_pickup(bot_unit, descriptor.pickup_unit)
+	end
+
 	return false, "unsupported_family"
 end
 
@@ -361,6 +375,7 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 	if not descriptor then
 		return false, classify_reason
 	end
+	descriptor.pickup_unit = target_unit
 
 	if descriptor.family == "slot_order" and _should_block_pickup_order then
 		local blocked, block_reason = _should_block_pickup_order(target_unit)
@@ -393,7 +408,25 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 		return false, select_reason
 	end
 
-	_bot_order_module().pickup(bot_unit, target_unit, ordering_player)
+	if descriptor.family == "grenade" then
+		local reserved, reserve_reason
+		if _reserve_grenade_pickup then
+			reserved, reserve_reason = _reserve_grenade_pickup(bot_unit, target_unit)
+		end
+		if not reserved then
+			_log(
+				"smart_tag_order_reject:" .. tostring(target_unit),
+				"smart-tag pickup ignored for "
+					.. tostring(descriptor.pickup_name)
+					.. " (reason="
+					.. tostring(reserve_reason or "grenade_reservation_failed")
+					.. ")"
+			)
+			return false, reserve_reason or "grenade_reservation_failed"
+		end
+	else
+		_bot_order_module().pickup(bot_unit, target_unit, ordering_player)
+	end
 
 	_log(
 		"smart_tag_order_accept:" .. tostring(target_unit),
@@ -434,12 +467,15 @@ function M.init(deps)
 	_is_host_singleplay = deps.is_host_singleplay
 	_health_station_tagged_until = setmetatable({}, { __mode = "k" })
 	_pickup_tagged_until = setmetatable({}, { __mode = "k" })
+	_set_tag_dispatch_suppression = 0
 end
 
 function M.wire(refs)
 	_should_block_pickup_order = refs.should_block_pickup_order
 	_needs_ammo_pickup = refs.needs_ammo_pickup
 	_record_health_station_tag = refs.record_health_station_tag
+	_can_reserve_grenade_pickup = refs.can_reserve_grenade_pickup
+	_reserve_grenade_pickup = refs.reserve_grenade_pickup
 end
 
 function M.health_station_recently_tagged(target_unit)
@@ -481,6 +517,20 @@ local function _dispatch_from_hook(interactor_unit, target_unit, optional_altern
 	end
 end
 
+local function _call_with_set_tag_dispatch_suppressed(callback)
+	_set_tag_dispatch_suppression = _set_tag_dispatch_suppression + 1
+
+	local ok, result_a, result_b, result_c, result_d, result_e = pcall(callback)
+
+	_set_tag_dispatch_suppression = math.max(0, _set_tag_dispatch_suppression - 1)
+
+	if not ok then
+		error(result_a, 0)
+	end
+
+	return result_a, result_b, result_c, result_d, result_e
+end
+
 function M.register_hooks()
 	_mod:hook_require("scripts/extension_systems/smart_tag/smart_tag_system", function(SmartTagSystem)
 		if not SmartTagSystem or rawget(SmartTagSystem, SMART_TAG_SYSTEM_SENTINEL) then
@@ -496,7 +546,11 @@ function M.register_hooks()
 				function(func, self, template_name, tagger_unit, target_unit, target_location)
 					local result = func(self, template_name, tagger_unit, target_unit, target_location)
 
-					_record_tag_permission(tagger_unit, target_unit)
+					if _set_tag_dispatch_suppression > 0 then
+						_record_tag_permission(tagger_unit, target_unit)
+					else
+						_dispatch_from_hook(tagger_unit, target_unit, nil)
+					end
 
 					return result
 				end
@@ -508,7 +562,9 @@ function M.register_hooks()
 				SmartTagSystem,
 				"set_contextual_unit_tag",
 				function(func, self, tagger_unit, target_unit, alternate)
-					local result = func(self, tagger_unit, target_unit, alternate)
+					local result = _call_with_set_tag_dispatch_suppressed(function()
+						return func(self, tagger_unit, target_unit, alternate)
+					end)
 
 					_dispatch_from_hook(tagger_unit, target_unit, alternate)
 
@@ -523,7 +579,9 @@ function M.register_hooks()
 				"trigger_tag_interaction",
 				function(func, self, tag_id, interactor_unit, target_unit, optional_alternate)
 					local dispatch_target_unit = target_unit or _target_unit_by_tag_id(self, tag_id)
-					local result = func(self, tag_id, interactor_unit, target_unit, optional_alternate)
+					local result = _call_with_set_tag_dispatch_suppressed(function()
+						return func(self, tag_id, interactor_unit, target_unit, optional_alternate)
+					end)
 
 					_dispatch_from_hook(interactor_unit, dispatch_target_unit, optional_alternate)
 

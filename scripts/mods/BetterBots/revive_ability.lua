@@ -20,7 +20,9 @@ local _action_input_is_bot_queueable
 local _combat_ability_identity
 
 local INTERACT_ACTION_PATCH_SENTINEL = "__bb_revive_ability_installed"
+local INTERACTION_SUCCESS_PATCH_SENTINEL = "__bb_rescue_success_installed"
 local _human_revive_priority_by_bot = setmetatable({}, { __mode = "k" })
+local _human_revive_need_type_by_bot = setmetatable({}, { __mode = "k" })
 local _human_revive_owner_by_target = setmetatable({}, { __mode = "k" })
 local _rescue_disabler_priority_by_bot = setmetatable({}, { __mode = "k" })
 
@@ -43,6 +45,32 @@ local RESCUE_INTERACTION_BY_NEED_TYPE = {
 	netted = "remove_net",
 	ledge = "pull_up",
 	hogtied = "rescue",
+}
+
+local RESCUE_NEED_BY_INTERACTION_TYPE = {
+	revive = "knocked_down",
+	remove_net = "netted",
+	pull_up = "ledge",
+	rescue = "hogtied",
+}
+
+local RESCUE_INTERACTION_HOOK_PATHS = {
+	{
+		path = "scripts/extension_systems/interaction/interactions/revive_interaction",
+		interaction_type = "revive",
+	},
+	{
+		path = "scripts/extension_systems/interaction/interactions/remove_net_interaction",
+		interaction_type = "remove_net",
+	},
+	{
+		path = "scripts/extension_systems/interaction/interactions/pull_up_interaction",
+		interaction_type = "pull_up",
+	},
+	{
+		path = "scripts/extension_systems/interaction/interactions/rescue_interaction",
+		interaction_type = "rescue",
+	},
 }
 
 local ATTACK_RESCUE_DISABLING_TYPES = {
@@ -276,12 +304,14 @@ end
 
 local function _clear_human_revive_priority(unit, behavior_component, perception_component, follow_component)
 	local previous_target = _human_revive_priority_by_bot[unit]
+	local previous_need_type = _human_revive_need_type_by_bot[unit]
 	local previous_disabler = _rescue_disabler_priority_by_bot[unit]
 	if not previous_target then
 		return false
 	end
 
 	_human_revive_priority_by_bot[unit] = nil
+	_human_revive_need_type_by_bot[unit] = nil
 	_rescue_disabler_priority_by_bot[unit] = nil
 	local lease = _human_revive_owner_by_target[previous_target]
 	if lease and lease.unit == unit then
@@ -316,6 +346,19 @@ local function _clear_human_revive_priority(unit, behavior_component, perception
 	end
 	if follow_component then
 		follow_component.needs_destination_refresh = true
+	end
+
+	if previous_disabler and _debug_enabled and _debug_enabled() and not _rescue_need_type(previous_target) then
+		_debug_log(
+			"rescue_disabled_clear:" .. tostring(unit) .. ":" .. tostring(previous_target),
+			_fixed_time(),
+			"["
+				.. _format_bot_id(unit)
+				.. "] rescue disabled state cleared: target="
+				.. tostring(previous_target)
+				.. " need_type="
+				.. tostring(previous_need_type)
+		)
 	end
 
 	return true
@@ -471,6 +514,7 @@ function M.apply_human_revive_priority(self, unit)
 	end
 
 	_human_revive_priority_by_bot[unit] = target_ally
+	_human_revive_need_type_by_bot[unit] = need_type
 	_rescue_disabler_priority_by_bot[unit] = disabler_unit
 	_claim_human_revive_owner(unit, target_ally)
 
@@ -785,6 +829,50 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	return true
 end
 
+function M.install_interaction_success_hooks(Interaction, interaction_type)
+	if not Interaction or rawget(Interaction, INTERACTION_SUCCESS_PATCH_SENTINEL) then
+		return
+	end
+
+	Interaction[INTERACTION_SUCCESS_PATCH_SENTINEL] = true
+
+	_mod:hook(
+		Interaction,
+		"stop",
+		function(func, self, world, interactor_unit, unit_data_component, t, result, is_server)
+			local target_unit = unit_data_component and unit_data_component.target_unit or nil
+			local stop_result = func(self, world, interactor_unit, unit_data_component, t, result, is_server)
+
+			if _debug_enabled and _debug_enabled() and is_server and result == "success" then
+				local bot_slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(interactor_unit)
+				if not bot_slot then
+					return stop_result
+				end
+
+				_debug_log(
+					"rescue_interaction_success:"
+						.. tostring(interactor_unit)
+						.. ":"
+						.. tostring(target_unit)
+						.. ":"
+						.. tostring(interaction_type),
+					_fixed_time(),
+					"["
+						.. _format_bot_id(interactor_unit)
+						.. "] rescue interaction succeeded: target="
+						.. tostring(target_unit)
+						.. " need_type="
+						.. tostring(RESCUE_NEED_BY_INTERACTION_TYPE[interaction_type])
+						.. " interaction="
+						.. tostring(interaction_type)
+				)
+			end
+
+			return stop_result
+		end
+	)
+end
+
 function M.register_hooks()
 	_mod:hook_require(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action",
@@ -816,6 +904,15 @@ function M.register_hooks()
 			end
 		end
 	)
+
+	for i = 1, #RESCUE_INTERACTION_HOOK_PATHS do
+		local hook = RESCUE_INTERACTION_HOOK_PATHS[i]
+		local path = hook.path
+		local interaction_type = hook.interaction_type
+		_mod:hook_require(path, function(Interaction)
+			M.install_interaction_success_hooks(Interaction, interaction_type)
+		end)
+	end
 end
 
 -- Called from the consolidated _refresh_destination hook_safe in BetterBots.lua.

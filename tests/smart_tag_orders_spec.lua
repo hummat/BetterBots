@@ -14,6 +14,7 @@ describe("smart_tag_orders", function()
 	local pickup_defs
 	local ammo_full_by_unit
 	local grenade_refill_by_unit
+	local grenade_reservations
 	local unit_alive_by_unit
 	local players_by_unit
 	local inventories_by_unit
@@ -55,6 +56,7 @@ describe("smart_tag_orders", function()
 		pickup_defs = {}
 		ammo_full_by_unit = {}
 		grenade_refill_by_unit = {}
+		grenade_reservations = {}
 		unit_alive_by_unit = {}
 		players_by_unit = {}
 		inventories_by_unit = {}
@@ -213,6 +215,17 @@ describe("smart_tag_orders", function()
 			end,
 			record_health_station_tag = function(unit)
 				health_station_tags[#health_station_tags + 1] = unit
+			end,
+			can_reserve_grenade_pickup = function(unit, _pickup_unit)
+				return grenade_refill_by_unit[unit] == true, "grenade_full"
+			end,
+			reserve_grenade_pickup = function(unit, pickup_unit)
+				grenade_reservations[#grenade_reservations + 1] = {
+					bot_unit = unit,
+					pickup_unit = pickup_unit,
+				}
+
+				return true
 			end,
 		})
 	end
@@ -448,18 +461,32 @@ describe("smart_tag_orders", function()
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
-	it("ignores unsupported grenade pickup families safely", function()
+	it("routes explicit grenade refill tags through the grenade pickup lane", function()
 		target_unit.pickup_type = "small_grenade"
 		players_by_unit[human_unit] = {
 			is_human_controlled = function()
 				return true
 			end,
 		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one }
+		grenade_refill_by_unit[bot_one] = true
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
 
-		local handled, reason = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
 
-		assert.is_false(handled)
-		assert.equals("unsupported_grenade_pickup", reason)
+		assert.is_true(handled)
+		assert.equals(bot_one, selected_bot)
+		assert.same({
+			bot_unit = bot_one,
+			pickup_unit = target_unit,
+		}, grenade_reservations[1])
 		assert.equals(0, #pickup_orders)
 	end)
 
@@ -790,6 +817,7 @@ describe("smart_tag_orders", function()
 			tagged_unit = target_unit,
 			alternate = nil,
 		}, result)
+		assert.equals(1, #pickup_orders)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
@@ -842,10 +870,11 @@ describe("smart_tag_orders", function()
 			tagged_unit = target_unit,
 			alternate = nil,
 		}, result)
+		assert.equals(1, #pickup_orders)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
-	it("records direct set_tag pickup tags for strict pickup mode", function()
+	it("routes direct set_tag pickup tags through pickup orders", function()
 		target_unit.pickup_type = "large_clip"
 		pickup_defs.large_clip = {
 			group = "ammo",
@@ -855,6 +884,15 @@ describe("smart_tag_orders", function()
 				return true
 			end,
 		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one }
+		_G.ALIVE[bot_one] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 8, y = 0, z = 0 }
 
 		SmartTagOrders.register_hooks()
 
@@ -883,6 +921,8 @@ describe("smart_tag_orders", function()
 			target_location = nil,
 		}, result)
 		assert.is_true(SmartTagOrders.pickup_recently_tagged(target_unit))
+		assert.equals(1, #pickup_orders)
+		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 
 	it("resolves already-tagged marker interactions from tag id when target unit is omitted", function()
@@ -941,6 +981,7 @@ describe("smart_tag_orders", function()
 			tagged_unit = nil,
 			alternate = nil,
 		}, result)
+		assert.equals(1, #pickup_orders)
 		assert.equals(bot_one, pickup_orders[1].bot_unit)
 	end)
 

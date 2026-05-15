@@ -709,6 +709,8 @@ function M.load_and_init(ctx)
 					and AmmoPolicy.needs_ammo_pickup_for_grenade_refill(unit)
 				)
 		end,
+		can_reserve_grenade_pickup = AmmoPolicy.can_reserve_grenade_pickup,
+		reserve_grenade_pickup = AmmoPolicy.reserve_tagged_grenade_pickup,
 	})
 
 	Settings.wire({

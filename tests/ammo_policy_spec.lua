@@ -5,16 +5,28 @@ describe("ammo_policy", function()
 	local captured_hook_require = {}
 	local debug_logs
 	local saved_unit
+	local saved_script_unit
+	local saved_position_lookup
+	local saved_vector3
+	local saved_blackboards
 
 	before_each(function()
 		update_hook = nil
 		captured_hook_require = {}
 		debug_logs = {}
 		saved_unit = rawget(_G, "Unit")
+		saved_script_unit = rawget(_G, "ScriptUnit")
+		saved_position_lookup = rawget(_G, "POSITION_LOOKUP")
+		saved_vector3 = rawget(_G, "Vector3")
+		saved_blackboards = rawget(_G, "BLACKBOARDS")
 	end)
 
 	after_each(function()
 		_G.Unit = saved_unit
+		_G.ScriptUnit = saved_script_unit
+		_G.POSITION_LOOKUP = saved_position_lookup
+		_G.Vector3 = saved_vector3
+		_G.BLACKBOARDS = saved_blackboards
 	end)
 
 	local function install_module(overrides)
@@ -55,6 +67,8 @@ describe("ammo_policy", function()
 			com_wheel = overrides and overrides.com_wheel,
 			is_enabled = overrides and overrides.is_enabled,
 			pickup_recently_tagged = overrides and overrides.pickup_recently_tagged,
+			bot_group_for_unit = overrides and overrides.bot_group_for_unit,
+			blackboard_write_component = overrides and overrides.blackboard_write_component,
 		})
 	end
 
@@ -1134,6 +1148,91 @@ describe("ammo_policy", function()
 		assert.equals(math.huge, self._pickup_component.ammo_pickup_valid_until)
 		assert.is_true(self._pickup_component.needs_ammo)
 		assert.equals("small_grenade_pickup", bot_group._bot_data.bot1.ammo_pickup_order_unit)
+	end)
+
+	it("reserves tagged grenade pickup orders for eligible grenade bots", function()
+		local follow_component = {}
+		local pickup_component = {
+			needs_ammo = false,
+			ammo_pickup = nil,
+			ammo_pickup_distance = math.huge,
+			ammo_pickup_valid_until = -math.huge,
+		}
+		local bot_group = {
+			_bot_data = {
+				bot1 = {
+					ammo_pickup_order_unit = nil,
+					pickup_component = pickup_component,
+				},
+			},
+		}
+
+		_G.Unit = {
+			get_data = function(unit, field_name)
+				if unit == "small_grenade_pickup" and field_name == "pickup_type" then
+					return "small_grenade"
+				end
+			end,
+		}
+		_G.POSITION_LOOKUP = {
+			bot1 = { x = 1, y = 0, z = 0 },
+			small_grenade_pickup = { x = 4, y = 0, z = 0 },
+		}
+		_G.Vector3 = {
+			distance = function(a, b)
+				return math.abs(a.x - b.x)
+			end,
+		}
+
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 1
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 0
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+					}
+				end
+			end,
+			bot_group_for_unit = function(unit)
+				assert.equals("bot1", unit)
+				return bot_group
+			end,
+			blackboard_write_component = function(blackboard, component_name)
+				assert.equals("follow", component_name)
+				assert.same({ unit = "bot1" }, blackboard)
+				return follow_component
+			end,
+		})
+		_G.BLACKBOARDS = {
+			bot1 = { unit = "bot1" },
+		}
+
+		local reserved, reason = AmmoPolicy.reserve_tagged_grenade_pickup("bot1", "small_grenade_pickup")
+
+		assert.is_true(reserved)
+		assert.is_nil(reason)
+		assert.equals("small_grenade_pickup", pickup_component.ammo_pickup)
+		assert.equals(3, pickup_component.ammo_pickup_distance)
+		assert.equals(math.huge, pickup_component.ammo_pickup_valid_until)
+		assert.is_true(pickup_component.needs_ammo)
+		assert.equals("small_grenade_pickup", bot_group._bot_data.bot1.ammo_pickup_order_unit)
+		assert.equals("small_grenade_pickup", bot_group._bot_data.bot1._bb_reserved_grenade_pickup)
+		assert.is_true(bot_group._bot_data.bot1._bb_reserved_grenade_pickup_explicit)
+		assert.is_true(follow_component.needs_destination_refresh)
 	end)
 
 	it("blocks nearby grenade pickup when strict pickup tags are required and the pickup is untagged", function()
