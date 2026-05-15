@@ -50,6 +50,28 @@ local HUMAN_REVIVE_OWNER_LEASE = 3
 
 local M = {}
 
+local function _patch_priority_shoot_action_data()
+	local ok, bot_actions = pcall(require, "scripts/settings/breed/breed_actions/bot_actions")
+	if not ok or type(bot_actions) ~= "table" then
+		return false
+	end
+
+	local shoot_action = bot_actions.shoot
+	local priority_action = bot_actions.shoot_priority_target
+	if
+		type(shoot_action) ~= "table"
+		or type(priority_action) ~= "table"
+		or priority_action.aim_speed ~= nil
+		or type(shoot_action.aim_speed) ~= "table"
+	then
+		return false
+	end
+
+	priority_action.aim_speed = shoot_action.aim_speed
+
+	return true
+end
+
 function M.init(deps)
 	assert(deps.combat_ability_identity, "revive_ability: combat_ability_identity dep required")
 	_mod = deps.mod
@@ -64,6 +86,7 @@ function M.init(deps)
 	local shared_rules = deps.shared_rules or {}
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_combat_ability_identity = deps.combat_ability_identity
+	_patch_priority_shoot_action_data()
 end
 
 function M.wire(deps)

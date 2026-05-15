@@ -14,9 +14,13 @@ local _saved_globals = {}
 
 local _orig_require = require
 local _ability_templates = {}
+local _bot_actions = {}
 local function _mock_require(path)
 	if path == "scripts/settings/ability/ability_templates/ability_templates" then
 		return _ability_templates
+	end
+	if path == "scripts/settings/breed/breed_actions/bot_actions" then
+		return _bot_actions
 	end
 	if path:match("^scripts/") then
 		return {}
@@ -192,6 +196,13 @@ local function init_module(opts)
 	_suppressed_reason = nil
 	_combat_template_enabled = true
 	_fixed_t = 100
+	_bot_actions = opts and opts.bot_actions
+		or {
+			shoot = {
+				aim_speed = { 10, 10, 12, 20, 20 },
+			},
+			shoot_priority_target = {},
+		}
 
 	ReviveAbility.init({
 		mod = {
@@ -264,6 +275,26 @@ describe("revive_ability", function()
 		assert.is_function(ReviveAbility.init)
 		assert.is_function(ReviveAbility.wire)
 		assert.is_function(ReviveAbility.try_pre_revive)
+	end)
+
+	it("patches priority shooting with vanilla aim speed metadata", function()
+		assert.equals(_bot_actions.shoot.aim_speed, _bot_actions.shoot_priority_target.aim_speed)
+	end)
+
+	it("does not overwrite priority shooting aim speed when vanilla provides it", function()
+		local vanilla_priority_aim_speed = { 8, 8, 10, 12, 12 }
+		init_module({
+			bot_actions = {
+				shoot = {
+					aim_speed = { 10, 10, 12, 20, 20 },
+				},
+				shoot_priority_target = {
+					aim_speed = vanilla_priority_aim_speed,
+				},
+			},
+		})
+
+		assert.equals(vanilla_priority_aim_speed, _bot_actions.shoot_priority_target.aim_speed)
 	end)
 
 	describe("try_pre_revive", function()
