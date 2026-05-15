@@ -404,6 +404,7 @@ function M.apply_human_revive_priority(self, unit)
 
 	if _debug_enabled and _debug_enabled() then
 		local reason = target_kind == "human" and ally_count == 1 and "mission_critical" or "ally_rescue"
+		local mode = disabler_unit and "disabler" or "interaction"
 		_debug_log(
 			"human_revive_priority:" .. tostring(unit) .. ":" .. tostring(target_ally),
 			_fixed_time(),
@@ -413,6 +414,12 @@ function M.apply_human_revive_priority(self, unit)
 				.. tostring(target_ally)
 				.. " reason="
 				.. reason
+				.. " need_type="
+				.. tostring(need_type)
+				.. " mode="
+				.. mode
+				.. " target_kind="
+				.. tostring(target_kind)
 				.. " distance="
 				.. tostring(distance)
 				.. (disabler_unit and " disabler=" .. tostring(disabler_unit) or "")

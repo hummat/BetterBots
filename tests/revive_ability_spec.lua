@@ -729,6 +729,7 @@ describe("revive_ability", function()
 			_G.POSITION_LOOKUP[bot] = vec(0)
 			_G.POSITION_LOOKUP[human] = vec(4)
 			_G.POSITION_LOOKUP[hound] = vec(4.5)
+			_debug_on = true
 
 			local self, registered = make_priority_self(bot, { valid_human_units = { human } })
 
@@ -741,6 +742,9 @@ describe("revive_ability", function()
 			assert.equals(hound, self._perception_component.target_enemy)
 			assert.equals(hound, self._perception_component.priority_target_enemy)
 			assert.equals(hound, self._perception_component.urgent_target_enemy)
+			assert.truthy(
+				string.find(_debug_logs[1].message, "need_type=pounced mode=disabler target_kind=human", 1, true)
+			)
 			assert.is_nil(registered())
 		end)
 

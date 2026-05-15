@@ -1000,6 +1000,7 @@ describe("smart_tag_orders", function()
 		assert.is_function(callback)
 
 		local target = {
+			set_tag = function() end,
 			set_contextual_unit_tag = function() end,
 			trigger_tag_interaction = function() end,
 		}
@@ -1007,10 +1008,12 @@ describe("smart_tag_orders", function()
 		callback(target)
 		callback(target)
 
-		assert.equals(2, #hook_registrations)
+		assert.equals(3, #hook_registrations)
 		assert.equals(target, hook_registrations[1].target)
-		assert.equals("set_contextual_unit_tag", hook_registrations[1].method)
+		assert.equals("set_tag", hook_registrations[1].method)
 		assert.equals(target, hook_registrations[2].target)
-		assert.equals("trigger_tag_interaction", hook_registrations[2].method)
+		assert.equals("set_contextual_unit_tag", hook_registrations[2].method)
+		assert.equals(target, hook_registrations[3].target)
+		assert.equals("trigger_tag_interaction", hook_registrations[3].method)
 	end)
 end)
