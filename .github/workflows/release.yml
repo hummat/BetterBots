@@ -23,7 +23,7 @@ jobs:
       - name: Install Lua tooling
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq lua5.4 liblua5.4-dev luarocks
+          sudo apt-get install -y -qq lua5.4 liblua5.4-dev luarocks ripgrep
           sudo luarocks --lua-version=5.4 install luacheck
           sudo luarocks --lua-version=5.4 install busted
           STYLUA_VERSION="2.0.2"

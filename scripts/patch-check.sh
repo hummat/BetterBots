@@ -6,6 +6,12 @@ DECOMPILE_ROOT="${DECOMPILE_ROOT:-$REPO_ROOT/../Darktide-Source-Code}"
 REFRESH=false
 errors=0
 
+if ! command -v rg >/dev/null 2>&1; then
+	echo "ERROR: ripgrep (rg) is required by patch-check but was not found in PATH." >&2
+	echo "       On Debian/Ubuntu: sudo apt-get install ripgrep" >&2
+	exit 2
+fi
+
 usage() {
 	cat <<'EOF'
 Usage:
