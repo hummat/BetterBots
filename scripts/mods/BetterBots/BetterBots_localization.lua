@@ -167,11 +167,11 @@ return {
 			.. "Other armored elites keep base-game aim until their weakspot nodes are verified.",
 	},
 	enable_charge_nav_validation = {
-		en = "Validate charge and dash launch paths",
+		en = "Prevent unsafe charge paths",
 	},
 	enable_charge_nav_validation_description = {
-		en = "Bots check the navmesh path before Zealot dash and Ogryn/Arbites charges "
-			.. "so they do not launch into blocked geometry.",
+		en = "Blocks bot charge and dash abilities when the projected path looks blocked, unsafe, "
+			.. "or too close to a dormant daemonhost.",
 	},
 	human_timing_profile = {
 		en = "Timing profile",
@@ -530,13 +530,14 @@ return {
 		en = "Bot survivability",
 	},
 	bot_survivability_profile_description = {
-		en = "Controls the base-game bot compensation tier. Auto keeps the game's difficulty scaling.",
+		en = "Controls the base-game bot stat buff. Auto keeps the game's difficulty scaling. "
+			.. "None disables the stat buff without forcing low-tier bot cosmetics.",
 	},
 	bot_survivability_profile_auto = {
 		en = "Auto (scales with difficulty)",
 	},
 	bot_survivability_profile_none = {
-		en = "None / Light",
+		en = "None (no stat buff)",
 	},
 	bot_survivability_profile_medium = {
 		en = "Medium",

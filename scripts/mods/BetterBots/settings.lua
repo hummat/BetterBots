@@ -376,7 +376,6 @@ local BOT_SURVIVABILITY_PROFILE_OPTIONS = {
 }
 
 local BOT_CONFIG_IDENTIFIER_BY_SURVIVABILITY_PROFILE = {
-	none = "low",
 	medium = "medium",
 	high = "high",
 }
@@ -557,6 +556,10 @@ end
 
 function M.bot_config_identifier_override()
 	return BOT_CONFIG_IDENTIFIER_BY_SURVIVABILITY_PROFILE[M.bot_survivability_profile()]
+end
+
+function M.bot_compensation_buff_enabled()
+	return M.bot_survivability_profile() ~= "none"
 end
 
 function M.bot_incoming_damage_reduction_enabled()

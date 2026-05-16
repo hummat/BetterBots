@@ -135,6 +135,14 @@ describe("bot_profiles", function()
 				"content/items/weapons/player/ranged/plasmagun_p1_m1",
 				profiles.veteran.loadout.slot_secondary
 			)
+			assert.equals(
+				"content/items/characters/player/human/gear_upperbody/d7_veteran_m_upperbody",
+				profiles.veteran.cosmetic_overrides.slot_gear_upperbody
+			)
+			assert.equals(
+				"content/items/characters/player/human/gear_lowerbody/d7_veteran_m_lowerbody",
+				profiles.veteran.cosmetic_overrides.slot_gear_lowerbody
+			)
 			assert.is_not_nil(profiles.veteran.talents.veteran_improved_tag)
 			assert.is_not_nil(profiles.veteran.talents.veteran_combat_ability_stagger_nearby_enemies)
 

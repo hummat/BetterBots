@@ -7,10 +7,13 @@ end
 local function setup_module(opts)
 	local BotCompensation = load_module()
 	local hooks = {}
+	local hooks_by_target = {}
 	local hook_counts = {}
 	local logs = {}
 	local bot_spawning = {}
 	local minion_attack = {}
+	local coop_game_mode = {}
+	local expedition_game_mode = {}
 	local opts_or_empty = opts or {}
 	local stub_mod = {
 		hook_require = function(_, path, callback)
@@ -18,12 +21,18 @@ local function setup_module(opts)
 				callback(bot_spawning)
 			elseif path == "scripts/utilities/minion_attack" then
 				callback(minion_attack)
+			elseif path == "scripts/managers/game_mode/game_modes/game_mode_coop_complete_objective" then
+				callback(coop_game_mode)
+			elseif path == "scripts/managers/game_mode/game_modes/game_mode_expedition" then
+				callback(expedition_game_mode)
 			else
 				error("unexpected hook_require path: " .. tostring(path))
 			end
 		end,
-		hook = function(_, _, method_name, handler)
+		hook = function(_, target, method_name, handler)
 			hook_counts[method_name] = (hook_counts[method_name] or 0) + 1
+			hooks_by_target[target] = hooks_by_target[target] or {}
+			hooks_by_target[target][method_name] = handler
 			hooks[method_name] = handler
 		end,
 	}
@@ -48,13 +57,24 @@ local function setup_module(opts)
 		bot_config_identifier_override = function()
 			return opts_or_empty.config_override
 		end,
+		bot_compensation_buff_enabled = function()
+			return opts_or_empty.compensation_buff_enabled
+		end,
 		bot_incoming_damage_reduction_enabled = function()
 			return opts_or_empty.damage_reduction_enabled
 		end,
 	})
 	BotCompensation.register_hooks()
 
-	return hooks, logs, BotCompensation, hook_counts, bot_spawning, minion_attack
+	return hooks,
+		logs,
+		BotCompensation,
+		hook_counts,
+		bot_spawning,
+		minion_attack,
+		hooks_by_target,
+		coop_game_mode,
+		expedition_game_mode
 end
 
 describe("bot_compensation", function()
@@ -100,6 +120,71 @@ describe("bot_compensation", function()
 
 		assert.is_false(original_called)
 		assert.equals("medium", result)
+	end)
+
+	it("does not force low bot config outside spawn-buff suppression when compensation buff is disabled", function()
+		local hooks = setup_module({ config_override = nil, compensation_buff_enabled = false })
+		local original_called = false
+
+		local result = hooks.get_bot_config_identifier(function()
+			original_called = true
+			return "high"
+		end)
+
+		assert.is_true(original_called)
+		assert.equals("high", result)
+	end)
+
+	it("suppresses only the bot spawn compensation buff when survivability is none", function()
+		local hooks, logs, _, _, _, _, hooks_by_target, coop_game_mode =
+			setup_module({ config_override = nil, compensation_buff_enabled = false, debug_enabled = true })
+		local bot_player = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		local original_called = false
+		local identifier_during_spawn
+
+		local result = hooks_by_target[coop_game_mode].on_player_unit_spawn(function()
+			original_called = true
+			identifier_during_spawn = hooks.get_bot_config_identifier(function()
+				return "high"
+			end)
+			return "spawned"
+		end, "game_mode", bot_player, "bot_unit", false)
+
+		local identifier_after_spawn = hooks.get_bot_config_identifier(function()
+			return "high"
+		end)
+
+		assert.is_true(original_called)
+		assert.equals("spawned", result)
+		assert.equals("low", identifier_during_spawn)
+		assert.equals("high", identifier_after_spawn)
+		assert.equals(2, #logs)
+		assert.equals("bot_compensation:profile:buff-suppressed:low", logs[1].key)
+		assert.equals("bot compensation profile buff-suppressed: low", logs[1].message)
+		assert.equals("bot_compensation:profile:base-game:high", logs[2].key)
+	end)
+
+	it("does not suppress spawn config selection for human players", function()
+		local hooks, _, _, _, _, _, hooks_by_target, coop_game_mode =
+			setup_module({ config_override = nil, compensation_buff_enabled = false })
+		local human_player = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		local identifier_during_spawn
+
+		hooks_by_target[coop_game_mode].on_player_unit_spawn(function()
+			identifier_during_spawn = hooks.get_bot_config_identifier(function()
+				return "high"
+			end)
+		end, "game_mode", human_player, "player_unit", false)
+
+		assert.equals("high", identifier_during_spawn)
 	end)
 
 	it("logs the override bot config selection once when debug is enabled", function()
@@ -217,7 +302,7 @@ describe("bot_compensation", function()
 	end)
 
 	it("does not double-install hooks when register_hooks runs twice against the same engine tables", function()
-		local _, _, BotCompensation, hook_counts, bot_spawning, minion_attack =
+		local _, _, BotCompensation, hook_counts, bot_spawning, minion_attack, _, coop_game_mode, expedition_game_mode =
 			setup_module({ damage_reduction_enabled = false })
 
 		BotCompensation.register_hooks()
@@ -227,7 +312,10 @@ describe("bot_compensation", function()
 		assert.equals(1, hook_counts.melee)
 		assert.equals(1, hook_counts.sweep)
 		assert.equals(1, hook_counts.update_lag_compensation_melee)
+		assert.equals(2, hook_counts.on_player_unit_spawn)
 		assert.is_true(bot_spawning.__bb_bot_compensation_installed)
 		assert.is_true(minion_attack.__bb_bot_compensation_installed)
+		assert.is_true(coop_game_mode.__bb_bot_compensation_installed)
+		assert.is_true(expedition_game_mode.__bb_bot_compensation_installed)
 	end)
 end)

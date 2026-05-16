@@ -209,6 +209,7 @@ function M.load_and_init(ctx)
 		debug_enabled = ctx.debug_enabled,
 		fixed_time = ctx.fixed_time,
 		bot_config_identifier_override = Settings.bot_config_identifier_override,
+		bot_compensation_buff_enabled = Settings.bot_compensation_buff_enabled,
 		bot_incoming_damage_reduction_enabled = Settings.bot_incoming_damage_reduction_enabled,
 	})
 

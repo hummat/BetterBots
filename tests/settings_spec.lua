@@ -144,18 +144,21 @@ describe("settings", function()
 			assert.is_nil(Settings.bot_config_identifier_override())
 		end)
 
-		it("maps none to the vanilla low bot config", function()
+		it("keeps none from forcing the low bot config and disables the compensation buff", function()
 			Settings.init(mock_mod({ bot_survivability_profile = "none" }))
 
-			assert.equals("low", Settings.bot_config_identifier_override())
+			assert.is_nil(Settings.bot_config_identifier_override())
+			assert.is_false(Settings.bot_compensation_buff_enabled())
 		end)
 
-		it("maps medium and high to vanilla bot configs", function()
+		it("maps medium and high to base-game bot configs and keeps the compensation buff enabled", function()
 			Settings.init(mock_mod({ bot_survivability_profile = "medium" }))
 			assert.equals("medium", Settings.bot_config_identifier_override())
+			assert.is_true(Settings.bot_compensation_buff_enabled())
 
 			Settings.init(mock_mod({ bot_survivability_profile = "high" }))
 			assert.equals("high", Settings.bot_config_identifier_override())
+			assert.is_true(Settings.bot_compensation_buff_enabled())
 		end)
 
 		it("falls back to auto for unknown survivability values", function()
@@ -163,6 +166,7 @@ describe("settings", function()
 
 			assert.equals("auto", Settings.bot_survivability_profile())
 			assert.is_nil(Settings.bot_config_identifier_override())
+			assert.is_true(Settings.bot_compensation_buff_enabled())
 		end)
 
 		it("keeps incoming bot damage reduction on unless explicitly disabled", function()

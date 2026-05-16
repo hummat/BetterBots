@@ -125,7 +125,7 @@ end
 
 Profile name is constructed as: `<tier>_bot_<1-6>` (e.g., `medium_bot_3`, `high_bot_5`).
 
-BetterBots' `bot_survivability_profile` setting hooks the same tier selector. `auto` leaves the vanilla difficulty mapping above untouched, `medium`/`high` force those vanilla tiers, and `none` forces `low` (currently no vanilla bot compensation buff).
+BetterBots' `bot_survivability_profile` setting hooks the same tier selector. `auto` leaves the vanilla difficulty mapping above untouched, and `medium`/`high` force those vanilla tiers. `none` leaves the difficulty-based profile tier intact for cosmetics/loadout selection, but suppresses the medium/high bot stat buff during spawn.
 
 For medium/high difficulty, bots receive stat buffs at spawn via:
 

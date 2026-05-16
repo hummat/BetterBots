@@ -5,14 +5,19 @@ local _debug_log
 local _debug_enabled
 local _fixed_time
 local _bot_config_identifier_override
+local _bot_compensation_buff_enabled
 local _bot_incoming_damage_reduction_enabled
 local _unpack = rawget(table or {}, "unpack") or unpack
 
 local BOT_SPAWNING_PATH = "scripts/managers/bot/bot_spawning"
 local MINION_ATTACK_PATH = "scripts/utilities/minion_attack"
+local GAME_MODE_COOP_PATH = "scripts/managers/game_mode/game_modes/game_mode_coop_complete_objective"
+local GAME_MODE_EXPEDITION_PATH = "scripts/managers/game_mode/game_modes/game_mode_expedition"
 local BOT_SPAWNING_SENTINEL = "__bb_bot_compensation_installed"
 local MINION_ATTACK_SENTINEL = "__bb_bot_compensation_installed"
+local GAME_MODE_SENTINEL = "__bb_bot_compensation_installed"
 local _logged_config_identifiers = {}
+local _suppress_bot_spawn_compensation_buff = false
 
 local MINION_ATTACK_DAMAGE_HOOKS = {
 	{
@@ -45,6 +50,11 @@ local MINION_ATTACK_DAMAGE_HOOKS = {
 }
 
 M.MINION_ATTACK_DAMAGE_HOOKS = MINION_ATTACK_DAMAGE_HOOKS
+
+local GAME_MODE_BUFF_HOOK_PATHS = {
+	GAME_MODE_COOP_PATH,
+	GAME_MODE_EXPEDITION_PATH,
+}
 
 local function _damage_reduction_enabled()
 	if not _bot_incoming_damage_reduction_enabled then
@@ -102,6 +112,35 @@ local function _log_config_identifier(source, identifier)
 	)
 end
 
+local function _bot_spawn_compensation_buff_enabled()
+	if not _bot_compensation_buff_enabled then
+		return true
+	end
+
+	return _bot_compensation_buff_enabled() ~= false
+end
+
+local function _should_suppress_bot_spawn_buff(player)
+	return not _bot_spawn_compensation_buff_enabled()
+		and player
+		and player.is_human_controlled
+		and not player:is_human_controlled()
+end
+
+local function _with_suppressed_bot_spawn_buff(callback)
+	local previous_value = _suppress_bot_spawn_compensation_buff
+	_suppress_bot_spawn_compensation_buff = true
+
+	local ok, result = pcall(callback)
+
+	_suppress_bot_spawn_compensation_buff = previous_value
+	if not ok then
+		error(result, 0)
+	end
+
+	return result
+end
+
 local function _call_original(func, args)
 	return func(_unpack(args, 1, args.n))
 end
@@ -127,12 +166,31 @@ local function _install_minion_attack_damage_hook(MinionAttack, spec)
 	end)
 end
 
+local function _install_game_mode_buff_hook(GameMode)
+	if GameMode[GAME_MODE_SENTINEL] then
+		return
+	end
+
+	_mod:hook(GameMode, "on_player_unit_spawn", function(func, self, player, unit, is_respawn)
+		if _should_suppress_bot_spawn_buff(player) then
+			return _with_suppressed_bot_spawn_buff(function()
+				return func(self, player, unit, is_respawn)
+			end)
+		end
+
+		return func(self, player, unit, is_respawn)
+	end)
+
+	GameMode[GAME_MODE_SENTINEL] = true
+end
+
 function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_bot_config_identifier_override = deps.bot_config_identifier_override
+	_bot_compensation_buff_enabled = deps.bot_compensation_buff_enabled
 	_bot_incoming_damage_reduction_enabled = deps.bot_incoming_damage_reduction_enabled
 end
 
@@ -143,6 +201,11 @@ function M.register_hooks()
 		end
 
 		_mod:hook(BotSpawning, "get_bot_config_identifier", function(func)
+			if _suppress_bot_spawn_compensation_buff then
+				_log_config_identifier("buff-suppressed", "low")
+				return "low"
+			end
+
 			local override = _bot_config_identifier_override and _bot_config_identifier_override() or nil
 			if override then
 				_log_config_identifier("override", override)
@@ -169,6 +232,10 @@ function M.register_hooks()
 
 		MinionAttack[MINION_ATTACK_SENTINEL] = true
 	end)
+
+	for i = 1, #GAME_MODE_BUFF_HOOK_PATHS do
+		_mod:hook_require(GAME_MODE_BUFF_HOOK_PATHS[i], _install_game_mode_buff_hook)
+	end
 end
 
 return M

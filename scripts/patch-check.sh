@@ -343,6 +343,30 @@ check_anchor \
 	"BotSpawning.get_bot_config_identifier = function ()" \
 	"bot spawning config selector"
 check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_coop_complete_objective.lua" \
+	"GameModeCoopCompleteObjective.on_player_unit_spawn = function (self, player, unit, is_respawn)" \
+	"coop game mode spawn hook"
+check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_coop_complete_objective.lua" \
+	'BotSpawning.get_bot_config_identifier()' \
+	"coop game mode bot compensation selector"
+check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_coop_complete_objective.lua" \
+	'add_internally_controlled_buff("bot_" .. bot_config_identifier .. "_buff", t)' \
+	"coop game mode bot compensation buff"
+check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_expedition.lua" \
+	"GameModeExpedition.on_player_unit_spawn = function (self, player, unit, is_respawn)" \
+	"expedition game mode spawn hook"
+check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_expedition.lua" \
+	'BotSpawning.get_bot_config_identifier()' \
+	"expedition game mode bot compensation selector"
+check_anchor \
+	"scripts/managers/game_mode/game_modes/game_mode_expedition.lua" \
+	'add_internally_controlled_buff("bot_" .. bot_config_identifier .. "_buff", t)' \
+	"expedition game mode bot compensation buff"
+check_anchor \
 	"scripts/settings/buff/player_buff_templates.lua" \
 	"templates.bot_medium_buff = {" \
 	"bot medium compensation buff"

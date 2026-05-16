@@ -324,6 +324,9 @@ local function make_bootstrap_harness(module_overrides)
 		bot_config_identifier_override = function()
 			return nil
 		end,
+		bot_compensation_buff_enabled = function()
+			return true
+		end,
 		bot_incoming_damage_reduction_enabled = function()
 			return true
 		end,
@@ -2071,6 +2074,9 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find('make_checkbox("enable_bot_incoming_damage_reduction")', 1, true))
 		assert.is_truthy(source:find('make_checkbox("enable_melee_improvements", {', 1, true))
 		assert.is_truthy(source:find('make_checkbox("enable_ammo_policy", {', 1, true))
+		assert.is_truthy(source:find('make_checkbox("enable_charge_nav_validation")', combat_index, true))
+		local diagnostics_body = source:sub(diagnostics_index)
+		assert.is_nil(diagnostics_body:find('make_checkbox("enable_charge_nav_validation")', 1, true))
 		assert.is_nil(source:find('setting_id = "bot_slots_core_group"', 1, true))
 		assert.is_nil(source:find('setting_id = "bot_slots_tertium_group"', 1, true))
 		assert.is_truthy(source:find('text = "behavior_profile_testing", value = "testing"', 1, true))
@@ -2081,6 +2087,7 @@ describe("startup regressions", function()
 		assert.is_truthy(localization:find('en = title("Combat Behavior")', 1, true))
 		assert.is_truthy(localization:find('en = title("Support & Pickups")', 1, true))
 		assert.is_truthy(localization:find('en = title("Bot Team Setup")', 1, true))
+		assert.is_truthy(localization:find('en = "Prevent unsafe charge paths"', 1, true))
 		assert.is_truthy(localization:find('bot_weapon_quality = {%s*en = "Bot weapon quality"', 1))
 		assert.is_nil(localization:find("bot_slots_core_group = {", 1, true))
 		assert.is_nil(localization:find("bot_slots_tertium_group = {", 1, true))

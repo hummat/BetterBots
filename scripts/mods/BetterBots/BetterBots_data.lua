@@ -188,6 +188,7 @@ return {
 					make_checkbox("enable_target_type_hysteresis"),
 					make_numeric("sprint_follow_distance", { 0, 30 }, 2),
 					make_checkbox("enable_poxburster"),
+					make_checkbox("enable_charge_nav_validation"),
 					make_checkbox("enable_daemonhost_avoidance", {
 						make_numeric("daemonhost_keepout_distance", { 7.5, 20 }, 0.5),
 					}),
@@ -270,7 +271,6 @@ return {
 							},
 						},
 					},
-					make_checkbox("enable_charge_nav_validation"),
 				},
 			},
 		},
