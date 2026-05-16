@@ -117,27 +117,40 @@ local function _resolve_settings()
 	return _cached_settings
 end
 
-local function _any_human_needs_healing(human_units, threshold, health_pct_fn, request_fn)
-	local limit = threshold or DEFERRAL_THRESHOLD
+local function _format_percent(value)
+	if value == nil then
+		return "nil"
+	end
+
+	return string.format("%.0f%%", value * 100)
+end
+
+local function _debug_health_reserve_detail(bot_health_pct, human_units, threshold, health_pct_fn)
+	if not (_debug_enabled and _debug_enabled()) then
+		return ""
+	end
+
 	local read_health_pct = health_pct_fn or (_health and _health.current_health_percent)
+	local lowest_human_health
 
-	if request_fn and request_fn(human_units) then
-		return true
-	end
+	if human_units and read_health_pct then
+		for i = 1, #human_units do
+			local human_unit = human_units[i]
+			local human_health_pct = human_unit and read_health_pct(human_unit)
 
-	if not (human_units and read_health_pct) then
-		return false
-	end
-
-	for i = 1, #human_units do
-		local human_unit = human_units[i]
-
-		if human_unit and read_health_pct(human_unit) < limit then
-			return true
+			if human_health_pct and (not lowest_human_health or human_health_pct < lowest_human_health) then
+				lowest_human_health = human_health_pct
+			end
 		end
 	end
 
-	return false
+	return " (bot_health="
+		.. _format_percent(bot_health_pct)
+		.. ", lowest_human_health="
+		.. _format_percent(lowest_human_health)
+		.. ", threshold="
+		.. _format_percent(threshold or DEFERRAL_THRESHOLD)
+		.. ")"
 end
 
 local function _should_defer_healing(bot_health_pct, human_needs_healing, emergency_threshold)
@@ -152,7 +165,7 @@ local function _should_defer_healing(bot_health_pct, human_needs_healing, emerge
 	return true
 end
 
-local function _bot_preserves_wounded_state(unit)
+local function _unit_preserves_wounded_state(unit)
 	if not (unit and ScriptUnit and ScriptUnit.has_extension) then
 		return false
 	end
@@ -164,6 +177,46 @@ local function _bot_preserves_wounded_state(unit)
 
 	local talents = talent_extension:talents()
 	return talents and talents.zealot_martyrdom ~= nil or false
+end
+
+local function _human_counts_for_healing_reserve(human_unit, health_pct, critical_threshold)
+	if _unit_preserves_wounded_state(human_unit) and health_pct >= (critical_threshold or EMERGENCY_THRESHOLD) then
+		return false
+	end
+
+	return true
+end
+
+local function _has_human_healing_request(human_units, request_fn)
+	if not request_fn then
+		return false
+	end
+
+	return request_fn(human_units) and true or false
+end
+
+local function _any_human_needs_healing(human_units, threshold, health_pct_fn, request_fn, critical_threshold)
+	local limit = threshold or DEFERRAL_THRESHOLD
+	local read_health_pct = health_pct_fn or (_health and _health.current_health_percent)
+
+	if not (human_units and read_health_pct) then
+		return _has_human_healing_request(human_units, request_fn)
+	end
+
+	for i = 1, #human_units do
+		local human_unit = human_units[i]
+		local human_health_pct = human_unit and read_health_pct(human_unit)
+
+		if
+			human_health_pct
+			and human_health_pct < limit
+			and _human_counts_for_healing_reserve(human_unit, human_health_pct, critical_threshold)
+		then
+			return true
+		end
+	end
+
+	return _has_human_healing_request(human_units, request_fn)
 end
 
 local function _mode_allows_resource(mode, resource_kind)
@@ -274,6 +327,17 @@ local function _apply_health_station_deferral(health_station_component)
 	health_station_component.needs_health_queue_number = 0
 end
 
+local function _mark_destination_refresh(self)
+	local follow_component = self and self._follow_component
+	if not follow_component then
+		return false
+	end
+
+	follow_component.needs_destination_refresh = true
+
+	return true
+end
+
 local function _apply_health_deployable_deferral(pickup_component)
 	pickup_component.health_deployable = nil
 	pickup_component.health_deployable_distance = math.huge
@@ -378,10 +442,10 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			return
 		end
 
-		if
-			settings.require_station_tag
-			and not (_health_station_recently_tagged and _health_station_recently_tagged(target_level_unit))
-		then
+		local station_was_tagged = settings.require_station_tag
+			and _health_station_recently_tagged
+			and _health_station_recently_tagged(target_level_unit)
+		if settings.require_station_tag and not station_was_tagged then
 			_apply_health_station_deferral(health_station_component)
 			if _health_station_log_state_changed(unit, "station_tag_required") then
 				_log("healing_station:" .. tostring(unit), "deferred health station until a human smart-tags it")
@@ -400,9 +464,10 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			human_units,
 			settings.human_threshold,
 			nil,
-			_com_wheel and _com_wheel.has_recent_health_request
+			_com_wheel and _com_wheel.has_recent_health_request,
+			settings.emergency_threshold
 		)
-		local preserve_wounded_state = _bot_preserves_wounded_state(unit)
+		local preserve_wounded_state = _unit_preserves_wounded_state(unit)
 
 		if
 			_should_defer_resource(
@@ -422,7 +487,16 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			elseif human_request_active then
 				_log("healing_station:" .. tostring(unit), "deferred health station to human request")
 			else
-				_log("healing_station:" .. tostring(unit), "deferred health station to human player")
+				_log(
+					"healing_station:" .. tostring(unit),
+					"deferred health station to human player"
+						.. _debug_health_reserve_detail(
+							bot_health_pct,
+							human_units,
+							settings.human_threshold,
+							_health.current_health_percent
+						)
+				)
 			end
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
@@ -453,10 +527,22 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		health_station_component.needs_health = true
 		health_station_component.needs_health_queue_number = 1
+		if station_was_tagged and _mark_destination_refresh(self) then
+			_log(
+				"healing_station_tag_refresh:" .. tostring(unit),
+				"health station destination refresh requested from human smart-tag"
+			)
+		end
 		if _health_station_log_state_changed(unit, "allow") then
 			_log(
 				"healing_station_allow:" .. tostring(unit),
 				"health station permitted: humans above reserve and bot not full"
+					.. _debug_health_reserve_detail(
+						bot_health_pct,
+						human_units,
+						settings.human_threshold,
+						_health.current_health_percent
+					)
 			)
 		end
 		if perf_t0 then
@@ -502,14 +588,15 @@ function M.install_bot_group_hooks(BotGroup)
 			human_units,
 			settings.human_threshold,
 			nil,
-			_com_wheel and _com_wheel.has_recent_health_request
+			_com_wheel and _com_wheel.has_recent_health_request,
+			settings.emergency_threshold
 		)
 
 		for unit, data in pairs(bot_data) do
 			local pickup_component = data and data.pickup_component
 			if pickup_component and pickup_component.health_deployable then
 				local bot_health_pct = _health.current_health_percent(unit)
-				local preserve_wounded_state = _bot_preserves_wounded_state(unit)
+				local preserve_wounded_state = _unit_preserves_wounded_state(unit)
 				if
 					_should_defer_resource(
 						"health_deployable",
@@ -545,7 +632,7 @@ M.should_defer_healing = _should_defer_healing
 M.should_defer_resource = _should_defer_resource
 M.should_skip_health_station_use = _should_skip_health_station_use
 M.should_defer_to_more_injured_bot = _should_defer_to_more_injured_bot
-M.bot_preserves_wounded_state = _bot_preserves_wounded_state
+M.bot_preserves_wounded_state = _unit_preserves_wounded_state
 M.apply_health_station_deferral = _apply_health_station_deferral
 M.apply_health_deployable_deferral = _apply_health_deployable_deferral
 M.resolve_settings = _resolve_settings

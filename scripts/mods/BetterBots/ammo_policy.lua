@@ -191,6 +191,24 @@ local function _clear_ammo_pickup_target(pickup_component)
 	pickup_component.ammo_pickup_valid_until = -math.huge
 end
 
+local function _distance_between_units(unit_a, unit_b)
+	local position_a = POSITION_LOOKUP and POSITION_LOOKUP[unit_a]
+	local position_b = POSITION_LOOKUP and POSITION_LOOKUP[unit_b]
+	if not (position_a and position_b and Vector3 and Vector3.distance) then
+		return nil
+	end
+
+	return Vector3.distance(position_a, position_b)
+end
+
+local function _format_percent(value)
+	if value == nil then
+		return "nil"
+	end
+
+	return string.format("%.0f%%", value * 100)
+end
+
 local function _all_eligible_humans_above_threshold(human_units, threshold)
 	if not (human_units and _Ammo) then
 		return true
@@ -425,6 +443,48 @@ local function _all_eligible_humans_above_grenade_threshold(human_units, thresho
 	return _store_scan_result(_human_grenade_scan_cache, fixed_t, human_units, threshold, true)
 end
 
+local function _debug_grenade_reserve_detail(human_units, threshold)
+	if not (_debug_enabled and _debug_enabled()) then
+		return ""
+	end
+
+	local eligible_count = 0
+	local lowest_fraction
+	local lowest_current
+	local lowest_max
+
+	if human_units then
+		for i = 1, #human_units do
+			local human_unit = human_units[i]
+			local eligible, current, max = _eligible_for_grenade_pickup(human_unit)
+
+			if eligible and current and max and max > 0 then
+				eligible_count = eligible_count + 1
+				local fraction = current / max
+
+				if not lowest_fraction or fraction < lowest_fraction then
+					lowest_fraction = fraction
+					lowest_current = current
+					lowest_max = max
+				end
+			end
+		end
+	end
+
+	local threshold_text = _format_percent(threshold or _human_grenade_threshold())
+	if eligible_count == 0 then
+		return " (eligible_humans=0, threshold=" .. threshold_text .. ")"
+	end
+
+	return " (lowest_human_grenades="
+		.. tostring(lowest_current)
+		.. "/"
+		.. tostring(lowest_max)
+		.. ", threshold="
+		.. threshold_text
+		.. ")"
+end
+
 local function _best_nearby_grenade_pickup(bot_group, unit)
 	if _nearby_grenade_pickups then
 		return _nearby_grenade_pickups(bot_group, unit)
@@ -643,6 +703,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		end
 
 		local reserved_grenade_pickup = _reserved_grenade_pickup(bot_group, unit)
+		local reserved_grenade_pickup_explicit = _reserved_grenade_pickup_is_explicit(bot_group, unit)
 		local pickup_order_unit = bot_group and bot_group:ammo_pickup_order_unit(unit) or nil
 		local has_external_ammo_pickup_order = pickup_order_unit ~= nil and pickup_order_unit ~= reserved_grenade_pickup
 
@@ -721,10 +782,15 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local grenade_eligible, grenade_current, grenade_max, grenade_reason = _eligible_for_grenade_pickup(unit)
 		if grenade_eligible and grenade_current < grenade_max then
 			local grenade_pickup, grenade_distance = _best_nearby_grenade_pickup(bot_group, unit)
-			if not grenade_pickup and reserved_grenade_pickup then
+			if reserved_grenade_pickup_explicit and reserved_grenade_pickup then
+				grenade_pickup = reserved_grenade_pickup
+				grenade_distance = _distance_between_units(unit, reserved_grenade_pickup)
+					or pickup_component.ammo_pickup_distance
+			elseif not grenade_pickup and reserved_grenade_pickup then
 				if _reserved_grenade_pickup_still_in_range(bot_group, unit, pickup_component) then
 					grenade_pickup = reserved_grenade_pickup
-					grenade_distance = pickup_component.ammo_pickup_distance
+					grenade_distance = _distance_between_units(unit, reserved_grenade_pickup)
+						or pickup_component.ammo_pickup_distance
 				elseif _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, reserved_grenade_pickup) then
 					_clear_grenade_pickup_log_state(unit)
 					_log(
@@ -735,7 +801,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			end
 
 			if grenade_pickup then
-				if not _pickup_has_required_tag(grenade_pickup) then
+				if not (reserved_grenade_pickup_explicit or _pickup_has_required_tag(grenade_pickup)) then
 					if _clear_reserved_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup) then
 						_clear_grenade_pickup_log_state(unit)
 					end
@@ -749,6 +815,20 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 							"grenade pickup deferred until a human smart-tags it"
 						)
 					end
+				elseif reserved_grenade_pickup_explicit then
+					_reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance, true)
+					pickup_component.needs_ammo = true
+					local pickup_state = "reserved_explicit:" .. tostring(grenade_pickup)
+					if _grenade_pickup_log_state_changed(unit, pickup_state) then
+						_log(
+							"grenade_pickup_allow:" .. tostring(unit),
+							"grenade pickup permitted: human smart-tag order"
+						)
+						_log(
+							"grenade_pickup_bind:" .. tostring(unit),
+							"grenade pickup bound into ammo slot from human smart-tag"
+						)
+					end
 				elseif
 					not human_request_active
 					and _all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
@@ -760,6 +840,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 						_log(
 							"grenade_pickup_allow:" .. tostring(unit),
 							"grenade pickup permitted: all eligible humans above reserve"
+								.. _debug_grenade_reserve_detail(human_units, _human_grenade_threshold())
 						)
 						_log("grenade_pickup_bind:" .. tostring(unit), "grenade pickup bound into ammo slot")
 					end
@@ -776,7 +857,11 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 						if human_request_active then
 							_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human request")
 						else
-							_log("grenade_pickup_defer:" .. tostring(unit), "grenade pickup deferred to human reserve")
+							_log(
+								"grenade_pickup_defer:" .. tostring(unit),
+								"grenade pickup deferred to human reserve"
+									.. _debug_grenade_reserve_detail(human_units, _human_grenade_threshold())
+							)
 						end
 					end
 				end

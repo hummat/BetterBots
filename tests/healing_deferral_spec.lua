@@ -299,9 +299,22 @@ describe("healing_deferral", function()
 	describe("install_behavior_ext_hooks", function()
 		local update_health_stations_hook
 		local saved_script_unit
+		local debug_logs
+
+		local function find_debug_log(pattern)
+			for i = 1, #debug_logs do
+				if string.find(debug_logs[i], pattern, 1, true) then
+					return debug_logs[i]
+				end
+			end
+
+			return nil
+		end
 
 		local function install_hook_fixture(opts)
 			local station_unit = {}
+			local martyrdom_units = opts.martyrdom_units or {}
+			debug_logs = {}
 
 			saved_script_unit = rawget(_G, "ScriptUnit")
 			_G.ScriptUnit = {
@@ -310,6 +323,19 @@ describe("healing_deferral", function()
 						return {
 							charge_amount = function()
 								return opts.charge_amount
+							end,
+						}
+					end
+
+					if
+						system_name == "talent_system"
+						and ((unit == "bot1" and opts.bot_has_martyrdom) or martyrdom_units[unit])
+					then
+						return {
+							talents = function()
+								return {
+									zealot_martyrdom = true,
+								}
 							end,
 						}
 					end
@@ -361,6 +387,12 @@ describe("healing_deferral", function()
 				},
 				fixed_time = function()
 					return 0
+				end,
+				debug_log = function(_, _, message)
+					debug_logs[#debug_logs + 1] = message
+				end,
+				debug_enabled = function()
+					return opts.debug_enabled == true
 				end,
 				health_station_recently_tagged = opts.health_station_recently_tagged,
 			})
@@ -551,6 +583,226 @@ describe("healing_deferral", function()
 
 			assert.is_true(self._health_station_component.needs_health)
 			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+		end)
+
+		it("refreshes destination when a tagged ping-only health station is allowed", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("logs human health reserve detail when a tagged station defers to a human", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				debug_enabled = true,
+				bot_health_pct = 0.50,
+				human_health_pct = 0.80,
+				human_threshold = 90,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.is_truthy(find_debug_log("deferred health station to human player"))
+			assert.is_truthy(find_debug_log("bot_health=50%"))
+			assert.is_truthy(find_debug_log("lowest_human_health=80%"))
+			assert.is_truthy(find_debug_log("threshold=90%"))
+		end)
+
+		it("does not let a tagged ping-only health station override Martyrdom preservation", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.50,
+				charge_amount = 2,
+				require_station_tag = true,
+				bot_has_martyrdom = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("does not let a tagged ping-only health station make a full-health bot heal", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 1.0,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = true,
+					needs_health_queue_number = 1,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("does not defer a tagged health station to a non-critical Martyrdom human", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.30,
+				human_threshold = 90,
+				charge_amount = 2,
+				require_station_tag = true,
+				martyrdom_units = {
+					human1 = true,
+				},
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("still defers a tagged health station to a critical Martyrdom human", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				bot_health_pct = 0.50,
+				human_health_pct = 0.10,
+				human_threshold = 90,
+				charge_amount = 2,
+				require_station_tag = true,
+				martyrdom_units = {
+					human1 = true,
+				},
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+			assert.is_false(self._follow_component.needs_destination_refresh)
 		end)
 	end)
 
