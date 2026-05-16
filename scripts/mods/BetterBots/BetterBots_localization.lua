@@ -25,16 +25,13 @@ return {
 	},
 	-- Groups
 	abilities_group = {
-		en = title("Abilities"),
+		en = title("Combat Abilities"),
 	},
 	bot_feature_toggles_group = {
-		en = title("Bot Tweaks"),
+		en = title("Combat Behavior"),
 	},
 	bot_tuning_group = {
-		en = title("Bot Tuning"),
-	},
-	healing_deferral_group = {
-		en = title("Healing Priority"),
+		en = title("Support & Pickups"),
 	},
 	bot_profiles_group = {
 		en = title("Bot Team Setup"),
@@ -81,10 +78,10 @@ return {
 	},
 	-- Behavior preset
 	behavior_profile = {
-		en = "Ability use style",
+		en = "Bot behavior preset",
 	},
 	behavior_profile_description = {
-		en = "Changes how freely bots spend combat abilities.",
+		en = "Sets the default team behavior style. Currently affects how freely bots spend combat abilities.",
 	},
 	behavior_profile_testing = {
 		en = "Testing - use abilities as soon as possible",
@@ -116,7 +113,7 @@ return {
 	},
 	enable_melee_improvements_description = {
 		en = "Bots use heavier swings on armor, quicker swings into crowds, and supported melee weapon specials. "
-			.. "Turn this off for vanilla melee behavior.",
+			.. "Turn this off for base-game melee behavior.",
 	},
 	enable_ranged_improvements = {
 		en = "Ranged improvements",
@@ -124,7 +121,7 @@ return {
 	enable_ranged_improvements_description = {
 		en = "Bots aim before firing, use charged shots, arm supported shotgun special shells, "
 			.. "and vent heat or peril when needed. "
-			.. "Turn this off for vanilla ranged behavior.",
+			.. "Turn this off for base-game ranged behavior.",
 	},
 	enable_team_cooldown = {
 		en = "Spread out team abilities",
@@ -142,13 +139,13 @@ return {
 		en = "Better blitz targeting",
 	},
 	enable_smart_targeting_description = {
-		en = "Bots aim blitz attacks at the enemy they are already tracking. Turn this off for vanilla blitz targeting.",
+		en = "Bots aim blitz attacks at the enemy they are already tracking. Turn this off for base-game blitz targeting.",
 	},
 	enable_daemonhost_avoidance = {
 		en = "Avoid sleeping daemonhosts",
 	},
 	enable_daemonhost_avoidance_description = {
-		en = "Bots stop fighting and sprinting near a sleeping daemonhost. Turn this off for vanilla behavior.",
+		en = "Bots stop fighting and sprinting near a sleeping daemonhost. Turn this off for base-game behavior.",
 	},
 	enable_hazard_movement_avoidance = {
 		en = "Avoid hazards and ledges",
@@ -167,7 +164,7 @@ return {
 	},
 	enable_weakspot_aim_description = {
 		en = "Bots aim for the torso on Scab Maulers so shots do not glance off the helmet. "
-			.. "Other armored elites keep vanilla aim until their weakspot nodes are verified.",
+			.. "Other armored elites keep base-game aim until their weakspot nodes are verified.",
 	},
 	enable_charge_nav_validation = {
 		en = "Validate charge and dash launch paths",
@@ -311,7 +308,8 @@ return {
 		en = "Bot ammo/grenade pickup policy",
 	},
 	enable_ammo_policy_description = {
-		en = "Bots defer ammo and grenades while humans are below their reserve thresholds. Off restores vanilla pickup.",
+		en = "Bots defer ammo and grenades while humans are below their reserve thresholds. "
+			.. "Off restores base-game pickup behavior.",
 	},
 	enable_pocketable_support = {
 		en = "Bot pocketable support",
@@ -379,7 +377,7 @@ return {
 	},
 	melee_horde_light_bias_description = {
 		en = "Higher values make bots use more quick swings against unarmored hordes. "
-			.. "Set to 0 for vanilla melee choices.",
+			.. "Set to 0 for base-game melee choices.",
 	},
 	rippergun_bayonet_distance = {
 		en = "Rippergun bayonet range (m)",
@@ -462,7 +460,7 @@ return {
 	bot_slot_1_profile_description = {
 		en = "Chooses the class for this slot. "
 			.. "If a Tertium bot fills it, that takes priority. "
-			.. "None keeps the vanilla Veteran.",
+			.. "None keeps the base-game Veteran bot.",
 	},
 	bot_slot_2_profile = {
 		en = "Bot slot 2 (Solo Play)",
@@ -470,7 +468,7 @@ return {
 	bot_slot_2_profile_description = {
 		en = "Chooses the class for this slot. "
 			.. "If a Tertium bot fills it, that takes priority. "
-			.. "None keeps the vanilla Veteran.",
+			.. "None keeps the base-game Veteran bot.",
 	},
 	bot_slot_3_profile = {
 		en = "Bot slot 3 (Solo Play)",
@@ -478,22 +476,22 @@ return {
 	bot_slot_3_profile_description = {
 		en = "Chooses the class for this slot. "
 			.. "If a Tertium bot fills it, that takes priority. "
-			.. "None keeps the vanilla Veteran.",
+			.. "None keeps the base-game Veteran bot.",
 	},
 	bot_slot_4_profile = {
 		en = "Bot slot 4 (Tertium)",
 	},
 	bot_slot_4_profile_description = {
-		en = "Only used when a Tertium mod adds a fourth bot. None keeps the vanilla Veteran.",
+		en = "Only used when a Tertium mod adds a fourth bot. None keeps the base-game Veteran bot.",
 	},
 	bot_slot_5_profile = {
 		en = "Bot slot 5 (Tertium)",
 	},
 	bot_slot_5_profile_description = {
-		en = "Only used when a Tertium mod adds a fifth bot. None keeps the vanilla Veteran.",
+		en = "Only used when a Tertium mod adds a fifth bot. None keeps the base-game Veteran bot.",
 	},
 	bot_profile_none = {
-		en = "None (vanilla veteran)",
+		en = "None (base-game Veteran)",
 	},
 	bot_profile_veteran = {
 		en = "Veteran - Plasma Gun + Power Sword",
@@ -532,7 +530,7 @@ return {
 		en = "Bot survivability",
 	},
 	bot_survivability_profile_description = {
-		en = "Controls the vanilla bot compensation tier. Auto keeps the game's difficulty scaling.",
+		en = "Controls the base-game bot compensation tier. Auto keeps the game's difficulty scaling.",
 	},
 	bot_survivability_profile_auto = {
 		en = "Auto (scales with difficulty)",
@@ -550,7 +548,7 @@ return {
 		en = "Bot incoming damage reduction",
 	},
 	enable_bot_incoming_damage_reduction_description = {
-		en = "Game default: some enemy attacks deal less damage to bot targets. "
+		en = "Base-game default: some enemy attacks deal less damage to bot targets. "
 			.. "Disable to make bots take normal player-target damage from those attacks.",
 	},
 	-- Diagnostics

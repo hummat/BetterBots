@@ -39,6 +39,20 @@ local function make_numeric(setting_id, range, step_size)
 	}
 end
 
+local function make_checkbox(setting_id, sub_widgets)
+	local widget = {
+		setting_id = setting_id,
+		type = "checkbox",
+		default_value = DEFAULTS[setting_id],
+	}
+
+	if sub_widgets then
+		widget.sub_widgets = sub_widgets
+	end
+
+	return widget
+end
+
 return {
 	name = mod:localize("mod_name"),
 	description = mod:localize("mod_description"),
@@ -46,23 +60,7 @@ return {
 	options = {
 		widgets = {
 			{
-				setting_id = "abilities_group",
-				type = "group",
-				sub_widgets = {
-					{ setting_id = "enable_stances", type = "checkbox", default_value = DEFAULTS.enable_stances },
-					{ setting_id = "enable_charges", type = "checkbox", default_value = DEFAULTS.enable_charges },
-					{ setting_id = "enable_shouts", type = "checkbox", default_value = DEFAULTS.enable_shouts },
-					{ setting_id = "enable_stealth", type = "checkbox", default_value = DEFAULTS.enable_stealth },
-					{
-						setting_id = "enable_deployables",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_deployables,
-					},
-					{ setting_id = "enable_grenades", type = "checkbox", default_value = DEFAULTS.enable_grenades },
-				},
-			},
-			{
-				setting_id = "bot_feature_toggles_group",
+				setting_id = "bot_profiles_group",
 				type = "group",
 				sub_widgets = {
 					{
@@ -75,78 +73,6 @@ return {
 							{ text = "behavior_profile_conservative", value = "conservative" },
 							{ text = "behavior_profile_testing", value = "testing" },
 						},
-					},
-					{ setting_id = "enable_pinging", type = "checkbox", default_value = DEFAULTS.enable_pinging },
-					{ setting_id = "enable_poxburster", type = "checkbox", default_value = DEFAULTS.enable_poxburster },
-					{
-						setting_id = "enable_melee_improvements",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_melee_improvements,
-					},
-					{
-						setting_id = "enable_ranged_improvements",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_ranged_improvements,
-					},
-					{
-						setting_id = "enable_team_cooldown",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_team_cooldown,
-					},
-					{
-						setting_id = "enable_engagement_leash",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_engagement_leash,
-					},
-					{
-						setting_id = "enable_smart_targeting",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_smart_targeting,
-					},
-					{
-						setting_id = "enable_daemonhost_avoidance",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_daemonhost_avoidance,
-					},
-					{
-						setting_id = "enable_hazard_movement_avoidance",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_hazard_movement_avoidance,
-					},
-					{
-						setting_id = "enable_target_type_hysteresis",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_target_type_hysteresis,
-					},
-					{
-						setting_id = "enable_pocketable_support",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_pocketable_support,
-					},
-					{
-						setting_id = "enable_smart_tag_orders",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_smart_tag_orders,
-					},
-					{
-						setting_id = "enable_com_wheel_responses",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_com_wheel_responses,
-					},
-					{
-						setting_id = "enable_human_revive_priority",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_human_revive_priority,
-					},
-					{
-						setting_id = "enable_weakspot_aim",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_weakspot_aim,
-					},
-					{
-						setting_id = "enable_charge_nav_validation",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_charge_nav_validation,
 					},
 					{
 						setting_id = "human_timing_profile",
@@ -174,6 +100,67 @@ return {
 							make_numeric("human_timing_opportunistic_jitter_max_ms", { 0, 1500 }, 25),
 						},
 					},
+					make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
+					make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
+					make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
+					make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
+					make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
+					{
+						setting_id = "bot_weapon_quality",
+						type = "dropdown",
+						default_value = DEFAULTS.bot_weapon_quality,
+						options = {
+							{ text = "bot_weapon_quality_auto", value = "auto" },
+							{ text = "bot_weapon_quality_low", value = "low" },
+							{ text = "bot_weapon_quality_medium", value = "medium" },
+							{ text = "bot_weapon_quality_high", value = "high" },
+							{ text = "bot_weapon_quality_max", value = "max" },
+						},
+					},
+					{
+						setting_id = "bot_survivability_profile",
+						type = "dropdown",
+						default_value = DEFAULTS.bot_survivability_profile,
+						options = {
+							{ text = "bot_survivability_profile_auto", value = "auto" },
+							{ text = "bot_survivability_profile_none", value = "none" },
+							{ text = "bot_survivability_profile_medium", value = "medium" },
+							{ text = "bot_survivability_profile_high", value = "high" },
+						},
+					},
+					make_checkbox("enable_bot_incoming_damage_reduction"),
+				},
+			},
+			{
+				setting_id = "abilities_group",
+				type = "group",
+				sub_widgets = {
+					make_checkbox("enable_stances"),
+					make_checkbox("enable_charges"),
+					make_checkbox("enable_shouts"),
+					make_checkbox("enable_stealth"),
+					make_checkbox("enable_deployables"),
+					make_checkbox("enable_grenades"),
+					make_checkbox("enable_team_cooldown"),
+				},
+			},
+			{
+				setting_id = "bot_feature_toggles_group",
+				type = "group",
+				sub_widgets = {
+					make_checkbox("enable_melee_improvements", {
+						make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
+					}),
+					make_checkbox("enable_ranged_improvements", {
+						make_numeric("rippergun_bayonet_distance", { 0, 6 }, 0.5),
+						make_numeric("ranged_bash_distance", { 0, 6 }, 0.5),
+						make_numeric("warp_weapon_peril_threshold", { 0, 100 }, 1),
+					}),
+					make_checkbox("enable_smart_targeting", {
+						make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
+						make_numeric("player_tag_bonus", { 0, 10 }, 1),
+					}),
+					make_checkbox("enable_engagement_leash"),
 					{
 						setting_id = "pressure_leash_profile",
 						type = "dropdown",
@@ -198,48 +185,20 @@ return {
 							make_numeric("pressure_leash_floor_m", { 4, 12 }, 1),
 						},
 					},
-					{
-						setting_id = "enable_bot_grimoire_pickup",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_bot_grimoire_pickup,
-					},
-					{
-						setting_id = "enable_bot_tome_pickup",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_bot_tome_pickup,
-					},
-					{
-						setting_id = "pickup_require_tag",
-						type = "checkbox",
-						default_value = DEFAULTS.pickup_require_tag,
-					},
+					make_checkbox("enable_target_type_hysteresis"),
+					make_numeric("sprint_follow_distance", { 0, 30 }, 2),
+					make_checkbox("enable_poxburster"),
+					make_checkbox("enable_daemonhost_avoidance", {
+						make_numeric("daemonhost_keepout_distance", { 7.5, 20 }, 0.5),
+					}),
+					make_checkbox("enable_hazard_movement_avoidance", {
+						make_numeric("hazard_avoidance_buffer", { 0, 5 }, 0.5),
+					}),
+					make_checkbox("enable_weakspot_aim"),
 				},
 			},
 			{
 				setting_id = "bot_tuning_group",
-				type = "group",
-				sub_widgets = {
-					make_numeric("sprint_follow_distance", { 0, 30 }, 2),
-					make_numeric("daemonhost_keepout_distance", { 7.5, 20 }, 0.5),
-					make_numeric("hazard_avoidance_buffer", { 0, 5 }, 0.5),
-					make_numeric("special_chase_penalty_range", { 0, 30 }, 2),
-					make_numeric("player_tag_bonus", { 0, 10 }, 1),
-					make_numeric("melee_horde_light_bias", { 0, 10 }, 1),
-					make_numeric("rippergun_bayonet_distance", { 0, 6 }, 0.5),
-					make_numeric("ranged_bash_distance", { 0, 6 }, 0.5),
-					{
-						setting_id = "enable_ammo_policy",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_ammo_policy,
-					},
-					make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
-					make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
-					make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
-					make_numeric("warp_weapon_peril_threshold", { 0, 100 }, 1),
-				},
-			},
-			{
-				setting_id = "healing_deferral_group",
 				type = "group",
 				sub_widgets = {
 					{
@@ -269,45 +228,19 @@ return {
 							},
 						},
 					},
-				},
-			},
-			{
-				setting_id = "bot_profiles_group",
-				type = "group",
-				sub_widgets = {
-					make_slot_dropdown(1, DEFAULTS.bot_slot_1_profile),
-					make_slot_dropdown(2, DEFAULTS.bot_slot_2_profile),
-					make_slot_dropdown(3, DEFAULTS.bot_slot_3_profile),
-					make_slot_dropdown(4, DEFAULTS.bot_slot_4_profile),
-					make_slot_dropdown(5, DEFAULTS.bot_slot_5_profile),
-					{
-						setting_id = "bot_weapon_quality",
-						type = "dropdown",
-						default_value = DEFAULTS.bot_weapon_quality,
-						options = {
-							{ text = "bot_weapon_quality_auto", value = "auto" },
-							{ text = "bot_weapon_quality_low", value = "low" },
-							{ text = "bot_weapon_quality_medium", value = "medium" },
-							{ text = "bot_weapon_quality_high", value = "high" },
-							{ text = "bot_weapon_quality_max", value = "max" },
-						},
-					},
-					{
-						setting_id = "bot_survivability_profile",
-						type = "dropdown",
-						default_value = DEFAULTS.bot_survivability_profile,
-						options = {
-							{ text = "bot_survivability_profile_auto", value = "auto" },
-							{ text = "bot_survivability_profile_none", value = "none" },
-							{ text = "bot_survivability_profile_medium", value = "medium" },
-							{ text = "bot_survivability_profile_high", value = "high" },
-						},
-					},
-					{
-						setting_id = "enable_bot_incoming_damage_reduction",
-						type = "checkbox",
-						default_value = DEFAULTS.enable_bot_incoming_damage_reduction,
-					},
+					make_checkbox("enable_human_revive_priority"),
+					make_checkbox("enable_ammo_policy", {
+						make_numeric("bot_ranged_ammo_threshold", { 0, 100 }, 5),
+						make_numeric("bot_human_ammo_reserve_threshold", { 50, 100 }, 5),
+						make_numeric("bot_human_grenade_reserve_threshold", { 0, 100 }, 5),
+					}),
+					make_checkbox("enable_pocketable_support"),
+					make_checkbox("enable_bot_tome_pickup"),
+					make_checkbox("enable_bot_grimoire_pickup"),
+					make_checkbox("pickup_require_tag"),
+					make_checkbox("enable_pinging"),
+					make_checkbox("enable_smart_tag_orders"),
+					make_checkbox("enable_com_wheel_responses"),
 				},
 			},
 			{
@@ -337,6 +270,7 @@ return {
 							},
 						},
 					},
+					make_checkbox("enable_charge_nav_validation"),
 				},
 			},
 		},
