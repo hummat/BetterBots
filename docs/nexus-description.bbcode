@@ -64,11 +64,14 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [size=3][b]Latest update[/b][/size]
 
-[b]v1.1.1 hotfix[/b]
+[b]v1.2.0[/b]
 
 [list]
-[*]Fixed a public/Havoc crash path where BetterBots loaded outside Solo Play and touched dedicated-server bot state it cannot own.
-[*]Fixed health station bot-priority deferral. The old rule looked at a value the game never provides, so that specific priority rule silently did nothing.
+[*]New tag-required pickup mode. Turn it on and bots only pick up items you have tagged, instead of hoovering everything in reach. Off by default — the original "grab opportunistically" behavior still works.
+[*]New bot compensation controls. The base game silently buffs bots on coop and expedition (extra HP, toughness, an extra wound, stun immunity above Malice). The mod now lets you toggle the buff off or pick a different tier, so you can run a real squad of "no-buff" bots if you want the harder fight.
+[*]Fixed bots interacting with medicaes and downed allies from way too far away. Both paths now respect the game's interaction distance, the same one humans are held to.
+[*]Fixed several smart-tag pickup edge cases — tag orders from non-owning bots no longer get lost, owners route to the correct target, and Solo Play tag sessions are detected properly.
+[*]Tightened mule-pickup visibility so bots stop trying to fetch items they cannot actually reach.
 [/list]
 
 [size=3][b]Requirements[/b][/size]
