@@ -298,12 +298,38 @@ describe("healing_deferral", function()
 	end)
 
 	describe("install_interaction_hooks", function()
-		it("logs successful bot health-station interactions after the engine applies healing", function()
+		it("logs health-station heal details after the engine applies healing", function()
 			local hook_handler
 			local health_by_unit = {
 				bot1 = 0.50,
 			}
+			local permanent_health_by_unit = {
+				bot1 = 0.30,
+			}
+			local damage_by_unit = {
+				bot1 = 50,
+			}
+			local permanent_damage_by_unit = {
+				bot1 = 30,
+			}
+			local charges_by_station = {
+				station1 = 2,
+			}
 			local debug_logs = {}
+			local saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "station1" and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return charges_by_station.station1
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
 			HealingDeferral.init({
 				mod = {
 					hook = function(_, target, method_name, handler)
@@ -325,6 +351,15 @@ describe("healing_deferral", function()
 					current_health_percent = function(unit)
 						return health_by_unit[unit]
 					end,
+					permanent_damage_taken_percent = function(unit)
+						return permanent_health_by_unit[unit]
+					end,
+					damage_taken = function(unit)
+						return damage_by_unit[unit]
+					end,
+					permanent_damage_taken = function(unit)
+						return permanent_damage_by_unit[unit]
+					end,
 				},
 				bot_slot_for_unit = function(unit)
 					return unit == "bot1" and 5 or nil
@@ -335,15 +370,24 @@ describe("healing_deferral", function()
 			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
 			local stop_result = hook_handler(function(_, _, interactor_unit)
 				health_by_unit[interactor_unit] = 1.0
+				permanent_health_by_unit[interactor_unit] = 0.10
+				damage_by_unit[interactor_unit] = 0
+				permanent_damage_by_unit[interactor_unit] = 10
+				charges_by_station.station1 = 1
 				return "engine_result"
-			end, {}, nil, "bot1", { target_unit = "station1" }, 20, "success", true)
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+			_G.ScriptUnit = saved_script_unit
 
 			assert.equals("engine_result", stop_result)
 			assert.is_truthy(debug_logs[1])
-			assert.equals("health station success: bot=5 health=50%->100%", debug_logs[1])
+			local expected_log = "health station heal applied: bot=5 result=success"
+				.. " health=50.0%->100.0% perm=30.0%->10.0%"
+				.. " damage=50.0->0.0 permanent_damage=30.0->10.0"
+				.. " charges=2->1 duration=3.00s"
+			assert.equals(expected_log, debug_logs[1])
 		end)
 
-		it("does not log health-station success for non-bot interactors", function()
+		it("does not log health-station stop details for non-bot interactors", function()
 			local hook_handler
 			local debug_logs = {}
 			HealingDeferral.init({
@@ -378,6 +422,57 @@ describe("healing_deferral", function()
 			end, {}, nil, "human1", { target_unit = "station1" }, 20, "success", true)
 
 			assert.equals(0, #debug_logs)
+		end)
+
+		it("logs no-op health-station stops separately from applied heals", function()
+			local hook_handler
+			local debug_logs = {}
+			HealingDeferral.init({
+				mod = {
+					hook = function(_, _, _, handler)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function(_, _, message)
+					debug_logs[#debug_logs + 1] = message
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function()
+						return 1.0
+					end,
+					permanent_damage_taken_percent = function()
+						return 0
+					end,
+					damage_taken = function()
+						return 0
+					end,
+					permanent_damage_taken = function()
+						return 0
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function()
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+
+			assert.is_truthy(debug_logs[1])
+			local expected_log = "health station no-op: bot=5 result=success"
+				.. " health=100.0%->100.0% perm=0.0%->0.0%"
+				.. " damage=0.0->0.0 permanent_damage=0.0->0.0"
+				.. " charges=unknown->unknown duration=3.00s"
+			assert.equals(expected_log, debug_logs[1])
 		end)
 
 		it("registers the health-station interaction hook through hook_require", function()

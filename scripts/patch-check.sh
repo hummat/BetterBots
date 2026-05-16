@@ -132,6 +132,10 @@ check_anchor \
 	"HealthStationInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
 	"health station interaction stop signature"
 check_anchor \
+	"scripts/extension_systems/health_station/health_station_extension.lua" \
+	"HealthStationExtension.charge_amount = function (self)" \
+	"health station charge amount accessor"
+check_anchor \
 	"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions.lua" \
 	"ScriptUnit.extension(unit, \"interactor_system\")" \
 	"bot condition interactor extension"

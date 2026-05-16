@@ -323,20 +323,90 @@ local function _clear_reserved_health_station(unit, station_unit)
 	return true
 end
 
-local function _health_percent(unit)
-	if not (_health and _health.current_health_percent) then
-		return nil
-	end
-
-	return _health.current_health_percent(unit)
-end
-
-local function _format_health_percent(health_pct)
-	if not health_pct then
+local function _format_precise_percent(value)
+	if type(value) ~= "number" then
 		return "unknown"
 	end
 
-	return string.format("%d%%", math.floor(health_pct * 100 + 0.5))
+	return string.format("%.1f%%", value * 100)
+end
+
+local function _format_number(value)
+	if type(value) ~= "number" then
+		return "unknown"
+	end
+
+	return string.format("%.1f", value)
+end
+
+local function _format_delta(before, after, formatter)
+	return formatter(before) .. "->" .. formatter(after)
+end
+
+local function _health_snapshot(unit)
+	if not _health then
+		return {}
+	end
+
+	return {
+		health_pct = _health.current_health_percent and _health.current_health_percent(unit) or nil,
+		permanent_damage_pct = _health.permanent_damage_taken_percent and _health.permanent_damage_taken_percent(unit)
+			or nil,
+		damage = _health.damage_taken and _health.damage_taken(unit) or nil,
+		permanent_damage = _health.permanent_damage_taken and _health.permanent_damage_taken(unit) or nil,
+	}
+end
+
+local function _logged_health_station_charge_amount(station_unit)
+	local extension = ScriptUnit
+		and ScriptUnit.has_extension
+		and station_unit
+		and ScriptUnit.has_extension(station_unit, "health_station_system")
+	if not (extension and extension.charge_amount) then
+		return nil
+	end
+
+	local ok, charge_amount = pcall(extension.charge_amount, extension)
+	if ok then
+		return charge_amount
+	end
+
+	return nil
+end
+
+local function _format_charge_amount(charge_amount)
+	if charge_amount == nil then
+		return "unknown"
+	end
+
+	return tostring(charge_amount)
+end
+
+local function _interaction_duration(unit_data_component)
+	if not unit_data_component then
+		return nil
+	end
+
+	local duration = unit_data_component.duration
+	if type(duration) == "number" then
+		return duration
+	end
+
+	local start_time = unit_data_component.start_time
+	local done_time = unit_data_component.done_time
+	if type(start_time) == "number" and type(done_time) == "number" then
+		return done_time - start_time
+	end
+
+	return nil
+end
+
+local function _format_duration(duration)
+	if type(duration) ~= "number" then
+		return "unknown"
+	end
+
+	return string.format("%.2fs", duration)
 end
 
 local function _open_reachable_health_station_interaction(unit, behavior_component, station_unit)
@@ -812,19 +882,42 @@ function M.install_interaction_hooks(HealthStationInteraction)
 				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
 			end
 
-			local target_unit = unit_data_component and unit_data_component.target_unit or nil
-			local before_health = _health_percent(interactor_unit)
+			local station_unit = unit_data_component and unit_data_component.target_unit or nil
+			local before_health = _health_snapshot(interactor_unit)
+			local before_charges = _logged_health_station_charge_amount(station_unit)
+			local duration = _interaction_duration(unit_data_component)
 			local stop_result = func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
-			local after_health = _health_percent(interactor_unit)
+			local after_health = _health_snapshot(interactor_unit)
+			local after_charges = _logged_health_station_charge_amount(station_unit)
+			local charge_consumed = before_charges ~= nil and after_charges ~= nil and after_charges < before_charges
+			local health_changed = before_health.health_pct ~= after_health.health_pct
+				or before_health.permanent_damage_pct ~= after_health.permanent_damage_pct
+				or before_health.damage ~= after_health.damage
+				or before_health.permanent_damage ~= after_health.permanent_damage
+			local outcome = charge_consumed or health_changed
 
 			_log(
-				"healing_station_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
-				"health station success: bot="
+				"healing_station_stop:" .. tostring(interactor_unit) .. ":" .. tostring(station_unit),
+				(outcome and "health station heal applied: bot=" or "health station no-op: bot=")
 					.. tostring(bot_slot)
+					.. " result="
+					.. tostring(result)
 					.. " health="
-					.. _format_health_percent(before_health)
-					.. "->"
-					.. _format_health_percent(after_health)
+					.. _format_delta(before_health.health_pct, after_health.health_pct, _format_precise_percent)
+					.. " perm="
+					.. _format_delta(
+						before_health.permanent_damage_pct,
+						after_health.permanent_damage_pct,
+						_format_precise_percent
+					)
+					.. " damage="
+					.. _format_delta(before_health.damage, after_health.damage, _format_number)
+					.. " permanent_damage="
+					.. _format_delta(before_health.permanent_damage, after_health.permanent_damage, _format_number)
+					.. " charges="
+					.. _format_delta(before_charges, after_charges, _format_charge_amount)
+					.. " duration="
+					.. _format_duration(duration)
 			)
 
 			return stop_result
