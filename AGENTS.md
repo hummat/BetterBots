@@ -24,8 +24,8 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 - `make test` — unit tests via busted (see `tests/*_spec.lua` for the full list; inventory enforced by `make doc-check`)
 - `make patch-check` — verify BetterBots' engine anchor contracts against the current `../Darktide-Source-Code` checkout
 - `make patch-check-refresh` — `git pull --ff-only` the decompiled source, then rerun the engine anchor checks
-- `make check` — local quality gate: auto-format, then lint + lsp + test + doc-check
-- `make check-ci` — CI quality gate: format-check + lint + lsp + test + doc-check
+- `make check` — local quality gate: auto-format, then lint + lsp + test + patch-check + doc-check
+- `make check-ci` — CI quality gate: format-check + lint + lsp + test + patch-check + doc-check
 
 **In-game** (manual verification):
 1. Launch with SoloPlay + Tertium5/6 mods active
@@ -113,7 +113,7 @@ Use project-local tooling configs before handing off changes:
 - `make lsp-check` → `lua-language-server --check` with `.luarc.json`
 - `make patch-check` / `make patch-check-refresh` → verify BetterBots' engine contract anchors against `../Darktide-Source-Code`
 - `make doc-check` → verify doc claims against code (heuristic function counts, closed issue state)
-- `make check` → auto-formats, then runs lint + lsp + test + doc-check
+- `make check` → auto-formats, then runs lint + lsp + test + patch-check + doc-check
 - `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → patch-check-refresh + check + package + tag + push + upload ZIP (CI also attaches ZIP)

@@ -35,16 +35,17 @@ For a full walkthrough, start with [`docs/dev/architecture.md`](docs/dev/archite
 
 ```bash
 git clone https://github.com/hummat/BetterBots.git
+git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git Darktide-Source-Code
 cd BetterBots
 make deps          # install the commit-msg hook
-make check-ci      # non-mutating gate: format-check + lint + lsp + tests + doc checks
+make check-ci      # non-mutating gate: format-check + lint + lsp + tests + patch checks + doc checks
 ```
 
 Typical inner loop:
 
 ```bash
 # edit code, then:
-make check         # auto-formats, then runs lint + lsp + tests + doc checks
+make check         # auto-formats, then runs lint + lsp + tests + patch checks + doc checks
 make test          # tests only, faster
 ```
 
@@ -52,6 +53,7 @@ The repo does not modify your shell `PATH`. `make tool-info` prints exactly whic
 
 ### Required tools
 
+- Sibling decompiled Darktide source checkout at `../Darktide-Source-Code` for patch checks
 - Lua 5.1 / LuaJIT (or anything `busted` supports)
 - `luacheck` — lint (via the repo-local `bin/luacheck` wrapper for the Lua 5.5 mismatch)
 - `stylua` — format
@@ -75,8 +77,8 @@ Verify in-game: start a Solo Play mission and look for `BetterBots loaded` in ch
 | Target | Description |
 |--------|-------------|
 | `make deps` | Install git hooks (Conventional Commits) |
-| `make check` | Auto-format, then run lint + lsp + tests + doc checks |
-| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
+| `make check` | Auto-format, then run lint + lsp + tests + patch checks + doc checks |
+| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + patch checks + doc checks |
 | `make test` | Run busted tests |
 | `make lint` | Run luacheck (via repo-local wrapper) |
 | `make format` | Format with StyLua |
@@ -90,7 +92,7 @@ Verify in-game: start a Solo Play mission and look for `BetterBots loaded` in ch
 | `make release VERSION=X.Y.Z` | patch-check-refresh + check + package + tag + push + upload ZIP |
 | `make tool-info` | Print which tool binaries and fallbacks will run |
 
-CI runs `make check-ci` on every push to `main` and every PR. Patch-day validation (`make patch-check-refresh`) is intentionally separate: it requires the decompiled source checkout to be present.
+CI runs `make check-ci` on every push to `main` and every PR after cloning `../Darktide-Source-Code`. Patch-day validation (`make patch-check-refresh`) is intentionally separate, but engine-contract checks run on every PR through `make check-ci`.
 
 ## Development workflow
 

@@ -37,8 +37,8 @@ tool paths and fallbacks the Make targets will use locally.
 | `make format` | Format with StyLua |
 | `make format-check` | Check formatting (dry run) |
 | `make lsp-check` | Run lua-language-server diagnostics |
-| `make check` | Auto-format, then run lint + lsp + tests + doc checks |
-| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + doc checks |
+| `make check` | Auto-format, then run lint + lsp + tests + patch checks + doc checks |
+| `make check-ci` | Non-mutating CI gate: format-check + lint + lsp + tests + patch checks + doc checks |
 | `make test` | Run busted tests |
 | `make doc-check` | Validate doc invariants |
 | `make patch-check` | Verify decompiled engine anchors against local checkout |
@@ -52,6 +52,9 @@ tool paths and fallbacks the Make targets will use locally.
 - `make lint` always uses `./bin/luacheck`, which keeps luacheck on a working Lua runtime.
 - `make test` tries `busted`, then `lua-busted`, then Arch's packaged
   `/usr/lib/luarocks/.../busted` runner.
+- `make patch-check`, `make check`, and `make check-ci` expect a sibling
+  decompiled source checkout at `../Darktide-Source-Code`. Create it with:
+  `git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git ../Darktide-Source-Code`.
 - `make tool-info` prints the exact paths and fallbacks used by the Makefile.
 
 ## Code Style

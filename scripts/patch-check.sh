@@ -51,6 +51,107 @@ check_anchor() {
 	ok "$label -> ${match%%:*}:${match#*:}"
 }
 
+check_minion_attack_damage_hooks() {
+	local minion_file="$DECOMPILE_ROOT/scripts/utilities/minion_attack.lua"
+	local hooks_file="$REPO_ROOT/scripts/mods/BetterBots/bot_compensation.lua"
+	local tmp_dir expected_file declared_file missing extra
+
+	if [[ ! -f "$minion_file" ]]; then
+		err "bot compensation MinionAttack coverage missing file: scripts/utilities/minion_attack.lua"
+		return
+	fi
+
+	if [[ ! -f "$hooks_file" ]]; then
+		err "bot compensation hook table missing file: scripts/mods/BetterBots/bot_compensation.lua"
+		return
+	fi
+
+	tmp_dir="$(mktemp -d)"
+	expected_file="$tmp_dir/expected"
+	declared_file="$tmp_dir/declared"
+
+	awk '
+		/^MinionAttack\.[[:alnum:]_]+[[:space:]]*=[[:space:]]*function/ {
+			if (in_func && reaches_modifier) {
+				print name
+			}
+
+			in_func = 1
+			reaches_modifier = 0
+			name = $0
+			sub(/^MinionAttack\./, "", name)
+			sub(/[[:space:]]*=.*/, "", name)
+		}
+
+		in_func && /^((local[[:space:]]+)?function)[[:space:]]+[[:alnum:]_]+/ {
+			if (reaches_modifier) {
+				print name
+			}
+
+			in_func = 0
+			reaches_modifier = 0
+			name = ""
+			next
+		}
+
+		in_func && /^end$/ {
+			if (reaches_modifier) {
+				print name
+			}
+
+			in_func = 0
+			reaches_modifier = 0
+			name = ""
+			next
+		}
+
+		in_func && (/bot_power_level_modifier/ || /_melee_hit/ || (name == "melee" && /_melee_with_/)) {
+			reaches_modifier = 1
+		}
+
+		END {
+			if (in_func && reaches_modifier) {
+				print name
+			}
+		}
+	' "$minion_file" | sort -u > "$expected_file"
+
+	awk '
+		/local MINION_ATTACK_DAMAGE_HOOKS[[:space:]]*=/ {
+			in_hooks = 1
+			next
+		}
+
+		in_hooks && /^}/ {
+			exit
+		}
+
+		in_hooks && /method[[:space:]]*=[[:space:]]*"/ {
+			line = $0
+			sub(/.*method[[:space:]]*=[[:space:]]*"/, "", line)
+			sub(/".*/, "", line)
+			print line
+		}
+	' "$hooks_file" | sort -u > "$declared_file"
+
+	missing="$(comm -23 "$expected_file" "$declared_file" || true)"
+	extra="$(comm -13 "$expected_file" "$declared_file" || true)"
+
+	if [[ -n "$missing" ]]; then
+		err "bot compensation missing MinionAttack hook(s): ${missing//$'\n'/, }"
+	fi
+
+	if [[ -n "$extra" ]]; then
+		err "bot compensation declares stale MinionAttack hook(s): ${extra//$'\n'/, }"
+	fi
+
+	if [[ -z "$missing" && -z "$extra" ]]; then
+		ok "bot compensation MinionAttack damage hooks -> $(paste -sd, "$declared_file")"
+	fi
+
+	rm -rf "$tmp_dir"
+}
+
 while (($# > 0)); do
 	case "$1" in
 		--refresh)
@@ -199,6 +300,8 @@ check_anchor \
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua" \
 	"BtBotShootAction._set_new_aim_target = function" \
 	"bot shoot aim-target hook (#92)"
+
+check_minion_attack_damage_hooks
 
 echo ""
 if ((errors > 0)); then

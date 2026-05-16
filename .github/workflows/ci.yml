@@ -46,6 +46,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Checkout decompiled Darktide source
+        run: git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git ../Darktide-Source-Code
+
       - name: Install Lua tooling
         run: |
           sudo apt-get update -qq

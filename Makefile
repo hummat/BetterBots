@@ -34,9 +34,9 @@ patch-check-refresh:
 profile-authoring-reference:
 	@python3 scripts/profile-authoring-reference.py generate
 
-check: format lint lsp-check test doc-check
+check: format lint lsp-check test patch-check doc-check
 
-check-ci: format-check lint lsp-check test doc-check
+check-ci: format-check lint lsp-check test patch-check doc-check
 
 test:
 	@if [ -d tests ]; then \
