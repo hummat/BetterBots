@@ -388,14 +388,19 @@ end
 function M.make_interactor_extension(opts)
 	opts = opts or {}
 	local can_interact = opts.can_interact
+	local max_interaction_distance = opts.max_interaction_distance or 2.5
 	local ext = {
 		can_interact = type(can_interact) == "function" and can_interact or function()
 			return can_interact ~= false
+		end,
+		_max_interaction_distance = function()
+			return max_interaction_distance
 		end,
 	}
 
 	_apply_audited_overrides("make_interactor_extension", ext, opts.overrides, {
 		can_interact = true,
+		_max_interaction_distance = true,
 	})
 
 	return ext

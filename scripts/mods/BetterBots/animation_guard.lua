@@ -5,24 +5,11 @@ local _mod -- luacheck: ignore 231
 local _debug_log
 local _debug_enabled
 local _fixed_time
-local _warned_keys = {}
 
 local INVALID_ANIMATION_VARIABLE_INDEX = 4294967295
 
 local function is_valid_variable_index(variable_index)
 	return variable_index ~= nil and variable_index ~= INVALID_ANIMATION_VARIABLE_INDEX
-end
-
-local function _warn_once(key, message)
-	if _warned_keys[key] then
-		return
-	end
-
-	_warned_keys[key] = true
-
-	if _mod and _mod.warning then
-		_mod:warning(message)
-	end
 end
 
 local function _is_bot_unit(self)
@@ -76,11 +63,6 @@ local function register_hooks()
 								"info"
 							)
 						end
-
-						_warn_once(
-							tostring(variable_name) .. ":" .. tostring(failure_reason),
-							"BetterBots: animation guard fell back to plain anim_event for " .. tostring(variable_name)
-						)
 
 						return self:anim_event(event_name)
 					end

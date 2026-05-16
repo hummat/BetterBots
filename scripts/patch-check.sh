@@ -116,6 +116,26 @@ check_anchor \
 	"BotBehaviorExtension._refresh_destination = function" \
 	"behavior refresh-destination hook"
 check_anchor \
+	"scripts/extension_systems/interaction/interactor_extension.lua" \
+	"InteractorExtension.can_interact = function (self, target_unit, interaction_type)" \
+	"interactor can_interact signature"
+check_anchor \
+	"scripts/extension_systems/interaction/interactor_extension.lua" \
+	"InteractorExtension._max_interaction_distance = function (self)" \
+	"interactor max interaction distance helper"
+check_anchor \
+	"scripts/settings/interaction/interaction_templates.lua" \
+	"interaction_class_name = \"health_station\"" \
+	"health station interaction template"
+check_anchor \
+	"scripts/extension_systems/interaction/interactions/health_station_interaction.lua" \
+	"HealthStationInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
+	"health station interaction stop signature"
+check_anchor \
+	"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions.lua" \
+	"ScriptUnit.extension(unit, \"interactor_system\")" \
+	"bot condition interactor extension"
+check_anchor \
 	"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions.lua" \
 	"conditions.can_activate_ability = function" \
 	"bot condition gate"

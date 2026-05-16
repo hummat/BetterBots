@@ -10,6 +10,7 @@ local _health
 local _perf
 local _com_wheel
 local _health_station_recently_tagged
+local _bot_slot_for_unit
 local _position_lookup
 local _vector3
 local _cached_settings
@@ -19,6 +20,7 @@ local _last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" }
 local _reserved_health_station_by_unit = setmetatable({}, { __mode = "k" })
 local _bot_group_units_scratch = {}
 local BOT_GROUP_PATCH_SENTINEL = "__bb_healing_deferral_bot_group_installed"
+local INTERACTION_PATCH_SENTINEL = "__bb_healing_deferral_health_station_interaction_installed"
 
 local MODE_SETTING_ID = "healing_deferral_mode"
 local HUMAN_THRESHOLD_SETTING_ID = "healing_deferral_human_threshold"
@@ -28,6 +30,7 @@ local DEFAULT_MODE = "stations_and_deployables"
 local DEFERRAL_THRESHOLD = 0.9
 local EMERGENCY_THRESHOLD = 0.25
 local BOT_HEALTH_STATION_PRIORITY_MARGIN = 0.15
+local DEFAULT_MAX_INTERACTION_DISTANCE = 2.5
 local VALID_MODES = {
 	off = true,
 	stations_only = true,
@@ -284,6 +287,11 @@ local function _health_station_charge_amount(health_station_extension)
 		or 0
 end
 
+local function _unit_position(unit)
+	local position_lookup = _position_lookup or POSITION_LOOKUP
+	return position_lookup and position_lookup[unit] or nil
+end
+
 local function _distance_squared_between_units(unit_a, unit_b)
 	local position_lookup = _position_lookup or POSITION_LOOKUP
 	local vector3 = _vector3 or Vector3
@@ -311,6 +319,78 @@ local function _clear_reserved_health_station(unit, station_unit)
 	end
 
 	_reserved_health_station_by_unit[unit] = nil
+
+	return true
+end
+
+local function _health_percent(unit)
+	if not (_health and _health.current_health_percent) then
+		return nil
+	end
+
+	return _health.current_health_percent(unit)
+end
+
+local function _format_health_percent(health_pct)
+	if not health_pct then
+		return "unknown"
+	end
+
+	return string.format("%d%%", math.floor(health_pct * 100 + 0.5))
+end
+
+local function _open_reachable_health_station_interaction(unit, behavior_component, station_unit)
+	if not (unit and behavior_component and station_unit) then
+		return false
+	end
+
+	local interactor_extension = ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(unit, "interactor_system")
+	if not (interactor_extension and interactor_extension.can_interact) then
+		return false
+	end
+
+	local can_interact_ok, can_interact =
+		pcall(interactor_extension.can_interact, interactor_extension, station_unit, "health_station")
+	if not can_interact_ok or not can_interact then
+		return false
+	end
+
+	local distance_squared = _distance_squared_between_units(unit, station_unit)
+	if not distance_squared then
+		return false
+	end
+
+	local max_interaction_distance = DEFAULT_MAX_INTERACTION_DISTANCE
+	if interactor_extension._max_interaction_distance then
+		local distance_ok, resolved_distance =
+			pcall(interactor_extension._max_interaction_distance, interactor_extension)
+		if distance_ok and type(resolved_distance) == "number" and resolved_distance > 0 then
+			max_interaction_distance = resolved_distance
+		end
+	end
+
+	if distance_squared > max_interaction_distance * max_interaction_distance then
+		return false
+	end
+
+	local target_level_unit_destination = behavior_component.target_level_unit_destination
+	local self_position = _unit_position(unit)
+	if not (target_level_unit_destination and target_level_unit_destination.store and self_position) then
+		return false
+	end
+
+	behavior_component.interaction_unit = station_unit
+	-- Vanilla can_use_health_station also checks the stored level-unit destination.
+	-- Once the station is in bot interaction range, snap that destination to the bot
+	-- so the BT can enter the interaction instead of waiting on path epsilon.
+	target_level_unit_destination:store(self_position)
+
+	_log(
+		"healing_station_interact_ready:" .. tostring(unit) .. ":" .. tostring(station_unit),
+		"health station interaction opened for bot"
+	)
 
 	return true
 end
@@ -423,6 +503,7 @@ function M.init(deps)
 	_perf = deps.perf
 	_com_wheel = deps.com_wheel
 	_health_station_recently_tagged = deps.health_station_recently_tagged
+	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_position_lookup = deps.position_lookup
 	_vector3 = deps.vector3
 end
@@ -678,7 +759,13 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		health_station_component.needs_health = true
 		health_station_component.needs_health_queue_number = 1
-		if (station_was_tagged or explicit_station_order) and _mark_destination_refresh(self) then
+		local interaction_opened =
+			_open_reachable_health_station_interaction(unit, self._behavior_component, target_level_unit)
+		if
+			(station_was_tagged or explicit_station_order)
+			and not interaction_opened
+			and _mark_destination_refresh(self)
+		then
 			_log(
 				"healing_station_tag_refresh:" .. tostring(unit),
 				"health station destination refresh requested from human smart-tag"
@@ -705,7 +792,54 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 	end)
 end
 
-function M.register_hooks() end
+function M.install_interaction_hooks(HealthStationInteraction)
+	if not HealthStationInteraction or rawget(HealthStationInteraction, INTERACTION_PATCH_SENTINEL) then
+		return
+	end
+
+	HealthStationInteraction[INTERACTION_PATCH_SENTINEL] = true
+
+	_mod:hook(
+		HealthStationInteraction,
+		"stop",
+		function(func, self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			if not (_debug_enabled and _debug_enabled() and interactor_is_server and result == "success") then
+				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			end
+
+			local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(interactor_unit) or nil
+			if not bot_slot then
+				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			end
+
+			local target_unit = unit_data_component and unit_data_component.target_unit or nil
+			local before_health = _health_percent(interactor_unit)
+			local stop_result = func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
+			local after_health = _health_percent(interactor_unit)
+
+			_log(
+				"healing_station_success:" .. tostring(interactor_unit) .. ":" .. tostring(target_unit),
+				"health station success: bot="
+					.. tostring(bot_slot)
+					.. " health="
+					.. _format_health_percent(before_health)
+					.. "->"
+					.. _format_health_percent(after_health)
+			)
+
+			return stop_result
+		end
+	)
+end
+
+function M.register_hooks()
+	_mod:hook_require(
+		"scripts/extension_systems/interaction/interactions/health_station_interaction",
+		function(HealthStationInteraction)
+			M.install_interaction_hooks(HealthStationInteraction)
+		end
+	)
+end
 
 function M.install_bot_group_hooks(BotGroup)
 	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) then

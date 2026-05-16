@@ -1,4 +1,5 @@
 local HealingDeferral = dofile("scripts/mods/BetterBots/healing_deferral.lua")
+local test_helper = dofile("tests/test_helper.lua")
 
 describe("healing_deferral", function()
 	describe("init", function()
@@ -296,6 +297,118 @@ describe("healing_deferral", function()
 		end)
 	end)
 
+	describe("install_interaction_hooks", function()
+		it("logs successful bot health-station interactions after the engine applies healing", function()
+			local hook_handler
+			local health_by_unit = {
+				bot1 = 0.50,
+			}
+			local debug_logs = {}
+			HealingDeferral.init({
+				mod = {
+					hook = function(_, target, method_name, handler)
+						assert.equals("stop", method_name)
+						assert.is_table(target)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function(_, _, message)
+					debug_logs[#debug_logs + 1] = message
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function(unit)
+						return health_by_unit[unit]
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			local stop_result = hook_handler(function(_, _, interactor_unit)
+				health_by_unit[interactor_unit] = 1.0
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1" }, 20, "success", true)
+
+			assert.equals("engine_result", stop_result)
+			assert.is_truthy(debug_logs[1])
+			assert.equals("health station success: bot=5 health=50%->100%", debug_logs[1])
+		end)
+
+		it("does not log health-station success for non-bot interactors", function()
+			local hook_handler
+			local debug_logs = {}
+			HealingDeferral.init({
+				mod = {
+					hook = function(_, _, _, handler)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function(_, _, message)
+					debug_logs[#debug_logs + 1] = message
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function()
+						return 0.5
+					end,
+				},
+				bot_slot_for_unit = function()
+					return nil
+				end,
+			})
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function()
+				return "engine_result"
+			end, {}, nil, "human1", { target_unit = "station1" }, 20, "success", true)
+
+			assert.equals(0, #debug_logs)
+		end)
+
+		it("registers the health-station interaction hook through hook_require", function()
+			local hooked_path
+			local installed_target
+			HealingDeferral.init({
+				mod = {
+					hook_require = function(_, path, callback)
+						hooked_path = path
+						callback({})
+					end,
+					hook = function(_, target)
+						installed_target = target
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+			})
+
+			HealingDeferral.register_hooks()
+
+			assert.equals("scripts/extension_systems/interaction/interactions/health_station_interaction", hooked_path)
+			assert.is_table(installed_target)
+		end)
+	end)
+
 	describe("install_behavior_ext_hooks", function()
 		local update_health_stations_hook
 		local saved_script_unit
@@ -315,6 +428,7 @@ describe("healing_deferral", function()
 			local station_unit = {}
 			local martyrdom_units = opts.martyrdom_units or {}
 			local station_units = opts.station_units or { station_unit }
+			local interactor_extensions = opts.interactor_extensions or {}
 			debug_logs = {}
 
 			saved_script_unit = rawget(_G, "ScriptUnit")
@@ -339,6 +453,10 @@ describe("healing_deferral", function()
 						}
 					end
 
+					if system_name == "interactor_system" then
+						return interactor_extensions[unit]
+					end
+
 					if
 						system_name == "talent_system"
 						and ((unit == "bot1" and opts.bot_has_martyrdom) or martyrdom_units[unit])
@@ -357,11 +475,15 @@ describe("healing_deferral", function()
 			}
 			local position_lookup
 			local vector3
-			if opts.bot_position or opts.station_position then
+			if opts.position_lookup then
+				position_lookup = opts.position_lookup
+			elseif opts.bot_position or opts.station_position then
 				position_lookup = {
 					bot1 = opts.bot_position or { x = 0, y = 0, z = 0 },
 					[station_unit] = opts.station_position or { x = 0, y = 0, z = 0 },
 				}
+			end
+			if position_lookup then
 				vector3 = {
 					distance = function(a, b)
 						local dx = a.x - b.x
@@ -706,6 +828,218 @@ describe("healing_deferral", function()
 			assert.are.equal(25, self._perception_component.target_level_unit_distance)
 			assert.is_true(self._follow_component.needs_destination_refresh)
 			assert.is_truthy(find_debug_log("health station permitted: explicit human smart-tag order"))
+		end)
+
+		it("opens the vanilla health-station condition when the assigned bot can already interact", function()
+			local can_interact_args
+			local bot_position = {
+				x = 1,
+				y = 2,
+				z = 0,
+			}
+			local destination = {
+				value = nil,
+				store = function(self, value)
+					self.value = value
+				end,
+			}
+			local station_unit = install_hook_fixture({
+				debug_enabled = true,
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				bot_position = bot_position,
+				interactor_extensions = {
+					bot1 = test_helper.make_interactor_extension({
+						can_interact = function(_, target, interaction_type)
+							can_interact_args = { target = target, interaction_type = interaction_type }
+							return true
+						end,
+					}),
+				},
+				health_station_recently_tagged = function()
+					return false
+				end,
+			})
+			local reserved, reason = HealingDeferral.reserve_tagged_health_station("bot1", station_unit)
+			assert.is_true(reserved, reason)
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_behavior_component = {
+					interaction_unit = nil,
+					target_level_unit_destination = destination,
+				},
+				_perception_component = {
+					target_level_unit = nil,
+					target_level_unit_distance = math.huge,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.same({ target = station_unit, interaction_type = "health_station" }, can_interact_args)
+			assert.equals(station_unit, self._behavior_component.interaction_unit)
+			assert.equals(bot_position, destination.value)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+			assert.is_truthy(find_debug_log("health station interaction opened"))
+		end)
+
+		it(
+			"keeps refreshing the health-station destination when can_interact is true but the bot is too far away",
+			function()
+				local can_interact_args
+				local bot_position = {
+					x = 0,
+					y = 0,
+					z = 0,
+				}
+				local original_destination = {
+					x = 10,
+					y = 20,
+					z = 0,
+				}
+				local destination = {
+					value = original_destination,
+					store = function(self, value)
+						self.value = value
+					end,
+				}
+				local station_unit = install_hook_fixture({
+					debug_enabled = true,
+					bot_health_pct = 0.50,
+					human_health_pct = 0.95,
+					charge_amount = 2,
+					require_station_tag = true,
+					bot_position = bot_position,
+					station_position = {
+						x = 3,
+						y = 0,
+						z = 0,
+					},
+					interactor_extensions = {
+						bot1 = test_helper.make_interactor_extension({
+							max_interaction_distance = 2.5,
+							can_interact = function(_, target, interaction_type)
+								can_interact_args = { target = target, interaction_type = interaction_type }
+								return true
+							end,
+						}),
+					},
+					health_station_recently_tagged = function()
+						return false
+					end,
+				})
+				local reserved, reason = HealingDeferral.reserve_tagged_health_station("bot1", station_unit)
+				assert.is_true(reserved, reason)
+				local self = {
+					_health_station_component = {
+						needs_health = false,
+						needs_health_queue_number = 0,
+					},
+					_follow_component = {
+						needs_destination_refresh = false,
+					},
+					_behavior_component = {
+						interaction_unit = nil,
+						target_level_unit_destination = destination,
+					},
+					_perception_component = {
+						target_level_unit = nil,
+						target_level_unit_distance = math.huge,
+					},
+					_side = {
+						valid_human_units = { "human1" },
+					},
+				}
+
+				update_health_stations_hook(self, "bot1")
+
+				assert.same({ target = station_unit, interaction_type = "health_station" }, can_interact_args)
+				assert.is_nil(self._behavior_component.interaction_unit)
+				assert.equals(original_destination, destination.value)
+				assert.is_true(self._follow_component.needs_destination_refresh)
+				assert.is_truthy(find_debug_log("health station destination refresh requested from human smart-tag"))
+				assert.is_nil(find_debug_log("health station interaction opened"))
+			end
+		)
+
+		it("keeps refreshing the health-station destination when station position is unavailable", function()
+			local bot_position = {
+				x = 0,
+				y = 0,
+				z = 0,
+			}
+			local original_destination = {
+				x = 10,
+				y = 20,
+				z = 0,
+			}
+			local destination = {
+				value = original_destination,
+				store = function(self, value)
+					self.value = value
+				end,
+			}
+			local station_unit = install_hook_fixture({
+				debug_enabled = true,
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				position_lookup = {
+					bot1 = bot_position,
+				},
+				interactor_extensions = {
+					bot1 = test_helper.make_interactor_extension({
+						can_interact = function()
+							return true
+						end,
+					}),
+				},
+				health_station_recently_tagged = function()
+					return false
+				end,
+			})
+			local reserved, reason = HealingDeferral.reserve_tagged_health_station("bot1", station_unit)
+			assert.is_true(reserved, reason)
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_behavior_component = {
+					interaction_unit = nil,
+					target_level_unit_destination = destination,
+				},
+				_perception_component = {
+					target_level_unit = nil,
+					target_level_unit_distance = math.huge,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_nil(self._behavior_component.interaction_unit)
+			assert.equals(original_destination, destination.value)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.is_truthy(find_debug_log("health station destination refresh requested from human smart-tag"))
+			assert.is_nil(find_debug_log("health station interaction opened"))
 		end)
 
 		it("clears an explicit health-station tag when the bot becomes full", function()

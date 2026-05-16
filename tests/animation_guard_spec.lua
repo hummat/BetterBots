@@ -30,7 +30,7 @@ describe("animation_guard", function()
 		assert.is_true(AnimationGuard.is_valid_variable_index(17))
 	end)
 
-	it("falls back to plain anim_event for bot units when the variable id is invalid", function()
+	it("falls back to plain anim_event for bot units when the variable id is invalid without warning", function()
 		local AnimationGuard = load_animation_guard()
 		local hook_handler
 		local warnings = {}
@@ -85,7 +85,7 @@ describe("animation_guard", function()
 
 		assert.is_false(original_called)
 		assert.equals("deploy_drone", fallback_event_name)
-		assert.equals(1, #warnings)
+		assert.equals(0, #warnings)
 	end)
 
 	it("falls back to plain anim_event when variable lookup throws", function()

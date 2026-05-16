@@ -656,6 +656,7 @@ function M.load_and_init(ctx)
 		perf = Perf,
 		com_wheel = ComWheelResponse,
 		health_station_recently_tagged = SmartTagOrders.health_station_recently_tagged,
+		bot_slot_for_unit = Debug.bot_slot_for_unit,
 	})
 
 	AmmoPolicy.init({
