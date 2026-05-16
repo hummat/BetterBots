@@ -307,6 +307,10 @@ check_anchor \
 	"PlayerUnitInputExtension.bot_unit_input = function" \
 	"player input bot accessor"
 check_anchor \
+	"scripts/extension_systems/action_input/player_unit_action_input_extension.lua" \
+	"PlayerUnitActionInputExtension.bot_queue_action_input = function" \
+	"action input bot queue"
+check_anchor \
 	"scripts/extension_systems/input/bot_unit_input.lua" \
 	"BotUnitInput.set_aim_position = function" \
 	"bot input aim position"
