@@ -83,6 +83,7 @@ local ATTACK_RESCUE_DISABLING_TYPES = {
 
 local HUMAN_REVIVE_OWNER_LEASE = 3
 local HUMAN_REVIVE_TAKEOVER_DISTANCE_MARGIN = 3
+local DEFAULT_MAX_INTERACTION_DISTANCE = 2.5
 
 local M = {}
 
@@ -189,6 +190,34 @@ local function _distance(a, b)
 	local dx, dy, dz = ax - bx, ay - by, az - bz
 
 	return math.sqrt(dx * dx + dy * dy + dz * dz)
+end
+
+local function _distance_squared(a, b)
+	if not a or not b then
+		return math.huge
+	end
+	if rawget(_G, "Vector3") and Vector3.distance_squared then
+		return Vector3.distance_squared(a, b)
+	end
+
+	local ax, ay, az = a.x or a[1] or 0, a.y or a[2] or 0, a.z or a[3] or 0
+	local bx, by, bz = b.x or b[1] or 0, b.y or b[2] or 0, b.z or b[3] or 0
+	local dx, dy, dz = ax - bx, ay - by, az - bz
+
+	return dx * dx + dy * dy + dz * dz
+end
+
+local function _max_interaction_distance(interactor_extension)
+	if not (interactor_extension and interactor_extension._max_interaction_distance) then
+		return DEFAULT_MAX_INTERACTION_DISTANCE
+	end
+
+	local ok, distance = pcall(interactor_extension._max_interaction_distance, interactor_extension)
+	if ok and type(distance) == "number" and distance > 0 then
+		return distance
+	end
+
+	return DEFAULT_MAX_INTERACTION_DISTANCE
 end
 
 local function _now()
@@ -419,6 +448,12 @@ local function _open_reachable_rescue_interaction(unit, behavior_component, targ
 	local ok, can_interact =
 		pcall(interactor_extension.can_interact, interactor_extension, target_ally, interaction_type)
 	if not ok or not can_interact then
+		return false
+	end
+
+	local distance_squared = _distance_squared(_unit_position(unit), _unit_position(target_ally))
+	local max_interaction_distance = _max_interaction_distance(interactor_extension)
+	if distance_squared > max_interaction_distance * max_interaction_distance then
 		return false
 	end
 

@@ -323,6 +323,22 @@ local function _clear_reserved_health_station(unit, station_unit)
 	return true
 end
 
+local function _clear_reserved_health_station_for_all(station_unit)
+	if not station_unit then
+		return false
+	end
+
+	local cleared = false
+	for unit, reserved_station in pairs(_reserved_health_station_by_unit) do
+		if reserved_station == station_unit then
+			_reserved_health_station_by_unit[unit] = nil
+			cleared = true
+		end
+	end
+
+	return cleared
+end
+
 local function _format_precise_percent(value)
 	if type(value) ~= "number" then
 		return "unknown"
@@ -411,6 +427,11 @@ end
 
 local function _open_reachable_health_station_interaction(unit, behavior_component, station_unit)
 	if not (unit and behavior_component and station_unit) then
+		return false
+	end
+
+	local health_station_extension = _health_station_extension(station_unit)
+	if not health_station_extension or _health_station_charge_amount(health_station_extension) <= 0 then
 		return false
 	end
 
@@ -704,13 +725,17 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 				and _health.permanent_damage_taken_percent(unit)
 			or 0
 		local charge_amount = _health_station_charge_amount(health_station_extension)
-		if reserved_station and charge_amount <= 0 then
-			_clear_reserved_health_station(unit, reserved_station)
+		if charge_amount <= 0 then
+			if reserved_station then
+				_clear_reserved_health_station(unit, reserved_station)
+			end
 			_apply_health_station_deferral(health_station_component)
 			if _health_station_log_state_changed(unit, "reserved_station_empty") then
 				_log(
 					"healing_station:" .. tostring(unit),
-					"released explicit health station smart-tag order because the station has no charges"
+					reserved_station
+							and "released explicit health station smart-tag order because the station has no charges"
+						or "deferred health station because the station has no charges"
 				)
 			end
 			if perf_t0 then
@@ -889,6 +914,9 @@ function M.install_interaction_hooks(HealthStationInteraction)
 			local stop_result = func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
 			local after_health = _health_snapshot(interactor_unit)
 			local after_charges = _logged_health_station_charge_amount(station_unit)
+			if after_charges ~= nil and after_charges <= 0 then
+				_clear_reserved_health_station_for_all(station_unit)
+			end
 			local charge_consumed = before_charges ~= nil and after_charges ~= nil and after_charges < before_charges
 			local health_changed = before_health.health_pct ~= after_health.health_pct
 				or before_health.permanent_damage_pct ~= after_health.permanent_damage_pct

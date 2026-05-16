@@ -726,6 +726,61 @@ describe("revive_ability", function()
 			assert.equals(_G.POSITION_LOOKUP[bot], aid_destination.value)
 		end)
 
+		it("does not open the vanilla revive condition outside interaction range", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			local can_interact_args
+			setup_human_unit(human, "knocked_down")
+			_extensions[bot] = {
+				interactor_system = test_helper.make_interactor_extension({
+					max_interaction_distance = 2.5,
+					can_interact = function(_, target, interaction_type)
+						can_interact_args = { target = target, interaction_type = interaction_type }
+						return true
+					end,
+				}),
+			}
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = vec(3)
+
+			local self, _, aid_destination = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_true(applied)
+			assert.same({ target = human, interaction_type = "revive" }, can_interact_args)
+			assert.is_nil(self._behavior_component.interaction_unit)
+			assert.is_nil(aid_destination.value)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("does not assign a rescue target when the ally position is unavailable", function()
+			local bot = make_unit("bot_1")
+			local human = make_unit("human_1")
+			setup_human_unit(human, "knocked_down")
+			_extensions[bot] = {
+				interactor_system = test_helper.make_interactor_extension({
+					max_interaction_distance = 2.5,
+					can_interact = function()
+						return true
+					end,
+				}),
+			}
+			_G.POSITION_LOOKUP[bot] = vec(0)
+			_G.POSITION_LOOKUP[human] = nil
+
+			local self, _, aid_destination = make_priority_self(bot, { valid_human_units = { human } })
+
+			local applied = ReviveAbility.apply_human_revive_priority(self, bot)
+
+			assert.is_false(applied)
+			assert.is_nil(self._perception_component.target_ally)
+			assert.is_false(self._behavior_component.revive_with_urgent_target)
+			assert.is_nil(self._behavior_component.interaction_unit)
+			assert.is_nil(aid_destination.value)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+		end)
+
 		it("assigns the nearest bot to a netted solo human and forces remove-net path refresh", function()
 			local bot = make_unit("bot_1")
 			local human = make_unit("human_1")

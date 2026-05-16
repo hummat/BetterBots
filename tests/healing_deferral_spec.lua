@@ -387,6 +387,101 @@ describe("healing_deferral", function()
 			assert.equals(expected_log, debug_logs[1])
 		end)
 
+		it("clears all reservations for a health station when its last charge is consumed", function()
+			local hook_handler
+			local health_by_unit = {
+				bot1 = 0.50,
+				bot2 = 0.50,
+			}
+			local permanent_health_by_unit = {
+				bot1 = 0.30,
+				bot2 = 0.30,
+			}
+			local damage_by_unit = {
+				bot1 = 50,
+				bot2 = 50,
+			}
+			local permanent_damage_by_unit = {
+				bot1 = 30,
+				bot2 = 30,
+			}
+			local charges_by_station = {
+				station1 = 1,
+			}
+			local saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "station1" and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return charges_by_station.station1
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return true
+						end
+					end,
+					hook = function(_, target, method_name, handler)
+						assert.equals("stop", method_name)
+						assert.is_table(target)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function(unit)
+						return health_by_unit[unit]
+					end,
+					permanent_damage_taken_percent = function(unit)
+						return permanent_health_by_unit[unit]
+					end,
+					damage_taken = function(unit)
+						return damage_by_unit[unit]
+					end,
+					permanent_damage_taken = function(unit)
+						return permanent_damage_by_unit[unit]
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot1", "station1"))
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot2", "station1"))
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function(_, _, interactor_unit)
+				health_by_unit[interactor_unit] = 1.0
+				permanent_health_by_unit[interactor_unit] = 0
+				damage_by_unit[interactor_unit] = 0
+				permanent_damage_by_unit[interactor_unit] = 0
+				charges_by_station.station1 = 0
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+			_G.ScriptUnit = saved_script_unit
+
+			assert.is_nil(HealingDeferral.reserved_health_station("bot1"))
+			assert.is_nil(HealingDeferral.reserved_health_station("bot2"))
+		end)
+
 		it("does not log health-station stop details for non-bot interactors", function()
 			local hook_handler
 			local debug_logs = {}
@@ -1283,6 +1378,43 @@ describe("healing_deferral", function()
 			assert.is_false(self._health_station_component.needs_health)
 			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
 			assert.is_false(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("does not keep refreshing a tagged health station with no charges", function()
+			local tagged_station
+			local station_unit = install_hook_fixture({
+				debug_enabled = true,
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 0,
+				require_station_tag = true,
+				health_station_recently_tagged = function(unit)
+					return unit == tagged_station
+				end,
+			})
+			tagged_station = station_unit
+			local self = {
+				_health_station_component = {
+					needs_health = true,
+					needs_health_queue_number = 1,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = station_unit,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+			assert.is_nil(find_debug_log("health station destination refresh requested from human smart-tag"))
 		end)
 
 		it("does not defer a tagged health station to a non-critical Martyrdom human", function()

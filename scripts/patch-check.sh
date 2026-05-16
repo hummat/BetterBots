@@ -132,6 +132,22 @@ check_anchor \
 	"HealthStationInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
 	"health station interaction stop signature"
 check_anchor \
+	"scripts/extension_systems/interaction/interactions/revive_interaction.lua" \
+	"ReviveInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
+	"revive interaction stop signature"
+check_anchor \
+	"scripts/extension_systems/interaction/interactions/remove_net_interaction.lua" \
+	"RemoveNetInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
+	"remove-net interaction stop signature"
+check_anchor \
+	"scripts/extension_systems/interaction/interactions/pull_up_interaction.lua" \
+	"PullUpInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, is_server)" \
+	"pull-up interaction stop signature"
+check_anchor \
+	"scripts/extension_systems/interaction/interactions/rescue_interaction.lua" \
+	"RescueInteraction.stop = function (self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)" \
+	"rescue interaction stop signature"
+check_anchor \
 	"scripts/extension_systems/health_station/health_station_extension.lua" \
 	"HealthStationExtension.charge_amount = function (self)" \
 	"health station charge amount accessor"
