@@ -12,6 +12,8 @@ local _needs_ammo_pickup
 local _record_health_station_tag
 local _can_reserve_grenade_pickup
 local _reserve_grenade_pickup
+local _can_reserve_health_station
+local _reserve_health_station
 
 local SUPPORTED_SLOT_NAMES = {
 	slot_pocketable = true,
@@ -355,6 +357,14 @@ local function _eligible_bot_for_family(bot_unit, descriptor)
 		return _can_reserve_grenade_pickup(bot_unit, descriptor.pickup_unit)
 	end
 
+	if descriptor.family == "health_station" then
+		if not _can_reserve_health_station then
+			return false, "health_station_reservation_unavailable"
+		end
+
+		return _can_reserve_health_station(bot_unit, descriptor.pickup_unit)
+	end
+
 	return false, "unsupported_family"
 end
 
@@ -425,7 +435,48 @@ function M.try_dispatch(interactor_unit, target_unit, optional_alternate)
 	end
 
 	if recorded and record_reason == "health_station" then
-		return false, "health_station_tag_recorded"
+		if (_is_enabled and not _is_enabled()) or not _reserve_health_station then
+			return false, "health_station_tag_recorded"
+		end
+
+		local descriptor = {
+			family = "health_station",
+			pickup_name = "health_station",
+			pickup_unit = target_unit,
+		}
+		local bot_unit, select_reason, select_detail =
+			_select_nearest_eligible_bot(interactor_unit, target_unit, descriptor)
+		if not bot_unit then
+			local detail_suffix = select_detail and ", detail=" .. tostring(select_detail) or ""
+			_log(
+				"smart_tag_order_reject:" .. tostring(target_unit),
+				"smart-tag pickup ignored for health_station (reason="
+					.. tostring(select_reason)
+					.. detail_suffix
+					.. ")"
+			)
+			return false, "health_station_tag_recorded"
+		end
+
+		local reserved, reserve_reason = _reserve_health_station(bot_unit, target_unit)
+		if not reserved then
+			_log(
+				"smart_tag_order_reject:" .. tostring(target_unit),
+				"smart-tag pickup ignored for health_station (reason="
+					.. tostring(reserve_reason or "health_station_reservation_failed")
+					.. ")"
+			)
+			return false, "health_station_tag_recorded"
+		end
+
+		_log(
+			"smart_tag_order_accept:" .. tostring(target_unit),
+			"smart-tag pickup routed health_station to bot "
+				.. tostring(_bot_slot_for_unit and _bot_slot_for_unit(bot_unit) or bot_unit)
+				.. " (family=health_station)"
+		)
+
+		return true, bot_unit
 	end
 
 	if _is_enabled and not _is_enabled() then
@@ -537,6 +588,8 @@ function M.wire(refs)
 	_record_health_station_tag = refs.record_health_station_tag
 	_can_reserve_grenade_pickup = refs.can_reserve_grenade_pickup
 	_reserve_grenade_pickup = refs.reserve_grenade_pickup
+	_can_reserve_health_station = refs.can_reserve_health_station
+	_reserve_health_station = refs.reserve_health_station
 end
 
 function M.health_station_recently_tagged(target_unit)

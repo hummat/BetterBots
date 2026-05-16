@@ -14,6 +14,7 @@ local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
 local _last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
+local _reserved_health_station_by_unit = setmetatable({}, { __mode = "k" })
 local _bot_group_units_scratch = {}
 local BOT_GROUP_PATCH_SENTINEL = "__bb_healing_deferral_bot_group_installed"
 
@@ -267,6 +268,61 @@ local function _should_skip_health_station_use(
 	return false, nil
 end
 
+local function _health_station_extension(station_unit)
+	return station_unit
+		and ScriptUnit
+		and ScriptUnit.has_extension
+		and ScriptUnit.has_extension(station_unit, "health_station_system")
+end
+
+local function _health_station_charge_amount(health_station_extension)
+	return health_station_extension
+			and health_station_extension.charge_amount
+			and health_station_extension:charge_amount()
+		or 0
+end
+
+local function _distance_between_units(unit_a, unit_b)
+	local position_a = POSITION_LOOKUP and POSITION_LOOKUP[unit_a]
+	local position_b = POSITION_LOOKUP and POSITION_LOOKUP[unit_b]
+	if not (position_a and position_b and Vector3 and Vector3.distance) then
+		return nil
+	end
+
+	return Vector3.distance(position_a, position_b)
+end
+
+local function _reserved_health_station(unit)
+	return unit and _reserved_health_station_by_unit[unit] or nil
+end
+
+local function _clear_reserved_health_station(unit, station_unit)
+	local reserved_station = _reserved_health_station(unit)
+	if not reserved_station then
+		return false
+	end
+
+	if station_unit and station_unit ~= reserved_station then
+		return false
+	end
+
+	_reserved_health_station_by_unit[unit] = nil
+
+	return true
+end
+
+local function _apply_reserved_health_station_target(unit, perception_component, station_unit)
+	if not (perception_component and station_unit) then
+		return
+	end
+
+	perception_component.target_level_unit = station_unit
+	local distance = _distance_between_units(unit, station_unit)
+	if distance then
+		perception_component.target_level_unit_distance = distance
+	end
+end
+
 local function _more_injured_bot_count(unit, bot_units, bot_health_pct, health_pct_fn, priority_margin)
 	if not (unit and bot_units and bot_health_pct and health_pct_fn) then
 		return 0
@@ -353,6 +409,7 @@ function M.init(deps)
 	_cached_settings_fixed_t = nil
 	_missing_health_warned = false
 	_last_health_station_log_state_by_unit = setmetatable({}, { __mode = "k" })
+	_reserved_health_station_by_unit = setmetatable({}, { __mode = "k" })
 	if deps.health_module then
 		_health = deps.health_module
 	else
@@ -376,6 +433,60 @@ local function _warn_missing_health_once()
 	end
 
 	_log("healing_deferral_missing_health", "healing deferral disabled: health utility unavailable")
+end
+
+function M.can_reserve_health_station(unit, station_unit)
+	local settings = _resolve_settings()
+	if not settings.require_station_tag then
+		return false, "station_tag_not_required"
+	end
+
+	if not _mode_allows_resource(settings.mode, "health_station") then
+		return false, "mode_disabled"
+	end
+
+	if not (_health and _health.current_health_percent) then
+		return false, "missing_health"
+	end
+
+	local health_station_extension = _health_station_extension(station_unit)
+	if not health_station_extension then
+		return false, "not_health_station"
+	end
+
+	local charge_amount = _health_station_charge_amount(health_station_extension)
+	if charge_amount <= 0 then
+		return false, "no_charges"
+	end
+
+	if _unit_preserves_wounded_state(unit) then
+		return false, "preserve_wounded_state"
+	end
+
+	local bot_health_pct = _health.current_health_percent(unit)
+	local total_damage_pct = math.max(1 - bot_health_pct, 0)
+	local permanent_damage_pct = _health.permanent_damage_taken_percent and _health.permanent_damage_taken_percent(unit)
+		or 0
+	local skip_station_use, skip_reason =
+		_should_skip_health_station_use(bot_health_pct, total_damage_pct, permanent_damage_pct, charge_amount, true)
+
+	if skip_station_use then
+		return false, skip_reason
+	end
+
+	return true, nil
+end
+
+function M.reserve_tagged_health_station(unit, station_unit)
+	local can_reserve, reason = M.can_reserve_health_station(unit, station_unit)
+	if not can_reserve then
+		return false, reason
+	end
+
+	_reserved_health_station_by_unit[unit] = station_unit
+	_log("health_station_reserve:" .. tostring(unit), "reserved tagged health station for bot")
+
+	return true, nil
 end
 
 -- Called from the consolidated bot_behavior_extension hook_require in BetterBots.lua.
@@ -407,9 +518,22 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		end
 
 		local perception_component = self._perception_component
+		local reserved_station = _reserved_health_station(unit)
 		local target_level_unit = perception_component and perception_component.target_level_unit or nil
-		local health_station_extension = target_level_unit
-			and ScriptUnit.has_extension(target_level_unit, "health_station_system")
+		local health_station_extension
+		if reserved_station then
+			health_station_extension = _health_station_extension(reserved_station)
+			if health_station_extension then
+				target_level_unit = reserved_station
+				_apply_reserved_health_station_target(unit, perception_component, reserved_station)
+			else
+				_clear_reserved_health_station(unit, reserved_station)
+				reserved_station = nil
+			end
+		end
+		if not health_station_extension then
+			health_station_extension = _health_station_extension(target_level_unit)
+		end
 		if not health_station_extension then
 			if perf_t0 then
 				_perf.finish("healing_deferral.health_stations", perf_t0)
@@ -422,7 +546,21 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local permanent_damage_pct = _health.permanent_damage_taken_percent
 				and _health.permanent_damage_taken_percent(unit)
 			or 0
-		local charge_amount = health_station_extension.charge_amount and health_station_extension:charge_amount() or 0
+		local charge_amount = _health_station_charge_amount(health_station_extension)
+		if reserved_station and charge_amount <= 0 then
+			_clear_reserved_health_station(unit, reserved_station)
+			_apply_health_station_deferral(health_station_component)
+			if _health_station_log_state_changed(unit, "reserved_station_empty") then
+				_log(
+					"healing_station:" .. tostring(unit),
+					"released explicit health station smart-tag order because the station has no charges"
+				)
+			end
+			if perf_t0 then
+				_perf.finish("healing_deferral.health_stations", perf_t0)
+			end
+			return
+		end
 		local skip_station_use, skip_reason = _should_skip_health_station_use(
 			bot_health_pct,
 			total_damage_pct,
@@ -432,6 +570,9 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		)
 
 		if skip_station_use then
+			if reserved_station then
+				_clear_reserved_health_station(unit, reserved_station)
+			end
 			_apply_health_station_deferral(health_station_component)
 			if skip_reason == "full_health" and _health_station_log_state_changed(unit, "full_health") then
 				_log("healing_station:" .. tostring(unit), "deferred health station because bot is already full")
@@ -445,7 +586,8 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 		local station_was_tagged = settings.require_station_tag
 			and _health_station_recently_tagged
 			and _health_station_recently_tagged(target_level_unit)
-		if settings.require_station_tag and not station_was_tagged then
+		local explicit_station_order = reserved_station == target_level_unit
+		if settings.require_station_tag and not (station_was_tagged or explicit_station_order) then
 			_apply_health_station_deferral(health_station_component)
 			if _health_station_log_state_changed(unit, "station_tag_required") then
 				_log("healing_station:" .. tostring(unit), "deferred health station until a human smart-tags it")
@@ -479,6 +621,9 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 			)
 		then
 			_apply_health_station_deferral(health_station_component)
+			if preserve_wounded_state and reserved_station then
+				_clear_reserved_health_station(unit, reserved_station)
+			end
 			if preserve_wounded_state then
 				_log(
 					"healing_station:" .. tostring(unit),
@@ -527,16 +672,19 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 
 		health_station_component.needs_health = true
 		health_station_component.needs_health_queue_number = 1
-		if station_was_tagged and _mark_destination_refresh(self) then
+		if (station_was_tagged or explicit_station_order) and _mark_destination_refresh(self) then
 			_log(
 				"healing_station_tag_refresh:" .. tostring(unit),
 				"health station destination refresh requested from human smart-tag"
 			)
 		end
-		if _health_station_log_state_changed(unit, "allow") then
+		local allow_state = explicit_station_order and "allow_explicit:" .. tostring(target_level_unit) or "allow"
+		if _health_station_log_state_changed(unit, allow_state) then
+			local allow_message = explicit_station_order and "health station permitted: explicit human smart-tag order"
+				or "health station permitted: humans above reserve and bot not full"
 			_log(
 				"healing_station_allow:" .. tostring(unit),
-				"health station permitted: humans above reserve and bot not full"
+				allow_message
 					.. _debug_health_reserve_detail(
 						bot_health_pct,
 						human_units,
@@ -633,6 +781,7 @@ M.should_defer_resource = _should_defer_resource
 M.should_skip_health_station_use = _should_skip_health_station_use
 M.should_defer_to_more_injured_bot = _should_defer_to_more_injured_bot
 M.bot_preserves_wounded_state = _unit_preserves_wounded_state
+M.reserved_health_station = _reserved_health_station
 M.apply_health_station_deferral = _apply_health_station_deferral
 M.apply_health_deployable_deferral = _apply_health_deployable_deferral
 M.resolve_settings = _resolve_settings

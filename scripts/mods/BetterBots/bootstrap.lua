@@ -743,6 +743,8 @@ function M.load_and_init(ctx)
 		end,
 		can_reserve_grenade_pickup = AmmoPolicy.can_reserve_grenade_pickup,
 		reserve_grenade_pickup = AmmoPolicy.reserve_tagged_grenade_pickup,
+		can_reserve_health_station = HealingDeferral.can_reserve_health_station,
+		reserve_health_station = HealingDeferral.reserve_tagged_health_station,
 	})
 
 	Settings.wire({

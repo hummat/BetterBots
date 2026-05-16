@@ -16,6 +16,8 @@ describe("smart_tag_orders", function()
 	local ammo_full_by_unit
 	local grenade_refill_by_unit
 	local grenade_reservations
+	local health_station_reserve_by_unit
+	local health_station_reservations
 	local unit_alive_by_unit
 	local players_by_unit
 	local inventories_by_unit
@@ -61,6 +63,8 @@ describe("smart_tag_orders", function()
 		ammo_full_by_unit = {}
 		grenade_refill_by_unit = {}
 		grenade_reservations = {}
+		health_station_reserve_by_unit = {}
+		health_station_reservations = {}
 		unit_alive_by_unit = {}
 		players_by_unit = {}
 		inventories_by_unit = {}
@@ -255,6 +259,17 @@ describe("smart_tag_orders", function()
 
 				return true
 			end,
+			can_reserve_health_station = function(unit, _station_unit)
+				return health_station_reserve_by_unit[unit] == true, "station_not_needed"
+			end,
+			reserve_health_station = function(unit, station_unit)
+				health_station_reservations[#health_station_reservations + 1] = {
+					bot_unit = unit,
+					station_unit = station_unit,
+				}
+
+				return true
+			end,
 		})
 	end
 
@@ -399,6 +414,45 @@ describe("smart_tag_orders", function()
 		assert.equals("health_station_tag_recorded", reason)
 		assert.same({ target_unit }, health_station_tags)
 		assert.equals(0, #pickup_orders)
+	end)
+
+	it("routes health station smart-tags to the nearest eligible bot", function()
+		target_unit.is_health_station = true
+		players_by_unit[human_unit] = {
+			is_human_controlled = function()
+				return true
+			end,
+		}
+		players_by_unit[bot_one] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		players_by_unit[bot_two] = {
+			is_human_controlled = function()
+				return false
+			end,
+		}
+		side_units = { human_unit, bot_one, bot_two }
+		_G.ALIVE[bot_one] = true
+		_G.ALIVE[bot_two] = true
+		_G.POSITION_LOOKUP[target_unit] = { x = 10, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_one] = { x = 5, y = 0, z = 0 }
+		_G.POSITION_LOOKUP[bot_two] = { x = 9, y = 0, z = 0 }
+		health_station_reserve_by_unit[bot_one] = true
+		health_station_reserve_by_unit[bot_two] = true
+
+		local handled, selected_bot = SmartTagOrders.try_dispatch(human_unit, target_unit, nil)
+
+		assert.is_true(handled)
+		assert.equals(bot_two, selected_bot)
+		assert.same({ target_unit }, health_station_tags)
+		assert.same({
+			bot_unit = bot_two,
+			station_unit = target_unit,
+		}, health_station_reservations[1])
+		assert.equals(0, #pickup_orders)
+		assert.is_truthy(find_debug_log("smart-tag pickup routed health_station to bot 2"))
 	end)
 
 	it("records health station smart-tags even when pickup-order routing is disabled", function()

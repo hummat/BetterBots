@@ -314,12 +314,24 @@ describe("healing_deferral", function()
 		local function install_hook_fixture(opts)
 			local station_unit = {}
 			local martyrdom_units = opts.martyrdom_units or {}
+			local station_units = opts.station_units or { station_unit }
 			debug_logs = {}
 
 			saved_script_unit = rawget(_G, "ScriptUnit")
 			_G.ScriptUnit = {
 				has_extension = function(unit, system_name)
-					if unit == station_unit and system_name == "health_station_system" then
+					if system_name == "health_station_system" then
+						local is_station = false
+						for i = 1, #station_units do
+							if unit == station_units[i] then
+								is_station = true
+								break
+							end
+						end
+						if not is_station then
+							return nil
+						end
+
 						return {
 							charge_amount = function()
 								return opts.charge_amount
@@ -618,6 +630,86 @@ describe("healing_deferral", function()
 			assert.is_true(self._health_station_component.needs_health)
 			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
 			assert.is_true(self._follow_component.needs_destination_refresh)
+		end)
+
+		it("keeps an explicit health-station tag after the tag window expires", function()
+			local station_unit = install_hook_fixture({
+				debug_enabled = true,
+				bot_health_pct = 0.50,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function()
+					return false
+				end,
+			})
+			local reserved, reason = HealingDeferral.reserve_tagged_health_station("bot1", station_unit)
+			assert.is_true(reserved, reason)
+			local self = {
+				_health_station_component = {
+					needs_health = false,
+					needs_health_queue_number = 0,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = nil,
+					target_level_unit_distance = math.huge,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_true(self._health_station_component.needs_health)
+			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
+			assert.equals(station_unit, self._perception_component.target_level_unit)
+			assert.is_true(self._follow_component.needs_destination_refresh)
+			assert.is_truthy(find_debug_log("health station permitted: explicit human smart-tag order"))
+		end)
+
+		it("clears an explicit health-station tag when the bot becomes full", function()
+			local bot_health_by_unit = {
+				bot1 = 0.50,
+			}
+			local station_unit = install_hook_fixture({
+				bot_health_by_unit = bot_health_by_unit,
+				human_health_pct = 0.95,
+				charge_amount = 2,
+				require_station_tag = true,
+				health_station_recently_tagged = function()
+					return false
+				end,
+			})
+			local reserved, reason = HealingDeferral.reserve_tagged_health_station("bot1", station_unit)
+			assert.is_true(reserved, reason)
+			bot_health_by_unit.bot1 = 1.0
+			local self = {
+				_health_station_component = {
+					needs_health = true,
+					needs_health_queue_number = 1,
+				},
+				_follow_component = {
+					needs_destination_refresh = false,
+				},
+				_perception_component = {
+					target_level_unit = nil,
+					target_level_unit_distance = math.huge,
+				},
+				_side = {
+					valid_human_units = { "human1" },
+				},
+			}
+
+			update_health_stations_hook(self, "bot1")
+
+			assert.is_false(self._health_station_component.needs_health)
+			assert.are.equal(0, self._health_station_component.needs_health_queue_number)
+			assert.is_false(self._follow_component.needs_destination_refresh)
+			assert.is_nil(HealingDeferral.reserved_health_station("bot1"))
 		end)
 
 		it("logs human health reserve detail when a tagged station defers to a human", function()
