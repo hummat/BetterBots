@@ -355,6 +355,30 @@ describe("healing_deferral", function()
 					return nil
 				end,
 			}
+			local position_lookup
+			local vector3
+			if opts.bot_position or opts.station_position then
+				position_lookup = {
+					bot1 = opts.bot_position or { x = 0, y = 0, z = 0 },
+					[station_unit] = opts.station_position or { x = 0, y = 0, z = 0 },
+				}
+				vector3 = {
+					distance = function(a, b)
+						local dx = a.x - b.x
+						local dy = a.y - b.y
+						local dz = a.z - b.z
+
+						return math.sqrt(dx * dx + dy * dy + dz * dz)
+					end,
+					distance_squared = function(a, b)
+						local dx = a.x - b.x
+						local dy = a.y - b.y
+						local dz = a.z - b.z
+
+						return dx * dx + dy * dy + dz * dz
+					end,
+				}
+			end
 
 			HealingDeferral.init({
 				mod = {
@@ -407,6 +431,8 @@ describe("healing_deferral", function()
 					return opts.debug_enabled == true
 				end,
 				health_station_recently_tagged = opts.health_station_recently_tagged,
+				position_lookup = position_lookup,
+				vector3 = vector3,
 			})
 
 			HealingDeferral.install_behavior_ext_hooks({})
@@ -639,6 +665,16 @@ describe("healing_deferral", function()
 				human_health_pct = 0.95,
 				charge_amount = 2,
 				require_station_tag = true,
+				bot_position = {
+					x = 0,
+					y = 0,
+					z = 0,
+				},
+				station_position = {
+					x = 3,
+					y = 4,
+					z = 0,
+				},
 				health_station_recently_tagged = function()
 					return false
 				end,
@@ -667,6 +703,7 @@ describe("healing_deferral", function()
 			assert.is_true(self._health_station_component.needs_health)
 			assert.are.equal(1, self._health_station_component.needs_health_queue_number)
 			assert.equals(station_unit, self._perception_component.target_level_unit)
+			assert.are.equal(25, self._perception_component.target_level_unit_distance)
 			assert.is_true(self._follow_component.needs_destination_refresh)
 			assert.is_truthy(find_debug_log("health station permitted: explicit human smart-tag order"))
 		end)

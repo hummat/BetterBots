@@ -10,6 +10,8 @@ local _health
 local _perf
 local _com_wheel
 local _health_station_recently_tagged
+local _position_lookup
+local _vector3
 local _cached_settings
 local _cached_settings_fixed_t
 local _missing_health_warned
@@ -282,14 +284,16 @@ local function _health_station_charge_amount(health_station_extension)
 		or 0
 end
 
-local function _distance_between_units(unit_a, unit_b)
-	local position_a = POSITION_LOOKUP and POSITION_LOOKUP[unit_a]
-	local position_b = POSITION_LOOKUP and POSITION_LOOKUP[unit_b]
-	if not (position_a and position_b and Vector3 and Vector3.distance) then
+local function _distance_squared_between_units(unit_a, unit_b)
+	local position_lookup = _position_lookup or POSITION_LOOKUP
+	local vector3 = _vector3 or Vector3
+	local position_a = position_lookup and position_lookup[unit_a]
+	local position_b = position_lookup and position_lookup[unit_b]
+	if not (position_a and position_b and vector3 and vector3.distance_squared) then
 		return nil
 	end
 
-	return Vector3.distance(position_a, position_b)
+	return vector3.distance_squared(position_a, position_b)
 end
 
 local function _reserved_health_station(unit)
@@ -317,9 +321,9 @@ local function _apply_reserved_health_station_target(unit, perception_component,
 	end
 
 	perception_component.target_level_unit = station_unit
-	local distance = _distance_between_units(unit, station_unit)
-	if distance then
-		perception_component.target_level_unit_distance = distance
+	local distance_squared = _distance_squared_between_units(unit, station_unit)
+	if distance_squared then
+		perception_component.target_level_unit_distance = distance_squared
 	end
 end
 
@@ -419,6 +423,8 @@ function M.init(deps)
 	_perf = deps.perf
 	_com_wheel = deps.com_wheel
 	_health_station_recently_tagged = deps.health_station_recently_tagged
+	_position_lookup = deps.position_lookup
+	_vector3 = deps.vector3
 end
 
 local function _warn_missing_health_once()
