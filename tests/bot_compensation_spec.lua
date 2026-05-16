@@ -71,6 +71,24 @@ describe("bot_compensation", function()
 		assert.equals("high", result)
 	end)
 
+	it("logs the base-game bot config selection once when debug is enabled", function()
+		local hooks, logs = setup_module({ config_override = nil, debug_enabled = true })
+
+		local first_result = hooks.get_bot_config_identifier(function()
+			return "high"
+		end)
+		local second_result = hooks.get_bot_config_identifier(function()
+			return "high"
+		end)
+
+		assert.equals("high", first_result)
+		assert.equals("high", second_result)
+		assert.equals(1, #logs)
+		assert.equals("bot_compensation:profile:base-game:high", logs[1].key)
+		assert.equals("bot compensation profile base-game: high", logs[1].message)
+		assert.equals("info", logs[1].level)
+	end)
+
 	it("overrides vanilla bot config selection when a fixed profile is configured", function()
 		local hooks = setup_module({ config_override = "medium" })
 		local original_called = false
@@ -82,6 +100,24 @@ describe("bot_compensation", function()
 
 		assert.is_false(original_called)
 		assert.equals("medium", result)
+	end)
+
+	it("logs the override bot config selection once when debug is enabled", function()
+		local hooks, logs = setup_module({ config_override = "medium", debug_enabled = true })
+
+		local first_result = hooks.get_bot_config_identifier(function()
+			return "high"
+		end)
+		local second_result = hooks.get_bot_config_identifier(function()
+			return "high"
+		end)
+
+		assert.equals("medium", first_result)
+		assert.equals("medium", second_result)
+		assert.equals(1, #logs)
+		assert.equals("bot_compensation:profile:override:medium", logs[1].key)
+		assert.equals("bot compensation profile override: medium", logs[1].message)
+		assert.equals("info", logs[1].level)
 	end)
 
 	it("leaves ranged bot damage modifier intact when reduction is enabled", function()
@@ -114,6 +150,10 @@ describe("bot_compensation", function()
 		assert.equals("hit_position", result)
 		assert.equals(1, #logs)
 		assert.equals("bot_compensation:ranged:bot_unit", logs[1].key)
+		assert.equals(
+			"suppressed base-game bot incoming damage modifier on ranged attack (" .. tostring(shoot_template) .. ")",
+			logs[1].message
+		)
 		assert.equals("info", logs[1].level)
 	end)
 

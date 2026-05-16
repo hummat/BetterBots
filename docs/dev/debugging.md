@@ -50,6 +50,8 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `fallback blocked` | Ability on cooldown or action_input invalid (post-activation spam) |
 | `blocked lossy network-sync profile overwrite` | `BotPlayer.set_profile` one-shot guard blocked the lossy 1.11+ sync overwrite for a resolved bot profile (#65) |
 | `allowed profile update` | `BotPlayer.set_profile` hook passed a later legitimate profile update through after the one-shot guard |
+| `bot compensation profile base-game` / `bot compensation profile override` | Bot survivability compensation selector resolved to the base-game identifier or to a BetterBots override. Logged once per identifier when debug logging is enabled. |
+| `suppressed base-game bot incoming damage modifier` | Bot incoming-damage reduction toggle removed an enemy attack's bot-only damage multiplier for the synchronous base-game damage call. |
 | `charge consumed` | Ability charge was spent (confirmed activation) |
 | `post-charge grace started` | Engagement leash recorded a movement-ability charge and started the temporary grace window (#47) |
 | `one-shot context dump` | First-time context dump for a template (debug-only) |

@@ -12,6 +12,7 @@ local BOT_SPAWNING_PATH = "scripts/managers/bot/bot_spawning"
 local MINION_ATTACK_PATH = "scripts/utilities/minion_attack"
 local BOT_SPAWNING_SENTINEL = "__bb_bot_compensation_installed"
 local MINION_ATTACK_SENTINEL = "__bb_bot_compensation_installed"
+local _logged_config_identifiers = {}
 
 local MINION_ATTACK_DAMAGE_HOOKS = {
 	{
@@ -75,7 +76,27 @@ local function _log_modifier_suppressed(kind, target_unit, owner)
 	_debug_log(
 		"bot_compensation:" .. kind .. ":" .. tostring(target_unit),
 		_fixed_time and _fixed_time() or 0,
-		"suppressed vanilla bot incoming damage modifier on " .. kind .. " attack (" .. tostring(owner) .. ")",
+		"suppressed base-game bot incoming damage modifier on " .. kind .. " attack (" .. tostring(owner) .. ")",
+		nil,
+		"info"
+	)
+end
+
+local function _log_config_identifier(source, identifier)
+	if not (_debug_enabled and _debug_enabled()) then
+		return
+	end
+
+	local key = "bot_compensation:profile:" .. source .. ":" .. tostring(identifier)
+	if _logged_config_identifiers[key] then
+		return
+	end
+
+	_logged_config_identifiers[key] = true
+	_debug_log(
+		key,
+		_fixed_time and _fixed_time() or 0,
+		"bot compensation profile " .. source .. ": " .. tostring(identifier),
 		nil,
 		"info"
 	)
@@ -124,10 +145,14 @@ function M.register_hooks()
 		_mod:hook(BotSpawning, "get_bot_config_identifier", function(func)
 			local override = _bot_config_identifier_override and _bot_config_identifier_override() or nil
 			if override then
+				_log_config_identifier("override", override)
 				return override
 			end
 
-			return func()
+			local identifier = func()
+			_log_config_identifier("base-game", identifier)
+
+			return identifier
 		end)
 
 		BotSpawning[BOT_SPAWNING_SENTINEL] = true
