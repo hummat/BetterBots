@@ -528,6 +528,31 @@ return {
 	bot_weapon_quality_max = {
 		en = "Max (fully upgraded)",
 	},
+	bot_survivability_profile = {
+		en = "Bot survivability",
+	},
+	bot_survivability_profile_description = {
+		en = "Controls the vanilla bot compensation tier. Auto keeps the game's difficulty scaling.",
+	},
+	bot_survivability_profile_auto = {
+		en = "Auto (scales with difficulty)",
+	},
+	bot_survivability_profile_none = {
+		en = "None / Light",
+	},
+	bot_survivability_profile_medium = {
+		en = "Medium",
+	},
+	bot_survivability_profile_high = {
+		en = "High",
+	},
+	enable_bot_incoming_damage_reduction = {
+		en = "Bot incoming damage reduction",
+	},
+	enable_bot_incoming_damage_reduction_description = {
+		en = "Game default: some enemy attacks deal less damage to bot targets. "
+			.. "Disable to make bots take normal player-target damage from those attacks.",
+	},
 	-- Diagnostics
 	enable_debug_logs = {
 		en = "Debug logging",

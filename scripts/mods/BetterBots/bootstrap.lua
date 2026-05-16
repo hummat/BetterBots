@@ -112,6 +112,7 @@ function M.load_and_init(ctx)
 	modules.SmartTagOrders = load_module(mod, "smart_tag_orders")
 	modules.BotProfileTemplates = load_module(mod, "bot_profile_templates")
 	modules.BotProfiles = load_module(mod, "bot_profiles")
+	modules.BotCompensation = load_module(mod, "bot_compensation")
 	modules.HumanLikeness = load_module(mod, "human_likeness")
 	modules.TargetTypeHysteresis = load_module(mod, "target_type_hysteresis")
 	modules.WeakspotAim = load_module(mod, "weakspot_aim")
@@ -176,6 +177,7 @@ function M.load_and_init(ctx)
 	local SmartTagOrders = modules.SmartTagOrders
 	local BotProfileTemplates = modules.BotProfileTemplates
 	local BotProfiles = modules.BotProfiles
+	local BotCompensation = modules.BotCompensation
 	local HumanLikeness = modules.HumanLikeness
 	local TargetTypeHysteresis = modules.TargetTypeHysteresis
 	local WeakspotAim = modules.WeakspotAim
@@ -199,6 +201,15 @@ function M.load_and_init(ctx)
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
 		profile_templates = BotProfileTemplates,
+	})
+
+	BotCompensation.init({
+		mod = mod,
+		debug_log = ctx.debug_log,
+		debug_enabled = ctx.debug_enabled,
+		fixed_time = ctx.fixed_time,
+		bot_config_identifier_override = Settings.bot_config_identifier_override,
+		bot_incoming_damage_reduction_enabled = Settings.bot_incoming_damage_reduction_enabled,
 	})
 
 	HumanLikeness.init({

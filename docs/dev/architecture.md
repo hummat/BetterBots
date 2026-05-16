@@ -55,12 +55,16 @@ This mod targets bot ability activation in three paths:
     - **Category gates** replace the old tier-level gates: abilities are gated by category (stances, charges, shouts, stealth, deployables, grenades) via `is_combat_template_enabled` / `is_item_ability_enabled` / `is_grenade_enabled`
     - **Semantic combat-ability gate**: shared templates resolve through `combat_ability_identity.lua`; Veteran shout routes to `enable_shouts`, Veteran stance/base/unknown falls back to `enable_stances` for settings compatibility, while engine metadata/input validation remains keyed by template name
     - **Feature gates**: optional bot behaviors (sprint, pinging, special_penalty, poxburster, melee_improvements, ranged_improvements, team_cooldown) gated via `is_feature_enabled(feature_name)` → `FEATURE_GATES` map → `mod:get(setting_id)`. `melee_improvements` covers both armor/horde attack selection and supported melee weapon specials; `ranged_improvements` covers ADS/charged-fire improvements plus supported shotgun special-shell preloads, rippergun bayonet rewrites, and direct ranged-bash/pistol-whip rewrites. Disabling all gates + all categories reverts to vanilla bot behavior.
+    - **Bot compensation settings**: `bot_survivability_profile` defaults to `auto`, which preserves vanilla `BotSpawning.get_bot_config_identifier()` difficulty scaling. Fixed profiles return vanilla config identifiers directly (`none` → `low`, `medium` → `medium`, `high` → `high`). `enable_bot_incoming_damage_reduction` defaults to true; disabling it temporarily clears `bot_power_level_modifier` on `minion_attack.lua` ranged/melee calls so bot targets take the unscaled player-target damage.
     - **BT enter gate**: the generated BT selector (`bt_bot_selector_node.lua`) inlines condition logic, bypassing the `condition_patch` gate. `BtBotActivateAbilityAction.enter` hook provides a last-resort gate for both combat and grenade abilities.
     - **DI pattern**: `init(deps)` receives `{ mod = mod }` from `BetterBots.lua`; all `mod:get()` calls are deferred to runtime so leaf modules can be unit-tested without a live DMF instance
     - Settings are reactive without restart: all gates call `mod:get()` on each evaluation, reading the current DMF setting value directly rather than caching
 11a. Bot profile replacement (#45, via `bot_profiles.lua` + `bot_profile_templates.lua`):
     - `bot_profile_templates.lua` owns the authored class loadout/talent tables
     - `bot_profiles.lua` owns runtime item resolution, spawn-slot selection, reset state, and profile-overwrite protection hooks
+11b. Bot survivability compensation (via `bot_compensation.lua`):
+    - hook `BotSpawning.get_bot_config_identifier`: optional fixed low/medium/high tier override for vanilla bot config selection and medium/high bot buffs
+    - hook `MinionAttack.shoot_hit_scan`, `MinionAttack.sweep`, `MinionAttack.melee`, and `MinionAttack.update_lag_compensation_melee`: when incoming bot damage reduction is disabled, temporarily remove `bot_power_level_modifier` for the vanilla attack call and restore it afterward, including error paths
 12. Structured JSONL event logging (`event_log.lua`):
     - opt-in via mod setting (`enable_event_log`)
     - emits decision, queued, consumed, blocked, item_stage, snapshot events to `./dump/betterbots_events_<timestamp>.jsonl`

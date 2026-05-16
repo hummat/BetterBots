@@ -321,6 +321,12 @@ local function make_bootstrap_harness(module_overrides)
 		resolve_pressure_leash_config = function()
 			return {}
 		end,
+		bot_config_identifier_override = function()
+			return nil
+		end,
+		bot_incoming_damage_reduction_enabled = function()
+			return true
+		end,
 		is_testing_profile = function()
 			return false
 		end,
@@ -608,6 +614,7 @@ local function make_bootstrap_harness(module_overrides)
 			}
 		end,
 	})
+	modules.BotCompensation = make_runtime_module("BotCompensation", install_calls)
 	modules.HumanLikeness = make_runtime_module("HumanLikeness", install_calls, {
 		patch_bot_settings = function(target)
 			record_install("HumanLikeness", "patch_bot_settings", target)
@@ -716,6 +723,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/smart_tag_orders"] = modules.SmartTagOrders,
 		["BetterBots/scripts/mods/BetterBots/bot_profile_templates"] = modules.BotProfileTemplates,
 		["BetterBots/scripts/mods/BetterBots/bot_profiles"] = modules.BotProfiles,
+		["BetterBots/scripts/mods/BetterBots/bot_compensation"] = modules.BotCompensation,
 		["BetterBots/scripts/mods/BetterBots/human_likeness"] = modules.HumanLikeness,
 		["BetterBots/scripts/mods/BetterBots/target_type_hysteresis"] = modules.TargetTypeHysteresis,
 		["BetterBots/scripts/mods/BetterBots/weakspot_aim"] = modules.WeakspotAim,
@@ -1050,6 +1058,12 @@ describe("startup regressions", function()
 		assert_module_loaded(source, "charge_nav_validation")
 	end)
 
+	it("loads bot_compensation through mod io", function()
+		local source = read_bootstrap_surface()
+
+		assert_module_loaded(source, "bot_compensation")
+	end)
+
 	it("initializes and registers extracted runtime modules", function()
 		local source = read_bootstrap_surface()
 
@@ -1080,6 +1094,8 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("ComWheelResponse%.register_hooks%(", 1))
 		assert.is_truthy(source:find("SmartTagOrders%.init%(", 1))
 		assert.is_truthy(source:find("SmartTagOrders%.register_hooks%(", 1))
+		assert.is_truthy(source:find("BotCompensation%.init%(", 1))
+		assert.is_truthy(source:find("BotCompensation%.register_hooks%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.init%(", 1))
 		assert.is_truthy(source:find("ChargeTracker%.handle%(", 1))
 		assert.is_truthy(source:find("GestaltInjector%.init%(", 1))

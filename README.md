@@ -215,6 +215,7 @@ scripts/mods/BetterBots/          # Mod source
   settings.lua                    #   Presets, category/feature gates, slider readers
   bot_profile_templates.lua       #   Authored bot class loadout/talent templates
   bot_profiles.lua                #   Bot-optimized class profiles per slot
+  bot_compensation.lua            #   Vanilla bot survivability tier and incoming-damage controls
   bot_targeting.lua               #   Shared perception target resolver + helpers
   charge_nav_validation.lua       #   Shared navmesh launch validation for charge/dash abilities (#13)
   sprint.lua                      #   Bot sprint injection (catch-up, rescue, traversal)

@@ -54,6 +54,11 @@ describe("settings", function()
 		it("enables human_revive_priority by default", function()
 			assert.is_true(Settings.DEFAULTS.enable_human_revive_priority)
 		end)
+
+		it("keeps vanilla bot compensation enabled by default", function()
+			assert.equals("auto", Settings.DEFAULTS.bot_survivability_profile)
+			assert.is_true(Settings.DEFAULTS.enable_bot_incoming_damage_reduction)
+		end)
 	end)
 
 	describe("resolve_preset", function()
@@ -128,6 +133,47 @@ describe("settings", function()
 		it("returns false when mod returns nil (defaults to balanced)", function()
 			Settings.init(mock_mod({}))
 			assert.is_false(Settings.is_testing_profile())
+		end)
+	end)
+
+	describe("bot compensation settings", function()
+		it("defaults survivability to auto and no config override", function()
+			Settings.init(mock_mod({}))
+
+			assert.equals("auto", Settings.bot_survivability_profile())
+			assert.is_nil(Settings.bot_config_identifier_override())
+		end)
+
+		it("maps none to the vanilla low bot config", function()
+			Settings.init(mock_mod({ bot_survivability_profile = "none" }))
+
+			assert.equals("low", Settings.bot_config_identifier_override())
+		end)
+
+		it("maps medium and high to vanilla bot configs", function()
+			Settings.init(mock_mod({ bot_survivability_profile = "medium" }))
+			assert.equals("medium", Settings.bot_config_identifier_override())
+
+			Settings.init(mock_mod({ bot_survivability_profile = "high" }))
+			assert.equals("high", Settings.bot_config_identifier_override())
+		end)
+
+		it("falls back to auto for unknown survivability values", function()
+			Settings.init(mock_mod({ bot_survivability_profile = "broken" }))
+
+			assert.equals("auto", Settings.bot_survivability_profile())
+			assert.is_nil(Settings.bot_config_identifier_override())
+		end)
+
+		it("keeps incoming bot damage reduction on unless explicitly disabled", function()
+			Settings.init(mock_mod({}))
+			assert.is_true(Settings.bot_incoming_damage_reduction_enabled())
+
+			Settings.init(mock_mod({ enable_bot_incoming_damage_reduction = true }))
+			assert.is_true(Settings.bot_incoming_damage_reduction_enabled())
+
+			Settings.init(mock_mod({ enable_bot_incoming_damage_reduction = false }))
+			assert.is_false(Settings.bot_incoming_damage_reduction_enabled())
 		end)
 	end)
 

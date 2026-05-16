@@ -292,6 +292,22 @@ return {
 							{ text = "bot_weapon_quality_max", value = "max" },
 						},
 					},
+					{
+						setting_id = "bot_survivability_profile",
+						type = "dropdown",
+						default_value = DEFAULTS.bot_survivability_profile,
+						options = {
+							{ text = "bot_survivability_profile_auto", value = "auto" },
+							{ text = "bot_survivability_profile_none", value = "none" },
+							{ text = "bot_survivability_profile_medium", value = "medium" },
+							{ text = "bot_survivability_profile_high", value = "high" },
+						},
+					},
+					{
+						setting_id = "enable_bot_incoming_damage_reduction",
+						type = "checkbox",
+						default_value = DEFAULTS.enable_bot_incoming_damage_reduction,
+					},
 				},
 			},
 			{

@@ -286,7 +286,8 @@ local GrenadeFallback, HealingDeferral = Modules.GrenadeFallback, Modules.Healin
 local AmmoPolicy, ComWheelResponse, MulePickup = Modules.AmmoPolicy, Modules.ComWheelResponse, Modules.MulePickup
 local PocketablePickup, SmartTagOrders, BotProfiles =
 	Modules.PocketablePickup, Modules.SmartTagOrders, Modules.BotProfiles
-local HumanLikeness, TargetTypeHysteresis = Modules.HumanLikeness, Modules.TargetTypeHysteresis
+local BotCompensation, HumanLikeness = Modules.BotCompensation, Modules.HumanLikeness
+local TargetTypeHysteresis = Modules.TargetTypeHysteresis
 local WeakspotAim, ChargeNavValidation = Modules.WeakspotAim, Modules.ChargeNavValidation
 local EngagementLeash, ReviveAbility = Modules.EngagementLeash, Modules.ReviveAbility
 
@@ -304,6 +305,7 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/bt_random_utility_nod
 end)
 
 do
+	BotCompensation.register_hooks()
 	local ok, BotSettings = pcall(require, "scripts/settings/bot/bot_settings")
 	if ok and BotSettings then
 		_patch_human_likeness_bot_settings(BotSettings)

@@ -159,6 +159,8 @@ M.DEFAULTS = {
 	bot_slot_4_profile = "none",
 	bot_slot_5_profile = "none",
 	bot_weapon_quality = "auto",
+	bot_survivability_profile = "auto",
+	enable_bot_incoming_damage_reduction = true,
 	enable_debug_logs = "off",
 	enable_event_log = false,
 	enable_perf_timing = false,
@@ -366,6 +368,19 @@ local PRESSURE_LEASH_PROFILE_OPTIONS = {
 	custom = true,
 }
 
+local BOT_SURVIVABILITY_PROFILE_OPTIONS = {
+	auto = true,
+	none = true,
+	medium = true,
+	high = true,
+}
+
+local BOT_CONFIG_IDENTIFIER_BY_SURVIVABILITY_PROFILE = {
+	none = "low",
+	medium = "medium",
+	high = "high",
+}
+
 local function _copy_config(config)
 	local copy = {}
 	for key, value in pairs(config) do
@@ -525,6 +540,36 @@ function M.pressure_leash_profile()
 		PRESSURE_LEASH_PROFILE_OPTIONS,
 		"auto"
 	)
+end
+
+function M.bot_survivability_profile()
+	if not _mod then
+		return M.DEFAULTS.bot_survivability_profile
+	end
+
+	local value = _mod:get("bot_survivability_profile")
+	if BOT_SURVIVABILITY_PROFILE_OPTIONS[value] then
+		return value
+	end
+
+	return M.DEFAULTS.bot_survivability_profile
+end
+
+function M.bot_config_identifier_override()
+	return BOT_CONFIG_IDENTIFIER_BY_SURVIVABILITY_PROFILE[M.bot_survivability_profile()]
+end
+
+function M.bot_incoming_damage_reduction_enabled()
+	if not _mod then
+		return M.DEFAULTS.enable_bot_incoming_damage_reduction
+	end
+
+	local value = _mod:get("enable_bot_incoming_damage_reduction")
+	if value == nil then
+		return M.DEFAULTS.enable_bot_incoming_damage_reduction
+	end
+
+	return value == true
 end
 
 function M.resolve_human_timing_config()
