@@ -43,6 +43,7 @@ tool paths and fallbacks the Make targets will use locally.
 | `make doc-check` | Validate doc invariants |
 | `make patch-check` | Verify decompiled engine anchors against local checkout |
 | `make patch-check-refresh` | Pull decompiled source, then re-run patch-check |
+| `make patch-audit` | Pull decompiled source, then run the full non-mutating gate |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make tool-info` | Show which tool binaries and fallbacks will run |
 | `make release VERSION=X.Y.Z` | Run patch-check-refresh + check + package + tag + push + upload ZIP |
@@ -52,8 +53,8 @@ tool paths and fallbacks the Make targets will use locally.
 - `make lint` always uses `./bin/luacheck`, which keeps luacheck on a working Lua runtime.
 - `make test` tries `busted`, then `lua-busted`, then Arch's packaged
   `/usr/lib/luarocks/.../busted` runner.
-- `make patch-check`, `make check`, and `make check-ci` expect a sibling
-  decompiled source checkout at `../Darktide-Source-Code`. Create it with:
+- `make patch-check`, `make patch-audit`, `make check`, and `make check-ci`
+  expect a sibling decompiled source checkout at `../Darktide-Source-Code`. Create it with:
   `git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git ../Darktide-Source-Code`.
 - `make tool-info` prints the exact paths and fallbacks used by the Makefile.
 

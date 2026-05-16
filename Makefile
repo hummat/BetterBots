@@ -2,7 +2,7 @@ LUA_FILES := $(shell find scripts tests -name '*.lua')
 BUSTED_BIN := $(shell command -v busted 2>/dev/null || command -v lua-busted 2>/dev/null || echo "")
 ARCH_BUSTED_BIN := $(shell ls /usr/lib/luarocks/rocks-*/busted/*/bin/busted 2>/dev/null | head -n 1)
 
-.PHONY: deps lint format format-check lsp-check check check-ci test doc-check patch-check patch-check-refresh profile-authoring-reference release package tool-info
+.PHONY: deps lint format format-check lsp-check check check-ci test doc-check patch-check patch-check-refresh patch-audit profile-authoring-reference release package tool-info
 
 deps:
 	git config core.hooksPath scripts/hooks
@@ -30,6 +30,8 @@ patch-check:
 
 patch-check-refresh:
 	@scripts/patch-check.sh --refresh
+
+patch-audit: patch-check-refresh check-ci
 
 profile-authoring-reference:
 	@python3 scripts/profile-authoring-reference.py generate

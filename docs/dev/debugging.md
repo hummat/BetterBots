@@ -367,6 +367,7 @@ make tool-info # shows the exact wrappers/binaries this repo will use
 make test      # runs busted, lua-busted, or Arch's luarocks path
 make check     # auto-formats, then runs lint + lsp + test + patch-check + doc-check
 make check-ci  # non-mutating CI gate: format-check + lint + lsp + test + patch-check + doc-check
+make patch-audit # refreshes decompiled source, then runs check-ci
 ```
 
 `make lint` uses the repo-local `bin/luacheck` wrapper. `make test` does not

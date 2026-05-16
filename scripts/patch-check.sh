@@ -51,6 +51,38 @@ check_anchor() {
 	ok "$label -> ${match%%:*}:${match#*:}"
 }
 
+check_engine_module_paths() {
+	local tmp_file path missing_count=0
+
+	tmp_file="$(mktemp)"
+
+	awk '
+		{
+			line = $0
+			while (match(line, /"scripts\/[^"]+"/)) {
+				path = substr(line, RSTART + 1, RLENGTH - 2)
+				if (path !~ /^scripts\/mods\/BetterBots\//) {
+					print path
+				}
+				line = substr(line, RSTART + RLENGTH)
+			}
+		}
+	' "$REPO_ROOT"/scripts/mods/BetterBots/*.lua | sort -u > "$tmp_file"
+
+	while IFS= read -r path; do
+		if [[ ! -f "$DECOMPILE_ROOT/$path.lua" ]]; then
+			err "engine module path missing: $path.lua"
+			missing_count=$((missing_count + 1))
+		fi
+	done < "$tmp_file"
+
+	if ((missing_count == 0)); then
+		ok "engine module path inventory -> $(wc -l < "$tmp_file") paths"
+	fi
+
+	rm -f "$tmp_file"
+}
+
 check_minion_attack_damage_hooks() {
 	local minion_file="$DECOMPILE_ROOT/scripts/utilities/minion_attack.lua"
 	local hooks_file="$REPO_ROOT/scripts/mods/BetterBots/bot_compensation.lua"
@@ -184,6 +216,8 @@ fi
 
 echo "Using decompiled source: $(git -C "$DECOMPILE_ROOT" log -1 --format='%h %s')"
 
+check_engine_module_paths
+
 check_anchor \
 	"scripts/extension_systems/ability/player_unit_ability_extension.lua" \
 	"PlayerUnitAbilityExtension.use_ability_charge = function" \
@@ -300,6 +334,18 @@ check_anchor \
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action.lua" \
 	"BtBotShootAction._set_new_aim_target = function" \
 	"bot shoot aim-target hook (#92)"
+check_anchor \
+	"scripts/managers/bot/bot_spawning.lua" \
+	"BotSpawning.get_bot_config_identifier = function ()" \
+	"bot spawning config selector"
+check_anchor \
+	"scripts/settings/buff/player_buff_templates.lua" \
+	"templates.bot_medium_buff = {" \
+	"bot medium compensation buff"
+check_anchor \
+	"scripts/settings/buff/player_buff_templates.lua" \
+	"templates.bot_high_buff = {" \
+	"bot high compensation buff"
 
 check_minion_attack_damage_hooks
 

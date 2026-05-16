@@ -87,12 +87,13 @@ Verify in-game: start a Solo Play mission and look for `BetterBots loaded` in ch
 | `make doc-check` | Validate doc invariants (see `scripts/doc-check/`) |
 | `make patch-check` | Verify decompiled Darktide engine anchors against the current local checkout |
 | `make patch-check-refresh` | `git pull --ff-only` the decompiled checkout, then verify anchors |
+| `make patch-audit` | Refresh decompiled source, then run the full non-mutating local gate |
 | `make profile-authoring-reference` | Refresh generated custom-profile lookup tables from [`hadrons-blessing`](https://github.com/hummat/hadrons-blessing) |
 | `make package` | Build Nexus-ready `BetterBots.zip` |
 | `make release VERSION=X.Y.Z` | patch-check-refresh + check + package + tag + push + upload ZIP |
 | `make tool-info` | Print which tool binaries and fallbacks will run |
 
-CI runs `make check-ci` on every push to `main` and every PR after cloning `../Darktide-Source-Code`. Patch-day validation (`make patch-check-refresh`) is intentionally separate, but engine-contract checks run on every PR through `make check-ci`.
+CI runs `make check-ci` on every push to `main` and every PR after cloning `../Darktide-Source-Code`. Use `make patch-audit` after a Darktide patch: it refreshes the decompiled checkout, then runs the same non-mutating local gate.
 
 ## Development workflow
 
@@ -115,9 +116,9 @@ Darktide patches regularly break hook anchors. The repo keeps a manual link to a
 
 When a patch lands:
 
-1. `make patch-check-refresh` — pulls the decompiled source and re-runs the anchor validator.
-2. If it fails, the failing anchor will tell you which hook needs updating and where.
-3. Update the hook, re-run `make check-ci`, then validate in-game before releasing.
+1. `make patch-audit` — pulls the decompiled source, then runs format-check, lint, LSP, tests, patch-check, and doc-check.
+2. If it fails, the failing anchor will tell you which hook or engine contract needs updating and where.
+3. Update the hook, re-run `make patch-audit`, then validate in-game before releasing.
 
 ### Live validation
 
