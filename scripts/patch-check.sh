@@ -57,6 +57,30 @@ check_anchor() {
 	ok "$label -> ${match%%:*}:${match#*:}"
 }
 
+# Multi-line regex variant for anchors that need to span lines (e.g. pinning a
+# specific cooldown value to its enclosing ability block when the value alone is
+# not unique within the file).
+check_anchor_multiline() {
+	local relative_file="$1"
+	local anchor="$2"
+	local label="$3"
+	local file="$DECOMPILE_ROOT/$relative_file"
+	local match
+
+	if [[ ! -f "$file" ]]; then
+		err "$label missing file: $relative_file"
+		return
+	fi
+
+	match=$(rg -nU -m 1 "$anchor" "$file" 2>/dev/null || true)
+	if [[ -z "$match" ]]; then
+		err "$label missing multiline anchor in $relative_file: $anchor"
+		return
+	fi
+
+	ok "$label -> ${match%%:*}:${match#*:}"
+}
+
 check_engine_module_paths() {
 	local tmp_file path missing_count=0
 
@@ -380,6 +404,12 @@ check_anchor \
 	"scripts/settings/buff/player_buff_templates.lua" \
 	"templates.bot_high_buff = {" \
 	"bot high compensation buff"
+
+# Ability cooldown anchors — pin specific CDs our heuristics docs/tuning rely on.
+check_anchor_multiline \
+	"scripts/settings/talent/talent_settings_ogryn.lua" \
+	'ogryn_2 = \{\s+combat_ability = \{\s+active_duration = 5,\s+cooldown = 30,' \
+	"Ogryn Loyal Protector (taunt) cooldown = 30s"
 
 check_minion_attack_damage_hooks
 

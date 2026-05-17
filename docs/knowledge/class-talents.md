@@ -261,7 +261,7 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 |----------|-----------|
 | Vulture's Mark | +5%/stack ranged dmg, crit, move speed (3 stacks, 8-12s), +15% toughness |
 | Chemical Dependency | +5%/stack crit (3 stacks), +10% ability CD regen, 90s duration, 50% toughness grant |
-| Adrenaline Junkie | Stacks now grant on kill (1.11.0 changed base proc from on_hit → on_kill, with on_hit kept as a sub-proc). 30 stacks → Frenzy: +25% melee damage, +10% attack speed, 10-20s |
+| Adrenaline Junkie | Base proc is `on_melee_hit` (1 stack/hit, +1 on crit; sub_1 swaps to 0 base + 2 on weakspot). Sub_2 adds kill bonus: +4 stacks on kill / +14 on elite kill. Per-stack: +10% crit chance, +10% movement speed. Max 30 stacks, 2s decay. Verified `broker_buff_templates.lua:L3584+` against 1.11.6. |
 
 ### Key Passives
 - Base crit: 10% (highest of all classes)

@@ -34,18 +34,20 @@ BLOCK IF num_nearby == 0 AND priority_target == nil
 
 ## Loyal Protector (`ogryn_taunt_shout`)
 
-**Cooldown:** 50s | **Role:** AoE taunt, draw aggro to protect team
+**Cooldown:** 30s | **Duration:** 15s taunt | **Role:** AoE taunt, +20% damage debuff on taunted enemies, full toughness restore on shout
 
 ### USE WHEN
 - Ally needs aid AND `num_nearby >= 2 AND toughness_pct > 0.30` — protect/revive
 - High density: `num_nearby >= 4 AND toughness_pct > 0.40 AND health_pct > 0.30`
 - Multiple elites threatening allies: `count_elites >= 2 AND any_ally_toughness_pct < 0.30`
 - `challenge_rating_sum >= 5.0 AND num_nearby >= 3`
+- Self-defense: `toughness_pct < 0.30 AND num_nearby >= 2` — shout fully restores toughness (`toughness_replenish_percent = 1`)
+- Just before throwing a Big Box of Hurt at an elite cluster — the +20% damage debuff amplifies the AoE
 
 ### DON'T USE WHEN
 - Bot is alone or isolated — no allies to benefit
-- Low toughness AND low health (`toughness_pct < 0.20 AND health_pct < 0.30`) — can't survive aggro
-- Only 1-2 trash enemies (`num_nearby <= 2 AND challenge_rating_sum < 1.5`) — 50s CD too expensive
+- Low toughness AND low health (`toughness_pct < 0.20 AND health_pct < 0.30`) — can't survive the aggro pull even with toughness refill
+- Only 1-2 trash enemies (`num_nearby <= 2 AND challenge_rating_sum < 1.5`) — debuff has no meaningful target
 - Against monstrosities alone — taunt doesn't affect them
 
 ### PROPOSED BOT RULES
@@ -53,10 +55,18 @@ BLOCK IF num_nearby == 0 AND priority_target == nil
 IF target_ally_needs_aid AND num_nearby >= 2 AND toughness_pct > 0.30 THEN activate (HIGH)
 IF num_nearby >= 4 AND toughness_pct > 0.40 AND health_pct > 0.30 THEN activate (MEDIUM)
 IF count_elites >= 2 AND any_ally_toughness_low THEN activate (MEDIUM)
+IF toughness_pct < 0.30 AND num_nearby >= 2 THEN activate (MEDIUM)  -- self-defense
+IF count_elites >= 2 AND big_box_of_hurt_ready THEN activate, then throw grenade (MEDIUM)
 BLOCK IF num_nearby <= 2 AND challenge_rating_sum < 1.5
 BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 ```
-**Confidence:** HIGH — "50s CD is unforgiving, save for emergencies."
+**Confidence:** HIGH — 30s CD makes Taunt an opportunity-gated tool, not an emergency-only one. Community top play uses it as a +20% team damage amp combo, with the toughness refill as a free defensive byproduct.
+
+**Mechanics:**
+- The taunted enemy gets `damage_taken_multiplier = 1.2` (+20% incoming damage) for 15s — applies to *all* damage sources, not just the Ogryn's
+- The Ogryn also gets `toughness_replenish_percent = 1` on shout (100% toughness refill)
+- Talents granting `damage_taken_vs_taunted` stack on top of the +20% base debuff
+- Cooldown was previously documented as 50s — corrected against `talent_settings_ogryn.lua:283` (`ogryn_2.combat_ability.cooldown = 30`)
 
 ---
 
