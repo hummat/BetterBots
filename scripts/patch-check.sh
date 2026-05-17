@@ -81,6 +81,64 @@ check_anchor_multiline() {
 	ok "$label -> ${match%%:*}:${match#*:}"
 }
 
+check_talent_and_special_rule_strings() {
+	# BetterBots heuristics dispatch on talent / special_rule names by string
+	# literal — e.g. `_has_talent(context, "psyker_smite_on_hit")` and
+	# `talent_ext:has_special_rule(rule_name)` against an iterated table of
+	# strings. If Fatshark renames a rule, those checks silently return false
+	# and the bot loses the entire branch with no test signal. This check
+	# auto-extracts every such string and verifies it appears in
+	# decompiled `scripts/settings/`.
+	local tmp_file path missing_count=0
+
+	tmp_file="$(mktemp)"
+
+	# Path 1: extract from `_has_talent(context, "…")` calls in any
+	# BetterBots Lua file. This is the dominant pattern (heuristics_*.lua).
+	awk '
+		{
+			line = $0
+			while (match(line, /_has_talent\(context, "[^"]+"/)) {
+				chunk = substr(line, RSTART, RLENGTH)
+				if (match(chunk, /"[^"]+"/)) {
+					name = substr(chunk, RSTART + 1, RLENGTH - 2)
+					print name
+				}
+				line = substr(line, RSTART + RLENGTH)
+			}
+		}
+	' "$REPO_ROOT"/scripts/mods/BetterBots/*.lua >> "$tmp_file"
+
+	# Path 2: extract talent-name-shaped string literals from files that
+	# iterate special_rule tables (currently only engagement_leash.lua's
+	# ALWAYS_COHERENCY_RULES). The grep is scoped to archetype-prefixed
+	# names to avoid catching unrelated string constants.
+	grep -hoE '"(adamant|broker|ogryn|psyker|veteran|zealot)_[a-z0-9_]+"' \
+		"$REPO_ROOT"/scripts/mods/BetterBots/engagement_leash.lua 2>/dev/null \
+		| sed -E 's/"([^"]+)"/\1/' >> "$tmp_file"
+
+	# Dedup
+	local extracted_file
+	extracted_file="$(mktemp)"
+	sort -u "$tmp_file" > "$extracted_file"
+
+	local total
+	total=$(wc -l < "$extracted_file")
+
+	while IFS= read -r name; do
+		if ! rg -lF "$name" "$DECOMPILE_ROOT/scripts/settings/" >/dev/null 2>&1; then
+			err "talent/special_rule string not found in decompiled source: $name"
+			missing_count=$((missing_count + 1))
+		fi
+	done < "$extracted_file"
+
+	if ((missing_count == 0)); then
+		ok "talent/special_rule string inventory -> $total strings verified"
+	fi
+
+	rm -f "$tmp_file" "$extracted_file"
+}
+
 check_engine_module_paths() {
 	local tmp_file path missing_count=0
 
@@ -247,6 +305,8 @@ fi
 echo "Using decompiled source: $(git -C "$DECOMPILE_ROOT" log -1 --format='%h %s')"
 
 check_engine_module_paths
+
+check_talent_and_special_rule_strings
 
 check_anchor \
 	"scripts/extension_systems/ability/player_unit_ability_extension.lua" \
