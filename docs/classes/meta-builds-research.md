@@ -625,11 +625,11 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 
 | Archetype | Classes | Bot trigger |
 |-----------|---------|-------------|
-| **Stance/buff on engage** | Vet (Exec Stance), Psyker (Scrier's), Hive Scum (Desperado/Rampage) | Activate when combat starts, not preemptively |
-| **Team support on pressure** | Vet (VoC), Zealot (Chorus), Psyker (Dome), Ogryn (Taunt) | Activate when team under fire / toughness dropping |
+| **Stance/buff on engage** | Vet (Exec Stance), Psyker (Scrier's), Hive Scum (Desperado/Rampage), Arbites (Castigator's Stance — 1.11 reframe) | Activate when combat starts, not preemptively. Opportunity-gated, not toughness-gated. |
+| **Team support on pressure** | Vet (VoC), Zealot (Chorus), Psyker (Dome), Ogryn (Taunt) | Activate on team-pressure signal (toughness drop, monstrosity spawn, corruption modifier). Ogryn Taunt is *also* a proactive damage-amp combo (+20% damage debuff to taunted) — not only pressure-reactive. |
 | **Dash/charge to gap-close** | Zealot (Fury), Ogryn (Bull Rush), Arbites (Break the Line) | Close distance to elites/specials or rescue downed allies |
-| **Emergency panic button** | Zealot (Stealth), Vet (Infiltrate), Ogryn (Taunt No Pain) | Low health/toughness when surrounded |
-| **Cooldown-gated nuke** | Ogryn (PBB at 80s), Hive Scum (Desperado at 45s) | Long CD = conservative, save for high-value moments |
+| **Emergency panic button** | Zealot (Stealth), Vet (Infiltrate) | Low health/toughness when surrounded. Note: Ogryn Taunt is NOT a panic button (30s CD; primary use is engagement-gated damage amp). |
+| **Cooldown-gated nuke** | Ogryn (PBB at 80s) | Long CD = conservative, save for high-value moments. (Hive Scum Desperado at 45s is now opportunity-gated, not panic-gated — moved up to Stance/buff on engage row.) |
 
 ### Most Popular Ability Per Class (Havoc meta)
 
@@ -677,6 +677,45 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 - **2x Toughness + 1x Health** (or 3x Toughness)
 - **Priority perks:** Combat Ability Regeneration > Gunner DR > Revive Speed > Stamina Regen
 - Combat Ability Regen appears in nearly every build -- abilities should be used frequently when off cooldown
+
+---
+
+### Post-1.11 meta shifts (2026-05-17)
+
+Compiled from 6 GPT Researcher autonomous reports (cached at `/tmp/bb-research/*.md` during the 2026-05-17 audit) cross-checked against decompiled source 1.11.6.
+
+**Which 1.11 changes shift meta vs. just shift numbers:**
+
+| 1.11 change | Number drift only | Meta shift | Reason |
+|---|---|---|---|
+| Veteran VoC 40s CD | ✓ | | Tempo slightly slower, but the build pick and trigger logic are identical |
+| Veteran Volley Fire 6s base / 9s with Big Game Hunter | | ✓ | Shorter base window means slow-fire weapons (Recon Lasgun) lose viability with Stance; Plasma and Helbore favored. Big Game Hunter detection becomes meaningful for activation threshold. |
+| Veteran Infiltrate 40s | ✓ | | Still niche; not a meta-shifting change |
+| Per-type grenade replenishment (Krak 90s / Frag 60s / Smoke 60s) | | ✓ | Krak builds plan around 90s cycles, not single-pool depletion. Bot heuristics may need per-type charge tracking rather than a shared pool. |
+| Hive Scum Adrenaline Junkie kill-on-bonus (1.11 sub_2 path) | | partial | Base trigger remains on_melee_hit; the +4/+14 elite-kill bonus via sub_2 is the new path. Affects build choice (sub_2 vs sub_1 weakspot path) but not Desperado uptime materially. |
+| Hive Scum flash grenade 2/2 charges | ✓ | | Same blitz, more uses per mission |
+| Ogryn Taunt CD (confirmed 30s, never 50s) | | ✓ | The 50s figure was a documentation bug, never a real CD value. The 30s CD reclassifies Taunt as engagement-gated, not panic-gated — see archetype table revision above. |
+
+**Builds whose meta ranking changed in 1.11 (community consensus, 2026 sources):**
+
+- Veteran Executioner's Stance + Recon Lasgun: dropped tier — the 6s window doesn't reward Recon's burst pacing. Plasma + Stance now requires Big Game Hunter to be competitive with VoC builds.
+- Veteran Counterfire keystone: gained relative value for non-BGH Stance builds (special-kill extension matters more on a 6s window). (unverified — only one 2026 source mentions this; needs in-game validation)
+- Hive Scum Gunslinger (Desperado + Float Like a Butterfly + Pickpocket): no change in dominance. Dodge-chain mechanic is unchanged; on_kill stacks change (sub_2 path) is opt-in.
+
+### Cross-class bot-rule pattern: opportunity-gated, not reactively-gated
+
+The single highest-leverage insight from the 2026-05-17 audit: across **every** class, top community play treats combat abilities as **opportunity-gated**, not **reactively-gated**. BetterBots' current heuristics lean toward reactive triggers (toughness drops, ally in distress) for most abilities. The largest single quality jump available is shifting trigger philosophy:
+
+| Ability | Current bot trigger | 2026 community trigger |
+|---|---|---|
+| Arbites Castigator's Stance | toughness < 30% | any sustained melee engagement |
+| Zealot Chorus | team toughness < 40% | monstrosity spawn OR corruption modifier (toughness still secondary) |
+| Ogryn Taunt | ally rescue / panic | Taunt+grenade combo on elite cluster, or boss-recovery window |
+| Psyker Smite | (not yet implemented) | warp_charge < 0.30 AND multi-target arc with high-value single target |
+| Veteran VoC | ally toughness broken | elite cluster ≥ 2 in coherency |
+| Hive Scum Desperado | toughness < 40% | ranged-pressure window AND ammo state |
+
+These are tractable tuning changes — most are threshold relaxation, not new module structure. Each per-class tactics doc now reflects the opportunity-gated trigger in its USE WHEN list; the BetterBots heuristics modules currently encode the more conservative reactive triggers and represent the primary follow-up implementation work.
 
 ---
 
