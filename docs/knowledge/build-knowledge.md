@@ -1,6 +1,6 @@
-# Build Optimization Knowledge (v1.10.7)
+# Build Optimization Knowledge (v1.11.6)
 
-Source: decompiled source + web research, compiled 2026-03-09.
+Source: decompiled source + web research, compiled 2026-03-09, refreshed 2026-05-17 against 1.11.6.
 Full meta builds: `../classes/meta-builds-research.md`.
 
 ## Class Base Stats
@@ -31,7 +31,7 @@ Full meta builds: `../classes/meta-builds-research.md`.
 ## Key Talent Values (build-relevant)
 
 ### Veteran
-- Volley Fire: 30s CD, 5s duration (8s improved), +25% ranged damage, +25% weakspot
+- Volley Fire: 30s CD, 6s duration (9s improved with Big Game Hunter), +25% ranged damage, +25% weakspot
 - Coherency aura: 0.75% ammo/tick (1%/tick improved), 5s CD
 - ADS-drain crit: +25% crit chance while draining stamina
 - Sniper's Focus: 10 stacks (15 improved), 5s duration per stack

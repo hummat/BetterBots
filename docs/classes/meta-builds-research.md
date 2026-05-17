@@ -5,6 +5,7 @@
 > Validated 2026-03-09: 12 GL builds machine-scraped (scraper now in `hadrons-blessing` repo) — full talent trees, perks, blessings corrected.
 > Bot tags updated 2026-03-11: removed stale `BOT:NO_DODGE` (bots dodge natively), `BOT:NO_PERIL_MGT` (BetterBots v0.5.0 overheat bridge), `BOT:ABILITY_MISSING` (all abilities have heuristics). New tags: `BOT:ABILITY_UNVALIDATED` (DLC-blocked), `BOT:NO_BLITZ` (blitz unsupported), `BOT:DODGE_CENTRIC_PLAYSTYLE` (build relies on dodge-chaining beyond vanilla bot capability).
 > Talent classification fixed 2026-03-11: split `Keystones:` into `Ability:` (combat ability + hex_frame modifiers) and `Keystones:` (actual passive keystones from circular_frame, identified via decompiled talent tree). Previous scraper mapped hex_frame → "keystone" but hex_frame = ability section on GL.
+> 1.11 refresh 2026-05-17: Veteran/Zealot/Hive Scum rebalance applied (Veteran Volley Fire 6s/9s, VoC 40s, Infiltrate 40s; per-type grenade replenish; Hive Scum Adrenaline Junkie kill-based; Hive Scum flash grenade charges 2/2). The meta build picks are unchanged; only the numbers inside build descriptions need re-reading against 1.11.6.
 > Purpose: inform bot AI ability/weapon profiles for BetterBots mod.
 > Cross-references: `classes/*.md` (ability templates), `classes/*-tactics.md` (heuristic rules), `knowledge/` (game system data)
 
@@ -42,7 +43,7 @@
 | Ability | Template | Meta Tier | Input | Role |
 |---------|----------|-----------|-------|------|
 | **Voice of Command** | `veteran_combat_ability` | S | `stance_pressed` | AoE stagger + team buffs. Dominates Havoc meta. |
-| **Executioner's Stance** | `veteran_combat_ability` | B | `stance_pressed` | +25% ranged damage, +25% weakspot for 5s. High skill floor. |
+| **Executioner's Stance** | `veteran_combat_ability` | B | `stance_pressed` | +25% ranged damage, +25% weakspot for 6s (9s with Big Game Hunter). High skill floor. |
 | **Infiltrate** | `veteran_stealth_combat_ability` | B | `stance_pressed` | Stealth for repositioning/revives. Less team value than VoC. |
 
 Note: VoC and Executioner's share `veteran_combat_ability` template -- need `class_tag` detection to branch.
@@ -753,7 +754,7 @@ Bots equipped via Tertium 5/6 should ideally get meta weapon pairings. The most 
 
 ## BREAKPOINT KNOWLEDGE
 
-### Key Enemy HP at Damnation/Auric (from decompiled source v1.10.7)
+### Key Enemy HP at Damnation/Auric (from decompiled source v1.11.6)
 
 | Enemy | Role | Armor | HP (Damn) | HP (Auric) |
 |-------|------|-------|-----------|------------|

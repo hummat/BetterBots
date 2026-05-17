@@ -1,6 +1,6 @@
 # Weapon Perks & Curio Perks — Complete Reference
 
-Source: decompiled v1.10.7 (`scripts/settings/equipment/`)
+Source: decompiled v1.11.6 (`scripts/settings/equipment/`)
 
 ## Weapon Perks (Melee)
 

@@ -1,6 +1,6 @@
-# Class Talent Values — All 6 Classes (v1.10.7)
+# Class Talent Values — All 6 Classes (v1.11.6)
 
-Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, verified 2026-03-09.
+Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, verified 2026-05-17 against 1.11.6.
 
 ## Tree Structure
 
@@ -18,9 +18,9 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 ### Combat Abilities
 | Ability | CD | Duration | Key Bonus |
 |---------|-----|----------|-----------|
-| Volley Fire (stance) | 30s | 5s | +25% ranged, +25% weakspot, outlines elites/specials |
-| Voice of Command (shout) | 30s | — | 9m AoE stagger, +50% toughness, can revive downed allies |
-| Infiltrate (stealth) | 45s | 8s | +25% move speed; exit: +30% damage 5s, 50% TDR 10s, 90% threat reduction 10s |
+| Volley Fire (stance) | 30s | 6s (9s with Big Game Hunter) | +25% ranged, +25% weakspot, outlines elites/specials |
+| Voice of Command (shout) | 40s | — | 9m AoE stagger, +50% toughness, can revive downed allies |
+| Infiltrate (stealth) | 40s | 8s | +25% move speed; exit: +30% damage 5s, 50% TDR 10s, 90% threat reduction 10s |
 
 ### Blitz/Grenades
 | Grenade | Max Charges | Notes |
@@ -28,7 +28,7 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 | Frag Grenade (base) | 3 | Improved: +25% damage, +25% radius; bleed (6 stacks) |
 | Krak Grenade | 3 | Improved: +75% damage |
 | Smoke Grenade | 3 | Improved: +100% fog duration |
-| Grenade replenishment | — | +1 grenade every 60s; OR 5% chance on elite kill (aura) |
+| Grenade replenishment | — | Default 75s; per-type since 1.11.0: Krak 90s / Frag 60s / Smoke 60s. OR 5% chance on elite kill (aura). |
 
 ### Keystones
 | Keystone | Key Stats |
@@ -251,17 +251,17 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 | Frenzied Rampage (punk_rage) | 30s | 10s (max 20-40s) | +50% melee power, +20% attack speed, 25% DR, +0.3s/kill extend |
 | Stimm Supply (stimm_field) | 60s | 20s | 3m radius, 50% corruption heal, 0.25s tick |
 
-### Rampage Exhaust — REMOVED in 1.10.6
-- ~~7s exhaustion after Rampage ends~~ — removed in Feb 2026 patch
-- Rampage is now pure upside with no exhaust penalty
-- This makes Rampage significantly more viable vs Desperado
+### Rampage Exhaust — DISABLED since 1.10.6
+- Template `broker_punk_rage_exhaustion` is still present in `broker_buff_templates.lua` and the talent settings still define exhaustion stats, but `talent_settings_broker.lua` sets `use_exhaust = false` (1.10.6+). The buff no longer applies in practice.
+- Rampage is pure upside with no exhaust penalty.
+- This makes Rampage significantly more viable vs Desperado.
 
 ### Keystones
 | Keystone | Key Stats |
 |----------|-----------|
 | Vulture's Mark | +5%/stack ranged dmg, crit, move speed (3 stacks, 8-12s), +15% toughness |
 | Chemical Dependency | +5%/stack crit (3 stacks), +10% ability CD regen, 90s duration, 50% toughness grant |
-| Adrenaline Junkie | 30 hit stacks → Frenzy: +25% melee damage, +10% attack speed, 10-20s |
+| Adrenaline Junkie | Stacks now grant on kill (1.11.0 changed base proc from on_hit → on_kill, with on_hit kept as a sub-proc). 30 stacks → Frenzy: +25% melee damage, +10% attack speed, 10-20s |
 
 ### Key Passives
 - Base crit: 10% (highest of all classes)
@@ -291,8 +291,9 @@ Source: decompiled `talent_settings_*.lua` + `archetype_talents/talents/*.lua`, 
 
 | Class | Ability | CD | Key Offensive | Key Defensive |
 |-------|---------|-----|---------------|---------------|
-| Veteran | Volley Fire | 30s | +25% ranged, +25% weakspot | AoE stagger |
-| Veteran | Exec Stance | 30s | +25% ranged, +25% weakspot | — |
+| Veteran | Volley Fire (stance) | 30s | +25% ranged, +25% weakspot (6s / 9s improved) | — |
+| Veteran | Voice of Command (shout) | 40s | — | 9m AoE stagger, +50% toughness |
+| Veteran | Infiltrate (stealth) | 40s | exit: +30% damage 5s, 50% TDR 10s | 90% threat reduction 10s |
 | Zealot | Chastise | 30s | +25% melee, +100% rending | +50% toughness |
 | Zealot | Chorus | — | push enemies | +100 toughness overheal |
 | Psyker | Venting Shriek | 30s | 500 PL AoE, 50% vent | — |

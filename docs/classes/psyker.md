@@ -1,6 +1,6 @@
 # Psyker (Psykinetic)
 
-> **Last updated:** 2026-03-05 | **Source version:** Darktide v1.10.7 (decompiled, Feb 2026)
+> **Last updated:** 2026-05-17 | **Source version:** Darktide v1.11.6 (decompiled, May 2026)
 
 ## Overview
 

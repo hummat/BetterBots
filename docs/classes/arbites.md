@@ -1,9 +1,9 @@
 # Arbites (Internal Codename: `adamant`)
 
-> Last updated: 2026-03-05
+> Last updated: 2026-05-17
 >
 > Reference document for mod development. All internal names, values, and mechanics
-> extracted from decompiled source (v1.10.7). Community usage notes from web guides.
+> extracted from decompiled source (v1.11.6). Community usage notes from web guides.
 
 ## Overview
 

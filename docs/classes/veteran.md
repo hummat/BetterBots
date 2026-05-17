@@ -1,7 +1,7 @@
 # Veteran (Sharpshooter)
 
-> Source version: Darktide v1.10.7 (decompiled source at `../Darktide-Source-Code/`)
-> Last updated: 2026-03-05
+> Source version: Darktide v1.11.6 (decompiled source at `../Darktide-Source-Code/`)
+> Last updated: 2026-05-17
 
 ## Overview
 
@@ -61,7 +61,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 | Cooldown | 30s (`veteran_2.combat_ability.cooldown`) |
 | Max charges | 1 |
 | Required weapon | `ranged` (must have ranged weapon) |
-| Duration | 5s (base Volley Fire), 8s (with Big Game Hunter talent) |
+| Duration | 6s (base Volley Fire), 9s (with Big Game Hunter talent) |
 
 **What it does:**
 - Enters Ranged Stance, instantly equipping the ranged weapon
@@ -84,7 +84,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 |---|---|---|
 | Volley Fire (base) | `veteran_combat_ability_stance` | Base combat ability: +15% ranged damage/weakspot |
 | Executioner's Stance (augmented) | `veteran_combat_ability_elite_and_special_outlines` | Upgrades Volley Fire to +25%/25%, outlines elites/specials, outlined kills extend duration, toughness regen |
-| Big Game Hunter | `veteran_combat_ability_ogryn_outlines` | Also outlines Ogryn-type enemies, +25% damage vs Ogryn/Monsters, extends duration to 8s |
+| Big Game Hunter | `veteran_combat_ability_ogryn_outlines` | Also outlines Ogryn-type enemies, +25% damage vs Ogryn/Monsters, extends duration to 9s |
 | Ranged Roamer Outlines | `veteran_combat_ability_ranged_roamer_outlines` | Outlines ranged enemies too |
 | Coherency Outlines | `veteran_combat_ability_coherency_outlines` | Shares outlines to allies in coherency for 5s |
 | Reloads Weapon | `veteran_combat_ability_reloads_secondary_weapon` | Ability instantly reloads ranged weapon |
@@ -95,7 +95,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 - Should be used proactively before engaging high-threat targets, not as panic button
 - Best when bot has clear line of sight and ranged weapon equipped
 - Bot must have ranged weapon wielded (or ability auto-equips it)
-- Duration of 5s means bot should already be in a shooting position
+- Duration of 6s (9s with Big Game Hunter) means bot should already be in a shooting position
 - Cooldown is short (30s) so relatively spammable
 
 ### Variant 2: Infiltrate (Shock Trooper path)
@@ -107,7 +107,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 | Ability template | `veteran_stealth_combat_ability` |
 | Ability type | `combat_ability` |
 | Class tag | `shock_trooper` |
-| Cooldown | 45s (`veteran_1.combat_ability.cooldown`) |
+| Cooldown | 40s (`veteran_1.combat_ability.cooldown`) |
 | Max charges | 1 |
 | Required weapon | `nil` (any weapon) |
 
@@ -135,7 +135,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 - Use to reposition safely when pinned by ranged enemies
 - Use to reach downed allies for revives safely
 - Bot should NOT attack during stealth unless truly necessary (breaks it)
-- 45s cooldown is longest of the three variants -- save for emergencies
+- 40s cooldown ties Voice of Command for the longest of the three variants -- save for emergencies
 - After stealth ends, the bot gets damage bonuses, so follow-up attacks are important
 - Ideal trigger condition: toughness < 30% OR ally is downed and needs revive
 
@@ -148,7 +148,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 | Ability template | `veteran_combat_ability` |
 | Ability type | `combat_ability` |
 | Class tag | `squad_leader` |
-| Cooldown | 30s (`veteran_3.combat_ability.cooldown`) |
+| Cooldown | 40s (`veteran_3.combat_ability.cooldown`) |
 | Max charges | 1 |
 | Required weapon | `nil` (any weapon) |
 | Shout radius | 9m (`veteran_3.combat_ability.radius`) |
@@ -166,7 +166,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 | Talent | Internal ID | Effect |
 |---|---|---|
 | Voice of Command (base) | `veteran_combat_ability_stagger_nearby_enemies` | Stagger enemies within 9m, restore toughness |
-| Revive Allies | `veteran_combat_ability_revive_nearby_allies` | Shout revives downed allies in range, but radius -33% and cooldown +50% (to 45s) |
+| Revive Allies | `veteran_combat_ability_revive_nearby_allies` | Shout revives downed allies in range, but radius -33% and cooldown +50% (to 60s) |
 | Toughness to Coherency | `veteran_combat_ability_increase_and_restore_toughness_to_coherency` | Grants +50 flat toughness to allies in coherency for duration |
 | Damage to Coherency | `veteran_combat_ability_melee_and_ranged_damage_to_coherency` | Grants melee and ranged damage buff to coherency allies |
 | Extra Charge | `veteran_combat_ability_extra_charge` | +1 ability charge |
@@ -176,7 +176,7 @@ BetterBots overrides metadata for bot activation to `combat_ability_pressed` wit
 - Use when surrounded by melee enemies (stagger buys 2.5s breathing room)
 - Use when toughness is critically low (instant full recovery)
 - Use when allies are downed and within 9m (revive talent)
-- Short cooldown (30s) allows fairly aggressive use
+- 40s cooldown — still aggressive use, but pair with elite-kill CDR to keep uptime high
 - Most team-friendly ability -- buffs coherency allies
 - Ideal trigger: multiple enemies within 9m AND toughness < 50%, OR ally downed within range
 
@@ -486,7 +486,7 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 - Use to burst down high-priority targets (Ragers, Gunners, Snipers)
 - Pair with a high-DPS semi-auto weapon (Infantry Lasgun MkIX is popular)
 - Killing outlined enemies refreshes the 5s duration -- chain kills to extend
-- Short 30s cooldown allows aggressive usage
+- 40s cooldown allows aggressive usage
 
 **Infiltrate (Stealth):**
 - Use as an escape when surrounded or about to go down
@@ -495,13 +495,13 @@ The Veteran has three keystone talent paths. Each fundamentally changes playstyl
 - Use to do hacking objectives uninterrupted
 - Do NOT attack during stealth unless you have `can_attack_during_invisibility`
 - After leaving stealth, enemies near you get suppressed -- follow up with attacks
-- 45s cooldown is the longest -- reserve for emergencies or high-value plays
+- 40s cooldown is the longest -- reserve for emergencies or high-value plays
 
 **Voice of Command (Shout):**
 - Use when surrounded by melee enemies for instant breathing room (2.5s heavy stagger)
 - Use when toughness is critically low (instant full recovery)
 - Use to revive downed allies within 9m (if revive talent is taken)
-- 30s cooldown (45s with revive talent) -- use aggressively
+- 40s cooldown (60s with revive talent) -- use aggressively
 - The stagger does NOT affect already-staggered enemies
 - Buffs allies in coherency (damage, toughness) -- use when team is grouped
 
@@ -565,7 +565,7 @@ The bot should check this tag to determine appropriate usage heuristics.
 | Team support | Outlines (visual only) | None | Stagger + buffs + revive |
 | Defensive use | Low | High | High |
 | Offensive use | High | Medium | Low |
-| Cooldown | 30s | 45s | 30s |
+| Cooldown | 30s | 40s | 40s |
 
 ### Source References
 - Ability templates: `scripts/settings/ability/ability_templates/veteran_combat_ability.lua`

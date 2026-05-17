@@ -1,7 +1,7 @@
 # Zealot (Preacher) -- Class Ability Reference
 
-> Last updated: 2026-03-05
-> Generated from decompiled source (`Darktide-Source-Code/` v1.10.7, Feb 2026) and community guides.
+> Last updated: 2026-05-17
+> Generated from decompiled source (`Darktide-Source-Code/` v1.11.6, May 2026) and community guides.
 > For BetterBots mod development. All internal IDs and values traced to source files.
 
 ## Overview

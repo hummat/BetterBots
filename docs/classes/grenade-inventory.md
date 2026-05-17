@@ -1,11 +1,11 @@
 # Grenade & Blitz Inventory
 
-> Source version: Darktide v1.10.7 (decompiled source at `../Darktide-Source-Code/`)
-> Last updated: 2026-04-12
+> Source version: Darktide v1.11.6 (decompiled source at `../Darktide-Source-Code/`)
+> Last updated: 2026-05-17
 
 ## Summary
 
-19 total grenade/blitz weapon templates exist across all classes. **All lack an `ability_template` field** (except `adamant_whistle`), meaning none can be activated through the standard `bt_bot_conditions.can_activate_ability` BT path. All require an item-based fallback approach (wield -> use -> unwield), similar to Tier 3 combat abilities.
+19 total grenade/blitz weapon templates exist across all classes — 18 live in the `grenades/` directory (including the expedition-only `expeditions_big_grenade`), and `broker_missile_launcher` sits in the missile-launcher inventory tree instead. **All lack an `ability_template` field** (except `adamant_whistle`), meaning none can be activated through the standard `bt_bot_conditions.can_activate_ability` BT path. All require an item-based fallback approach (wield -> use -> unwield), similar to Tier 3 combat abilities.
 
 The BT node `activate_grenade_ability` exists at priority 9 with component `grenade_ability_action`, but it relies on `ability_meta_data` lookup via `ability_template` -- a field none of these templates define.
 
@@ -17,7 +17,7 @@ The BT node `activate_grenade_ability` exists at priority 9 with component `gren
 
 ## Template Inventory
 
-### Standard Grenades (9)
+### Standard Grenades (9 + 1 expedition-only)
 
 Generated via `grenade_weapon_template_generator`. Default wield time ~1.5s. All use the same input pattern: `aim_hold` (`action_one_pressed`) -> hold -> `aim_released` (`action_one_hold` release). Action kind: `throw_grenade`.
 
@@ -32,6 +32,7 @@ Generated via `grenade_weapon_template_generator`. Default wield time ~1.5s. All
 | `ogryn_grenade_friend_rock` | `ogryn_grenade_friend_rock.lua` | Ogryn |
 | `smoke_grenade` | `smoke_grenade.lua` | Veteran |
 | `tox_grenade` | `tox_grenade.lua` | Hive Scum (via `broker_tox_grenade`) |
+| `expeditions_big_grenade` | `expeditions_big_grenade.lua` | Expedition mode only — gated on `game_mode:in_safe_zone()`, not in standard mission rotation |
 
 **Input sequence:**
 1. `action_one_pressed` -- begins aim/hold (`aim_hold` action)

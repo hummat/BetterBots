@@ -1,6 +1,6 @@
-# Weapon Blessings Catalog (v1.10.7)
+# Weapon Blessings Catalog (v1.11.6)
 
-Source: decompiled `weapon_traits_bespoke_*.lua`, verified 2026-03-09. All 18 S/A-tier meta weapons.
+Source: decompiled `weapon_traits_bespoke_*.lua`, verified 2026-03-09 against 1.10.7. Spot-rechecked 2026-05-17: no S/A-tier weapon trait values flagged as changed in 1.11.x. All 18 S/A-tier meta weapons.
 All values are the raw multipliers (0.1 = 10%). Tiers: T1/T2/T3/T4.
 
 ## File-to-Weapon Mapping

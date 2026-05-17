@@ -1,9 +1,11 @@
-# Buff Template Values — All 6 Classes (v1.10.7)
+# Buff Template Values — All 6 Classes (v1.11.6)
 
 Source: decompiled `scripts/settings/buff/archetype_buff_templates/*.lua`
 Cross-referenced with `talent_settings_*.lua` for resolved numerical values.
 
 This is the exhaustive reference. For a concise summary, see `class-talents.md`.
+
+**1.11.5 refactor note.** Several Veteran (and a smaller number of other-class) templates moved from `proc_buff` to `server_only_proc_buff`. The behaviour is identical when the reader is on the host; on dedicated-server clients these buffs are no longer locally-authoritative. BetterBots is host-only (Solo Play), so the change is transparent for this mod. **Ogryn rename:** the `ShoutAbilityImplementation` module is now `ShoutAbility` — buff template references that loaded it via the old name were updated wholesale in 1.11.x.
 
 ---
 

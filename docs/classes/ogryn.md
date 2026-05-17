@@ -1,7 +1,7 @@
 # Ogryn (Skullbreaker) - Class Ability Reference
 
-> Last updated: 2026-03-05
-> Source: Decompiled Darktide v1.10.7 (Feb 2026) + community guides.
+> Last updated: 2026-05-17
+> Source: Decompiled Darktide v1.11.6 (May 2026) + community guides.
 > Purpose: Complete ability mapping for BetterBots mod development.
 
 ## Overview

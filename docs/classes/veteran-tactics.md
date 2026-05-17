@@ -1,6 +1,6 @@
 # Veteran — Bot Tactical Heuristics
 
-> Sources: community guides, Steam discussions, decompiled source v1.10.7. See bottom for links.
+> Sources: community guides, Steam discussions, decompiled source v1.11.6. See bottom for links.
 
 ## Executioner's Stance (`veteran_ranger_stance`)
 
@@ -32,7 +32,7 @@ Aggressive — 30s is short. Use whenever elites present.
 
 ## Voice of Command (`veteran_squad_leader_stance`)
 
-**Cooldown:** 30s (45s with revive talent) | **Role:** AoE stagger + toughness recovery
+**Cooldown:** 40s (60s with revive talent) | **Role:** AoE stagger + toughness recovery
 
 **Note:** Shares `veteran_combat_ability` template with Executioner's Stance. Needs `class_tag == "squad_leader"` detection to branch.
 
@@ -56,7 +56,7 @@ IF target_ally_needs_aid AND need_type == "knocked_down" AND ally_distance <= 9 
 IF target_ally_needs_aid AND ally_distance <= 9 AND num_nearby >= 1 THEN activate
 BLOCK IF toughness_pct > 0.80 AND num_nearby <= 2
 ```
-**Confidence:** HIGH — community consensus: "spam it, 30s CD."
+**Confidence:** HIGH — community consensus is "spam it." CD bumped to 40s in 1.11.0, so the tempo is slightly slower than the old guidance but the playstyle is the same.
 
 **Current BetterBots note:** the shipped Voice of Command + Focus Target path also cares about tag ownership, not just whether an enemy is already tagged. BetterBots now allows one narrow override on an already-tagged elite/special so the Veteran can still claim `enemy_over_here_veteran` and apply the Focus Target debuff instead of silently yielding the tag forever.
 
@@ -64,7 +64,7 @@ BLOCK IF toughness_pct > 0.80 AND num_nearby <= 2
 
 ## Infiltrate (`veteran_invisibility`)
 
-**Cooldown:** 45s | **Role:** Emergency escape / clutch revive
+**Cooldown:** 40s | **Role:** Emergency escape / clutch revive
 
 ### USE WHEN
 - Toughness critical (<15%) AND `num_nearby >= 3` — about to die

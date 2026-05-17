@@ -1,6 +1,6 @@
-# Darktide Damage System (v1.10.7)
+# Darktide Damage System (v1.11.6)
 
-Source: decompiled Lua, verified 2026-03-09. Full pipeline in `scripts/utilities/attack/damage_calculation.lua`.
+Source: decompiled Lua, verified 2026-03-09 against 1.10.7. Spot-rechecked 2026-05-17: pipeline structure unchanged in 1.11.x. Full pipeline in `scripts/utilities/attack/damage_calculation.lua`.
 
 ## Pipeline Summary (13 stages)
 

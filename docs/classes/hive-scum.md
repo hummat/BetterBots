@@ -1,6 +1,6 @@
 # Hive Scum (Internal: `broker`)
 
-> Last updated: 2026-03-05 | Source: Darktide decompiled v1.10.7 (Feb 2026)
+> Last updated: 2026-05-17 | Source: Darktide decompiled v1.11.6 (May 2026)
 
 ## Overview
 
@@ -147,7 +147,7 @@ Three mutually exclusive grenade options, all `ability_type = "grenade_ability"`
 |---|---|
 | Internal name | `broker_flash_grenade` / `broker_flash_grenade_improved` |
 | Item | `content/items/weapons/player/grenade_quick_flash` |
-| Charges | 3 (default) / 5 (improved) |
+| Charges | 2 (default) / 2 (improved) — 1.11.0 reduced both from 3 / 5 |
 | Recharge | 1 charge per 20 kills |
 
 **What it does:**

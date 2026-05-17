@@ -1,7 +1,7 @@
 # Character State Detection API Reference
 
-> Source version: Darktide v1.10.7 (decompiled source at `../Darktide-Source-Code/`)
-> Last updated: 2026-03-06
+> Source version: Darktide v1.11.6 (decompiled source at `../Darktide-Source-Code/`)
+> Last updated: 2026-05-17
 
 ## Purpose
 

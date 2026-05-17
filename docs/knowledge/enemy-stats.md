@@ -1,6 +1,6 @@
-# Enemy Stats Reference (v1.10.7)
+# Enemy Stats Reference (v1.11.6)
 
-Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed files. Verified 2026-03-09.
+Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed files. Verified 2026-03-09, spot-rechecked 2026-05-17 against 1.11.6.
 
 ## Difficulty Levels
 
@@ -47,6 +47,7 @@ Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed file
 | Breed | Armor | Base | Damn | Auric |
 |-------|-------|------|------|-------|
 | chaos_hound | DR | 700 | 1050 | 1400 |
+| chaos_armored_hound (1.11.0) | resistant | `_special_health_steps(1100)` | — | — |
 | chaos_poxwalker_bomber | DR | 700 | 1050 | 1400 |
 | renegade_netgunner | berserker | 450 | 675 | 900 |
 | cultist_mutant | berserker | 2000 | 3000 | 4000 |
@@ -71,6 +72,7 @@ Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed file
 | Breed | Armor | Base | Damn | Auric |
 |-------|-------|------|------|-------|
 | chaos_plague_ogryn | resistant | 20000 | 40000 | 60000 |
+| chaos_ogryn_houndmaster (1.11.0) | resistant | 22000 | — | — |
 | chaos_beast_of_nurgle | resistant | 17500 | 35000 | 52500 |
 | chaos_spawn | resistant | 15750 | 31500 | 47250 |
 | chaos_daemonhost | resistant | 16000 | 32000 | 40000 |
@@ -79,6 +81,15 @@ Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed file
 | renegade_captain | **armored** (toughness=void_shield) | 16000 | 40000 | 50000 |
 
 (DR = disgustingly_resilient. All armor types now source-verified.)
+
+### 1.11.0 additions — environment and expedition-only
+
+| Breed | Role | Base | Notes |
+|-------|------|------|-------|
+| sand_vortex | living prop / hazard | `_roamer_health_steps(1000)` | `is_untargetable = true`, `challenge_rating = 30`, chaos faction — bots skip via the engine's `_is_valid_target` filter |
+| attack_valkyrie | flying enemy (expedition) | `_roamer_health_steps(1000)` | `flying = true`, `airbound = true`, `faction_name = "imperium"` (hostile despite the faction string — engine targets via side relations, not faction), `fly_fast_speed = 40`. Only present in expedition mode maps. |
+
+The Valkyrie sits in `side.ai_target_units` (master list) but not in `side.ai_ground_target_units` (since 1.11.0), because its `navigation_extension:move_medium()` is not `"ground"`. The bot's forced-priority broadphase ignores it; the scoring loop still picks it up.
 
 ## Hit Mass (Cleave Weight) — Key Values
 
@@ -92,6 +103,9 @@ Source: `scripts/settings/difficulty/minion_difficulty_settings.lua`, breed file
 | Berzerker/Executor | renegade_berzerker, renegade_executor | 10.0 |
 | Ogryn elite | bulwark, gunner, executor | 12.5 |
 | Monster/Captain | all bosses, captains | 20.0 |
+| Houndmaster boss (1.11.0) | chaos_ogryn_houndmaster | 20.0 |
+| Armored Hound (1.11.0) | chaos_armored_hound | 8.0 |
+| Poxwalker Bomber (1.11.0 retune) | chaos_poxwalker_bomber | 5.0 (was 2.5) |
 
 ## Cleave Budget Reference
 

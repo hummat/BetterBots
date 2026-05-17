@@ -76,12 +76,15 @@ Pre-populating talents with a non-default combat ability (e.g.
 `veteran_combat_ability_elite_and_special_outlines`) automatically suppresses the
 default (e.g. `veteran_combat_ability_stance`). Same for grenades/blitz.
 
-### Crash risk
+### Crash risk (none in 1.11.6)
 
-Pass 1 calls `talent_definitions[talent_name]` without a nil guard. If the talents table
-contains a key not present in `archetype.talents` (wrong class, typo, base_talents key),
-it will crash on indexing `talent.player_ability`. **Only inject valid talent names for
-the correct class.**
+The 1.11 source guards both lookups with `if talent then` (`player_talents.lua:45,70`),
+so a stray talent name no longer crashes the indexing path — it is silently skipped.
+
+That makes mistakes easier to miss, not safer to ship: the bad talent doesn't crash, but
+it also doesn't apply, so the resolved profile silently loses the ability the author
+intended. **Inject only valid talent names for the correct class** and verify resolved
+ability via `bb-log` or the in-game `/bb_brain` command.
 
 Base stat node talents (e.g. `base_toughness_node_buff_medium_1`) ARE in every class's
 talent definitions — they're shared. So they are safe to inject.

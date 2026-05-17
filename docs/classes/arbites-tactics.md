@@ -1,6 +1,6 @@
 # Arbites — Bot Tactical Heuristics
 
-> Sources: community guides, Steam discussions, decompiled source v1.10.7. See bottom for links.
+> Sources: community guides, Steam discussions, decompiled source v1.11.6. See bottom for links.
 
 ## Castigator's Stance (`adamant_stance`)
 
