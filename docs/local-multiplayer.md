@@ -19,7 +19,7 @@ Darktide deliberately moved from VT2's P2P model to dedicated-server-only. But t
 
 ## How SoloPlay Works
 
-`ConnectionSingleplayer` (`scripts/multiplayer/connection/connection_singleplayer.lua`) is a deliberate stub:
+`ConnectionSingleplayer` (`scripts/multiplayer/connection/connection_singleplayer.lua` — the connection class itself; orchestrated by `scripts/managers/multiplayer/connection_manager.lua`) is a deliberate stub:
 
 - `max_members()` returns **1** — hardcoded, no slots for other players
 - Zero networking — no lobby, no channels, no RPC dispatch
@@ -32,7 +32,7 @@ The SoloPlay mod (Nexus #176) hooks session boot to call `boot_singleplayer_sess
 
 ## Network Platform Modes
 
-The engine supports multiple networking backends (`connection_manager.lua` lines 33–78):
+The engine supports multiple networking backends (`scripts/managers/multiplayer/connection_manager.lua` lines 33–78):
 
 ```lua
 "lan"          → Network.init_lan_client(config, port)    -- exists, unused in production
@@ -48,7 +48,7 @@ The WAN path internally reuses LAN lobby APIs: joining a dedicated server calls 
 
 ## Host Types
 
-From `matchmaking_constants.lua`:
+From `scripts/settings/network/matchmaking_constants.lua`:
 
 ```lua
 HOST_TYPES = table.enum(

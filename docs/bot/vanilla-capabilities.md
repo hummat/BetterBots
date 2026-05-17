@@ -1,6 +1,6 @@
 # Vanilla Bot Capabilities Reference
 
-What Darktide bots can and cannot do out of the box (v1.10, Feb 2026). Source-verified against decompiled code with community observations for context.
+What Darktide bots can and cannot do out of the box (v1.11.6, May 2026). Source-verified against decompiled code with community observations for context.
 
 ---
 

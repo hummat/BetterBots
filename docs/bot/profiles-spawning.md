@@ -1,6 +1,6 @@
 # Bot Profiles, Spawning, and Group Coordination
 
-Comprehensive reference for how Darktide bots are configured, spawned, coordinated, and synchronized. Based on decompiled source (v1.10.7).
+Comprehensive reference for how Darktide bots are configured, spawned, coordinated, and synchronized. Based on decompiled source (v1.11.6).
 
 For BetterBots' manual profile-editing workflow, see
 [`docs/bot/custom-profiles.md`](custom-profiles.md). Generated lookup tables for engine weapon paths, talent keys,
@@ -515,6 +515,24 @@ BotSynchronizerHost.remove_peer(channel_id) -- client disconnected
 ```
 
 When a new peer connects, existing bots are communicated via profile sync. The `rpc_add_bot_player` RPC tells each client to create the bot's player object.
+
+### 9.4 Profile validation in 1.11+ (`is_local_profile` guard)
+
+Darktide 1.11 (Warband) added a talent-layout validator that runs during profile deserialization. Two gates now sit in `scripts/extension_systems/unit_templates.lua` (lines 334 and 1037) and one in `scripts/utilities/profile_utils.lua:_convert_profile_from_lookups_to_data`:
+
+```lua
+if not profile.is_local_profile then
+    local active_layouts = TalentLayoutParser.archetype_layouts(archetype)
+    talents = TalentLayoutParser.validate_talent_layouts(talents, active_layouts, false)
+end
+```
+
+`validate_talent_layouts` strips talents that can't traverse back to a start node in the tree layout. Combined with `ProfileSynchronizerClient` overwriting BotPlayer profiles via `set_profile`, this used to silently drop BetterBots' injected talents and reconstruct loadouts from lossy `loadout_item_data` — the #65 P0 crash. The fix is to mark resolved bot profiles with `is_local_profile = true` plus a one-shot `set_profile` hook (see `scripts/mods/BetterBots/bot_profiles.lua` and the closed #65 thread).
+
+**Patch-migration check.** Before trusting bot spawns on the next Darktide release:
+1. Re-confirm the `not profile.is_local_profile` gate still exists in `unit_templates.lua`.
+2. Re-confirm `ProfileSynchronizerClient` still overwrites via `set_profile`.
+3. Run a Tertium5/6 mission with a non-veteran bot profile to catch regressions.
 
 ---
 

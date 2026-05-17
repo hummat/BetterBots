@@ -2,7 +2,7 @@
 
 How behavior tree decisions become game inputs that fire abilities, weapons, and interactions.
 
-**Source version:** Darktide v1.10.7 (decompiled via Aussiemon/Darktide-Source-Code)
+**Source version:** Darktide v1.11.6 (decompiled via Aussiemon/Darktide-Source-Code)
 
 ---
 

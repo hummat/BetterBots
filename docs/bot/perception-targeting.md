@@ -1,7 +1,7 @@
 # Bot Perception and Target Selection Reference
 
-> Source: Aussiemon/Darktide-Source-Code (decompiled, v1.10.7)
-> Date: 2026-03-05
+> Source: Aussiemon/Darktide-Source-Code (decompiled, v1.11.6)
+> Date: 2026-05-17
 
 This document describes how Darktide bots perceive enemies and select targets. All values come from the decompiled source unless noted otherwise.
 
@@ -15,7 +15,7 @@ This document describes how Darktide bots perceive enemies and select targets. A
 
 The perception system has two update phases per tick:
 
-1. **`pre_update`** -- Forces priority perception updates for enemies within **0.75m** (`FORCED_PRIO_UPDATE_RANGE`) of the bot. If an enemy is this close and moving (`velocity > 0`), it gets registered for immediate perception + slot updates. This ensures melee-range enemies are never stale.
+1. **`pre_update`** -- Forces priority perception updates for enemies within **0.75m** (`FORCED_PRIO_UPDATE_RANGE`) of the bot. If an enemy is this close and moving (`velocity > 0`), it gets registered for immediate perception + slot updates. This ensures melee-range enemies are never stale. **As of 1.11.0**, the broadphase filter at this stage reads `side.ai_ground_target_units` (not `ai_target_units`), so flying enemies — currently the new `attack_valkyrie` — are excluded from the forced-priority path and only enter targeting via the slower `_update_target_enemy` scoring loop.
 
 2. **`update`** -- Runs every tick but only for bot-controlled units (skipped if `player:is_human_controlled()`). Calls three sub-updates:
    - `_update_target_enemy` -- target scoring and selection
@@ -35,6 +35,8 @@ The reevaluation timer is set to **t + 0.3s** after each full evaluation (source
 The bot iterates over `side.ai_target_units` -- all enemy units registered as targetable on the opposing side. A target is valid if:
 - `breed.not_bot_target` is **false** (vanilla: only `chaos_poxwalker_bomber` sets this true; **BetterBots #34 patches this to nil** and suppresses unsafe poxburster targets near the bot/human players instead)
 - The enemy is in `aggroed_minion_target_units` (has been aggroed/alerted), **OR** is a player breed (PvP-relevant, not typical gameplay)
+
+**`ai_target_units` vs `ai_ground_target_units` (1.11.0 split):** `ai_target_units` is the master list — every valid enemy on the opposing side. `ai_ground_target_units` is the subset whose `navigation_extension:move_medium() == "ground"`. The split is populated server-side in `scripts/extension_systems/side/side_system.lua:485-519`. Scoring (`_update_target_enemy`, line 201) still iterates `ai_target_units` so flying enemies are reachable via the normal loop; only the forced-priority broadphase in `pre_update` skips them. BetterBots' `sprint.lua` and `target_type_hysteresis.lua` use `ai_target_units` deliberately — they want the full enemy list.
 
 ### Blackboard Output
 
