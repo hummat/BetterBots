@@ -100,6 +100,34 @@ BLOCK IF team_actively_retreating
 
 ---
 
+## Keystone implications for bots
+
+### Adrenaline Junkie (`broker_keystone_adrenaline_junkie`)
+
+Source: `broker_buff_templates.lua:L3584+` (1.11.6 verified).
+
+**Trigger is `on_melee_hit`**, not pure on-kill as some community sources frame it:
+- Base: 1 stack per melee hit, +1 on crit (2 stacks per crit hit)
+- `sub_1` (regular hits → 0 stacks, weakspot hits → +2): swaps base to weakspot-only
+- `sub_2` (`extra_killing_blow_stacks`): adds +4 stacks on kill, +14 on elite kill — this is the *only* kill-gated path
+- Per-stack: +10% crit chance, +10% movement speed (multiplier-scaled)
+- Max 30 stacks, 2s decay per stack — refreshes on stack add or remove
+
+**Bot implication:** sustained melee hit rate feeds the stack pool, not kill rate alone. A bot Adrenaline Junkie running Desperado (ranged stance) will *not* build melee stacks — the keystone is misaligned with the Desperado playstyle and only pays off on Rampage builds or hybrid melee-pressure scenarios. Verify keystone selection at spawn time.
+
+### Float Like a Butterfly (`broker_keystone_vultures_mark_on_dodge` or similar)
+
+**Bot incompatibility (acknowledged gap):** the Gunslinger meta build is dodge-chain-dependent — successful input-timed dodges grant crit/damage stacks and 1s blanket damage immunity (Vulture's Dodge). BetterBots cannot reliably emulate human dodge timing. Accept the gap:
+- Bots fire Desperado for raw ranged DPS + ammo sustain; the crit-uptime ceiling will be lower than human play
+- Do NOT attempt to fake dodge inputs
+- The existing `bot_medium_buff` / `bot_high_buff` survival compensation covers the missing dodge-immunity uptime well enough for Solo Play coop modes
+
+### Pickpocket (`broker_keystone_pickpocket` or similar)
+
+Restores ammo on kills from low-ammo state. Passive — no bot action required. A bot running Desperado + Pickpocket will sustain ammo as long as kill rate stays above the keystone's threshold. The existing ammo_policy module already handles this correctly via per-frame ammo state without needing keystone-aware logic.
+
+---
+
 ## Weapon Type Awareness
 
 Desperado requires/auto-wields ranged. Rampage requires/auto-wields melee. The bot needs to check `required_weapon_type` or current wielded weapon. Since bots have one combat ability (determined by loadout), this is spawn-time, not runtime.

@@ -4,29 +4,39 @@
 
 ## Executioner's Stance (`veteran_ranger_stance`)
 
-**Cooldown:** 30s | **Role:** Ranged DPS burst vs elites/specials
+**Cooldown:** 30s | **Duration:** 6s base / 9s with Big Game Hunter (1.11) | **Role:** Ranged DPS burst vs elites/specials
+
+> 1.11 shortened the Volley Fire window from the pre-Warband duration to 6s base. Big Game Hunter (talent: `veteran_combat_ability_outlined_kills_extends_duration`) extends to 9s when activated while an outlined target is present, AND re-extends on each outlined-kill via `add_internally_controlled_buff` (so chain kills keep refreshing the 9s window). Buff also grants `stun_immune`, `slowdown_immune`, `suppression_immune`, `uninterruptible` — fire freely without worrying about being staggered.
 
 ### USE WHEN
-- Elite or special is current target (vanilla Fatshark heuristic — proven)
-- 2+ elites/specials visible (chain kills extend stance)
+- Elite or special is current target AND `target_dist > 6` (vanilla Fatshark heuristic — proven for the 6s window)
+- 2+ elites/specials visible — first kill must land within ~3s for the window to be worthwhile
 - Monster visible with no melee pressure (`urgent_target_enemy` set, `num_nearby <= 2`)
-- Target at medium+ range (>6m) where ranged bonuses matter
+- **Big Game Hunter detected** AND any single outlined target present — first kill extends to 9s, lower bar than base activation
 
 ### DON'T USE WHEN
 - Surrounded by melee (`num_nearby > 5` and `target_enemy_type == "melee"`)
-- No elite/special/monster visible — wasting it on poxwalkers
-- Already in melee range of all threats
+- No elite/special/monster visible — 6s is too short to wait for spawns
+- Already in melee range of all threats — ranged buffs wasted
+- Outlined target list is empty AND build has Big Game Hunter — wastes the 9s extension path; fire only when chain-kill is feasible
 
 ### PROPOSED BOT RULES
 ```
-IF target has tag "special" or "elite" THEN activate
-IF urgent_target_enemy AND num_nearby <= 2 THEN activate
+IF target has tag "special" or "elite" AND target_dist > 6 THEN activate (HIGH)
+IF urgent_target_enemy AND num_nearby <= 2 THEN activate (HIGH)
+IF has_special_rule("veteran_combat_ability_outlined_kills_extends_duration")
+   AND outlined_targets_visible >= 1 THEN activate (MEDIUM)  -- BGH first-kill extends window
 BLOCK IF num_nearby > 5 AND target_enemy_type == "melee"
+BLOCK IF outlined_targets_visible == 0 AND target_kill_time_estimate > 3  -- 6s window will close before first kill
 ```
-**Confidence:** HIGH
+**Confidence:** HIGH for base activation; the BGH extension path is a new threshold and needs in-game validation.
 
 ### COOLDOWN MANAGEMENT
-Aggressive — 30s is short. Use whenever elites present.
+Aggressive — 30s is short. Use whenever elites present and a kill is achievable inside the 6s base window. The 9s BGH window changes this math: with chain-kill maintenance, a single activation can extend through 2-3 elite kills.
+
+### Detection
+- `has_special_rule("veteran_combat_ability_outlined_kills_extends_duration")` — Big Game Hunter present
+- Outline visibility: query the perception system for `keywords.is_outlined` on visible enemies (the keyword Volley Fire applies in the stance prefab)
 
 ---
 

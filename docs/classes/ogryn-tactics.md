@@ -68,6 +68,11 @@ BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 - Talents granting `damage_taken_vs_taunted` stack on top of the +20% base debuff
 - Cooldown was previously documented as 50s — corrected against `talent_settings_ogryn.lua:283` (`ogryn_2.combat_ability.cooldown = 30`)
 
+**Boss timing:**
+- Against monstrosities, fire Taunt during the boss's recovery / idle phase, not mid-charge or mid-slam — the 15s debuff window aligns with the team's damage burst after the boss exits its active animation
+- Bots cannot reliably read boss animation state. Practical proxy: `target_is_monster AND target_velocity < 2 AND no_recent_boss_attack` (heuristic for "boss is idling"). Without a reliable proxy, default to firing Taunt when a monstrosity *first becomes attackable* — community top play also accepts this opener as second-best timing.
+- Cooldown is 30s, so a single boss fight will see 2-3 Taunt windows — no need to save the first cast for the perfect moment
+
 ---
 
 ## Point-Blank Barrage (`ogryn_gunlugger_stance`)

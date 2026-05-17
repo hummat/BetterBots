@@ -64,27 +64,47 @@ BLOCK IF allies_in_coherency == 0 AND num_nearby > 2  -- don't dump aggro if tea
 
 ---
 
-## Bolstering Prayer / Relic (`zealot_relic`)
+## Chorus of Spiritual Fortitude / Relic (`zealot_relic`)
 
-**Cooldown:** 60s | **Role:** Team toughness support (Tier 3 item-based)
+**Cooldown:** 60s | **Channel duration:** 5.5s, uninterruptible | **Buff radius:** 10m | **Stagger radius:** 4m / 2s stagger | **Role:** Team toughness support + boss/elite stagger (Tier 3 item-based)
+
+> Renamed from "Bolstering Prayer" — `zealot_bolstering_prayer` is the talent name; in-game UI calls it Chorus of Spiritual Fortitude. The `_relic` suffix matches the inventory item.
+
+### Mechanics (decompiled source, `zealot_relic.lua:L134-L175`)
+- Channel is **uninterruptible** (`uninterruptible = true`) for the full 5.5s
+- Self toughness restore on activation: 100% (`toughness_restored = 1`)
+- Self bonus toughness during channel: +400 flat (`toughness_bonus_flat = 400`)
+- 40% TDR during channel (`toughness_damage_taken_multiplier = 0.6`)
+- Per-tick ally buff (0.8s tick): +25% flat toughness to allies / +50% flat to self, +15 flat toughness stacking buff (up to 5 stacks = +75 flat at full duration)
+- 20% toughness-regen-rate buff to allies in coherency
+- 4m stagger radius around the channeling zealot — staggered enemies pinned for 2s on channel start
+- The 10m buff radius applies separately to allies; the 4m stagger radius is enemy-only
 
 ### USE WHEN
+- **Monstrosity spawn or entry** — community top play deploys the Relic as the monstrosity appears, using the 4m stagger to cancel its first slam/grab. Treat as the dominant trigger, not as a panic button.
+- Corruption modifier active (Maelstrom mutators) AND allies in coherency >= 2 — even at full toughness, channel cleanses some corruption (verify against current corruption-cleanse buff template before relying on this)
 - Average ally toughness < 40% AND allies in coherency >= 2 AND `num_nearby < 2`
 - Self toughness < 25% AND `num_nearby < 3`
+- Ally downed within 10m AND `num_nearby < 3` — the channel buff helps the reviver, the stagger buys time
 
 ### DON'T USE WHEN
-- `num_nearby >= 3` — vulnerable while channeling
-- Elite engaged at close range
-- No allies in coherency
+- `allies_in_coherency == 0` — no allies inside the 10m buff radius
+- `num_nearby >= 3 AND no_monstrosity` — vulnerable during 5.5s commit; only acceptable if a monstrosity threat justifies the trade
+- About to engage at melee range — bot will be locked into the relic for 5.5s; ranged enemies at >10m will continue firing freely
 
 ### PROPOSED BOT RULES
 ```
+IF enemy_monstrosity_in_proximity AND distance < 20 THEN activate (HIGH)  -- dominant trigger
+IF corruption_modifier_active AND allies_in_coherency >= 2 THEN activate (HIGH)
 IF avg_ally_toughness_pct < 0.40 AND allies_in_coherency >= 2 AND num_nearby < 2 THEN activate (HIGH)
 IF toughness_pct < 0.25 AND num_nearby < 3 THEN activate (MEDIUM)
-BLOCK IF num_nearby >= 3
+IF target_ally_needs_aid AND ally_dist < 10 AND num_nearby < 3 THEN activate (MEDIUM)
+BLOCK IF num_nearby >= 3 AND NOT enemy_monstrosity_in_proximity
 BLOCK IF allies_in_coherency == 0
 ```
-**Confidence:** HIGH — existing `cumulative_challenge_rating >= 1.75` threshold in code is a reasonable proxy.
+**Confidence:** HIGH on monstrosity trigger; existing `cumulative_challenge_rating >= 1.75` proxy in code roughly captures this but doesn't explicitly identify monstrosities. A future refinement: gate the threshold on `boss_monstrosity_active` flag for a cleaner trigger.
+
+**Commit warning:** the bot must hold the relic for the full 5.5s channel. If a higher-priority decision flips mid-channel (e.g., ally suddenly downed), the bot cannot abort — the channel is `uninterruptible`. Bot-level heuristics that try to cancel the relic mid-cast will silently fail.
 
 ---
 

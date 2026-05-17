@@ -183,13 +183,18 @@ Increases cooldown (flat reduction is negative = increase), but adds extra fines
 
 **Input actions**: This ability is activated by wielding the relic item, NOT through the standard ability template action system. The player equips the relic and uses it like a weapon.
 
-**What it does** (from talent settings and buff templates):
+**What it does** (from talent settings and buff templates, decompiled source 1.11.6):
 - Channels a prayer that restores toughness to self and nearby allies
-- Self toughness restore: **50%** per tick
-- Team toughness restore: **25%** per tick
-- Tick rate: **0.8s**
+- **Channel duration**: 5.5s (`zealot_relic.lua:L134`)
+- **Uninterruptible**: yes (`uninterruptible = true`) — bot cannot abort mid-channel
+- **Buff radius**: 10m (`radius = 10`) — allies inside this radius receive toughness benefits
+- **Stagger radius**: 4m (`force_stagger_radius = 4`), `force_stagger_duration = 2` — enemies inside this smaller radius are staggered for 2s on channel start (used to cancel monstrosity grabs/slams)
+- **Suppression aura**: 15m (`explosion_area_suppression.distance = 15`) with `instant_aggro = true`
+- Self toughness restore on activation: **100%** (`toughness_restored = 1`); bonus +400 flat during channel
+- 40% TDR during channel (`toughness_damage_taken_multiplier = 0.6`)
+- Per-tick (every 0.8s): self toughness +50% flat, allies +25% flat, allies 20% toughness regen rate
 - Grants stacking `zealot_channel_toughness_bonus`: **+15 flat toughness** per stack (up to 5 stacks, 10s duration)
-- Total potential bonus toughness: +75 flat
+- Total potential bonus toughness: +75 flat per ally + the per-tick refills
 
 **Bot usage notes**: This is the hardest ability to implement for bots (Tier 3). It requires:
 1. Switching to the relic weapon slot

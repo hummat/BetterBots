@@ -120,6 +120,32 @@ IF has(psyker_overcharge_stance_infinite_casting)
 | Brain Burst | Special/elite at >8m, `peril_pct < 0.75` | `peril_pct >= 0.80`, surrounded (`num_nearby >= 3`), close range (<5m) | 3s charge time = vulnerable |
 | Assail | Specials / explicit priority targets at any range; crowd softening only while charge-rich | Carapace armor, low remaining shard count for crowd use | Fast burst vs horde, aimed shard vs specials |
 | Chain Lightning | `num_nearby >= 4` (horde CC), `peril_pct < 0.70` | `peril_pct >= 0.85`, single target | Best AoE CC in game |
+| Smite | 2+ elites/specials in a 30° arc AND `warp_charge < 0.30` (room for ~64% cycle cost) | High peril (`warp_charge >= 0.55` leaves no headroom), single chaff target, Carapace-only target | Warp-charge-**percentage**-gated, not discrete charges; single-target chain-stun (no horde jump like Chain Lightning) |
+
+### Smite mechanics (decompiled source, `psyker_smite.lua` + `weapon_charge_templates.lua:L109-L127`)
+
+Smite is **not** a discrete-charge blitz like Brain Burst or Assail. It is gated by the psyker's warp charge pool:
+
+| Phase | Initial cost | Full-charge cost | Charge time |
+|---|---|---|---|
+| Charge (non-sticky) | 20% warp charge | +9% (`full_charge_warp_charge_percent`) | 3s |
+| Lock-on / sticky | 30% warp charge | +9% | 3s |
+| Fire | 25% warp charge | +10% | 0.5s |
+
+**Full cycle minimum cost: ~64% warp charge** (non-sticky path; sticky path +10%). Activating Smite below ~65% headroom (i.e. `warp_charge > 0.35`) cannot complete a clean cycle and risks Soulblaze at peril cap.
+
+Smite does NOT chain like Chain Lightning. It is a single-target **stagger-then-kill** ability: the charge phase staggers the target via `psyker_smite_stagger`, the fire phase kills via `psyker_smite_kill`. Use it on the most threatening single target (Mauler, Bulwark, Rager) when warp charge is fresh.
+
+**Bot rule:**
+```
+IF warp_charge < 0.30 AND high_value_single_target_visible
+   AND (target_is_carapace OR target_is_special OR target_is_elite)
+   AND distance(target) < 25 THEN activate (HIGH)
+BLOCK IF warp_charge >= 0.55  -- no headroom for full cycle
+BLOCK IF target_is_trash_only
+BLOCK IF surrounded AND distance < 5  -- vulnerable during charge
+```
+**Confidence:** MEDIUM — not yet implemented in BetterBots heuristics. Smite is a separate blitz from Chain Lightning and needs its own activation logic. Chain Lightning's `chain_lightning_max_jumps` stat does NOT affect Smite.
 
 **Current BetterBots note:** all three Psyker blitzes are implemented. Brain Burst now has a dedicated long-charge rule instead of the generic priority-target dispatcher: it blocks at high Peril, blocks under close melee pressure on non-hard targets, and keeps its hard-target bias for super-armor / monsters. Its precision target is seeded from the bot perception priority slots rather than blindly inheriting `target_enemy`. When `psyker_smite_on_hit` is equipped, BetterBots also de-prioritizes manual Brain Burst on ordinary elite/special targets that the proc already covers, while preserving bombers, super-armor, monsters, and explicit long-range priority targets. Assail now uses that same precision-target ordering, favors the aimed shard path on specials, and only starts a crowd burst while the bot still has a substantial shard reserve; once committed, it rapidly spends that reserve unless Peril crosses the shared configurable warp peril stop line.
 
