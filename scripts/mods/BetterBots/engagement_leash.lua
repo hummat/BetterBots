@@ -18,6 +18,8 @@ local _is_enabled
 local _HumanLikeness
 local _Heuristics
 
+local MELEE_HOOK_PATCH_SENTINEL = "__bb_engagement_leash_installed"
+
 -- Coherency-derived constants
 local BASE_LEASH = 12
 local COHERENCY_STICKINESS_LIMIT = 20
@@ -168,6 +170,12 @@ end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
 function M.install_melee_hooks(BtBotMeleeAction)
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) then
+		return
+	end
+
+	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = true
+
 	_mod:hook(
 		BtBotMeleeAction,
 		"_allow_engage",

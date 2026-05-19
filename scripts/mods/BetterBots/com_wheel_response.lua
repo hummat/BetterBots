@@ -1,6 +1,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -172,7 +182,7 @@ function M.install_hooks(Vo)
 end
 
 function M.register_hooks()
-	_mod:hook_require("scripts/utilities/vo", function(Vo)
+	_hook_require_now("scripts/utilities/vo", function(Vo)
 		M.install_hooks(Vo)
 	end)
 end

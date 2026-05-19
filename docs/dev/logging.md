@@ -62,7 +62,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `BetterBots DEBUG: settings: preset=..., sprint_dist=..., chase_range=..., tag_bonus=..., horde_bias=..., smart_targeting=..., dh_avoidance=...` (`startup:settings`; concise startup summary, intentionally not a full config dump)
 - `patched <bt_bot_conditions|bt_conditions>.can_activate_ability (version=<N>)` (startup patch confirmation for the condition hooks)
 - `ability template metadata patch installed (version=<N>, injected=<N>, overridden=<N>)` (startup debug/info confirmation that the ability template metadata patch ran)
-- `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (startup debug/info confirmation that the shared melee hook callback installed)
+- `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (startup debug/info confirmation that the shared melee hook installer ran)
 - `installed BtBotInteractAction.enter hook` (startup debug/info confirmation for the defensive pre-revive hook)
 - `entered GameplayStateRun`
 - `bb-perf:auto: ...` (automatic mission-end / quit perf dump; same payload as `/bb_perf` but tagged separately for grepability; omitted when the window contains `0 bot frames`)
@@ -180,7 +180,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `patched ability effect context is_local_unit=false for bot` (ability effect VFX suppression applied for bot-owned ability contexts; VFX validation signal)
 - `patched CharacterStateMachine _is_local_unit=false for bot` (state-machine local-unit suppression applied for bot units; VFX/SFX validation signal)
 - `restored visual loadout is_local_unit after init error` (visual loadout hook restored shared state before rethrowing; direct failure-path validation signal for `#73`)
-- `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (the shared `hook_require` callback for `bt_bot_melee_action` was installed; startup validation signal for `#67`)
+- `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (the shared `bt_bot_melee_action` hook installer ran; startup validation signal for `#67`)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag|companion_tag|recent_companion_tag|dormant_daemonhost)` (ping system — meaningful suppression, one-shot per repeated target/reason; `companion_tag` means an Arbites bot yielded enemy tagging to mastiff smart-tagging instead of issuing a normal ping on the same target, `recent_companion_tag` means another Arbites bot just issued a mastiff command on that enemy so the generic ping path deliberately backs off instead of re-pinging it, and `dormant_daemonhost` means stage-aware daemonhost avoidance blocked the normal ping path)

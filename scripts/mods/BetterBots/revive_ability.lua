@@ -3,6 +3,16 @@
 -- Hooks BtBotInteractAction.enter; delegates hold+release to ability_queue's
 -- state machine via _fallback_state_by_unit.
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -909,7 +919,7 @@ function M.install_interaction_success_hooks(Interaction, interaction_type)
 end
 
 function M.register_hooks()
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action",
 		function(BtBotInteractAction)
 			if not BtBotInteractAction or rawget(BtBotInteractAction, INTERACT_ACTION_PATCH_SENTINEL) then
@@ -944,7 +954,7 @@ function M.register_hooks()
 		local hook = RESCUE_INTERACTION_HOOK_PATHS[i]
 		local path = hook.path
 		local interaction_type = hook.interaction_type
-		_mod:hook_require(path, function(Interaction)
+		_hook_require_now(path, function(Interaction)
 			M.install_interaction_success_hooks(Interaction, interaction_type)
 		end)
 	end

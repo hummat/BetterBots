@@ -7,10 +7,21 @@
 -- commonly hit this edge case.
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
 local _warned = false
+local DOOR_EXTENSION_SENTINEL = "__bb_airlock_guard_installed"
 
 local function _is_known_nil_node_crash(err)
 	local message = tostring(err)
@@ -20,7 +31,13 @@ local function _is_known_nil_node_crash(err)
 end
 
 local function register_hooks()
-	_mod:hook_require("scripts/extension_systems/door/door_extension", function(DoorExtension)
+	_hook_require_now("scripts/extension_systems/door/door_extension", function(DoorExtension)
+		if not DoorExtension or rawget(DoorExtension, DOOR_EXTENSION_SENTINEL) then
+			return
+		end
+
+		DoorExtension[DOOR_EXTENSION_SENTINEL] = true
+
 		_mod:hook(DoorExtension, "teleport_bots", function(func, self)
 			local ok, err = pcall(func, self)
 			if not ok then

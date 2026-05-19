@@ -2,11 +2,22 @@
 -- plain anim event so bot-only item abilities cannot crash the animation path.
 -- luacheck: globals Unit
 local _mod -- luacheck: ignore 231
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
 
 local INVALID_ANIMATION_VARIABLE_INDEX = 4294967295
+local ANIMATION_EXTENSION_SENTINEL = "__bb_animation_guard_installed"
 
 local function is_valid_variable_index(variable_index)
 	return variable_index ~= nil and variable_index ~= INVALID_ANIMATION_VARIABLE_INDEX
@@ -31,9 +42,18 @@ local function _safe_animation_find_variable(unit, variable_name)
 end
 
 local function register_hooks()
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/animation/authoritative_player_unit_animation_extension",
 		function(AuthoritativePlayerUnitAnimationExtension)
+			if
+				not AuthoritativePlayerUnitAnimationExtension
+				or rawget(AuthoritativePlayerUnitAnimationExtension, ANIMATION_EXTENSION_SENTINEL)
+			then
+				return
+			end
+
+			AuthoritativePlayerUnitAnimationExtension[ANIMATION_EXTENSION_SENTINEL] = true
+
 			_mod:hook(
 				AuthoritativePlayerUnitAnimationExtension,
 				"anim_event_with_variable_float",

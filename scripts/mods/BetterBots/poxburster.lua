@@ -8,11 +8,20 @@ local POXBURSTER_SUPPRESS_DIST = 5
 local POXBURSTER_HUMAN_SUPPRESS_DIST = 8
 local POXBURSTER_PUSH_DIST = 3
 local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
-local _poxburster_breed_patched = false
 local POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL = "__bb_poxburster_installed"
 local POXBURSTER_MELEE_PATCH_SENTINEL = "__bb_poxburster_melee_installed"
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -164,21 +173,12 @@ end
 
 function M.register_hooks()
 	-- Breed patch: remove not_bot_target so bots can target poxbursters.
-	_mod:hook_require("scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed", function(breed_data)
+	_hook_require_now("scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed", function(breed_data)
 		if breed_data.not_bot_target then
 			breed_data.not_bot_target = nil
-			_poxburster_breed_patched = true
 			_debug_log("poxburster_patch", 0, "patched poxburster breed: removed not_bot_target", nil, "info")
 		end
 	end)
-
-	-- Eagerly patch if breed was already loaded before our hook_require fired.
-	local ok, breed = pcall(require, "scripts/settings/breed/breeds/chaos/chaos_poxwalker_bomber_breed")
-	if ok and breed and breed.not_bot_target and not _poxburster_breed_patched then
-		breed.not_bot_target = nil
-		_poxburster_breed_patched = true -- luacheck: ignore 311 (read in hook_require callback above)
-		_debug_log("poxburster_patch_eager", 0, "patched poxburster breed (eager): removed not_bot_target", nil, "info")
-	end
 end
 
 -- Close-range suppression: after target selection runs, if the chosen target

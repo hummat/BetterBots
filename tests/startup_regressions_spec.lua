@@ -76,6 +76,19 @@ local function find_install_call(calls, module_name, method_name)
 	return nil
 end
 
+local function count_install_calls(calls, module_name, method_name)
+	local count = 0
+
+	for i = 1, #calls do
+		local entry = calls[i]
+		if entry.module == module_name and entry.method == method_name then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 local function find_echo(echoes, pattern)
 	for i = 1, #echoes do
 		if string.find(echoes[i], pattern, 1, true) then
@@ -271,6 +284,7 @@ local function make_bootstrap_harness(module_overrides)
 			end,
 		}
 	local managers = module_overrides.__managers
+	local require_modules = module_overrides.__require_modules or {}
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -494,7 +508,9 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 	})
 	modules.MeleeMetaData = make_runtime_module("MeleeMetaData", install_calls, {
-		inject = function() end,
+		inject = function(target)
+			record_install("MeleeMetaData", "inject", target)
+		end,
 		sync_all = function() end,
 	})
 	modules.MeleeAttackChoice = make_runtime_module("MeleeAttackChoice", install_calls, {
@@ -503,7 +519,9 @@ local function make_bootstrap_harness(module_overrides)
 		end,
 	})
 	modules.RangedMetaData = make_runtime_module("RangedMetaData", install_calls, {
-		inject = function() end,
+		inject = function(target)
+			record_install("RangedMetaData", "inject", target)
+		end,
 		sync_all = function() end,
 	})
 	modules.TargetSelection = make_runtime_module("TargetSelection", install_calls)
@@ -653,7 +671,12 @@ local function make_bootstrap_harness(module_overrides)
 	})
 
 	for module_name, override in pairs(module_overrides) do
-		if module_name == "__fixed_frame" or module_name == "__managers" or module_name == "__settings" then
+		if
+			module_name == "__fixed_frame"
+			or module_name == "__managers"
+			or module_name == "__settings"
+			or module_name == "__require_modules"
+		then
 			-- test-only harness knobs, not runtime modules
 			local _ = override
 		elseif override.__strict then
@@ -819,6 +842,9 @@ local function make_bootstrap_harness(module_overrides)
 				end
 				if path == "scripts/settings/bot/bot_settings" then
 					return {}
+				end
+				if require_modules[path] ~= nil then
+					return require_modules[path]
 				end
 				return saved_require(path)
 			end)
@@ -1081,13 +1107,13 @@ describe("startup regressions", function()
 		assert.is_truthy(source:find("ReviveAbility%.init%(", 1))
 		assert.is_truthy(source:find("ReviveAbility%.register_hooks%(", 1))
 		assert.is_truthy(source:find("SustainedFire%.init%(", 1))
-		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/input/bot_unit_input"', 1))
+		assert.is_truthy(source:find('mod:hook_require_now%("scripts/extension_systems/input/bot_unit_input"', 1))
 		assert.is_truthy(source:find("SustainedFire%.install_bot_unit_input_hooks%(", 1))
 		assert.is_truthy(source:find("Sprint%.install_bot_unit_input_hooks%(", 1))
-		assert.is_truthy(source:find('mod:hook_require%("scripts/extension_systems/group/bot_group"', 1))
+		assert.is_truthy(source:find('mod:hook_require_now%("scripts/extension_systems/group/bot_group"', 1))
 		assert.is_truthy(source:find("HazardAvoidance%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(
-			source:find('mod:hook_require%("scripts/extension_systems/hazard_prop/hazard_prop_extension"', 1)
+			source:find('mod:hook_require_now%("scripts/extension_systems/hazard_prop/hazard_prop_extension"', 1)
 		)
 		assert.is_truthy(source:find("HealingDeferral%.install_bot_group_hooks%(", 1))
 		assert.is_truthy(source:find("MulePickup%.install_bot_group_hooks%(", 1))
@@ -1340,6 +1366,58 @@ describe("startup regressions", function()
 			"scripts/settings/bot/bot_settings",
 			"scripts/settings/equipment/weapon_templates/weapon_templates",
 		}, sorted_keys(harness.hook_require_callbacks))
+	end)
+
+	it("installs melee action hooks when the engine module was already loaded before hook_require", function()
+		local melee_action = {
+			_choose_attack = function() end,
+			enter = function() end,
+			_should_defend = function() end,
+			_allow_engage = function() end,
+			_is_in_engage_range = function() end,
+		}
+		local harness = make_bootstrap_harness({
+			__require_modules = {
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action"] = melee_action,
+			},
+		})
+
+		harness:load()
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action",
+			melee_action
+		)
+
+		assert.equals(2, count_install_calls(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
+		assert.equals(2, count_install_calls(harness.install_calls, "Poxburster", "install_melee_hooks"))
+		assert.equals(2, count_install_calls(harness.install_calls, "EngagementLeash", "install_melee_hooks"))
+	end)
+
+	it("ignores a nil melee action hook target", function()
+		local harness = make_bootstrap_harness()
+
+		harness:load()
+		harness:invoke_hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", nil)
+
+		assert.equals(0, count_install_calls(harness.install_calls, "MeleeAttackChoice", "install_melee_hooks"))
+		assert.equals(0, count_install_calls(harness.install_calls, "Poxburster", "install_melee_hooks"))
+		assert.equals(0, count_install_calls(harness.install_calls, "EngagementLeash", "install_melee_hooks"))
+	end)
+
+	it("patches weapon templates when the engine module was already loaded before hook_require", function()
+		local weapon_templates = {}
+		local harness = make_bootstrap_harness({
+			__require_modules = {
+				["scripts/settings/equipment/weapon_templates/weapon_templates"] = weapon_templates,
+			},
+		})
+
+		harness:load()
+		harness:invoke_hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", weapon_templates)
+
+		assert.equals(2, count_install_calls(harness.install_calls, "MeleeMetaData", "inject"))
+		assert.equals(2, count_install_calls(harness.install_calls, "RangedMetaData", "inject"))
+		assert.equals(2, count_install_calls(harness.install_calls, "GrenadeFallback", "prime_weapon_templates"))
 	end)
 
 	it("dispatches use_ability_charge through ChargeTracker.handle", function()
@@ -1809,11 +1887,11 @@ describe("startup regressions", function()
 				local_string_consts[ident] = literal
 			end
 
-			for target in source:gmatch('hook_require%(%s*"([^"]+)"') do
+			for target in source:gmatch('hook_require[_%w]*%(%s*"([^"]+)"') do
 				record_owner(target, path)
 			end
 
-			for ident in source:gmatch("hook_require%(%s*([%w_]+)[,%)]") do
+			for ident in source:gmatch("hook_require[_%w]*%(%s*([%w_]+)[,%)]") do
 				local resolved = local_string_consts[ident]
 				if resolved then
 					record_owner(resolved, path)
@@ -1830,6 +1908,44 @@ describe("startup regressions", function()
 
 		table.sort(duplicates)
 		assert.same({}, duplicates)
+	end)
+
+	it("requires production hook_require call sites to use eager cached-module replay", function()
+		local bare_hook_require_sites = {}
+		local allow_bare_hook_require = {
+			["scripts/mods/BetterBots/BetterBots.lua:scripts/extension_systems/behavior/nodes/bt_random_utility_node"] = true,
+		}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+
+			for target in source:gmatch('[:%.]hook_require%(%s*"([^"]+)"') do
+				local key = path .. ":" .. target
+				if not allow_bare_hook_require[key] then
+					bare_hook_require_sites[#bare_hook_require_sites + 1] = key
+				end
+			end
+
+			local local_string_consts = {}
+			for ident, literal in source:gmatch('local%s+([%w_]+)%s*=%s*"([^"]+)"') do
+				local_string_consts[ident] = literal
+			end
+			for ident in source:gmatch("[:%.]hook_require%(%s*([%w_]+)[,%)]") do
+				local target = local_string_consts[ident]
+				if target then
+					local key = path .. ":" .. target
+					if not allow_bare_hook_require[key] then
+						bare_hook_require_sites[#bare_hook_require_sites + 1] = key
+					end
+				elseif ident ~= "path" then
+					local key = path .. ":" .. ident
+					bare_hook_require_sites[#bare_hook_require_sites + 1] = key
+				end
+			end
+		end)
+
+		table.sort(bare_hook_require_sites)
+		assert.same({}, bare_hook_require_sites)
 	end)
 
 	it("guards hook_require registration against same-path clobbers at runtime", function()
@@ -1927,7 +2043,7 @@ describe("startup regressions", function()
 		local main_source = read_file("scripts/mods/BetterBots/BetterBots.lua")
 		local revive_source = read_file("scripts/mods/BetterBots/revive_ability.lua")
 
-		local hook_pattern = 'hook_require%("scripts/extension_systems/behavior/bot_behavior_extension"'
+		local hook_pattern = 'hook_require_now%("scripts/extension_systems/behavior/bot_behavior_extension"'
 		local main_count = 0
 		for _ in main_source:gmatch(hook_pattern) do
 			main_count = main_count + 1
@@ -2016,8 +2132,7 @@ describe("startup regressions", function()
 		local source = assert(handle:read("*a"))
 		handle:close()
 
-		assert.is_truthy(source:find('mod:hook_require%("scripts/settings/bot/bot_settings"', 1))
-		assert.is_truthy(source:find('pcall%(require, "scripts/settings/bot/bot_settings"%)', 1))
+		assert.is_truthy(source:find('mod:hook_require_now%("scripts/settings/bot/bot_settings"', 1))
 	end)
 
 	it("refreshes live mule pickup state when the grimoire setting changes", function()

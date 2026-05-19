@@ -10,6 +10,16 @@ local ANTI_ARMOR_RANGED_TARGET_BREEDS = {
 }
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -23,6 +33,7 @@ local _anti_armor_ranged_policy
 local _close_range_ranged_policy
 local _warned_errors = {}
 local BOT_PERCEPTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
+local INVENTORY_SWITCH_PATCH_SENTINEL = "__bb_target_type_hysteresis_inventory_switch_installed"
 
 local function _load_runtime_deps()
 	if not _bot_target_selection then
@@ -749,9 +760,18 @@ function M.post_update_target_enemy(
 end
 
 function M.register_hooks()
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_inventory_switch_action",
 		function(BtBotInventorySwitchAction)
+			if
+				not BtBotInventorySwitchAction
+				or rawget(BtBotInventorySwitchAction, INVENTORY_SWITCH_PATCH_SENTINEL)
+			then
+				return
+			end
+
+			BtBotInventorySwitchAction[INVENTORY_SWITCH_PATCH_SENTINEL] = true
+
 			_mod:hook_safe(
 				BtBotInventorySwitchAction,
 				"enter",

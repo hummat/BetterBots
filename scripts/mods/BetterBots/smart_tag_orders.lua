@@ -1,6 +1,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -686,7 +696,7 @@ local function _call_with_set_tag_dispatch_suppressed(callback)
 end
 
 function M.register_hooks()
-	_mod:hook_require("scripts/extension_systems/smart_tag/smart_tag_system", function(SmartTagSystem)
+	_hook_require_now("scripts/extension_systems/smart_tag/smart_tag_system", function(SmartTagSystem)
 		if not SmartTagSystem or rawget(SmartTagSystem, SMART_TAG_SYSTEM_SENTINEL) then
 			return
 		end

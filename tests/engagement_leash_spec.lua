@@ -370,6 +370,35 @@ describe("engagement_leash", function()
 	end)
 
 	describe("action_data restoration", function()
+		it("does not reinstall melee hooks when the same action table is replayed", function()
+			local hook_count = 0
+			local stub_mod = {
+				hook = function()
+					hook_count = hook_count + 1
+				end,
+			}
+			local BtBotMeleeAction = {}
+
+			EngagementLeash.init({
+				mod = stub_mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				perf = nil,
+				is_enabled = function()
+					return true
+				end,
+			})
+			EngagementLeash.install_melee_hooks(BtBotMeleeAction)
+			EngagementLeash.install_melee_hooks(BtBotMeleeAction)
+
+			assert.equals(2, hook_count)
+		end)
+
 		it("compute_effective_leash is pure (no side effects on inputs)", function()
 			local unit = make_unit("bot")
 			POSITION_LOOKUP_STUB[unit] = make_pos(0, 0, 0)

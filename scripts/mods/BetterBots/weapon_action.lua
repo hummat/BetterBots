@@ -3,6 +3,16 @@
 local DEFAULT_WARP_WEAPON_PERIL_THRESHOLD = 0.99
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -17,6 +27,9 @@ local _missing_shoot_extension_warned = {}
 
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
 local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
+local ACTION_INPUT_PATCH_SENTINEL = "__bb_weapon_action_input_installed"
+local VISUAL_LOADOUT_PATCH_SENTINEL = "__bb_weapon_action_visual_loadout_installed"
+local WEAPON_SYSTEM_PATCH_SENTINEL = "__bb_weapon_action_weapon_system_installed"
 local _shoot_action_hooks_installed = false
 local _missing_bt_bot_shoot_action_warned = false
 
@@ -111,7 +124,7 @@ function M.register_hooks(deps)
 	-- so slot_percentage returns 0 and the BT vent node never fires. Bridge
 	-- warp_charge.current_percentage so should_vent_overheat triggers for peril.
 	-- Also guards against plasma-style nested thresholds that crash vanilla.
-	_mod:hook_require("scripts/utilities/overheat", function(Overheat)
+	_hook_require_now("scripts/utilities/overheat", function(Overheat)
 		if not Overheat or rawget(Overheat, OVERHEAT_PATCH_SENTINEL) then
 			return
 		end
@@ -145,7 +158,7 @@ function M.register_hooks(deps)
 	-- Shoot-action hooks: weakspot handoff, scratchpad cleanup, close-range ADS
 	-- policy, and the _may_fire() validation fix.
 	local _ads_logged_scratchpads = setmetatable({}, { __mode = "k" })
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action",
 		function(BtBotShootAction)
 			if not BtBotShootAction then
@@ -581,9 +594,18 @@ function M.register_hooks(deps)
 
 	-- bot_queue_action_input: wield lock, vent translation, peril guard,
 	-- and diagnostic weapon logging.
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/action_input/player_unit_action_input_extension",
 		function(PlayerUnitActionInputExtension)
+			if
+				not PlayerUnitActionInputExtension
+				or rawget(PlayerUnitActionInputExtension, ACTION_INPUT_PATCH_SENTINEL)
+			then
+				return
+			end
+
+			PlayerUnitActionInputExtension[ACTION_INPUT_PATCH_SENTINEL] = true
+
 			_mod:hook_safe(PlayerUnitActionInputExtension, "extensions_ready", function(self, _world, unit)
 				self._betterbots_player_unit = unit
 			end)
@@ -768,9 +790,15 @@ function M.register_hooks(deps)
 	)
 
 	-- Wield slot redirect: keep combat ability slot wielded during item fallback.
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout",
 		function(PlayerUnitVisualLoadout)
+			if not PlayerUnitVisualLoadout or rawget(PlayerUnitVisualLoadout, VISUAL_LOADOUT_PATCH_SENTINEL) then
+				return
+			end
+
+			PlayerUnitVisualLoadout[VISUAL_LOADOUT_PATCH_SENTINEL] = true
+
 			_mod:hook(
 				PlayerUnitVisualLoadout,
 				"wield_slot",
@@ -815,7 +843,13 @@ function M.register_hooks(deps)
 
 	-- WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement calls
 	-- player:account_id() unconditionally; bot-backed player objects can return nil.
-	_mod:hook_require("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
+	_hook_require_now("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
+		if not WeaponSystem or rawget(WeaponSystem, WEAPON_SYSTEM_PATCH_SENTINEL) then
+			return
+		end
+
+		WeaponSystem[WEAPON_SYSTEM_PATCH_SENTINEL] = true
+
 		_mod:hook(
 			WeaponSystem,
 			"queue_perils_of_the_warp_elite_kills_achievement",

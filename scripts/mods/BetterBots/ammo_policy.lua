@@ -1,6 +1,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -653,13 +663,13 @@ function M.install_interaction_hooks(AmmunitionInteraction)
 end
 
 function M.register_hooks()
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/interaction/interactions/ammunition_interaction",
 		function(AmmunitionInteraction)
 			M.install_interaction_hooks(AmmunitionInteraction)
 		end
 	)
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/interaction/interactions/grenade_interaction",
 		function(GrenadeInteraction)
 			M.install_interaction_hooks(GrenadeInteraction)

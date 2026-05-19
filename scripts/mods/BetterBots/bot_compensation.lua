@@ -1,6 +1,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -167,7 +177,7 @@ local function _install_minion_attack_damage_hook(MinionAttack, spec)
 end
 
 local function _install_game_mode_buff_hook(GameMode)
-	if GameMode[GAME_MODE_SENTINEL] then
+	if not GameMode or GameMode[GAME_MODE_SENTINEL] then
 		return
 	end
 
@@ -195,8 +205,8 @@ function M.init(deps)
 end
 
 function M.register_hooks()
-	_mod:hook_require(BOT_SPAWNING_PATH, function(BotSpawning)
-		if BotSpawning[BOT_SPAWNING_SENTINEL] then
+	_hook_require_now(BOT_SPAWNING_PATH, function(BotSpawning)
+		if not BotSpawning or BotSpawning[BOT_SPAWNING_SENTINEL] then
 			return
 		end
 
@@ -221,8 +231,8 @@ function M.register_hooks()
 		BotSpawning[BOT_SPAWNING_SENTINEL] = true
 	end)
 
-	_mod:hook_require(MINION_ATTACK_PATH, function(MinionAttack)
-		if MinionAttack[MINION_ATTACK_SENTINEL] then
+	_hook_require_now(MINION_ATTACK_PATH, function(MinionAttack)
+		if not MinionAttack or MinionAttack[MINION_ATTACK_SENTINEL] then
 			return
 		end
 
@@ -234,7 +244,7 @@ function M.register_hooks()
 	end)
 
 	for i = 1, #GAME_MODE_BUFF_HOOK_PATHS do
-		_mod:hook_require(GAME_MODE_BUFF_HOOK_PATHS[i], _install_game_mode_buff_hook)
+		_hook_require_now(GAME_MODE_BUFF_HOOK_PATHS[i], _install_game_mode_buff_hook)
 	end
 end
 

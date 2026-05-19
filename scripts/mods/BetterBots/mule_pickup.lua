@@ -1,6 +1,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _is_grimoire_pickup_enabled
@@ -892,14 +902,14 @@ function M.register_hooks()
 	M.patch_pickups()
 	M.sync_live_bot_groups()
 
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/interaction/interactions/pocketable_interaction",
 		function(PocketableInteraction)
 			M.install_interaction_hooks(PocketableInteraction)
 		end
 	)
 
-	_mod:hook_require("scripts/utilities/bot_order", function(BotOrder)
+	_hook_require_now("scripts/utilities/bot_order", function(BotOrder)
 		if not BotOrder or rawget(BotOrder, BOT_ORDER_PATCH_SENTINEL) then
 			return
 		end

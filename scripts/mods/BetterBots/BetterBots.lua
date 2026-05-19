@@ -67,8 +67,8 @@ end
 local _original_hook_require = mod._raw_hook_require
 local _hook_require_callsite_by_path = {}
 
-function mod:hook_require(path, callback)
-	local caller = debug.getinfo(2, "Sl")
+local function _record_hook_require_callsite(path, caller_level)
+	local caller = debug.getinfo(caller_level, "Sl")
 	local callsite = string.format("%s:%s", caller and caller.short_src or "?", caller and caller.currentline or 0)
 	local first_callsite = _hook_require_callsite_by_path[path]
 
@@ -84,8 +84,24 @@ function mod:hook_require(path, callback)
 	end
 
 	_hook_require_callsite_by_path[path] = callsite
+end
+
+function mod:hook_require(path, callback)
+	_record_hook_require_callsite(path, 3)
 
 	return _original_hook_require(self, path, callback)
+end
+
+function mod:hook_require_now(path, callback)
+	_record_hook_require_callsite(path, 3)
+
+	local result = _original_hook_require(self, path, callback)
+	local ok, target = pcall(require, path)
+	if ok and target ~= nil then
+		callback(target)
+	end
+
+	return result
 end
 
 local function _refresh_debug_log_level()
@@ -296,7 +312,7 @@ local function _patch_human_likeness_bot_settings(BotSettings)
 	HumanLikeness.patch_bot_settings(BotSettings)
 end
 
-mod:hook_require("scripts/settings/bot/bot_settings", function(BotSettings)
+mod:hook_require_now("scripts/settings/bot/bot_settings", function(BotSettings)
 	_patch_human_likeness_bot_settings(BotSettings)
 end)
 
@@ -306,15 +322,6 @@ end)
 
 do
 	BotCompensation.register_hooks()
-	local ok, BotSettings = pcall(require, "scripts/settings/bot/bot_settings")
-	if ok and BotSettings then
-		_patch_human_likeness_bot_settings(BotSettings)
-	else
-		mod:warning(
-			"BetterBots: fallback require of bot_settings failed; human-likeness reaction-time patch may be skipped. "
-				.. tostring(BotSettings)
-		)
-	end
 end
 
 ReviveAbility.wire({
@@ -566,22 +573,20 @@ local function _install_bot_perception_extension_hooks(BotPerceptionExtension)
 	end
 end
 
-mod:hook_require(
+mod:hook_require_now(
 	"scripts/extension_systems/perception/bot_perception_extension",
 	_install_bot_perception_extension_hooks
 )
 
-do
-	local ok, BotPerceptionExtension = pcall(require, "scripts/extension_systems/perception/bot_perception_extension")
-	if ok and BotPerceptionExtension then
-		_install_bot_perception_extension_hooks(BotPerceptionExtension)
-	end
-end
-
 -- Consolidated bt_bot_melee_action hook_require: three modules hook this path.
 -- DMF hook_require is keyed by (path, mod_name) — multiple calls from the same mod
 -- on the same path silently clobber each other (#67). Single callback installs all hooks.
-mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action", function(BtBotMeleeAction)
+local BT_BOT_MELEE_ACTION_PATH = "scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action"
+local function _install_bt_bot_melee_action_hooks(BtBotMeleeAction)
+	if not BtBotMeleeAction then
+		return
+	end
+
 	local ok, err
 	ok, err = pcall(MeleeAttackChoice.install_melee_hooks, BtBotMeleeAction)
 	if not ok then
@@ -604,25 +609,47 @@ mod:hook_require("scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_me
 			"info"
 		)
 	end
-end)
+end
+
+mod:hook_require_now(BT_BOT_MELEE_ACTION_PATH, _install_bt_bot_melee_action_hooks)
 
 -- Hooks that remain in main: template injection, sprint, BT enter,
 -- charge consume, state change retry, ADS gestalt, update tick.
 
-mod:hook_require("scripts/settings/ability/ability_templates/ability_templates", function(AbilityTemplates)
-	MetaData.inject(AbilityTemplates)
-end)
+local ABILITY_TEMPLATES_PATH = "scripts/settings/ability/ability_templates/ability_templates"
+local function _install_ability_template_patches(AbilityTemplates)
+	if not AbilityTemplates then
+		return
+	end
 
-mod:hook_require("scripts/settings/equipment/weapon_templates/weapon_templates", function(WeaponTemplates)
+	MetaData.inject(AbilityTemplates)
+end
+
+mod:hook_require_now(ABILITY_TEMPLATES_PATH, _install_ability_template_patches)
+
+local WEAPON_TEMPLATES_PATH = "scripts/settings/equipment/weapon_templates/weapon_templates"
+local function _install_weapon_template_patches(WeaponTemplates)
+	if not WeaponTemplates then
+		return
+	end
+
 	MeleeMetaData.inject(WeaponTemplates)
 	RangedMetaData.inject(WeaponTemplates)
 	GrenadeFallback.prime_weapon_templates(WeaponTemplates)
-end)
+end
+
+mod:hook_require_now(WEAPON_TEMPLATES_PATH, _install_weapon_template_patches)
 
 -- DMF hook_require is keyed by (path, mod_name) — multiple callbacks from the
 -- same mod on the same path silently clobber each other. Install all
 -- BotUnitInput hooks through one callback so sprint and sustained-fire coexist.
-mod:hook_require("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
+local BOT_UNIT_INPUT_DISPATCHER_SENTINEL = "__bb_bot_unit_input_dispatcher_installed"
+mod:hook_require_now("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
+	if not BotUnitInput or rawget(BotUnitInput, BOT_UNIT_INPUT_DISPATCHER_SENTINEL) then
+		return
+	end
+
+	BotUnitInput[BOT_UNIT_INPUT_DISPATCHER_SENTINEL] = true
 	SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
 	Sprint.install_bot_unit_input_hooks(BotUnitInput)
 end)
@@ -632,7 +659,7 @@ end)
 -- hooks through one callback so healing deferral, mule pickup, and hazard
 -- diagnostics all survive.
 local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
-mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
+mod:hook_require_now("scripts/extension_systems/group/bot_group", function(BotGroup)
 	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
 		return
 	end
@@ -643,14 +670,22 @@ mod:hook_require("scripts/extension_systems/group/bot_group", function(BotGroup)
 	Modules.HazardAvoidance.install_bot_group_hooks(BotGroup)
 end)
 
-mod:hook_require("scripts/extension_systems/hazard_prop/hazard_prop_extension", function(HazardPropExtension)
+mod:hook_require_now("scripts/extension_systems/hazard_prop/hazard_prop_extension", function(HazardPropExtension)
 	Modules.HazardAvoidance.install_hazard_prop_hooks(HazardPropExtension)
 end)
 
 -- BT activate ability enter hook: category gate (#6), rescue aim (#10), event logging
-mod:hook_require(
+local BT_ACTIVATE_ABILITY_ACTION_SENTINEL = "__bb_bt_activate_ability_action_installed"
+mod:hook_require_now(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)
+		if
+			not BtBotActivateAbilityAction or rawget(BtBotActivateAbilityAction, BT_ACTIVATE_ABILITY_ACTION_SENTINEL)
+		then
+			return
+		end
+
+		BtBotActivateAbilityAction[BT_ACTIVATE_ABILITY_ACTION_SENTINEL] = true
 		mod:hook(
 			BtBotActivateAbilityAction,
 			"enter",
@@ -804,20 +839,42 @@ mod:hook_require(
 )
 
 -- Charge consume tracking + VFX suppression (#42). Consolidated: both modules hook this path (#67).
-mod:hook_require("scripts/extension_systems/ability/player_unit_ability_extension", function(PlayerUnitAbilityExtension)
-	local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
-	if not ok then
-		mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
+local PLAYER_ABILITY_DISPATCHER_SENTINEL = "__bb_player_ability_dispatcher_installed"
+mod:hook_require_now(
+	"scripts/extension_systems/ability/player_unit_ability_extension",
+	function(PlayerUnitAbilityExtension)
+		if not PlayerUnitAbilityExtension or rawget(PlayerUnitAbilityExtension, PLAYER_ABILITY_DISPATCHER_SENTINEL) then
+			return
+		end
+
+		PlayerUnitAbilityExtension[PLAYER_ABILITY_DISPATCHER_SENTINEL] = true
+		local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
+		if not ok then
+			mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
+		end
+		mod:hook_safe(
+			PlayerUnitAbilityExtension,
+			"use_ability_charge",
+			function(self, ability_type, optional_num_charges)
+				ChargeTracker.handle(self, ability_type, optional_num_charges)
+			end
+		)
 	end
-	mod:hook_safe(PlayerUnitAbilityExtension, "use_ability_charge", function(self, ability_type, optional_num_charges)
-		ChargeTracker.handle(self, ability_type, optional_num_charges)
-	end)
-end)
+)
 
 -- State change retry: schedule fast retry when ability state transition fails
-mod:hook_require(
+local ACTION_CHARACTER_STATE_CHANGE_SENTINEL = "__bb_action_character_state_change_installed"
+mod:hook_require_now(
 	"scripts/extension_systems/ability/actions/action_character_state_change",
 	function(ActionCharacterStateChange)
+		if
+			not ActionCharacterStateChange
+			or rawget(ActionCharacterStateChange, ACTION_CHARACTER_STATE_CHANGE_SENTINEL)
+		then
+			return
+		end
+
+		ActionCharacterStateChange[ACTION_CHARACTER_STATE_CHANGE_SENTINEL] = true
 		mod:hook(ActionCharacterStateChange, "finish", function(func, self, reason, data, t, time_in_action)
 			return ItemFallback.on_state_change_finish(func, self, reason, data, t, time_in_action)
 		end)
@@ -828,7 +885,7 @@ mod:hook_require(
 -- + revive-candidate diagnostics (#7) + main update tick.
 -- Consolidated: multiple modules hook this path (#67).
 local BEHAVIOR_DISPATCHER_SENTINEL = "__bb_behavior_dispatcher_installed"
-mod:hook_require("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
+mod:hook_require_now("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
 	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_DISPATCHER_SENTINEL) then
 		return
 	end

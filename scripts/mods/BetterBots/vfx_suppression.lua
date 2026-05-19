@@ -10,10 +10,23 @@
 -- distortion, lunge sounds, shout aim indicator, targeted dash crosshair,
 -- item placement previews) without touching gameplay state.
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 
 local M = {}
+local ABILITY_EXTENSION_SENTINEL = "__bb_vfx_suppression_ability_installed"
+local VISUAL_LOADOUT_EXTENSION_SENTINEL = "__bb_vfx_suppression_loadout_installed"
+local CHARACTER_STATE_MACHINE_SENTINEL = "__bb_vfx_suppression_csm_installed"
 
 function M.init(deps)
 	_mod = deps.mod
@@ -23,6 +36,12 @@ end
 
 -- Called from the consolidated player_unit_ability_extension hook_require in BetterBots.lua (#67).
 function M.install_ability_ext_hooks(PlayerUnitAbilityExtension)
+	if not PlayerUnitAbilityExtension or rawget(PlayerUnitAbilityExtension, ABILITY_EXTENSION_SENTINEL) then
+		return
+	end
+
+	PlayerUnitAbilityExtension[ABILITY_EXTENSION_SENTINEL] = true
+
 	_mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
 		local player = extension_init_data.player
 		if player and not player:is_human_controlled() then
@@ -48,9 +67,18 @@ function M.register_hooks()
 	-- constructs wieldable slot scripts. AimProjectileEffects.init caches
 	-- context.is_local_unit on its own field — a hook_safe (post-call) is too late.
 	-- Save/restore extension_init_data.is_local_unit so other extensions aren't affected.
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/visual_loadout/player_unit_visual_loadout_extension",
 		function(PlayerUnitVisualLoadoutExtension)
+			if
+				not PlayerUnitVisualLoadoutExtension
+				or rawget(PlayerUnitVisualLoadoutExtension, VISUAL_LOADOUT_EXTENSION_SENTINEL)
+			then
+				return
+			end
+
+			PlayerUnitVisualLoadoutExtension[VISUAL_LOADOUT_EXTENSION_SENTINEL] = true
+
 			_mod:hook(
 				PlayerUnitVisualLoadoutExtension,
 				"init",
@@ -100,9 +128,18 @@ function M.register_hooks()
 		end
 	)
 
-	_mod:hook_require(
+	_hook_require_now(
 		"scripts/extension_systems/character_state_machine/character_state_machine_extension",
 		function(CharacterStateMachineExtension)
+			if
+				not CharacterStateMachineExtension
+				or rawget(CharacterStateMachineExtension, CHARACTER_STATE_MACHINE_SENTINEL)
+			then
+				return
+			end
+
+			CharacterStateMachineExtension[CHARACTER_STATE_MACHINE_SENTINEL] = true
+
 			_mod:hook_safe(CharacterStateMachineExtension, "init", function(self, _context, unit, extension_init_data)
 				local player = extension_init_data.player
 				if player and not player:is_human_controlled() then

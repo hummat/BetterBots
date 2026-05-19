@@ -2,6 +2,16 @@
 -- BetterBots' version that checks heuristics, guards, and rescue intent.
 -- Also fixes should_vent_overheat hysteresis (#30).
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -777,41 +787,13 @@ function M._action_input_is_bot_queueable(...)
 end
 
 function M.register_hooks()
-	_mod:hook_require("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
+	_hook_require_now("scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions", function(conditions)
 		_install_condition_patch(conditions, _patched_bt_bot_conditions, "bt_bot_conditions")
 	end)
 
-	_mod:hook_require("scripts/extension_systems/behavior/utilities/bt_conditions", function(conditions)
+	_hook_require_now("scripts/extension_systems/behavior/utilities/bt_conditions", function(conditions)
 		_install_condition_patch(conditions, _patched_bt_conditions, "bt_conditions")
 	end)
-
-	-- Eagerly patch if conditions were already loaded.
-	local function _try_patch_conditions_now(module_path, patched_set, patch_label)
-		local ok, conditions_or_err = pcall(require, module_path)
-		if not ok then
-			_mod:echo(
-				"BetterBots WARNING: condition patch failed for "
-					.. patch_label
-					.. " ("
-					.. tostring(conditions_or_err)
-					.. ")"
-			)
-			return
-		end
-
-		_install_condition_patch(conditions_or_err, patched_set, patch_label)
-	end
-
-	_try_patch_conditions_now(
-		"scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions",
-		_patched_bt_bot_conditions,
-		"bt_bot_conditions"
-	)
-	_try_patch_conditions_now(
-		"scripts/extension_systems/behavior/utilities/bt_conditions",
-		_patched_bt_conditions,
-		"bt_conditions"
-	)
 end
 
 return M

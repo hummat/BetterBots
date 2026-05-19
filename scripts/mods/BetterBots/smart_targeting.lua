@@ -2,6 +2,16 @@
 -- Keeps vanilla sticky/range validation by swapping the candidate unit only
 -- for the duration of SmartTargetingActionModule.fixed_update().
 local _mod -- luacheck: ignore 231
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -121,7 +131,7 @@ end
 
 local function register_hooks()
 	for i = 1, #TARGETING_MODULE_PATHS do
-		_mod:hook_require(TARGETING_MODULE_PATHS[i], install_fixed_update_hook)
+		_hook_require_now(TARGETING_MODULE_PATHS[i], install_fixed_update_hook)
 	end
 end
 

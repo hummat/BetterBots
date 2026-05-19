@@ -19,7 +19,7 @@ This mod targets bot ability activation in three paths:
 
 `scripts/mods/BetterBots/BetterBots.lua` coordinates hook registration and runtime lifecycle; `bootstrap.lua` loads modules, initializes dependencies, and wires cross-module references.
 
-1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`).
+1. Injects missing `ability_meta_data` for Tier 2 templates (via `meta_data.lua`, installed through `mod:hook_require_now` on `AbilityTemplates`).
 2. Overrides selected template metadata (`veteran_*`) to use bot-valid inputs.
 3. Replaces `can_activate_ability` on both `bt_bot_conditions` and `bt_conditions` so templates with valid metadata can pass (via `condition_patch.lua`).
 4. Adds a fallback in `BotBehaviorExtension:update` (via `update_dispatcher.lua` coordinating `ability_queue.lua` for Tier 1/2 and `grenade_fallback.lua` for grenade/blitz paths):
@@ -169,7 +169,7 @@ This mod targets bot ability activation in three paths:
     - also caches weapon-special metadata on enter and prepends `special_action` for supported melee families
     - 1H power swords arm broadly in live combat windows (including multi-target non-elite pressure), Zealot 2H power swords resolve both `toggle_special` and `toggle_special_with_block`, 1H force swords stay targeted at elite/special/monster/super-armor value, 2H force swords instead require at least 10 stored special charges and an unarmored horde window, thunder hammers widen to armored/heavy elites plus captain/monster/boss, chain-family `toggle_special` weapons stay armor/heavy biased, ordinary human/Ogryn power mauls arm for high-health or armored targets, Ogryn `ogryn_club_p1_m2/m3` latrine shovels fold for high-health or armored targets, and direct combat axe/sword/knife plus Ogryn club/pickaxe/combat-blade specials use the same high-value target gate
 27. Melee attack metadata injection (#23, via `melee_meta_data.lua`):
-    - hook `WeaponTemplates` require: auto-derives and injects `attack_meta_data` for all melee weapons
+    - patches `WeaponTemplates` through `mod:hook_require_now`: auto-derives and injects `attack_meta_data` for all melee weapons even if another mod required the templates first
     - traverses action graph: `start_attack` → `allowed_chain_actions` → light/heavy action → `damage_profile`
     - classifies `arc` from `cleave_distribution` (0/1/2) and `penetrating` from `armor_damage_modifier[armored]` (threshold ≥ 0.5)
     - feeds the BetterBots `_choose_attack` replacement with weapon-specific arc/penetration data instead of leaving bots on the vanilla light-only fallback
@@ -177,13 +177,14 @@ This mod targets bot ability activation in three paths:
 28. Ranged weapon `attack_meta_data` injection (#31, via `ranged_meta_data.lua`):
     - auto-derives `attack_meta_data` for player ranged weapons where `bt_bot_shoot_action`'s hardcoded fallback chain (`action_shoot` → `start_input` → `"shoot"`) produces invalid input names
     - scans `action_inputs` for `action_one_pressed` (fire), `action_two_hold` (aim), `hold_input` combos (aim-fire)
+    - runs through the same `WeaponTemplates` `hook_require_now` installer as melee metadata so load order with sibling mods cannot skip the patch
     - syncs with `enable_ranged_improvements`: disabling the setting restores any BetterBots-injected or patched ranged metadata fields on the live weapon templates
 29. Sustained-fire hold bridge (#87, via `sustained_fire.lua`):
     - `weapon_action.lua` owns the single `PlayerUnitActionInputExtension.bot_queue_action_input` hook and forwards successful `weapon_action` requests to downstream observers rather than letting multiple modules hook the method independently; `weapon_action_logging.lua` owns diagnostic queue context/logging used by that hook
     - `SustainedFire.observe_queued_weapon_action(...)` remains one observer, and `ranged_special_action.lua` now shares the same seam for shotgun special-shell preload tracking
     - the same hook also exposes a narrow rewrite seam before the queued input is forwarded, so `ranged_special_action.lua` can rewrite supported shotgun fire requests into `special_action` without owning the engine hook itself
-    - `BetterBots.lua` owns the single `hook_require("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
-    - `BetterBots.lua` also owns the shared `hook_require("...group/bot_group")` callback for healing deferral + mule pickup and wraps `mod:hook_require` with a duplicate-path guard so same-path registrations fail loudly instead of silently clobbering each other
+    - `BetterBots.lua` owns the single `hook_require_now("...bot_unit_input")` callback and installs both sprint + sustained-fire hooks together, avoiding DMF same-path clobbering inside one mod
+    - `BetterBots.lua` also owns the shared `hook_require_now("...group/bot_group")` callback for healing deferral + mule pickup and wraps hook-require registration with a duplicate-path guard so same-path registrations fail loudly instead of silently clobbering each other
     - hook `BotUnitInput.update`: cache the live bot unit on the input object so later low-level injection knows which unit it is driving
     - hook `BotUnitInput._update_actions`: inject raw hold inputs (`action_one_hold` for most full-auto/stream paths, `action_two_hold` for Purgatus flame charge) while sustained state is fresh
     - scope is execution-only: it respects the current `attack_meta_data` path choice and does not decide ADS vs hipfire vs brace
@@ -214,7 +215,7 @@ This mod targets bot ability activation in three paths:
     - logs `anti-armor ranged family kept ranged target type ...` when the anti-armor target-type lift fires
 31a. Per-breed weakspot aim override (#92, via `weakspot_aim.lua`):
     - wraps `BtBotShootAction.enter` to cache the shooter unit on the scratchpad, then uses `_set_new_aim_target` for initial override application and `_aim_position` for live Bulwark/Crusher refresh
-    - `weapon_action.lua` owns the `bt_bot_shoot_action` hook_require callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard on `mod:hook_require` forbids a second registration from this module
+    - `weapon_action.lua` owns the `bt_bot_shoot_action` `hook_require_now` callback and forwards `BtBotShootAction` into `WeakspotAim.install_on_shoot_action(...)`; BetterBots's duplicate-path guard forbids a second registration from this module
     - `weapon_action_shoot.lua` normalizes BT shoot scratchpads and suppresses stale `aim` / `unaim` queue inputs when the live `weapon_action` template no longer accepts them, so post-swap melee/warp templates do not inherit old `zoom` traffic from an earlier ranged shoot scratchpad
     - `weapon_action_voidblast.lua` carries the Voidblast (`forcestaff_p1_m1`) charged-shot fixes without stealing weakspot-owned hook slots:
       - `_update_aim` provides scratchpad context plus temporary retarget freezing once a charge anchor exists and restores the forced target even if vanilla `_update_aim` throws
@@ -287,27 +288,31 @@ DMF dedupes hook registrations by `(mod, obj, method)`. A second `mod:hook` / `m
 | Engine method | Features dispatched | Dispatcher location |
 |---|---|---|
 | `BotPerceptionExtension._update_target_enemy` | `TargetTypeHysteresis`, `Poxburster` | `BetterBots.lua` `_install_bot_perception_extension_hooks` |
-| `BotBehaviorExtension._verify_target_ally_aid_destination` | `ReviveAbility` rescue priority | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
-| `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require(..., bot_behavior_extension)` callback |
+| `BotBehaviorExtension._verify_target_ally_aid_destination` | `ReviveAbility` rescue priority | `BetterBots.lua` `mod:hook_require_now(..., bot_behavior_extension)` callback |
+| `BotBehaviorExtension._refresh_destination` | `MulePickup`, `ReviveAbility` | `BetterBots.lua` `mod:hook_require_now(..., bot_behavior_extension)` callback |
 | `BotUnitInput._update_movement` | `Sprint`, `HazardAvoidance` movement safety | `sprint.lua` hook forwards to `hazard_avoidance.lua` |
-| `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` `mod:hook_require(..., bt_bot_melee_action)` callback |
+| `BtBotMeleeAction` melee hooks | `MeleeAttackChoice`, `Poxburster`, `EngagementLeash` | `BetterBots.lua` shared installer, called by `mod:hook_require_now(..., bt_bot_melee_action)` |
 
-**Rule 2: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
+**Rule 2: production `hook_require` registrations use `mod:hook_require_now`.** `mod:hook_require_now(path, callback)` registers the DMF `hook_require` callback and immediately `pcall(require, path)` to replay the same installer against an already-cached engine module. This closes the load-order hole where another mod requires a shared engine path before BetterBots boots. The only bare `mod:hook_require` exception is diagnostic-only `BtRandomUtilityNode` combat utility logging; losing it cannot drop gameplay patches or crash guards.
+
+Leaf modules that can be unit-tested without the full BetterBots bootstrap should call a local `_hook_require_now(...)` helper that uses `_mod.hook_require_now` in production and falls back to `_mod["hook_require"]` for narrow test doubles. Do not add new production `mod:hook_require(...)` calls.
+
+**Rule 3: every `hook_require` callback must be idempotent and hot-reload-safe.** DMF re-fires every registered `hook_require` callback whenever any mod calls `require()` on the same path (not just on first load), and `Ctrl+Shift+R` re-executes `BetterBots.lua` from scratch. Unguarded callbacks stack wrappers or retry field replacements on every replay. Guard pattern:
 
 ```lua
 local SENTINEL = "__bb_<feature>_installed"
-mod:hook_require("scripts/extension_systems/.../some_file", function(Target)
+mod:hook_require_now("scripts/extension_systems/.../some_file", function(Target)
     if not Target or rawget(Target, SENTINEL) then return end
     Target[SENTINEL] = true
     -- hook / field mutation here
 end)
 ```
 
-The sentinel string must live on the engine class table (`rawget(Target, SENTINEL)`), not in a module-level Lua local (`setmetatable({}, {__mode="k"})`). Module locals reset when `BetterBots.lua` re-executes on hot reload; the engine class persists. Current callers of this pattern: `poxburster.lua`, `revive_ability.lua`, `ammo_policy.lua`, `weapon_action.lua`, `smart_targeting.lua`, `hazard_avoidance.lua`, and the consolidated dispatchers in `BetterBots.lua`.
+The sentinel string must live on the engine class table (`rawget(Target, SENTINEL)`), not in a module-level Lua local (`setmetatable({}, {__mode="k"})`). Module locals reset when `BetterBots.lua` re-executes on hot reload; the engine class persists. Current callers of this pattern: `airlock_guard.lua`, `animation_guard.lua`, `bot_compensation.lua`, `engagement_leash.lua`, `poxburster.lua`, `revive_ability.lua`, `ammo_policy.lua`, `weapon_action.lua`, `smart_targeting.lua`, `target_selection.lua`, `target_type_hysteresis.lua`, `vfx_suppression.lua`, `hazard_avoidance.lua`, and the consolidated dispatchers in `BetterBots.lua`.
 
 Regression coverage: `tests/startup_regressions_spec.lua` includes idempotency tests that simulate hot reload by loading the test harness twice with a shared extension table and assert zero new hook registrations on the second load.
 
-**Rule 3: wrap optional pre-hook logic in `pcall` when the original is essential.** When a hook injects optional behavior *before* a critical engine action (revive interaction entry, rescue charge, etc.), an exception in the injected code must not prevent the original from running. A nil-component or unexpected-return error in `try_pre_revive` would otherwise leave a downed ally never rescued. Pattern:
+**Rule 4: wrap optional pre-hook logic in `pcall` when the original is essential.** When a hook injects optional behavior *before* a critical engine action (revive interaction entry, rescue charge, etc.), an exception in the injected code must not prevent the original from running. A nil-component or unexpected-return error in `try_pre_revive` would otherwise leave a downed ally never rescued. Pattern:
 
 ```lua
 local ok, err = pcall(M.optional_enhancement, unit, args)

@@ -4,6 +4,16 @@
 local M = {}
 
 local _mod
+
+local function _hook_require_now(path, callback)
+	local hook_require_now = _mod and _mod.hook_require_now
+	if hook_require_now then
+		return hook_require_now(_mod, path, callback)
+	end
+
+	return _mod["hook_require"](_mod, path, callback)
+end
+
 local _breed_utils
 local _debug_log
 local _debug_enabled
@@ -27,6 +37,7 @@ local _cached_slot_ammo_pct
 local _is_daemonhost_avoidance_enabled
 local _daemonhost_breed_names
 local _is_non_aggroed_daemonhost
+local BOT_TARGET_SELECTION_SENTINEL = "__bb_target_selection_installed"
 local DAEMONHOST_BREED_NAMES = {
 	chaos_daemonhost = true,
 	chaos_mutator_daemonhost = true,
@@ -234,7 +245,13 @@ function M.register_hooks()
 			end,
 		}
 
-	_mod:hook_require("scripts/utilities/bot_target_selection", function(BotTargetSelection)
+	_hook_require_now("scripts/utilities/bot_target_selection", function(BotTargetSelection)
+		if not BotTargetSelection or rawget(BotTargetSelection, BOT_TARGET_SELECTION_SENTINEL) then
+			return
+		end
+
+		BotTargetSelection[BOT_TARGET_SELECTION_SENTINEL] = true
+
 		_mod:hook(
 			BotTargetSelection,
 			"slot_weight",
