@@ -89,6 +89,18 @@ local function count_install_calls(calls, module_name, method_name)
 	return count
 end
 
+local function count_warnings(warnings, pattern)
+	local count = 0
+
+	for i = 1, #warnings do
+		if string.find(warnings[i], pattern, 1, true) then
+			count = count + 1
+		end
+	end
+
+	return count
+end
+
 local function find_echo(echoes, pattern)
 	for i = 1, #echoes do
 		if string.find(echoes[i], pattern, 1, true) then
@@ -285,6 +297,7 @@ local function make_bootstrap_harness(module_overrides)
 		}
 	local managers = module_overrides.__managers
 	local require_modules = module_overrides.__require_modules or {}
+	local persistent_tables = module_overrides.__persistent_tables or {}
 
 	local function record_install(module_name, method_name, ...)
 		install_calls.install_calls[#install_calls.install_calls + 1] = {
@@ -326,7 +339,9 @@ local function make_bootstrap_harness(module_overrides)
 		reset = function() end,
 	})
 	modules.MetaData = make_runtime_module("MetaData", install_calls, {
-		inject = function() end,
+		inject = function(target)
+			record_install("MetaData", "inject", target)
+		end,
 	})
 	modules.Settings = make_runtime_module("Settings", install_calls, {
 		resolve_human_timing_config = function()
@@ -676,6 +691,7 @@ local function make_bootstrap_harness(module_overrides)
 			or module_name == "__managers"
 			or module_name == "__settings"
 			or module_name == "__require_modules"
+			or module_name == "__persistent_tables"
 		then
 			-- test-only harness knobs, not runtime modules
 			local _ = override
@@ -799,6 +815,12 @@ local function make_bootstrap_harness(module_overrides)
 		warning = function(_, message)
 			warnings[#warnings + 1] = message
 		end,
+		persistent_table = function(_, id, default)
+			if persistent_tables[id] == nil then
+				persistent_tables[id] = default or {}
+			end
+			return persistent_tables[id]
+		end,
 	}
 
 	local harness = {
@@ -814,6 +836,12 @@ local function make_bootstrap_harness(module_overrides)
 		register_calls = install_calls.register_calls,
 		install_calls = install_calls.install_calls,
 		load = function()
+			local saved_package_loaded = {}
+			for path, target in pairs(require_modules) do
+				saved_package_loaded[path] = package.loaded[path]
+				package.loaded[path] = target
+			end
+
 			rawset(_G, "get_mod", function(mod_name)
 				assert.equals("BetterBots", mod_name)
 				return fake_mod
@@ -850,6 +878,9 @@ local function make_bootstrap_harness(module_overrides)
 			end)
 
 			local ok, loaded = pcall(dofile, "scripts/mods/BetterBots/BetterBots.lua")
+			for path in pairs(require_modules) do
+				package.loaded[path] = saved_package_loaded[path]
+			end
 			rawset(_G, "require", saved_require)
 			rawset(_G, "get_mod", saved_get_mod)
 			rawset(_G, "ScriptUnit", saved_script_unit)
@@ -1420,6 +1451,127 @@ describe("startup regressions", function()
 		assert.equals(2, count_install_calls(harness.install_calls, "GrenadeFallback", "prime_weapon_templates"))
 	end)
 
+	it("cached weapon-template replay fills melee max_range before bot melee range calculation", function()
+		local real_melee_meta_data = dofile("scripts/mods/BetterBots/melee_meta_data.lua")
+		local weapon_templates = {
+			sword = {
+				keywords = { "melee" },
+				actions = {
+					action_melee_start_left = {
+						start_input = "start_attack",
+						allowed_chain_actions = {
+							light_attack = {
+								action_name = "action_left_light",
+								chain_time = 0.12,
+							},
+						},
+					},
+					action_left_light = {
+						damage_profile = {
+							cleave_distribution = {
+								attack = { 0.5, 1 },
+							},
+							armor_damage_modifier = {
+								attack = {
+									[2] = { 0.25, 0.5 },
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		local harness = make_bootstrap_harness({
+			MeleeMetaData = real_melee_meta_data,
+			Settings = {
+				is_feature_enabled = function(feature_name)
+					return feature_name == "melee_improvements"
+				end,
+			},
+			__require_modules = {
+				["scripts/settings/equipment/weapon_templates/weapon_templates"] = weapon_templates,
+			},
+		})
+
+		harness:load()
+
+		local light_attack = weapon_templates.sword.attack_meta_data.light_attack
+		assert.equals(2.5, light_attack.max_range)
+		assert.same({
+			{ action_input = "start_attack", timing = 0 },
+			{ action_input = "light_attack", timing = 0.12 },
+		}, light_attack.action_inputs)
+	end)
+
+	it("patches ability templates when the engine module was already loaded before hook_require", function()
+		local ability_templates = {}
+		local harness = make_bootstrap_harness({
+			__require_modules = {
+				["scripts/settings/ability/ability_templates/ability_templates"] = ability_templates,
+			},
+		})
+
+		harness:load()
+		harness:invoke_hook_require("scripts/settings/ability/ability_templates/ability_templates", ability_templates)
+
+		assert.equals(2, count_install_calls(harness.install_calls, "MetaData", "inject"))
+	end)
+
+	it("installs perception hooks when the engine module was already loaded before hook_require", function()
+		local perception_ext = {
+			_update_target_enemy = function() end,
+		}
+		local harness = make_bootstrap_harness({
+			__require_modules = {
+				["scripts/extension_systems/perception/bot_perception_extension"] = perception_ext,
+			},
+		})
+
+		harness:load()
+
+		assert.equals(1, #harness.hook_registrations)
+		assert.equals(perception_ext, harness.hook_registrations[1].target)
+		assert.equals("_update_target_enemy", harness.hook_registrations[1].method)
+	end)
+
+	it("warns and rethrows cached hook_require_now installer failures", function()
+		local weapon_templates = {}
+		local harness = make_bootstrap_harness({
+			MeleeMetaData = {
+				inject = function()
+					error("synthetic melee installer failure")
+				end,
+			},
+			__require_modules = {
+				["scripts/settings/equipment/weapon_templates/weapon_templates"] = weapon_templates,
+			},
+		})
+
+		local ok, err = pcall(function()
+			harness:load()
+		end)
+
+		assert.is_false(ok)
+		assert.truthy(tostring(err):find("synthetic melee installer failure", 1, true))
+		assert.equals(1, count_warnings(harness.warnings, "hook_require_now installer failed"))
+	end)
+
+	it("rejects non-table cached hook_require_now targets before callback dispatch", function()
+		local harness = make_bootstrap_harness({
+			__require_modules = {
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_melee_action"] = true,
+			},
+		})
+
+		local ok, err = pcall(function()
+			harness:load()
+		end)
+
+		assert.is_false(ok)
+		assert.truthy(tostring(err):find("cached module is boolean", 1, true))
+		assert.equals(1, count_warnings(harness.warnings, "cached module is boolean"))
+	end)
+
 	it("dispatches use_ability_charge through ChargeTracker.handle", function()
 		local harness = make_bootstrap_harness()
 		harness:load()
@@ -1946,6 +2098,47 @@ describe("startup regressions", function()
 
 		table.sort(bare_hook_require_sites)
 		assert.same({}, bare_hook_require_sites)
+	end)
+
+	it("keeps hook_require_now patch-state caches persistent across hot reload", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		assert.is_truthy(source:find('_persistent_weak_table%("bb_patched_ability_templates"', 1))
+		assert.is_truthy(source:find('_persistent_weak_table%("bb_patched_weapon_templates"', 1))
+		assert.is_truthy(source:find('_persistent_weak_table%("bb_patched_weapon_templates_ranged"', 1))
+	end)
+
+	it("warns hook install failures instead of echoing them as chat-only messages", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		assert.is_nil(source:find('mod:echo%("BetterBots: [^"]*hook install failed', 1))
+		assert.is_truthy(source:find('mod:warning%("BetterBots: [^"]*hook install failed', 1))
+	end)
+
+	it("requires leaf hook_require_now shims to warn on fallback and preserve real callsites", function()
+		local offenders = {}
+
+		each_mod_source_file(function(path)
+			local source = read_file(path)
+			if source:find("local function _hook_require_now", 1, true) then
+				if not source:find("hook_require_now_missing", 1, true) then
+					offenders[#offenders + 1] = path .. ":missing warning"
+				end
+				if not source:find("hook_require_now%(_mod, path, callback, 4%)", 1) then
+					offenders[#offenders + 1] = path .. ":missing caller-level override"
+				end
+			end
+		end)
+
+		table.sort(offenders)
+		assert.same({}, offenders)
+	end)
+
+	it("does not hide hook_require_now installer failures behind pcall require", function()
+		local source = read_file("scripts/mods/BetterBots/BetterBots.lua")
+
+		assert.is_nil(source:find("pcall%(require", 1))
+		assert.is_truthy(source:find("package%.loaded%[path%]", 1))
 	end)
 
 	it("guards hook_require registration against same-path clobbers at runtime", function()

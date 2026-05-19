@@ -16,9 +16,12 @@ local _mod
 local function _hook_require_now(path, callback)
 	local hook_require_now = _mod and _mod.hook_require_now
 	if hook_require_now then
-		return hook_require_now(_mod, path, callback)
+		return hook_require_now(_mod, path, callback, 4)
 	end
 
+	if _mod and _mod.warning and _mod._raw_hook_require then
+		_mod:warning("BetterBots: hook_require_now_missing for " .. tostring(path))
+	end
 	return _mod["hook_require"](_mod, path, callback)
 end
 

@@ -63,6 +63,9 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `patched <bt_bot_conditions|bt_conditions>.can_activate_ability (version=<N>)` (startup patch confirmation for the condition hooks)
 - `ability template metadata patch installed (version=<N>, injected=<N>, overridden=<N>)` (startup debug/info confirmation that the ability template metadata patch ran)
 - `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (startup debug/info confirmation that the shared melee hook installer ran)
+- `BetterBots: hook_require_now installer failed for <path>: <err>` (startup warning followed by rethrow; a hook installer failed during cached replay or normal hook dispatch)
+- `BetterBots: hook_require_now cached module is <type> for <path>` (startup warning followed by rethrow; cached replay saw an invalid non-table engine module)
+- `BetterBots: hook_require_now_missing for <path>` (startup warning that a leaf module fell back to bare `hook_require`; this should only appear in narrow test doubles, not in-game)
 - `installed BtBotInteractAction.enter hook` (startup debug/info confirmation for the defensive pre-revive hook)
 - `entered GameplayStateRun`
 - `bb-perf:auto: ...` (automatic mission-end / quit perf dump; same payload as `/bb_perf` but tagged separately for grepability; omitted when the window contains `0 bot frames`)
@@ -181,6 +184,7 @@ tail -f "$LOG_DIR/$LATEST" | rg --line-buffered "BetterBots|\\[MOD\\]\\[BetterBo
 - `patched CharacterStateMachine _is_local_unit=false for bot` (state-machine local-unit suppression applied for bot units; VFX/SFX validation signal)
 - `restored visual loadout is_local_unit after init error` (visual loadout hook restored shared state before rethrowing; direct failure-path validation signal for `#73`)
 - `installed consolidated bt_bot_melee_action hooks (melee_attack_choice, poxburster, engagement_leash)` (the shared `bt_bot_melee_action` hook installer ran; startup validation signal for `#67`)
+- `BetterBots: <module> hook install failed: <err>` (startup/runtime warning for optional hook installation failures; these are warning-channel messages so `bb-log warnings` can see them)
 - `bot <slot> pinged <target> (reason: <reason>)` (ping system — bot pinged an elite/special)
 - `bot <slot> ping fail for <target>: <err>` (ping system — ping attempt failed)
 - `bot <slot> skipped ping for <target> (reason: already_tagged|no_los|hold_last_tag|companion_tag|recent_companion_tag|dormant_daemonhost)` (ping system — meaningful suppression, one-shot per repeated target/reason; `companion_tag` means an Arbites bot yielded enemy tagging to mastiff smart-tagging instead of issuing a normal ping on the same target, `recent_companion_tag` means another Arbites bot just issued a mastiff command on that enemy so the generic ping path deliberately backs off instead of re-pinging it, and `dormant_daemonhost` means stage-aware daemonhost avoidance blocked the normal ping path)

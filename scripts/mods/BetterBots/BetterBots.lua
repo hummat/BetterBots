@@ -16,9 +16,6 @@ local CONDITIONS_PATCH_VERSION = "2026-03-05-conditions-v4"
 local _last_debug_log_t_by_key = {}
 local _patched_bt_bot_conditions = setmetatable({}, { __mode = "k" })
 local _patched_bt_conditions = setmetatable({}, { __mode = "k" })
-local _patched_ability_templates = setmetatable({}, { __mode = "k" })
-local _patched_weapon_templates = setmetatable({}, { __mode = "k" })
-local _patched_weapon_templates_ranged = setmetatable({}, { __mode = "k" })
 local _fallback_state_by_unit = setmetatable({}, { __mode = "k" })
 local _last_charge_event_by_unit = setmetatable({}, { __mode = "k" })
 local _grenade_state_by_unit = setmetatable({}, { __mode = "k" })
@@ -53,6 +50,16 @@ local TIMING_SETTING_IDS = {
 -- "none" gestalt which disables aim-down-sights. Inject safe defaults.
 local DEFAULT_RANGED_GESTALT = "killshot"
 local DEFAULT_MELEE_GESTALT = "linesman"
+
+local function _persistent_weak_table(id)
+	local state = mod.persistent_table and mod:persistent_table(id, {}) or {}
+
+	return setmetatable(state, { __mode = "k" })
+end
+
+local _patched_ability_templates = _persistent_weak_table("bb_patched_ability_templates")
+local _patched_weapon_templates = _persistent_weak_table("bb_patched_weapon_templates")
+local _patched_weapon_templates_ranged = _persistent_weak_table("bb_patched_weapon_templates_ranged")
 local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
 
 -- Rescue aim (#10): when a charge/dash activates for ally rescue, store the
@@ -86,19 +93,45 @@ local function _record_hook_require_callsite(path, caller_level)
 	_hook_require_callsite_by_path[path] = callsite
 end
 
-function mod:hook_require(path, callback)
-	_record_hook_require_callsite(path, 3)
+local function _warn(message)
+	if mod.warning then
+		mod:warning(message)
+	else
+		mod:echo(message)
+	end
+end
+
+local function _run_hook_require_callback(path, callback, target)
+	local ok, err = pcall(callback, target)
+	if not ok then
+		_warn("BetterBots: hook_require_now installer failed for " .. tostring(path) .. ": " .. tostring(err))
+		error(err, 0)
+	end
+end
+
+function mod:hook_require(path, callback, caller_level)
+	_record_hook_require_callsite(path, caller_level or 3)
 
 	return _original_hook_require(self, path, callback)
 end
 
-function mod:hook_require_now(path, callback)
-	_record_hook_require_callsite(path, 3)
+function mod:hook_require_now(path, callback, caller_level)
+	_record_hook_require_callsite(path, caller_level or 3)
 
-	local result = _original_hook_require(self, path, callback)
-	local ok, target = pcall(require, path)
-	if ok and target ~= nil then
-		callback(target)
+	local result = _original_hook_require(self, path, function(target)
+		return _run_hook_require_callback(path, callback, target)
+	end)
+	local loaded = package.loaded and package.loaded[path]
+	if loaded ~= nil and loaded ~= false then
+		if type(loaded) ~= "table" then
+			local message = "BetterBots: hook_require_now cached module is "
+				.. type(loaded)
+				.. " for "
+				.. tostring(path)
+			_warn(message)
+			error(message)
+		end
+		_run_hook_require_callback(path, callback, loaded)
 	end
 
 	return result
@@ -590,15 +623,15 @@ local function _install_bt_bot_melee_action_hooks(BtBotMeleeAction)
 	local ok, err
 	ok, err = pcall(MeleeAttackChoice.install_melee_hooks, BtBotMeleeAction)
 	if not ok then
-		mod:echo("BetterBots: melee_attack_choice hook install failed: " .. tostring(err))
+		mod:warning("BetterBots: melee_attack_choice hook install failed: " .. tostring(err))
 	end
 	ok, err = pcall(Poxburster.install_melee_hooks, BtBotMeleeAction)
 	if not ok then
-		mod:echo("BetterBots: poxburster melee hook install failed: " .. tostring(err))
+		mod:warning("BetterBots: poxburster melee hook install failed: " .. tostring(err))
 	end
 	ok, err = pcall(EngagementLeash.install_melee_hooks, BtBotMeleeAction)
 	if not ok then
-		mod:echo("BetterBots: engagement_leash hook install failed: " .. tostring(err))
+		mod:warning("BetterBots: engagement_leash hook install failed: " .. tostring(err))
 	end
 	if _debug_enabled() then
 		_debug_log(
@@ -850,7 +883,7 @@ mod:hook_require_now(
 		PlayerUnitAbilityExtension[PLAYER_ABILITY_DISPATCHER_SENTINEL] = true
 		local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
 		if not ok then
-			mod:echo("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
+			mod:warning("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
 		end
 		mod:hook_safe(
 			PlayerUnitAbilityExtension,
@@ -893,11 +926,11 @@ mod:hook_require_now("scripts/extension_systems/behavior/bot_behavior_extension"
 	local ok, err
 	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
-		mod:echo("BetterBots: healing_deferral behavior hook install failed: " .. tostring(err))
+		mod:warning("BetterBots: healing_deferral behavior hook install failed: " .. tostring(err))
 	end
 	ok, err = pcall(AmmoPolicy.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then
-		mod:echo("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
+		mod:warning("BetterBots: ammo_policy behavior hook install failed: " .. tostring(err))
 	end
 	mod:hook_safe(BotBehaviorExtension, "_verify_target_ally_aid_destination", function(self, unit)
 		local h_ok, h_err = pcall(ReviveAbility.apply_human_revive_priority, self, unit)
