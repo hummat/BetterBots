@@ -251,6 +251,7 @@ scripts/mods/BetterBots/          # Mod source
   vfx_suppression.lua             #   Bot VFX/SFX bleed suppression
   animation_guard.lua             #   Animation crash guard for bot-only item paths
   airlock_guard.lua               #   Airlock teleport crash guard
+  suppression_guard.lua           #   Vanilla suppression LOS node crash guard
   event_log.lua                   #   Structured JSONL event logging
   debug.lua                       #   Debug commands (/bb_state, /bb_decide, /bb_brain)
   log_levels.lua                  #   Tiered debug log level constants

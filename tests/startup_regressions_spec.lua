@@ -551,6 +551,7 @@ local function make_bootstrap_harness(module_overrides)
 	modules.SmartTargeting = make_runtime_module("SmartTargeting", install_calls)
 	modules.AnimationGuard = make_runtime_module("AnimationGuard", install_calls)
 	modules.AirlockGuard = make_runtime_module("AirlockGuard", install_calls)
+	modules.SuppressionGuard = make_runtime_module("SuppressionGuard", install_calls)
 	modules.VfxSuppression = make_runtime_module("VfxSuppression", install_calls, {
 		install_ability_ext_hooks = function(target)
 			record_install("VfxSuppression", "install_ability_ext_hooks", target)
@@ -742,6 +743,7 @@ local function make_bootstrap_harness(module_overrides)
 		["BetterBots/scripts/mods/BetterBots/smart_targeting"] = modules.SmartTargeting,
 		["BetterBots/scripts/mods/BetterBots/animation_guard"] = modules.AnimationGuard,
 		["BetterBots/scripts/mods/BetterBots/airlock_guard"] = modules.AirlockGuard,
+		["BetterBots/scripts/mods/BetterBots/suppression_guard"] = modules.SuppressionGuard,
 		["BetterBots/scripts/mods/BetterBots/vfx_suppression"] = modules.VfxSuppression,
 		["BetterBots/scripts/mods/BetterBots/weapon_action_logging"] = modules.WeaponActionLogging,
 		["BetterBots/scripts/mods/BetterBots/weapon_action_shoot"] = modules.WeaponActionShoot,

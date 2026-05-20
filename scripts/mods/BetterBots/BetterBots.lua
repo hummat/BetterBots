@@ -328,6 +328,7 @@ local MeleeMetaData, MeleeAttackChoice = Modules.MeleeMetaData, Modules.MeleeAtt
 local RangedMetaData, TargetSelection, Poxburster = Modules.RangedMetaData, Modules.TargetSelection, Modules.Poxburster
 local SmartTargeting, AnimationGuard, AirlockGuard =
 	Modules.SmartTargeting, Modules.AnimationGuard, Modules.AirlockGuard
+local SuppressionGuard = Modules.SuppressionGuard
 local VfxSuppression, WeaponAction = Modules.VfxSuppression, Modules.WeaponAction
 local RangedSpecialAction, SustainedFire, ConditionPatch =
 	Modules.RangedSpecialAction, Modules.SustainedFire, Modules.ConditionPatch
@@ -501,6 +502,7 @@ Poxburster.register_hooks()
 MeleeAttackChoice.register_hooks()
 AnimationGuard.register_hooks()
 AirlockGuard.register_hooks()
+SuppressionGuard.register_hooks()
 SmartTargeting.register_hooks()
 VfxSuppression.register_hooks()
 WeaponAction.register_hooks({

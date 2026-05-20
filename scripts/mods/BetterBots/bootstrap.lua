@@ -89,6 +89,7 @@ function M.load_and_init(ctx)
 	modules.SmartTargeting = load_module(mod, "smart_targeting")
 	modules.AnimationGuard = load_module(mod, "animation_guard")
 	modules.AirlockGuard = load_module(mod, "airlock_guard")
+	modules.SuppressionGuard = load_module(mod, "suppression_guard")
 	modules.VfxSuppression = load_module(mod, "vfx_suppression")
 	modules.WeaponActionLogging = load_module(mod, "weapon_action_logging")
 	modules.WeaponActionShoot = load_module(mod, "weapon_action_shoot")
@@ -154,6 +155,7 @@ function M.load_and_init(ctx)
 	local SmartTargeting = modules.SmartTargeting
 	local AnimationGuard = modules.AnimationGuard
 	local AirlockGuard = modules.AirlockGuard
+	local SuppressionGuard = modules.SuppressionGuard
 	local VfxSuppression = modules.VfxSuppression
 	local WeaponActionLogging = modules.WeaponActionLogging
 	local WeaponActionShoot = modules.WeaponActionShoot
@@ -493,6 +495,13 @@ function M.load_and_init(ctx)
 	})
 
 	AirlockGuard.init({
+		mod = mod,
+		debug_log = ctx.debug_log,
+		debug_enabled = ctx.debug_enabled,
+		fixed_time = ctx.fixed_time,
+	})
+
+	SuppressionGuard.init({
 		mod = mod,
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,

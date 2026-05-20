@@ -162,6 +162,10 @@ This mod targets bot ability activation in three paths:
     - hook `PlayerUnitVisualLoadoutExtension.init`: sets `is_local_unit = false` in the wieldable slot scripts context for bot units
     - hook `CharacterStateMachineExtension.init`: sets `_is_local_unit = false` for bot units
     - prevents first-person VFX/SFX (lunge screen distortion, lunge sounds, shout aim indicator, dash crosshair, item placement previews, Wwise global state) from bleeding into human player's view in Solo Play
+25a. Suppression LOS node crash guard (MFL87 Nexus report, via `suppression_guard.lua`):
+    - hooks `scripts/utilities/attack/suppression` through `hook_require_now`
+    - wraps `Suppression.apply_suppression` and `Suppression.apply_area_minion_suppression` only when the attacking unit lacks `enemy_aim_target_03`, preserving the normal direct path for ordinary player/minion units
+    - catches only the vanilla `suppression.lua` `UnitApi node failed` crash after suppression side effects have already run; unrelated suppression failures rethrow
 26. Melee attack selection bias fix (#52, via `melee_attack_choice.lua`):
     - hook `BtBotMeleeAction.enter` and `BtBotMeleeAction._choose_attack`; export the defend-suppression predicate into `poxburster.lua` so the existing single `_should_defend` hook owns both poxburster push setup and general melee attack-commit suppression
     - adds a light-attack tie/bias for unarmored horde targets so wide-arc heavies stop winning every mixed-trash engagement by default, while armored targets still preserve penetrating heavy preference

@@ -464,6 +464,10 @@ check_anchor \
 	"scripts/settings/buff/player_buff_templates.lua" \
 	"templates.bot_high_buff = {" \
 	"bot high compensation buff"
+check_anchor \
+	"scripts/utilities/attack/suppression.lua" \
+	'Unit.world_position(attacking_unit, Unit.node(attacking_unit, "enemy_aim_target_03"))' \
+	"suppression attacker enemy aim node lookup"
 
 # Ability cooldown anchors — pin specific CDs our heuristics docs/tuning rely on.
 check_anchor_multiline \
