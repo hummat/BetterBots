@@ -3444,19 +3444,81 @@ describe("heuristics", function()
 				_G.Vector3 = saved_vector3
 			end)
 
-			it("uses whistle when the companion is close enough to an elite target", function()
+			it("holds whistle for a lone elite or special target", function()
 				local result, rule = Heuristics.evaluate_grenade_heuristic(
 					"adamant_whistle",
 					helper.make_context({
 						target_enemy = "gunner",
-						target_enemy_position = { 8, 0, 0 },
+						target_enemy_position = { 5, 0, 0 },
 						target_is_elite_special = true,
 						companion_unit = "mastiff",
 						companion_position = { 1, 0, 0 },
 					})
 				)
+				assert.is_false(result)
+				assert.matches("hold", rule)
+			end)
+
+			it("uses whistle when three elites or specials are clustered around the companion", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 5, 0, 0 },
+						companion_unit = "mastiff",
+						companion_position = { 1, 0, 0 },
+						companion_nearby_count = 3,
+						companion_nearby_elite_special_count = 3,
+					})
+				)
 				assert.is_true(result)
-				assert.matches("priority_target", rule)
+				assert.matches("priority_pack", rule)
+			end)
+
+			it("uses whistle when a monster is near the companion", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "monster",
+						target_enemy_position = { 12, 0, 0 },
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+						companion_nearby_count = 1,
+						companion_nearby_monster_count = 1,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("monster", rule)
+			end)
+
+			it("holds whistle when the companion is outside the 5m effect radius from the target", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 7, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = { 1, 0, 0 },
+					})
+				)
+				assert.is_false(result)
+				assert.matches("companion_far", rule)
+			end)
+
+			it("holds whistle when the live companion has no position in context", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "gunner",
+						target_enemy_position = { 11, 0, 0 },
+						target_is_elite_special = true,
+						companion_unit = "mastiff",
+						companion_position = nil,
+					})
+				)
+				assert.is_false(result)
+				assert.matches("companion_position_missing", rule)
 			end)
 
 			it("holds whistle when the companion is too far from the target", function()
@@ -3472,6 +3534,53 @@ describe("heuristics", function()
 				)
 				assert.is_false(result)
 				assert.matches("companion_far", rule)
+			end)
+
+			it("holds whistle for four trash enemies clustered around the companion", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "poxwalker",
+						target_enemy_position = { 2, 0, 0 },
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+						companion_nearby_count = 4,
+						companion_nearby_challenge = 2.0,
+					})
+				)
+				assert.is_false(result)
+				assert.matches("hold", rule)
+			end)
+
+			it("uses whistle when five enemies are clustered around the companion", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "poxwalker",
+						target_enemy_position = { 2, 0, 0 },
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+						companion_nearby_count = 5,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("companion_horde", rule)
+			end)
+
+			it("uses whistle for companion horde even when the current target is outside the effect radius", function()
+				local result, rule = Heuristics.evaluate_grenade_heuristic(
+					"adamant_whistle",
+					helper.make_context({
+						target_enemy = "poxwalker",
+						target_enemy_position = { 12, 0, 0 },
+						companion_unit = "mastiff",
+						companion_position = { 0, 0, 0 },
+						companion_nearby_count = 6,
+						companion_nearby_challenge = 11,
+					})
+				)
+				assert.is_true(result)
+				assert.matches("companion_horde", rule)
 			end)
 		end)
 
@@ -3771,6 +3880,7 @@ describe("heuristics", function()
 
 		it("captures the live companion unit and positions in context", function()
 			_G.ALIVE.target_enemy = true
+			unit_alive_lookup.mastiff = true
 			script_unit_extensions = {
 				hazard_bot = {
 					companion_spawner_system = helper.make_companion_spawner_extension({
@@ -3796,8 +3906,154 @@ describe("heuristics", function()
 			assert.equals("target_pos", context.target_enemy_position)
 		end)
 
+		it("counts enemies near the live companion position", function()
+			_G.POSITION_LOOKUP = {
+				hazard_bot = { x = 0, y = 0, z = 0 },
+				mastiff = { x = 10, y = 0, z = 0 },
+				enemy_1 = { x = 10, y = 0, z = 0 },
+				enemy_2 = { x = 13, y = 0, z = 0 },
+				enemy_3 = { x = 14.5, y = 0, z = 0 },
+				enemy_4 = { x = 16, y = 0, z = 0 },
+			}
+			_G.ALIVE.enemy_1 = true
+			_G.ALIVE.enemy_2 = true
+			_G.ALIVE.enemy_3 = true
+			_G.ALIVE.enemy_4 = true
+			unit_alive_lookup.mastiff = true
+			side_system = helper.make_side_system_double({
+				side_by_unit = {
+					hazard_bot = {
+						relation_units = function(_, relation)
+							assert.equals("enemy", relation)
+							return { "enemy_1", "enemy_2", "enemy_3", "enemy_4" }
+						end,
+					},
+				},
+			})
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
+				},
+				enemy_1 = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
+						challenge_rating = 0.5,
+					}),
+				},
+				enemy_2 = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
+						challenge_rating = 0.5,
+					}),
+				},
+				enemy_3 = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
+						challenge_rating = 0.5,
+					}),
+				},
+				enemy_4 = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_poxwalker",
+						tags = { minion = true },
+						challenge_rating = 0.5,
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(3, context.companion_nearby_count)
+			assert.equals(1.5, context.companion_nearby_challenge)
+		end)
+
+		it("counts priority enemies and monsters near the live companion position", function()
+			_G.POSITION_LOOKUP = {
+				hazard_bot = { x = 0, y = 0, z = 0 },
+				mastiff = { x = 10, y = 0, z = 0 },
+				elite_enemy = { x = 10, y = 0, z = 0 },
+				special_enemy = { x = 13, y = 0, z = 0 },
+				monster_enemy = { x = 14.5, y = 0, z = 0 },
+				far_elite = { x = 16, y = 0, z = 0 },
+			}
+			_G.ALIVE.elite_enemy = true
+			_G.ALIVE.special_enemy = true
+			_G.ALIVE.monster_enemy = true
+			_G.ALIVE.far_elite = true
+			unit_alive_lookup.mastiff = true
+			side_system = helper.make_side_system_double({
+				side_by_unit = {
+					hazard_bot = {
+						relation_units = function(_, relation)
+							assert.equals("enemy", relation)
+							return { "elite_enemy", "special_enemy", "monster_enemy", "far_elite" }
+						end,
+					},
+				},
+			})
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
+				},
+				elite_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "renegade_executor",
+						tags = { elite = true },
+					}),
+				},
+				special_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "renegade_gunner",
+						tags = { special = true },
+					}),
+				},
+				monster_enemy = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "chaos_plague_ogryn",
+						tags = { monster = true },
+					}),
+				},
+				far_elite = {
+					unit_data_system = helper.make_minion_unit_data_extension({
+						name = "renegade_executor",
+						tags = { elite = true },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals(3, context.companion_nearby_count)
+			assert.equals(2, context.companion_nearby_elite_special_count)
+			assert.equals(1, context.companion_nearby_monster_count)
+		end)
+
 		it("captures the live companion when ALIVE is missing but Unit.alive succeeds", function()
 			_G.ALIVE.mastiff = nil
+			unit_alive_lookup.mastiff = true
+			script_unit_extensions = {
+				hazard_bot = {
+					companion_spawner_system = helper.make_companion_spawner_extension({
+						companion_units = { "mastiff" },
+					}),
+				},
+			}
+
+			local context = Heuristics.build_context("hazard_bot", nil)
+
+			assert.equals("mastiff", context.companion_unit)
+			assert.equals("dog_pos", context.companion_position)
+		end)
+
+		it("captures the live companion when ALIVE is stale but Unit.alive succeeds", function()
+			_G.ALIVE.mastiff = false
 			unit_alive_lookup.mastiff = true
 			script_unit_extensions = {
 				hazard_bot = {

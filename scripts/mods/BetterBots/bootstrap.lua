@@ -231,6 +231,7 @@ function M.load_and_init(ctx)
 		bot_slot_for_unit = Debug.bot_slot_for_unit,
 		close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
 		anti_armor_ranged_policy = RangedMetaData.anti_armor_ranged_policy,
+		immediate_melee_pressure_distance = Settings.immediate_melee_pressure_distance,
 		is_enabled = function()
 			return Settings.is_feature_enabled("target_type_hysteresis")
 		end,

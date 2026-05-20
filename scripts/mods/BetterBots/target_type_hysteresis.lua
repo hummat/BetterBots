@@ -3,6 +3,9 @@ local M = {}
 local MARGIN_FACTOR = 0.10 -- Score difference must exceed this fraction of max to flip type
 local MOMENTUM_FACTOR = 0.05 -- Bonus added to current type's score to resist flipping
 local REEVALUATION_INTERVAL_S = 0.3 -- Matches vanilla target reevaluation period
+local DEFAULT_IMMEDIATE_MELEE_PRESSURE_DISTANCE = 2.5
+local POXBURSTER_PUSH_DISTANCE = 3
+local POXBURSTER_BREED_NAME = "chaos_poxwalker_bomber"
 local ANTI_ARMOR_RANGED_TARGET_BREEDS = {
 	chaos_ogryn_bulwark = true,
 	chaos_ogryn_executor = true,
@@ -34,6 +37,7 @@ local _breed
 local _player_unit_visual_loadout
 local _anti_armor_ranged_policy
 local _close_range_ranged_policy
+local _immediate_melee_pressure_distance
 local _warned_errors = {}
 local BOT_PERCEPTION_PATCH_SENTINEL = "__bb_target_type_hysteresis_installed"
 local INVENTORY_SWITCH_PATCH_SENTINEL = "__bb_target_type_hysteresis_inventory_switch_installed"
@@ -150,6 +154,21 @@ local function _weapon_template_name(weapon_template)
 	return type(weapon_template) == "table" and weapon_template.name or nil
 end
 
+local function _is_immediate_melee_pressure(target_breed, target_distance_sq)
+	if target_distance_sq == nil then
+		return false
+	end
+
+	local configured_distance = _immediate_melee_pressure_distance and _immediate_melee_pressure_distance()
+		or DEFAULT_IMMEDIATE_MELEE_PRESSURE_DISTANCE
+	local pressure_distance = configured_distance
+	if target_breed and target_breed.name == POXBURSTER_BREED_NAME then
+		pressure_distance = math.max(pressure_distance, POXBURSTER_PUSH_DISTANCE)
+	end
+
+	return target_distance_sq <= pressure_distance * pressure_distance
+end
+
 local function _anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template, secondary_status)
 	local breed_name = target_breed and target_breed.name
 	if ANTI_ARMOR_RANGED_TARGET_BREEDS[breed_name] ~= true then
@@ -199,6 +218,27 @@ local function _anti_armor_ranged_candidate_policy(target_breed, target_distance
 	return policy, diagnostic
 end
 
+local function _close_range_ranged_diagnostic(
+	target_breed,
+	target_distance_sq,
+	weapon_template,
+	secondary_status,
+	policy
+)
+	if not policy then
+		return nil
+	end
+
+	return {
+		breed = target_breed and target_breed.name or "unknown",
+		distance = target_distance_sq and math.sqrt(target_distance_sq) or nil,
+		family = policy.family,
+		reason = nil,
+		secondary_status = secondary_status or "unknown",
+		weapon = _weapon_template_name(weapon_template) or "none",
+	}
+end
+
 local function _calculate_score(
 	unit,
 	target_unit,
@@ -227,15 +267,29 @@ local function _calculate_score(
 
 	local anti_armor_policy, anti_armor_diagnostic =
 		_anti_armor_ranged_candidate_policy(target_breed, target_distance_sq, weapon_template, secondary_status)
+	local immediate_melee_pressure = _is_immediate_melee_pressure(target_breed, target_distance_sq)
+	if anti_armor_policy and immediate_melee_pressure then
+		anti_armor_diagnostic.reason = "immediate_melee_pressure"
+		anti_armor_policy = nil
+	end
+
 	local hard_armor_without_active_ranged_policy = anti_armor_diagnostic
 		and anti_armor_diagnostic.reason ~= "policy_active"
 
 	if _close_range_ranged_policy and target_distance_sq ~= nil then
 		local close_range_policy = weapon_template and _close_range_ranged_policy(weapon_template) or nil
+		local close_range_diagnostic = _close_range_ranged_diagnostic(
+			target_breed,
+			target_distance_sq,
+			weapon_template,
+			secondary_status,
+			close_range_policy
+		)
 
 		if
 			close_range_policy
 			and not hard_armor_without_active_ranged_policy
+			and not immediate_melee_pressure
 			and close_range_policy.hold_ranged_target_distance_sq
 			and target_distance_sq <= close_range_policy.hold_ranged_target_distance_sq
 			and ranged_score <= melee_score
@@ -244,6 +298,10 @@ local function _calculate_score(
 			ranged_score = melee_score + scale * 0.25 + 1
 			policy = policy or {}
 			policy.close_range_ranged_family = close_range_policy.family
+		elseif close_range_diagnostic and immediate_melee_pressure then
+			close_range_diagnostic.reason = "immediate_melee_pressure"
+			policy = policy or {}
+			policy.close_range_ranged_diagnostic = close_range_diagnostic
 		end
 	end
 
@@ -294,6 +352,8 @@ local function _collect_stabilized_choice(
 	local best_ranged_score, best_ranged_target, best_ranged_target_distance_sq = -math.huge, nil, math.huge
 	local best_ranged_policy = nil
 	local best_ranged_anti_armor_diagnostic = nil
+	local best_melee_close_range_diagnostic = nil
+	local best_ranged_close_range_diagnostic = nil
 
 	local should_fully_reevaluate = not current_target_enemy or t > perception_component.target_enemy_reevaluation_t
 
@@ -333,6 +393,8 @@ local function _collect_stabilized_choice(
 				if best_melee_score < melee_score then
 					best_melee_score, best_melee_target, best_melee_target_distance_sq =
 						melee_score, target_unit, target_distance_sq
+					best_melee_close_range_diagnostic = ranged_policy and ranged_policy.close_range_ranged_diagnostic
+						or nil
 				end
 
 				if best_ranged_score < ranged_score then
@@ -340,6 +402,8 @@ local function _collect_stabilized_choice(
 						ranged_score, target_unit, target_distance_sq
 					best_ranged_policy = ranged_policy
 					best_ranged_anti_armor_diagnostic = anti_armor_diagnostic
+					best_ranged_close_range_diagnostic = ranged_policy and ranged_policy.close_range_ranged_diagnostic
+						or nil
 				end
 			end
 
@@ -364,6 +428,7 @@ local function _collect_stabilized_choice(
 				melee_score = best_melee_score,
 				ranged_score = best_ranged_score,
 				anti_armor_ranged_diagnostic = best_ranged_anti_armor_diagnostic,
+				close_range_ranged_diagnostic = best_melee_close_range_diagnostic,
 			}
 		end
 
@@ -376,6 +441,7 @@ local function _collect_stabilized_choice(
 			melee_score = best_melee_score,
 			ranged_score = best_ranged_score,
 			close_range_ranged_family = best_ranged_policy and best_ranged_policy.close_range_ranged_family or nil,
+			close_range_ranged_diagnostic = best_ranged_close_range_diagnostic,
 			anti_armor_ranged_breed = best_ranged_policy and best_ranged_policy.anti_armor_ranged_breed or nil,
 			anti_armor_ranged_family = best_ranged_policy and best_ranged_policy.anti_armor_ranged_family or nil,
 			anti_armor_ranged_diagnostic = best_ranged_anti_armor_diagnostic,
@@ -423,6 +489,7 @@ local function _collect_stabilized_choice(
 			melee_score = melee_score,
 			ranged_score = ranged_score,
 			close_range_ranged_family = ranged_policy and ranged_policy.close_range_ranged_family or nil,
+			close_range_ranged_diagnostic = ranged_policy and ranged_policy.close_range_ranged_diagnostic or nil,
 			anti_armor_ranged_breed = ranged_policy and ranged_policy.anti_armor_ranged_breed or nil,
 			anti_armor_ranged_family = ranged_policy and ranged_policy.anti_armor_ranged_family or nil,
 			anti_armor_ranged_diagnostic = anti_armor_diagnostic,
@@ -442,6 +509,7 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_anti_armor_ranged_policy = deps.anti_armor_ranged_policy
+	_immediate_melee_pressure_distance = deps.immediate_melee_pressure_distance
 end
 
 function M.analyze_target_type_choice(current_type, melee_score, ranged_score)
@@ -527,6 +595,49 @@ local function _log_anti_armor_ranged_skip(unit, stabilized, t)
 			.. _format_distance(diagnostic.distance)
 			.. ", min_distance="
 			.. _format_distance(diagnostic.min_distance)
+			.. ", chosen="
+			.. tostring(stabilized.target_enemy_type)
+			.. ", melee="
+			.. string.format("%.2f", stabilized.melee_score or 0)
+			.. ", ranged="
+			.. string.format("%.2f", stabilized.ranged_score or 0)
+			.. ")",
+		nil,
+		"debug"
+	)
+end
+
+local function _log_close_range_ranged_skip(unit, stabilized, t)
+	local diagnostic = stabilized and stabilized.close_range_ranged_diagnostic
+	if not diagnostic or not (_debug_enabled and _debug_enabled() and _debug_log) then
+		return
+	end
+
+	local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "unknown"
+	_debug_log(
+		"close_range_ranged_skip:"
+			.. tostring(unit)
+			.. ":"
+			.. tostring(diagnostic.family)
+			.. ":"
+			.. tostring(diagnostic.weapon)
+			.. ":"
+			.. tostring(diagnostic.reason),
+		_fixed_time and _fixed_time() or t or 0,
+		"close-range ranged target skipped (reason="
+			.. tostring(diagnostic.reason)
+			.. ", bot="
+			.. tostring(bot_slot)
+			.. ", family="
+			.. tostring(diagnostic.family)
+			.. ", weapon="
+			.. tostring(diagnostic.weapon)
+			.. ", secondary_status="
+			.. tostring(diagnostic.secondary_status)
+			.. ", breed="
+			.. tostring(diagnostic.breed)
+			.. ", distance="
+			.. _format_distance(diagnostic.distance)
 			.. ", chosen="
 			.. tostring(stabilized.target_enemy_type)
 			.. ", melee="
@@ -707,6 +818,10 @@ function M.post_update_target_enemy(
 					.. tostring(stabilized.close_range_ranged_family)
 					.. ", distance="
 					.. string.format("%.2f", stabilized.target_enemy_distance or 0)
+					.. ", melee="
+					.. string.format("%.2f", stabilized.melee_score or 0)
+					.. ", ranged="
+					.. string.format("%.2f", stabilized.ranged_score or 0)
 					.. ")",
 				nil,
 				"debug"
@@ -735,6 +850,7 @@ function M.post_update_target_enemy(
 		end
 
 		_log_anti_armor_ranged_skip(self_unit, stabilized, t)
+		_log_close_range_ranged_skip(self_unit, stabilized, t)
 
 		if previous_target_enemy == nil or t > previous_reevaluation_t then
 			perception_component.target_enemy_reevaluation_t = t + REEVALUATION_INTERVAL_S

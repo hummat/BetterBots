@@ -46,6 +46,7 @@ This mod targets bot ability activation in three paths:
     - `evaluate_item_heuristic(ability_name, context, opts)` for item-path abilities
     - `evaluate_grenade_heuristic(grenade_template_name, context, opts)` for grenade/blitz abilities
     - `heuristics_context.lua` owns `build_context()` and shared target/breed/resource helper functions
+    - Arbites Remote Detonation adds dog-centered context (`companion_nearby_count`, `companion_nearby_challenge`, `companion_nearby_elite_special_count`, `companion_nearby_monster_count`) from enemies within the 5m whistle effect radius, separate from the bot-centered `num_nearby`
     - `heuristics_veteran.lua`, `heuristics_zealot.lua`, `heuristics_psyker.lua`, `heuristics_ogryn.lua`, `heuristics_arbites.lua`, `heuristics_hive_scum.lua`, and `heuristics_grenade.lua` own the per-career and grenade/blitz trigger rules
     - `combat_ability_identity.lua` separates engine template identity (`ability_component.template_name`) from semantic ability identity (`ability_name` / `semantic_key`) so shared templates such as Veteran shout vs stance can route to different heuristics/settings without changing template-based engine lookups
     - `testing/aggressive/balanced/conservative` behavior presets: per-template threshold tables control when abilities fire (aggressive = early, conservative = emergency-only). Testing mode applies a narrow leniency override after heuristic evaluation so bots produce validation events faster without bypassing hard safety/resource guards
@@ -214,6 +215,7 @@ This mod targets bot ability activation in three paths:
     - recomputes melee vs ranged scores with the same `BotTargetSelection` primitives, then applies a small current-type momentum bonus plus a score margin before allowing a type flip
     - stabilizes `perception_component.target_enemy_type` on both full reevaluation and current-target-only rescoring, reducing 0.3 s melee/ranged swap thrash on close scores
     - when the bot has an explicit anti-armor secondary family (plasma, bolter/bolt pistol, helbore, stub revolver, heavy stubber), lifts the ranged score above melee for Mauler/Bulwark/Crusher targets at that family's policy distance so vanilla `killshot`'s `-5` armored-elite ranged weight does not force a long melee chase
+    - suppresses close-range ranged-family and anti-armor ranged holds under immediate melee pressure (configured default: 2.5m; poxbursters use at least 3m so the poxburster melee-push path can run)
     - suppresses the generic close-range ranged-family hold for hard-armored targets unless an explicit anti-armor ranged policy is active, so heavy stubbers below their anti-armor minimum and unsupported families like ripperguns can still swap to melee instead of staying ranged for point-blank specials
     - logs `type flip ...` on real transitions and `type hold ... over raw ...` when hysteresis actively suppresses a raw flip
     - logs `anti-armor ranged family kept ranged target type ...` when the anti-armor target-type lift fires

@@ -841,8 +841,15 @@ describe("grenade_fallback", function()
 					monster_count = 0,
 					target_enemy = "enemy_1",
 					target_enemy_distance = 11,
+					target_enemy_position = "target_pos",
 					target_breed_name = "renegade_executor",
 					peril_pct = 0,
+					companion_unit = "dog_unit",
+					companion_position = "dog_pos",
+					companion_nearby_count = 4,
+					companion_nearby_challenge = 2,
+					companion_nearby_elite_special_count = 3,
+					companion_nearby_monster_count = 1,
 				}
 			end,
 			evaluate_grenade_heuristic = function()
@@ -872,12 +879,60 @@ describe("grenade_fallback", function()
 		assert.equals("grenade", _event_decisions[1].source)
 		assert.equals("grenade_smoke_hold", _event_decisions[1].rule)
 		assert.truthy(find_debug_log("grenade held veteran_frag_grenade"))
+		assert.truthy(find_debug_log("bot=slot1"))
 		assert.truthy(find_debug_log("distance=11"))
 		assert.truthy(find_debug_log("challenge=4.5"))
 		assert.truthy(find_debug_log("elites=2"))
 		assert.truthy(find_debug_log("specials=1"))
 		assert.truthy(find_debug_log("monsters=0"))
 		assert.truthy(find_debug_log("breed=renegade_executor"))
+		assert.truthy(find_debug_log("companion=present"))
+		assert.truthy(find_debug_log("companion_pos=present"))
+		assert.truthy(find_debug_log("target_pos=present"))
+		assert.truthy(find_debug_log("companion_nearby=4"))
+		assert.truthy(find_debug_log("companion_challenge=2"))
+		assert.truthy(find_debug_log("companion_priority=3"))
+		assert.truthy(find_debug_log("companion_monsters=1"))
+	end)
+
+	it("logs whistle companion position holds with companion state", function()
+		_heuristic_result = false
+		_heuristic_rule = "grenade_whistle_block_companion_position_missing"
+		_debug_enabled_result = true
+		GrenadeFallback.wire({
+			build_context = function()
+				return {
+					num_nearby = 1,
+					target_enemy = "enemy_1",
+					target_enemy_position = "target_pos",
+					companion_unit = "dog_unit",
+				}
+			end,
+			evaluate_grenade_heuristic = function()
+				return _heuristic_result, _heuristic_rule
+			end,
+			equipped_grenade_ability = function()
+				return mock_ability_extension, { name = "adamant_whistle" }
+			end,
+			is_combat_ability_active = function()
+				return _combat_ability_active
+			end,
+			is_grenade_enabled = function()
+				return _grenades_enabled_result
+			end,
+			query_weapon_switch_lock = function(unit_arg)
+				return _query_weapon_switch_lock(unit_arg)
+			end,
+		})
+
+		GrenadeFallback.try_queue(unit, blackboard)
+
+		assert.truthy(find_debug_log("grenade held adamant_whistle"))
+		assert.truthy(find_debug_log("bot=slot1"))
+		assert.truthy(find_debug_log("rule=grenade_whistle_block_companion_position_missing"))
+		assert.truthy(find_debug_log("companion=present"))
+		assert.truthy(find_debug_log("companion_pos=missing"))
+		assert.truthy(find_debug_log("target_pos=present"))
 	end)
 
 	it("logs non-explosive reuse pacing holds with the blocking rule", function()
@@ -908,7 +963,8 @@ describe("grenade_fallback", function()
 		GrenadeFallback.try_queue(unit, blackboard)
 
 		assert.equals(0, #_recorded_inputs)
-		assert.truthy(find_debug_log("grenade held zealot_fire_grenade (rule=grenade_fire_block_recent_use"))
+		assert.truthy(find_debug_log("grenade held zealot_fire_grenade"))
+		assert.truthy(find_debug_log("rule=grenade_fire_block_recent_use"))
 	end)
 
 	it("queues grenade_ability wield when idle and heuristic passes", function()

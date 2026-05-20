@@ -29,6 +29,8 @@ A five-line mental model:
 4. If the BT can't handle it directly (Tier 3 items, grenades, shotgun specials), a state-machine fallback drives the engine-facing inputs: [`item_fallback.lua`](scripts/mods/BetterBots/item_fallback.lua), [`grenade_fallback.lua`](scripts/mods/BetterBots/grenade_fallback.lua), [`ranged_special_action.lua`](scripts/mods/BetterBots/ranged_special_action.lua).
 5. Cross-cutting policies (sprint, pinging, pickups, healing deferral, engagement leash, com-wheel response) hook BotBehaviorExtension through [`update_dispatcher.lua`](scripts/mods/BetterBots/update_dispatcher.lua).
 
+Close-range target-type tuning is exposed through the DMF settings UI; `immediate_melee_pressure_distance` controls when bots stop preserving close-range guns and let melee targeting win again.
+
 For a full walkthrough, start with [`docs/dev/architecture.md`](docs/dev/architecture.md) and then [`docs/bot/behavior-tree.md`](docs/bot/behavior-tree.md). Both are kept up to date alongside the code.
 
 ## Quick start (development)

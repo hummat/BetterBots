@@ -159,6 +159,13 @@ return {
 	enable_target_type_hysteresis_description = {
 		en = "Bots are less likely to keep flipping between melee and ranged when both choices are close.",
 	},
+	immediate_melee_pressure_distance = {
+		en = "Melee danger cutoff (m)",
+	},
+	immediate_melee_pressure_distance_description = {
+		en = "Inside this distance, bots stop preserving close-range guns such as shotguns and flamers "
+			.. "and let melee targeting win again.",
+	},
 	enable_weakspot_aim = {
 		en = "Aim for real weakspots on armored elites",
 	},

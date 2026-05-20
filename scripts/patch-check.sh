@@ -341,6 +341,14 @@ check_anchor \
 	"BotBehaviorExtension._refresh_destination = function" \
 	"behavior refresh-destination hook"
 check_anchor \
+	"scripts/extension_systems/side/side_system.lua" \
+	"self.side_by_unit = {}" \
+	"side system unit lookup"
+check_anchor \
+	"scripts/extension_systems/side/side.lua" \
+	"Side.relation_units = function (self, relation)" \
+	"side relation_units lookup"
+check_anchor \
 	"scripts/extension_systems/interaction/interactor_extension.lua" \
 	"InteractorExtension.can_interact = function (self, target_unit, interaction_type)" \
 	"interactor can_interact signature"

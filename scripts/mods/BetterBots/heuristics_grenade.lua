@@ -1,7 +1,10 @@
 local _is_monster_signal_allowed
 local _is_daemonhost_avoidance_enabled
 local _warp_weapon_peril_threshold
-local WHISTLE_MAX_COMPANION_DISTANCE_SQ = 10 * 10
+local WHISTLE_EFFECT_RADIUS_SQ = 5 * 5
+local WHISTLE_COMPANION_HORDE_COUNT = 5
+local WHISTLE_COMPANION_PRIORITY_COUNT = 3
+local WHISTLE_COMPANION_MONSTER_COUNT = 1
 local DEFAULT_ASSAIL_PERIL_THRESHOLD = 0.85
 
 local GRENADE_HORDE_PRESETS = {
@@ -423,27 +426,34 @@ local function _grenade_mine(context, rule_prefix, preset)
 end
 
 local function _grenade_whistle(context)
-	if not context.companion_unit or not context.companion_position then
+	if not context.companion_unit then
 		return false, "grenade_whistle_block_no_companion"
+	end
+
+	if not context.companion_position then
+		return false, "grenade_whistle_block_companion_position_missing"
 	end
 
 	if not context.target_enemy or not context.target_enemy_position then
 		return false, "grenade_whistle_block_no_target"
 	end
 
+	if (context.companion_nearby_monster_count or 0) >= WHISTLE_COMPANION_MONSTER_COUNT then
+		return true, "grenade_whistle_companion_monster"
+	end
+
+	if (context.companion_nearby_elite_special_count or 0) >= WHISTLE_COMPANION_PRIORITY_COUNT then
+		return true, "grenade_whistle_companion_priority_pack"
+	end
+
+	if (context.companion_nearby_count or 0) >= WHISTLE_COMPANION_HORDE_COUNT then
+		return true, "grenade_whistle_companion_horde"
+	end
+
 	if
-		Vector3.distance_squared(context.companion_position, context.target_enemy_position)
-		> WHISTLE_MAX_COMPANION_DISTANCE_SQ
+		Vector3.distance_squared(context.companion_position, context.target_enemy_position) > WHISTLE_EFFECT_RADIUS_SQ
 	then
 		return false, "grenade_whistle_block_companion_far"
-	end
-
-	if context.target_is_elite_special or context.priority_target_enemy or context.urgent_target_enemy then
-		return true, "grenade_whistle_priority_target"
-	end
-
-	if (context.elite_count + context.special_count) >= 1 then
-		return true, "grenade_whistle_priority_pack"
 	end
 
 	return false, "grenade_whistle_hold"

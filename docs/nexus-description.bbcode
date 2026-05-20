@@ -58,7 +58,7 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 [list]
 [*]behavior presets: Testing, Aggressive, Balanced, Conservative
 [*]toggles for ability groups, grenades/blitzes, melee/ranged behavior, weapon specials, daemonhost safety, poxburster safety, healing deferral, ping-only health-station use, ping-only pickup use, grimoire pickup, and debug logging
-[*]sliders for sprint range, chase range, ammo reserve rules, melee horde bias, player-tag response, peril thresholds, and human-likeness timing
+[*]sliders for sprint range, chase range, ammo reserve rules, melee horde bias, player-tag response, close-melee danger, peril thresholds, and human-likeness timing
 [*]profile options for bot class selection, weapon quality, survivability tier, and incoming damage reduction
 [/list]
 
@@ -68,6 +68,8 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [list]
 [*]Added a crash guard for the vanilla [font=Courier New]suppression.lua:344 UnitApi node failed[/font] crash MFL87 reported on Nexus. The guarded case is an attacker unit missing [font=Courier New]enemy_aim_target_03[/font] during minion suppression.
+[*]Fixed close-range guns such as shotguns and the Rumbler staying out when enemies are already in melee range. There is a new cutoff slider if 2.5m is too tight for your setup.
+[*]Retuned Arbites Remote Detonation so bots spend it when the mastiff is in a real cluster, instead of wasting it on one elite or holding because the dog is away from the bot's selected target.
 [/list]
 
 [b]v1.2.0[/b]

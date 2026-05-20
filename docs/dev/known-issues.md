@@ -32,7 +32,7 @@ None currently. `#17`, `#96`, `#100`, `#106`, `#107`, and `#108` are closed from
 
 3. ~~Mastiff-pinned target fixation~~ **Validated and closed** (#69). Run `0` logged both melee and ranged `friendly companion pin -100` penalties against pinned enemies, confirming bots now de-prioritize already-controlled mastiff targets.
 
-4. ~~Arbites whistle ignores mastiff position~~ **Validated and closed** (#70). Run `0` logged repeated `grenade_whistle_block_companion_far` holds plus successful `adamant_whistle` charge consumes, confirming the mastiff-distance gate blocks empty-space whistles while still allowing valid detonations.
+4. ~~Arbites whistle ignores mastiff position~~ **Closed** (#70). Remote Detonation requires a live companion with known position before queuing; missing companion position now logs `grenade_whistle_block_companion_position_missing`, and dog-centered pressure approves detonation only for 5+ enemies, 3+ elites/specials, or any monster in the 5m effect radius.
 
 5. ~~Ogryn grenade mid-horde~~ **Validated and closed** (#71). Committed grenade swaps now block when the current target is inside 4m, and single-target throw heuristics also block under crowd pressure. Crowd-control and area-denial grenades are still allowed in dense fights.
 

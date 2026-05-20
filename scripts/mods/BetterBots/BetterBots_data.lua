@@ -185,7 +185,9 @@ return {
 							make_numeric("pressure_leash_floor_m", { 4, 12 }, 1),
 						},
 					},
-					make_checkbox("enable_target_type_hysteresis"),
+					make_checkbox("enable_target_type_hysteresis", {
+						make_numeric("immediate_melee_pressure_distance", { 1, 6 }, 0.5),
+					}),
 					make_numeric("sprint_follow_distance", { 0, 30 }, 2),
 					make_checkbox("enable_poxburster"),
 					make_checkbox("enable_charge_nav_validation"),

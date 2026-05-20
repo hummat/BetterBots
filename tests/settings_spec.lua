@@ -1021,6 +1021,23 @@ describe("settings", function()
 				assert.equals(0, Settings.ranged_bash_distance())
 			end)
 		end)
+
+		describe("immediate_melee_pressure_distance", function()
+			it("returns default 2.5 when mod returns nil", function()
+				Settings.init(mock_mod({}))
+				assert.equals(2.5, Settings.immediate_melee_pressure_distance())
+			end)
+
+			it("returns configured value", function()
+				Settings.init(mock_mod({ immediate_melee_pressure_distance = 4 }))
+				assert.equals(4, Settings.immediate_melee_pressure_distance())
+			end)
+
+			it("falls back to default for invalid values", function()
+				Settings.init(mock_mod({ immediate_melee_pressure_distance = 7 }))
+				assert.equals(2.5, Settings.immediate_melee_pressure_distance())
+			end)
+		end)
 	end)
 
 	describe("new feature gates", function()

@@ -113,7 +113,7 @@ Issues are tracked on [GitHub](https://github.com/hummat/BetterBots/issues).
 | 68 | **P1: Veteran class swap with other mods** | **Done.** Yield guard now checks `profile.character_id and profile.name` (real backend characters always carry `name`; vanilla bot stubs use `name_list_id` instead), committed in `8520485`. Validated from run `console-2026-04-07-15.36.11`: BetterBots preserved external profiles for bot slots 1–4 with real `character_id` values and logged `allowed profile update (no _bb_resolved sentinel)`. Regression coverage in `tests/bot_profiles_spec.lua`. Closed. |
 | 73 | **P1: exception-safe shared state mutation** | **Done.** Wrapped the temporary shared-state mutations in restore-on-error guards. Kept as defensive hardening; reopen only on actual repro. |
 | 69 | P2: Mastiff-pinned target fixation | **Done.** Validated in run `0`: friendly companion-pin penalties fired in both melee and ranged scoring. |
-| 70 | P2: Arbites whistle ignores dog position | **Done.** Validated in run `0`: invalid whistles were held and valid whistles still consumed charges. |
+| 70 | P2: Arbites whistle ignores dog position | **Done.** Remote Detonation requires a live companion with known position before queuing; missing companion position has a distinct block rule, and dog-centered pressure approves detonation for 5+ enemies, 3+ elites/specials, or any monster in the 5m effect radius. |
 | 71 | P2: Ogryn grenade mid-horde | **Done.** April 7 event log shows `grenade_ogryn_frag_block_melee_range` below 4m and `grenade_ogryn_frag_horde` only above 4m. |
 | 72 | P3: Configurable ammo policy | **Done.** April 7 logs exercised both the lowered ranged fire gate and ammo pickup decisions in runtime. |
 

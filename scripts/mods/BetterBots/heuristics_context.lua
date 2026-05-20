@@ -64,6 +64,22 @@ local function _unit_is_alive(unit)
 	return false
 end
 
+local function _companion_unit_is_alive(unit)
+	if Unit and Unit.alive then
+		return Unit.alive(unit) == true
+	end
+
+	return _unit_is_alive(unit)
+end
+
+local function _companion_units(companion_spawner_extension)
+	if not (companion_spawner_extension and companion_spawner_extension:should_have_companion()) then
+		return nil
+	end
+
+	return companion_spawner_extension.companion_units and companion_spawner_extension:companion_units() or nil
+end
+
 local function _scan_interacting_allies(side, fixed_t)
 	if _interacting_cache_t == fixed_t and _interacting_cache_side == side then
 		return _interacting_units, _interacting_profiles, _interacting_types
@@ -291,6 +307,18 @@ local function _format_distance(value)
 	return value and string.format("%.1f", value) or "unknown"
 end
 
+local function _distance_sq(a, b)
+	if not (a and b and a.x and b.x) then
+		return nil
+	end
+
+	local dx = b.x - a.x
+	local dy = b.y - a.y
+	local dz = b.z - a.z
+
+	return dx * dx + dy * dy + dz * dz
+end
+
 local function _log_target_daemonhost_range(unit, context, daemonhost_unit, target_daemonhost_dist_sq)
 	if not (_debug_log and _debug_enabled and _debug_enabled()) then
 		return
@@ -470,6 +498,10 @@ local function build_context(unit, blackboard)
 		urgent_target_enemy = nil,
 		companion_unit = nil,
 		companion_position = nil,
+		companion_nearby_count = 0,
+		companion_nearby_challenge = 0,
+		companion_nearby_elite_special_count = 0,
+		companion_nearby_monster_count = 0,
 		target_ally_needs_aid = false,
 		target_ally_need_type = nil,
 		target_ally_distance = nil,
@@ -505,14 +537,47 @@ local function build_context(unit, blackboard)
 	end
 
 	local companion_spawner_extension = ScriptUnit.has_extension(unit, "companion_spawner_system")
-	local companion_units = companion_spawner_extension and companion_spawner_extension:companion_units()
+	local companion_units = _companion_units(companion_spawner_extension)
 	if companion_units then
 		for i = 1, #companion_units do
 			local companion_unit = companion_units[i]
-			if companion_unit and _unit_is_alive(companion_unit) then
+			if companion_unit and _companion_unit_is_alive(companion_unit) then
 				context.companion_unit = companion_unit
 				context.companion_position = POSITION_LOOKUP and POSITION_LOOKUP[companion_unit] or nil
 				break
+			end
+		end
+	end
+
+	local side_system = Managers
+		and Managers.state
+		and Managers.state.extension
+		and Managers.state.extension:system("side_system")
+	local side = side_system and side_system.side_by_unit and side_system.side_by_unit[unit] or nil
+	if side and side.relation_units and context.companion_position then
+		local enemy_units = side:relation_units("enemy")
+		local radius_sq = 5 * 5
+
+		for i = 1, #enemy_units do
+			local enemy_unit = enemy_units[i]
+			local enemy_position = POSITION_LOOKUP and POSITION_LOOKUP[enemy_unit] or nil
+			local dist_sq = _distance_sq(context.companion_position, enemy_position)
+
+			if dist_sq and dist_sq <= radius_sq and _unit_is_alive(enemy_unit) then
+				local enemy_breed = _enemy_breed(enemy_unit)
+				if enemy_breed then
+					context.companion_nearby_count = context.companion_nearby_count + 1
+					context.companion_nearby_challenge = context.companion_nearby_challenge
+						+ (enemy_breed.challenge_rating or 0)
+
+					local tags = enemy_breed.tags
+					if tags and (tags.elite or tags.special) then
+						context.companion_nearby_elite_special_count = context.companion_nearby_elite_special_count + 1
+					end
+					if tags and tags.monster then
+						context.companion_nearby_monster_count = context.companion_nearby_monster_count + 1
+					end
+				end
 			end
 		end
 	end
@@ -677,12 +742,7 @@ local function build_context(unit, blackboard)
 		end
 	end
 
-	local side_system = Managers
-		and Managers.state
-		and Managers.state.extension
-		and Managers.state.extension:system("side_system")
 	if side_system then
-		local side = side_system.side_by_unit[unit]
 		if side then
 			local interacting_units, interacting_profiles, interacting_types = _scan_interacting_allies(side, fixed_t)
 			local best_distance_sq = math.huge

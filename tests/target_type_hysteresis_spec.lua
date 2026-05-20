@@ -232,6 +232,7 @@ local function run_hooked_selection(opts)
 				perf_tags[#perf_tags + 1] = { tag = tag, token = token }
 			end,
 		},
+		immediate_melee_pressure_distance = opts.immediate_melee_pressure_distance,
 		anti_armor_ranged_policy = opts.anti_armor_ranged_policy,
 		close_range_ranged_policy = opts.close_range_ranged_policy or function(weapon_template)
 			local keywords = weapon_template and weapon_template.keywords or {}
@@ -486,7 +487,7 @@ describe("target_type_hysteresis", function()
 		assert.is_truthy(find_debug_log(result.debug_logs, "type hold melee over raw ranged"))
 	end)
 
-	it("preserves ranged targeting for the explicit close-range family set under melee pressure", function()
+	it("preserves ranged targeting for the explicit close-range hold family set under melee pressure", function()
 		local cases = {
 			{
 				family = "flamer",
@@ -572,6 +573,147 @@ describe("target_type_hysteresis", function()
 				)
 			)
 		end
+	end)
+
+	it("lets shotgun and thumper target selection return to melee under close melee pressure", function()
+		local cases = {
+			{
+				family = "shotgun",
+				template = {
+					name = "shotgun_p1_m1",
+					keywords = { "ranged", "shotgun", "p1" },
+				},
+			},
+			{
+				family = "shotgun_grenade",
+				template = {
+					name = "ogryn_thumper_p1_m1",
+					keywords = { "ranged", "shotgun_grenade", "p1" },
+				},
+			},
+		}
+
+		for i = 1, #cases do
+			local case = cases[i]
+			local result = run_hooked_selection({
+				t = 1,
+				debug_enabled = true,
+				previous_target_type = "ranged",
+				target_distance_sq = 4,
+				bot_secondary_weapon_template = case.template,
+				close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+				bot_selection = {
+					slot_weight = function()
+						return 10
+					end,
+					melee_distance_weight = function()
+						return 8
+					end,
+					ranged_distance_weight = function()
+						return 0
+					end,
+					line_of_sight_weight = function()
+						return 0
+					end,
+				},
+			})
+
+			assert.equals(
+				"melee",
+				result.perception_component.target_enemy_type,
+				"family " .. case.family .. " should not force ranged at melee distance"
+			)
+			assert.is_nil(
+				find_debug_log(
+					result.debug_logs,
+					"close-range ranged family kept ranged target type (family=" .. case.family
+				)
+			)
+			local skip_log = find_debug_log(result.debug_logs, "close-range ranged target skipped")
+			assert.is_truthy(skip_log)
+			assert.matches("reason=immediate_melee_pressure", skip_log.message, 1, true)
+			assert.matches("bot=", skip_log.message, 1, true)
+			assert.matches("family=" .. case.family, skip_log.message, 1, true)
+			assert.matches("weapon=" .. case.template.name, skip_log.message, 1, true)
+			assert.matches("breed=renegade_gunner", skip_log.message, 1, true)
+			assert.matches("distance=2.00", skip_log.message, 1, true)
+			assert.matches("chosen=melee", skip_log.message, 1, true)
+			assert.matches("melee=", skip_log.message, 1, true)
+			assert.matches("ranged=", skip_log.message, 1, true)
+		end
+	end)
+
+	it("uses the configured immediate melee pressure distance for close-range ranged holds", function()
+		local result = run_hooked_selection({
+			t = 1,
+			debug_enabled = true,
+			previous_target_type = "ranged",
+			target_distance_sq = 16,
+			immediate_melee_pressure_distance = function()
+				return 4.5
+			end,
+			bot_secondary_weapon_template = {
+				name = "shotgun_p1_m1",
+				keywords = { "ranged", "shotgun", "p1" },
+			},
+			close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+			bot_selection = {
+				slot_weight = function()
+					return 10
+				end,
+				melee_distance_weight = function()
+					return 8
+				end,
+				ranged_distance_weight = function()
+					return 0
+				end,
+				line_of_sight_weight = function()
+					return 0
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
+		local skip_log = find_debug_log(result.debug_logs, "close-range ranged target skipped")
+		assert.is_truthy(skip_log)
+		assert.matches("reason=immediate_melee_pressure", skip_log.message, 1, true)
+		assert.matches("distance=4.00", skip_log.message, 1, true)
+	end)
+
+	it("keeps poxbursters in melee-push targeting range even under close-range ranged holds", function()
+		local result = run_hooked_selection({
+			t = 1,
+			debug_enabled = true,
+			previous_target_type = "ranged",
+			target_distance_sq = 8,
+			target_breed = {
+				name = "chaos_poxwalker_bomber",
+				not_bot_target = false,
+				tags = { special = true },
+			},
+			bot_secondary_weapon_template = {
+				name = "flamer_p1_m1",
+				keywords = { "ranged", "flamer", "p1" },
+			},
+			close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
+			bot_selection = {
+				slot_weight = function()
+					return 10
+				end,
+				melee_distance_weight = function()
+					return 8
+				end,
+				ranged_distance_weight = function()
+					return 0
+				end,
+				line_of_sight_weight = function()
+					return 0
+				end,
+			},
+		})
+
+		assert.equals("melee", result.perception_component.target_enemy_type)
+		assert.is_nil(find_debug_log(result.debug_logs, "close-range ranged family kept ranged target type"))
 	end)
 
 	it("prefers ranged target type for hard-armored targets when the secondary has anti-armor ranged policy", function()

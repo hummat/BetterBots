@@ -14,6 +14,7 @@ local _event_log
 local _is_suppressed
 local _perf
 local _warp_weapon_peril_threshold
+local _bot_slot_for_unit
 
 -- Late-bound cross-module refs (set via wire)
 local _build_context
@@ -59,6 +60,20 @@ local function _context_debug_summary(context)
 		.. tostring(context.target_breed_name or "none")
 		.. ", peril="
 		.. tostring(context.peril_pct)
+		.. ", companion="
+		.. (context.companion_unit and "present" or "missing")
+		.. ", companion_pos="
+		.. (context.companion_position and "present" or "missing")
+		.. ", target_pos="
+		.. (context.target_enemy_position and "present" or "missing")
+		.. ", companion_nearby="
+		.. tostring(context.companion_nearby_count or 0)
+		.. ", companion_challenge="
+		.. tostring(context.companion_nearby_challenge or 0)
+		.. ", companion_priority="
+		.. tostring(context.companion_nearby_elite_special_count or 0)
+		.. ", companion_monsters="
+		.. tostring(context.companion_nearby_monster_count or 0)
 end
 
 local function _is_soft_revalidation_hold(rule)
@@ -616,12 +631,16 @@ local function try_queue(unit, blackboard)
 				or (context and context.peril_pct ~= nil and context.peril_pct > 0)
 			)
 		then
+			local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(unit) or "?"
+
 			_debug_log(
 				"grenade_decision_block:" .. grenade_name .. ":" .. tostring(unit),
 				fixed_t,
 				"grenade held "
 					.. grenade_name
-					.. " (rule="
+					.. " (bot="
+					.. tostring(bot_slot)
+					.. ", rule="
 					.. tostring(rule)
 					.. ", "
 					.. _context_debug_summary(context)
@@ -861,6 +880,7 @@ return {
 		_grenade_state_by_unit = deps.grenade_state_by_unit
 		_perf = deps.perf
 		_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
+		_bot_slot_for_unit = deps.bot_slot_for_unit
 		_grenade_profiles = deps.grenade_profiles
 		assert(_grenade_profiles, "BetterBots: grenade_fallback requires grenade_profiles")
 		_grenade_profiles.init({

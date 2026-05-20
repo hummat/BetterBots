@@ -53,7 +53,7 @@ upgraded node (`adamant_area_buff_drone_improved`) enhances it; taking Charge or
 | Cooldown | **60s**, 1 charge |
 | Range | 6m (near), 12m (far/cone forward) |
 | Shape | Cone (`shout_dot = 0.75`) |
-| Effects | Staggers enemies (light stagger, 2.5s duration, shout_target power 1000, action power 500). Applies `adamant_whistle_electrocution` to enemies. Refills own toughness to 100%. |
+| Effects | Staggers enemies within 5m of the companion (light stagger, 2.5s duration, shout_target power 1000), applies `adamant_whistle_electrocution`, and creates a 4m explosion at the companion position (2m close radius, action power 500). |
 | Animation | `ability_shout`, 0.75s total |
 | `ability_meta_data` | **None** -- no pre-defined bot activation metadata |
 
@@ -165,7 +165,7 @@ Modifying talents:
 | Effects | Commands Cyber-Mastiff to target. Electric discharge at mastiff's position dealing damage + heavy stagger. Disables grenade pickups (`disable_grenade_pickups` special rule). |
 | Charge replenishment | Auto-replenishes charges on cooldown timer (via `adamant_whistle_replenishment` buff) |
 
-**Bot usage notes:** This replaces grenades entirely. Uses `grenade_ability_pressed/hold` input -- different from combat ability. The `order_companion` action kind is unique to Arbites. Bot should use to direct mastiff at priority targets (specials, elites). Requires companion to be alive. Incompatible with Lone Wolf talent.
+**Bot usage notes:** This replaces grenades entirely. Uses `grenade_ability_pressed/hold` input -- different from combat ability. The `order_companion` action kind is unique to Arbites. Bot should use it when the mastiff is already in a high-value cluster: 5+ enemies, 3+ elites/specials, or any monster inside the 5m effect radius. A lone elite or special is not enough. Requires companion to be alive. Incompatible with Lone Wolf talent.
 
 ### 4. Voltaic Shock Mine (internal: `adamant_shock_mine`; formerly: Shock Mine)
 
