@@ -45,6 +45,15 @@ require_cmd gh
 require_clean_git
 
 TAG="v$VERSION_ARG"
+PACKAGE_ASSET="BetterBots.zip"
+
+release_exists() {
+  gh release view "$TAG" >/dev/null 2>&1
+}
+
+release_asset_exists() {
+  gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "$PACKAGE_ASSET"
+}
 
 echo "Release: $TAG"
 echo "Running patch drift gate..."
@@ -73,18 +82,34 @@ git push
 git push origin "$TAG"
 
 echo "Waiting for GitHub release to be created by CI..."
-for i in $(seq 1 12); do
-  if gh release view "$TAG" >/dev/null 2>&1; then
+for _ in $(seq 1 12); do
+  if release_exists; then
     break
   fi
   sleep 5
 done
 
-if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "BetterBots.zip"; then
-  echo "BetterBots.zip already attached by CI — skipping upload."
+echo "Waiting for $PACKAGE_ASSET from CI..."
+for _ in $(seq 1 24); do
+  if release_asset_exists; then
+    echo "$PACKAGE_ASSET already attached by CI; skipping upload."
+    echo "Done. Release: https://github.com/hummat/BetterBots/releases/tag/$TAG"
+    exit 0
+  fi
+  sleep 5
+done
+
+echo "CI did not attach $PACKAGE_ASSET within timeout; uploading local package..."
+upload_log="$(mktemp)"
+if gh release upload "$TAG" "$PACKAGE_ASSET" --clobber 2>"$upload_log"; then
+  rm -f "$upload_log"
+elif grep -q "ReleaseAsset.name already exists" "$upload_log" && release_asset_exists; then
+  echo "$PACKAGE_ASSET appeared during upload fallback; treating as success."
+  rm -f "$upload_log"
 else
-  echo "Uploading BetterBots.zip to release..."
-  gh release upload "$TAG" BetterBots.zip --clobber
+  cat "$upload_log" >&2
+  rm -f "$upload_log"
+  exit 2
 fi
 
 echo "Done. Release: https://github.com/hummat/BetterBots/releases/tag/$TAG"
