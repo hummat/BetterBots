@@ -64,12 +64,13 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [size=3][b]Latest update[/b][/size]
 
-[b]Next patch[/b]
+[b]v1.2.1[/b]
 
 [list]
-[*]Added a crash guard for the vanilla [font=Courier New]suppression.lua:344 UnitApi node failed[/font] crash MFL87 reported on Nexus. The guarded case is an attacker unit missing [font=Courier New]enemy_aim_target_03[/font] during minion suppression.
-[*]Fixed close-range guns such as shotguns and the Rumbler staying out when enemies are already in melee range. There is a new cutoff slider if 2.5m is too tight for your setup.
-[*]Retuned Arbites Remote Detonation so bots spend it when the mastiff is in a real cluster, instead of wasting it on one elite or holding because the dog is away from the bot's selected target.
+[*]Fixed close-range guns — shotguns, the Rumbler, and other close-range families — staying out when enemies are already in melee range. There is a new [i]immediate melee pressure cutoff[/i] slider (default 2.5m, range 1–6m) if that is too tight for your setup.
+[*]Retuned Arbites Remote Detonation so bots spend it when the mastiff is in a real cluster — 5 enemies, 3 elites/specials, or any monster within 5m of the dog — instead of wasting it on one elite or holding because the dog drifted away from the bot's current target.
+[*]Added a crash guard for the vanilla [font=Courier New]suppression.lua:344 UnitApi node failed[/font] crash MFL87 reported on Nexus. The guarded case is an attacker unit missing the [font=Courier New]enemy_aim_target_03[/font] node during minion suppression.
+[*]Hardened mod cold boot and hot reload: cached [font=Courier New]hook_require[/font] installers replay correctly across reloads, and the ability metadata patch survives a Lua state reset without re-warning.
 [/list]
 
 [b]v1.2.0[/b]
