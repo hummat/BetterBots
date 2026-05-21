@@ -96,6 +96,12 @@ None currently. `#17`, `#96`, `#100`, `#106`, `#107`, and `#108` are closed from
    - BetterBots does not modify bot counts or door/teleport logic. This is a vanilla/SoloPlay issue.
    - Mitigation: `airlock_guard.lua` wraps `teleport_bots` with pcall — un-teleported bots catch up via normal follow behavior.
 
+4. Vanilla Hive Scum Stimm Field teardown crash after Solo Play death/mission teardown.
+   - Symptom reported on Nexus by Skieppy for BetterBots v1.2.1: after a Solo Play death/wipe with a Hive Scum bot carrying Stimm Field, Darktide crashed while leaving/restarting the failed run with `proximity_broker_stimm_field.lua:349: Cannot access property "remove_externally_controlled_buff_with_linger" on destroyed object of type PlayerUnitBuffExtension`.
+   - Source-grounded likely root cause: vanilla `ProximityBrokerStimmField` stores affected units' `buff_extension` objects when they enter the field, then the linger cleanup path later calls `remove_externally_controlled_buff_with_linger(...)` on the stored extension. If mission teardown has already destroyed the player unit or its buff extension, that call can hit a destroyed object.
+   - BetterBots likely exposes the crash by enabling bot deployment of `broker_ability_stimm_field`; the failing call is in Darktide's own proximity/buff cleanup after the deployable exists.
+   - Treat as a one-off external/vanilla teardown issue unless repeated. Immediate mitigation: disable BetterBots Deployables, or use a Hive Scum bot without Stimm Field / switch that bot away from Hive Scum.
+
 ## Current fix direction
 
 1. ~~Add explicit restore-on-disable behavior.~~ Done (#57) — set `is_togglable = false` instead.

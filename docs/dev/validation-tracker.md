@@ -964,7 +964,7 @@ Legend: `PASS` = repeated successful evidence in logs and in-game effect, `PARTI
 | `zealot_relic` | PASS | run `2026-03-07-tier3-final`: 2 consumes, 0 failures, 100% rate |
 | `psyker_force_field*` | PASS | run `2026-03-07-tier3-final`: 1 consume, 0 failures, 100% rate |
 | `adamant_area_buff_drone` | PASS | run `2026-03-07-tier3-final`: 5 consumes, 0 failures, 100% rate |
-| `broker_ability_stimm_field` | BLOCKED | DLC not owned in current environment, cannot validate yet |
+| `broker_ability_stimm_field` | PARTIAL | DLC not owned in current environment, so no maintainer-run validation. Nexus report by Skieppy on 2026-05-20 for v1.2.1 crashed in vanilla `proximity_broker_stimm_field.lua` linger cleanup after a Solo Play death with a Hive Scum Stimm Field bot; this strongly implies the deployable reached engine-side proximity/buff handling, but no BetterBots `fallback item queued` / charge-consume log was provided. |
 
 ### Heuristic Validation (post-refactor, #2)
 
@@ -997,7 +997,7 @@ Legend: `PASS` = activated with correct rule + holds observed, `UNTESTED` = not 
 | `_can_activate_zealot_relic` | `zealot_relic` | PASS | 2026-03-07-tier3-final | 2 consumes; `self_critical` observed (toughness-gated activation) |
 | `_can_activate_force_field` | `psyker_force_field*` | PASS | 2026-03-07-tier3-final | 1 consume; activated under combat pressure |
 | `_can_activate_drone` | `adamant_area_buff_drone` | PASS | 2026-03-07-tier3-final | 5 consumes; activated reliably in combat |
-| `_can_activate_stimm_field` | `broker_ability_stimm_field` | BLOCKED | — | Hive Scum DLC not owned |
+| `_can_activate_stimm_field` | `broker_ability_stimm_field` | PARTIAL | Nexus report 2026-05-20 | Community crash report implies Stimm Field deployable existed and entered vanilla proximity/buff cleanup; no BetterBots debug/event log, so heuristic rule and charge-consume confirmation remain unverified. |
 
 ### M5 Batch Validation (2026-03-11)
 
