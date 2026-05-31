@@ -15,6 +15,7 @@ local _health
 local _ammo
 local _unit_get_data
 local _human_slot_scan_cache
+local _com_wheel
 
 local WIELD_TIMEOUT_S = 2
 local USE_TIMEOUT_S = 3
@@ -211,6 +212,14 @@ local function _carried_template_for_slot(unit, slot_name)
 	return nil
 end
 
+local function _pickup_name_from_carried_template(weapon_template)
+	if not weapon_template then
+		return nil
+	end
+
+	return weapon_template.swap_pickup_name or weapon_template.give_pickup_name or weapon_template.pickup_name
+end
+
 local function _supported_carried_pickup(unit)
 	local inventory_component = _inventory_component(unit)
 	if not inventory_component then
@@ -221,7 +230,7 @@ local function _supported_carried_pickup(unit)
 		local slot_name = CARRIED_SLOT_ORDER[i]
 		if not _slot_is_empty(inventory_component, slot_name) then
 			local weapon_template = _carried_template_for_slot(unit, slot_name)
-			local pickup_name = weapon_template and weapon_template.pickup_name or nil
+			local pickup_name = _pickup_name_from_carried_template(weapon_template)
 			local entry = _pickup_entry(pickup_name)
 
 			if entry then
@@ -305,6 +314,24 @@ local function _scan_team_resource_need(unit)
 	return any_medical_need, any_low_ammo
 end
 
+local function _human_units_for_request(unit)
+	return (_human_units and _human_units(nil, unit)) or {}
+end
+
+local function _has_recent_health_request(unit)
+	return _com_wheel
+			and _com_wheel.has_recent_health_request
+			and _com_wheel.has_recent_health_request(_human_units_for_request(unit))
+		or false
+end
+
+local function _has_recent_ammo_request(unit)
+	return _com_wheel
+			and _com_wheel.has_recent_ammo_request
+			and _com_wheel.has_recent_ammo_request(_human_units_for_request(unit))
+		or false
+end
+
 local function _desired_action(unit, blackboard)
 	local entry, pickup_name, slot_name = _supported_carried_pickup(unit)
 	if not entry then
@@ -341,10 +368,32 @@ local function _desired_action(unit, blackboard)
 	end
 
 	local any_medical_need, any_low_ammo = _scan_team_resource_need(unit)
+	local explicit_health_request = _has_recent_health_request(unit)
+	local explicit_ammo_request = _has_recent_ammo_request(unit)
 	local safe_to_deploy = context
 		and context.allies_in_coherency >= 2
 		and context.num_nearby == 0
 		and not context.target_enemy
+
+	-- Command-wheel resource requests are team-wide; if multiple bots carry the
+	-- matching crate, all of them may respond during the request window.
+	if entry.kind == "medical_crate" and explicit_health_request then
+		return {
+			pickup_name = pickup_name,
+			slot_name = slot_name,
+			wield_input = entry.wield_input,
+			use_input = entry.use_input,
+		}
+	end
+
+	if entry.kind == "ammo_crate" and explicit_ammo_request then
+		return {
+			pickup_name = pickup_name,
+			slot_name = slot_name,
+			wield_input = entry.wield_input,
+			use_input = entry.use_input,
+		}
+	end
 
 	if not safe_to_deploy then
 		return nil
@@ -388,6 +437,7 @@ function M.init(deps)
 	_ammo = deps.ammo_module or require("scripts/utilities/ammo")
 	_unit_get_data = deps.unit_get_data or (Unit and Unit.get_data)
 	_human_slot_scan_cache = {}
+	_com_wheel = deps.com_wheel
 
 	M.patch_pickups()
 end

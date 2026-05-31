@@ -713,6 +713,7 @@ function M.load_and_init(ctx)
 		fixed_time = ctx.fixed_time,
 		state_by_unit = ctx.pocketable_state_by_unit,
 		build_context = Heuristics.build_context,
+		com_wheel = ComWheelResponse,
 		is_enabled = function()
 			return Settings.is_feature_enabled("pocketable_support")
 		end,

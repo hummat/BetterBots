@@ -23,6 +23,7 @@ describe("pocketable_pickup", function()
 	local bot_health_pct
 	local bot_corruption_pct
 	local saved_script_unit
+	local com_wheel
 
 	local function init_module()
 		ok, PocketablePickup = load_module()
@@ -85,6 +86,7 @@ describe("pocketable_pickup", function()
 			unit_get_data = function(target_unit, key)
 				return target_unit and target_unit[key]
 			end,
+			com_wheel = com_wheel,
 		})
 	end
 
@@ -119,6 +121,7 @@ describe("pocketable_pickup", function()
 		}
 		bot_health_pct = 1
 		bot_corruption_pct = 0
+		com_wheel = nil
 		inventory_component = {
 			wielded_slot = "slot_primary",
 			slot_pocketable = "medical_item",
@@ -126,13 +129,15 @@ describe("pocketable_pickup", function()
 		}
 		carried_templates = {
 			slot_pocketable = {
-				pickup_name = "medical_crate_pocketable",
+				swap_pickup_name = "medical_crate_pocketable",
+				give_pickup_name = "medical_crate_pocketable",
 				action_inputs = {
 					place = {},
 				},
 			},
 			slot_pocketable_small = {
-				pickup_name = "syringe_power_boost_pocketable",
+				swap_pickup_name = "syringe_power_boost_pocketable",
+				give_pickup_name = "syringe_power_boost_pocketable",
 				action_inputs = {
 					use_self = {},
 				},
@@ -334,7 +339,8 @@ describe("pocketable_pickup", function()
 				target_enemy = nil,
 			})
 			carried_templates.slot_pocketable_small = {
-				pickup_name = "syringe_corruption_pocketable",
+				swap_pickup_name = "syringe_corruption_pocketable",
+				give_pickup_name = "syringe_corruption_pocketable",
 				action_inputs = {
 					use_self = {},
 				},
@@ -366,7 +372,8 @@ describe("pocketable_pickup", function()
 			target_enemy = nil,
 		})
 		carried_templates.slot_pocketable_small = {
-			pickup_name = "syringe_corruption_pocketable",
+			swap_pickup_name = "syringe_corruption_pocketable",
+			give_pickup_name = "syringe_corruption_pocketable",
 			action_inputs = {
 				use_self = {},
 			},
@@ -387,7 +394,8 @@ describe("pocketable_pickup", function()
 			target_enemy = nil,
 		})
 		carried_templates.slot_pocketable_small = {
-			pickup_name = "syringe_corruption_pocketable",
+			swap_pickup_name = "syringe_corruption_pocketable",
+			give_pickup_name = "syringe_corruption_pocketable",
 			action_inputs = {
 				use_self = {},
 			},
@@ -407,7 +415,8 @@ describe("pocketable_pickup", function()
 			target_enemy = nil,
 		})
 		carried_templates.slot_pocketable_small = {
-			pickup_name = "syringe_corruption_pocketable",
+			swap_pickup_name = "syringe_corruption_pocketable",
+			give_pickup_name = "syringe_corruption_pocketable",
 			action_inputs = {
 				use_self = {},
 			},
@@ -453,6 +462,121 @@ describe("pocketable_pickup", function()
 			input = "place",
 			raw_input = nil,
 		}, queued_inputs[2])
+	end)
+
+	it("identifies carried ammo crates from swap pickup name instead of deployed pickup name", function()
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 1,
+				uses_ammo = true,
+				ammo_pct = 0.20,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		carried_templates.slot_pocketable = {
+			pickup_name = "ammo_cache_deployable",
+			swap_pickup_name = "ammo_cache_pocketable",
+			give_pickup_name = "ammo_cache_pocketable",
+			action_inputs = {
+				place = {},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			allies_in_coherency = 2,
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+		assert.same({
+			component = "weapon_action",
+			input = "wield",
+			raw_input = "wield_3",
+		}, queued_inputs[1])
+	end)
+
+	it("deploys a carried medical crate immediately on explicit health request", function()
+		com_wheel = {
+			has_recent_health_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 0.95,
+				corruption_pct = 0,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 4,
+			allies_in_coherency = 0,
+			target_enemy = "enemy_unit",
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.same({
+			component = "weapon_action",
+			input = "place",
+			raw_input = nil,
+		}, queued_inputs[1])
+	end)
+
+	it("deploys a carried ammo crate immediately on explicit ammo request", function()
+		com_wheel = {
+			has_recent_ammo_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 1,
+				uses_ammo = true,
+				ammo_pct = 0.95,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		carried_templates.slot_pocketable = {
+			pickup_name = "ammo_cache_deployable",
+			swap_pickup_name = "ammo_cache_pocketable",
+			give_pickup_name = "ammo_cache_pocketable",
+			action_inputs = {
+				place = {},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 4,
+			allies_in_coherency = 0,
+			target_enemy = "enemy_unit",
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.same({
+			component = "weapon_action",
+			input = "place",
+			raw_input = nil,
+		}, queued_inputs[1])
 	end)
 
 	it("does not report success when the carried slot empties without a confirmed use transition", function()
