@@ -470,6 +470,9 @@ local function _grenade_smite(context)
 		return false, "grenade_smite_block_dormant_daemonhost"
 	end
 
+	-- Intentionally fixed at 0.85 rather than the configurable assail
+	-- threshold: smite is a stationary channel, so holding it at high peril
+	-- is riskier than lobbing assail projectiles.
 	if context.peril_pct and context.peril_pct >= 0.85 then
 		return false, "grenade_smite_block_peril"
 	end

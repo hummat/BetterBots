@@ -500,7 +500,42 @@ describe("pocketable_pickup", function()
 		}, queued_inputs[1])
 	end)
 
-	it("deploys a carried medical crate immediately on explicit health request", function()
+	it("deploys a carried medical crate on explicit health request even below coherency minimum", function()
+		com_wheel = {
+			has_recent_health_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 0.95,
+				corruption_pct = 0,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			allies_in_coherency = 0,
+			target_enemy = nil,
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.same({
+			component = "weapon_action",
+			input = "place",
+			raw_input = nil,
+		}, queued_inputs[1])
+	end)
+
+	it("holds a carried medical crate on explicit health request while enemies are nearby", function()
 		com_wheel = {
 			has_recent_health_request = function()
 				return true
@@ -528,6 +563,46 @@ describe("pocketable_pickup", function()
 
 		PocketablePickup.try_queue(unit, { perception = {} })
 
+		assert.equals(0, #queued_inputs)
+	end)
+
+	it("deploys a carried ammo crate on explicit ammo request even below coherency minimum", function()
+		com_wheel = {
+			has_recent_ammo_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 1,
+				uses_ammo = true,
+				ammo_pct = 0.95,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		carried_templates.slot_pocketable = {
+			pickup_name = "ammo_cache_deployable",
+			swap_pickup_name = "ammo_cache_pocketable",
+			give_pickup_name = "ammo_cache_pocketable",
+			action_inputs = {
+				place = {},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			allies_in_coherency = 0,
+			target_enemy = nil,
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
 		assert.same({
 			component = "weapon_action",
 			input = "place",
@@ -535,7 +610,7 @@ describe("pocketable_pickup", function()
 		}, queued_inputs[1])
 	end)
 
-	it("deploys a carried ammo crate immediately on explicit ammo request", function()
+	it("holds a carried ammo crate on explicit ammo request while enemies are nearby", function()
 		com_wheel = {
 			has_recent_ammo_request = function()
 				return true
@@ -572,11 +647,7 @@ describe("pocketable_pickup", function()
 
 		PocketablePickup.try_queue(unit, { perception = {} })
 
-		assert.same({
-			component = "weapon_action",
-			input = "place",
-			raw_input = nil,
-		}, queued_inputs[1])
+		assert.equals(0, #queued_inputs)
 	end)
 
 	it("does not report success when the carried slot empties without a confirmed use transition", function()

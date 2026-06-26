@@ -1,4 +1,3 @@
-local _mod
 local _patched_set
 local _debug_log
 local _debug_enabled
@@ -113,7 +112,9 @@ local function inject(AbilityTemplates)
 		if template and not template.ability_meta_data then
 			template.ability_meta_data = meta_data
 			injected_count = injected_count + 1
-			_mod:echo("BetterBots: injected meta_data for " .. template_name)
+			if _debug_enabled() then
+				_debug_log("meta_data_injected:" .. template_name, 0, "injected meta_data for " .. template_name)
+			end
 		end
 	end
 
@@ -128,15 +129,19 @@ local function inject(AbilityTemplates)
 		if template and current_input ~= target_input then
 			template.ability_meta_data = meta_data
 			overridden_count = overridden_count + 1
-			_mod:echo(
-				"BetterBots: patched meta_data for "
-					.. template_name
-					.. " (action_input="
-					.. tostring(current_input)
-					.. " -> "
-					.. tostring(target_input)
-					.. ")"
-			)
+			if _debug_enabled() then
+				_debug_log(
+					"meta_data_patched:" .. template_name,
+					0,
+					"patched meta_data for "
+						.. template_name
+						.. " (action_input="
+						.. tostring(current_input)
+						.. " -> "
+						.. tostring(target_input)
+						.. ")"
+				)
+			end
 		end
 	end
 
@@ -160,7 +165,6 @@ end
 
 return {
 	init = function(deps)
-		_mod = deps.mod
 		_patched_set = deps.patched_ability_templates
 		_debug_log = deps.debug_log
 		_debug_enabled = deps.debug_enabled

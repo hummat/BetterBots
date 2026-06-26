@@ -351,10 +351,10 @@ local function _resolve_profile_template(class_name)
 			if _debug_enabled() then
 				if is_weapon_slot then
 					local stat_names = {}
-					local base_stats_override = master_overrides.base_stats or {}
-					local stat_value = base_stats_override[1] and base_stats_override[1].value or 0
+					local debug_base_stats = master_overrides.base_stats or {}
+					local stat_value = debug_base_stats[1] and debug_base_stats[1].value or 0
 
-					for _, s in ipairs(base_stats_override) do
+					for _, s in ipairs(debug_base_stats) do
 						stat_names[#stat_names + 1] = s.name:match("([^_]+_stat)$") or s.name
 					end
 
@@ -371,7 +371,7 @@ local function _resolve_profile_template(class_name)
 							.. " baseItemLevel="
 							.. tostring(master_overrides.baseItemLevel)
 							.. " stats="
-							.. tostring(#base_stats_override)
+							.. tostring(#debug_base_stats)
 							.. " ("
 							.. table.concat(stat_names, ",")
 							.. ")"
@@ -556,7 +556,10 @@ local function resolve_profile(profile)
 			or profile.loadout_item_ids[slot_name]
 
 		if item_data then
-			profile.loadout_item_data[slot_name] = item_data
+			-- Deep-copy: the resolved profile is cached per template choice, so
+			-- assigning its nested tables by reference would share mutable
+			-- item_data between same-class bots (see talents/bot_gestalts above).
+			profile.loadout_item_data[slot_name] = _deep_copy_profile(item_data)
 		elseif item_name and not profile.loadout_item_data[slot_name] then
 			profile.loadout_item_data[slot_name] = {
 				id = item_name,

@@ -631,18 +631,15 @@ local function inject(WeaponTemplates)
 		if type(template) == "table" and has_keyword(template, "ranged") and existing_attack_meta_data then
 			local aim_fire_input, aim_fire_action = find_aim_fire_input(template)
 			if aim_fire_input and existing_attack_meta_data.aim_fire_action_input ~= aim_fire_input then
-				local changed = false
 				local change = ensure_change(template, "fields")
 				local aim_input, aim_action, unaim_input, unaim_action =
 					find_aim_action_for_fire(template, aim_fire_input)
 
-				if existing_attack_meta_data.aim_fire_action_input ~= aim_fire_input then
-					record_original_field(change, existing_attack_meta_data, "aim_fire_action_input")
-					record_original_field(change, existing_attack_meta_data, "aim_fire_action_name")
-					existing_attack_meta_data.aim_fire_action_input = aim_fire_input
-					existing_attack_meta_data.aim_fire_action_name = aim_fire_action
-					changed = true
-				end
+				record_original_field(change, existing_attack_meta_data, "aim_fire_action_input")
+				record_original_field(change, existing_attack_meta_data, "aim_fire_action_name")
+				existing_attack_meta_data.aim_fire_action_input = aim_fire_input
+				existing_attack_meta_data.aim_fire_action_name = aim_fire_action
+				local changed = true
 
 				if aim_input and existing_attack_meta_data.aim_action_input ~= aim_input then
 					record_original_field(change, existing_attack_meta_data, "aim_action_input")

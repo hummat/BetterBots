@@ -911,14 +911,13 @@ function M.install_interaction_hooks(HealthStationInteraction)
 		HealthStationInteraction,
 		"stop",
 		function(func, self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
-			if not (_debug_enabled and _debug_enabled() and interactor_is_server and result == "success") then
+			-- Reservation cleanup below is functional, not diagnostic — it must
+			-- run regardless of the debug setting. Only the _log call is gated.
+			if not (interactor_is_server and result == "success") then
 				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
 			end
 
 			local bot_slot = _bot_slot_for_unit and _bot_slot_for_unit(interactor_unit) or nil
-			if not bot_slot then
-				return func(self, world, interactor_unit, unit_data_component, t, result, interactor_is_server)
-			end
 
 			local station_unit = unit_data_component and unit_data_component.target_unit or nil
 			local before_health = _health_snapshot(interactor_unit)
@@ -936,6 +935,15 @@ function M.install_interaction_hooks(HealthStationInteraction)
 				or before_health.damage ~= after_health.damage
 				or before_health.permanent_damage ~= after_health.permanent_damage
 			local outcome = charge_consumed or health_changed
+
+			-- A successful station interaction satisfies this bot's claim even
+			-- when snapshots show no heal/charge delta; keeping it would block
+			-- other bots.
+			_clear_reserved_health_station(interactor_unit, station_unit)
+
+			if not bot_slot then
+				return stop_result
+			end
 
 			_log(
 				"healing_station_stop:" .. tostring(interactor_unit) .. ":" .. tostring(station_unit),

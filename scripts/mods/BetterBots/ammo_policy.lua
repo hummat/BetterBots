@@ -328,6 +328,29 @@ local function _bot_group_data(bot_group, unit)
 	return bot_group and bot_group._bot_data and bot_group._bot_data[unit] or nil
 end
 
+local function _grenade_pickup_reserved_by_other_bot(bot_group, unit, grenade_pickup)
+	local bot_data_by_unit = bot_group and bot_group._bot_data
+	if not bot_data_by_unit then
+		return false
+	end
+
+	for other_unit, other_data in pairs(bot_data_by_unit) do
+		-- A marker only counts while its pickup order is still live — mirrors
+		-- the self-clearing consistency rule in _reserved_grenade_pickup, so a
+		-- stale marker (order cleared by vanilla, bot died) can't block the
+		-- pickup forever.
+		if
+			other_unit ~= unit
+			and other_data._bb_reserved_grenade_pickup == grenade_pickup
+			and other_data.ammo_pickup_order_unit == grenade_pickup
+		then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function _reserved_grenade_pickup(bot_group, unit)
 	local bot_data = _bot_group_data(bot_group, unit)
 	if not bot_data then
@@ -844,6 +867,7 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 					end
 				elseif
 					not human_request_active
+					and not _grenade_pickup_reserved_by_other_bot(bot_group, unit, grenade_pickup)
 					and _all_eligible_humans_above_grenade_threshold(human_units, _human_grenade_threshold())
 				then
 					_reserve_grenade_pickup(bot_group, unit, pickup_component, grenade_pickup, grenade_distance)

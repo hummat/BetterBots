@@ -473,7 +473,11 @@ function M.register_hooks(deps)
 					_ads_logged_scratchpads[scratchpad] = true
 					if _debug_enabled() then
 						local gestalt = scratchpad.ranged_gestalt or "?"
-						_mod:echo("BetterBots DEBUG: bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")")
+						_debug_log(
+							"ads_confirmed:" .. tostring(gestalt),
+							_fixed_time(),
+							"bot ADS confirmed (ranged_gestalt=" .. tostring(gestalt) .. ")"
+						)
 					end
 				end
 				return result
@@ -539,9 +543,14 @@ function M.register_hooks(deps)
 				local fire_action_input = scratchpad.fire_action_input
 				scratchpad.fire_action_input = forced_fire_action_input
 
-				local may_fire = func(self, unit, scratchpad, range_squared, t)
+				-- Restore the swap even when vanilla _may_fire raises; a
+				-- stranded forced input would corrupt every later fire.
+				local call_ok, may_fire = pcall(func, self, unit, scratchpad, range_squared, t)
 
 				scratchpad.fire_action_input = fire_action_input
+				if not call_ok then
+					error(may_fire, 0)
+				end
 				if not may_fire then
 					_weapon_action_shoot.log_plasma_may_fire_block(scratchpad, range_squared, t)
 				end
@@ -806,6 +815,9 @@ function M.register_hooks(deps)
 				PlayerUnitVisualLoadout,
 				"wield_slot",
 				function(func, slot_to_wield, player_unit, t, skip_wield_action)
+					if _is_enabled and not _is_enabled() then
+						return func(slot_to_wield, player_unit, t, skip_wield_action)
+					end
 					local perf_t0 = _perf and _perf.begin()
 					local should_lock, ability_name, lock_reason, slot_to_keep = should_lock_weapon_switch(player_unit)
 					if should_lock then

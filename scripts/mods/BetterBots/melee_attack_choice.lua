@@ -5,7 +5,9 @@ local M = {}
 local _mod
 local _debug_log
 local _debug_enabled
-local _fixed_time
+local _fixed_time = function()
+	return 0
+end
 local _armored_type
 local _super_armor_type
 local _armor
@@ -849,7 +851,7 @@ function M.init(deps)
 	_mod = deps.mod
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
-	_fixed_time = deps.fixed_time
+	_fixed_time = deps.fixed_time or _fixed_time
 	_armored_type = deps.ARMOR_TYPE_ARMORED
 	_super_armor_type = deps.ARMOR_TYPE_SUPER_ARMOR
 	_is_enabled = deps.is_enabled

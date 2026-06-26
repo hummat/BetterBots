@@ -1,4 +1,5 @@
 local _is_testing_profile
+local _is_daemonhost_avoidance_enabled
 local _context_module
 local _veteran_module
 local _is_monster_signal_allowed
@@ -93,6 +94,18 @@ local function _testing_profile_can_override_rule(rule)
 end
 
 local function _apply_behavior_profile(can_activate, rule, context, opts)
+	-- Direct dormant-daemonhost targets: abilities must never fire on (or at)
+	-- a sleeping daemonhost. The grenade paths carry their own duplicated
+	-- gates because they run outside this dispatcher.
+	if
+		context
+		and context.target_is_dormant_daemonhost
+		and _is_daemonhost_avoidance_enabled
+		and _is_daemonhost_avoidance_enabled()
+	then
+		return false, "daemonhost_dormant_target"
+	end
+
 	if
 		context
 		and context.target_is_near_dormant_daemonhost
@@ -398,6 +411,9 @@ return {
 		_debug_enabled = deps.debug_enabled
 		_resolve_decision_cache = deps.resolve_decision_cache or {}
 		_resolve_decision_cache_hits_logged = deps.resolve_decision_cache_hits_logged or {}
+		_is_daemonhost_avoidance_enabled = deps.is_daemonhost_avoidance_enabled or function()
+			return true
+		end
 
 		_context_module.init({
 			fixed_time = deps.fixed_time,
@@ -421,6 +437,13 @@ return {
 
 		if deps.ogryn_module.init then
 			deps.ogryn_module.init({
+				debug_log = deps.debug_log,
+				debug_enabled = deps.debug_enabled,
+			})
+		end
+
+		if deps.zealot_module.init then
+			deps.zealot_module.init({
 				debug_log = deps.debug_log,
 				debug_enabled = deps.debug_enabled,
 			})

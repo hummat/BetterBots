@@ -38,6 +38,10 @@ function M.action_input_is_bot_queueable(
 		return true
 	end
 
+	if not ability_extension then
+		return false
+	end
+
 	return ability_extension:action_input_is_currently_valid(ability_component_name, action_input, used_input, fixed_t)
 end
 

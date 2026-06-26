@@ -1028,6 +1028,109 @@ describe("weapon_action", function()
 		assert.is_truthy(find_debug_log("shoot scratchpad normalization skipped"))
 	end)
 
+	it("reports ADS confirmation through debug_log, not screen echo", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				return true
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		rawset(_G, "require", saved_require)
+
+		BtBotShootAction._start_aiming({}, 12, { ranged_gestalt = "burst" })
+
+		assert.equals(0, #_echoes, "ADS confirmation must not echo to screen")
+		assert.is_truthy(find_debug_log("ADS confirmed"))
+	end)
+
+	it("restores fire_action_input when vanilla _may_fire raises mid-swap", function()
+		local saved_require = require
+		local BtBotShootAction = {
+			enter = function() end,
+			_start_aiming = function() end,
+			_may_fire = function()
+				error("vanilla may_fire exploded")
+			end,
+		}
+		local scratchpad = {
+			aiming_shot = true,
+			fire_action_input = "shoot_pressed",
+			aim_fire_action_input = "shoot_charged",
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_shoot_action"] = BtBotShootAction,
+			}),
+		})
+
+		rawset(_G, "require", function(path)
+			if path == "scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout" then
+				return {
+					wielded_weapon_template = function()
+						return nil
+					end,
+				}
+			end
+
+			return saved_require(path)
+		end)
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return false
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		rawset(_G, "require", saved_require)
+
+		local ok = pcall(BtBotShootAction._may_fire, {}, "bot_1", scratchpad, 100, 12)
+
+		assert.is_false(ok, "error must still propagate")
+		assert.equals("shoot_pressed", scratchpad.fire_action_input, "swap must be restored on error")
+	end)
+
 	it("logs a plasma _may_fire block reason when shoot selection never queues a shot", function()
 		local saved_require = require
 		local BtBotShootAction = {
@@ -3543,7 +3646,7 @@ describe("weapon_action", function()
 
 		rawset(_G, "require", saved_require)
 
-		assert.is_truthy(find_echo("bot ADS confirmed"))
+		assert.equals(1, count_debug_logs("bot ADS confirmed"))
 	end)
 
 	it("suppresses stale aim inputs when the live weapon no longer supports aiming", function()
@@ -3887,5 +3990,41 @@ describe("weapon_action", function()
 		PlayerUnitVisualLoadout.wield_slot("slot_secondary", "bot_1", 0, false)
 
 		assert.equals("slot_combat_ability", wielded_slot)
+	end)
+
+	it("does not redirect wield_slot when the feature is disabled", function()
+		local wielded_slot
+		local PlayerUnitVisualLoadout = {
+			wield_slot = function(slot_to_wield)
+				wielded_slot = slot_to_wield
+				return slot_to_wield
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout"] = PlayerUnitVisualLoadout,
+			}),
+			is_enabled = function()
+				return false
+			end,
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return true, "zealot_relic", "sequence", "slot_combat_ability"
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		PlayerUnitVisualLoadout.wield_slot("slot_secondary", "bot_1", 0, false)
+
+		assert.equals("slot_secondary", wielded_slot, "disabled feature must not redirect wields")
 	end)
 end)

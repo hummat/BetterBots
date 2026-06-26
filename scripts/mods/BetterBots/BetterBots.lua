@@ -1063,15 +1063,18 @@ mod:command("bb_reset", "Reset all BetterBots settings to their default values",
 
 	-- Always attempt to persist, even on partial failure — keeping the successful
 	-- resets on disk is better than losing them alongside the failed ones.
+	local save_ok = true
 	local dmf_module = rawget(_G, "dmf")
 	if type(dmf_module) == "table" and type(dmf_module.save_unsaved_settings_to_file) == "function" then
-		pcall(function()
+		save_ok = pcall(function()
 			dmf_module.save_unsaved_settings_to_file()
 		end)
 	end
 
-	if #failures == 0 then
+	if #failures == 0 and save_ok then
 		mod:echo("BetterBots: all settings reset to defaults")
+	elseif #failures == 0 then
+		mod:echo("BetterBots: settings reset to defaults, but saving to disk failed — they may revert next launch")
 	else
 		mod:echo("BetterBots: reset partially failed: " .. table.concat(failures, ", "))
 	end

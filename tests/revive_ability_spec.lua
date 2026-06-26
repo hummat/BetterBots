@@ -573,6 +573,29 @@ describe("revive_ability", function()
 			assert.equals(3, evt.enemies)
 		end)
 
+		it("emits event log without erroring when Debug lacks bot_slot_for_unit", function()
+			ReviveAbility.wire({
+				MetaData = { inject = function() end },
+				EventLog = {
+					is_enabled = function()
+						return true
+					end,
+					emit = function(evt)
+						_event_log_events[#_event_log_events + 1] = evt
+					end,
+				},
+				Debug = {},
+				is_combat_template_enabled = function()
+					return true
+				end,
+			})
+
+			ReviveAbility.try_pre_revive(unit, blackboard, { interaction_type = "rescue" })
+
+			assert.equals(1, #_event_log_events)
+			assert.is_nil(_event_log_events[1].bot)
+		end)
+
 		it("logs revive candidates before interact enter for defensive revive templates", function()
 			setup_unit(unit, "veteran_combat_ability", true, 1, nil, {
 				combat_ability_name = "veteran_combat_ability_shout",

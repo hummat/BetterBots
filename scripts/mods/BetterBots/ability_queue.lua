@@ -209,8 +209,10 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		local suppressed, suppress_reason = _is_suppressed(unit)
 		if suppressed and suppress_reason == "daemonhost_nearby" then
 			local action_input_extension = state.action_input_extension
-				or ScriptUnit.extension(unit, "action_input_system")
-			_clear_combat_ability_queue(action_input_extension, ability_component_name)
+				or ScriptUnit.has_extension(unit, "action_input_system")
+			if action_input_extension then
+				_clear_combat_ability_queue(action_input_extension, ability_component_name)
+			end
 			_clear_active_state(state)
 			state.next_try_t = fixed_t + 1.5
 			if _debug_enabled() then
@@ -226,8 +228,10 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		if fixed_t >= state.hold_until then
 			if state.wait_action_input and not state.wait_sent then
 				local action_input_extension = state.action_input_extension
-					or ScriptUnit.extension(unit, "action_input_system")
-				action_input_extension:bot_queue_action_input(ability_component_name, state.wait_action_input, nil)
+					or ScriptUnit.has_extension(unit, "action_input_system")
+				if action_input_extension then
+					action_input_extension:bot_queue_action_input(ability_component_name, state.wait_action_input, nil)
+				end
 				state.wait_sent = true
 			end
 
@@ -264,7 +268,17 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 		return
 	end
 
-	local action_input_extension = state.action_input_extension or ScriptUnit.extension(unit, "action_input_system")
+	local action_input_extension = state.action_input_extension or ScriptUnit.has_extension(unit, "action_input_system")
+	if not action_input_extension then
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_no_action_input_ext:" .. tostring(unit),
+				fixed_t,
+				"fallback ability skipped (no action_input_system extension)"
+			)
+		end
+		return
+	end
 	local used_input = activation_data.used_input
 	local validation_t0 = _perf and _perf.begin() or nil
 	local action_input_is_valid = _action_input_is_bot_queueable(

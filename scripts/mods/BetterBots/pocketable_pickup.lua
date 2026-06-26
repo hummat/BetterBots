@@ -376,8 +376,13 @@ local function _desired_action(unit, blackboard)
 		and not context.target_enemy
 
 	-- Command-wheel resource requests are team-wide; if multiple bots carry the
-	-- matching crate, all of them may respond during the request window.
-	if entry.kind == "medical_crate" and explicit_health_request then
+	-- matching crate, all of them may respond during the request window. The
+	-- explicit path skips the coherency minimum (the player asked for it) but
+	-- still requires combat safety: the wield+place sequence leaves the bot
+	-- defenseless for seconds, so never start it with enemies present.
+	local safe_for_explicit_deploy = context and context.num_nearby == 0 and not context.target_enemy
+
+	if entry.kind == "medical_crate" and explicit_health_request and safe_for_explicit_deploy then
 		return {
 			pickup_name = pickup_name,
 			slot_name = slot_name,
@@ -386,7 +391,7 @@ local function _desired_action(unit, blackboard)
 		}
 	end
 
-	if entry.kind == "ammo_crate" and explicit_ammo_request then
+	if entry.kind == "ammo_crate" and explicit_ammo_request and safe_for_explicit_deploy then
 		return {
 			pickup_name = pickup_name,
 			slot_name = slot_name,

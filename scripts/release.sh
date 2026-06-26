@@ -24,6 +24,11 @@ if [[ -z "$VERSION_ARG" ]]; then
   exit 2
 fi
 
+if [[ ! "$VERSION_ARG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "VERSION must be X.Y.Z (got: '$VERSION_ARG')" >&2
+  exit 2
+fi
+
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required command: $1" >&2
@@ -88,6 +93,11 @@ for _ in $(seq 1 12); do
   fi
   sleep 5
 done
+
+if ! release_exists; then
+  echo "CI did not create release $TAG within timeout. Check the release workflow, then re-run." >&2
+  exit 2
+fi
 
 echo "Waiting for $PACKAGE_ASSET from CI..."
 for _ in $(seq 1 24); do
