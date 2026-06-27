@@ -14,6 +14,8 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 
 ## Completed validation queues
 
+**v1.2.2 release-candidate validation (2026-06-27)**: airgpu Windows 11 cold-launch run with the staged full test bundle confirmed the v1.2.2 pocketable safe-hook fix under SoloPlay + Tertium setup. The copied log `console-2026-06-27-15.03.17-28b4576c-7ef4-4e68-94a3-7db109049ce4.log` has `BetterBots loaded`, zero `safe_hook`, zero `bad argument #1 to '__index'`, zero `pocketable_pickup.lua:110`, zero `[MOD][BetterBots][ERROR]`, and zero `Script Error` matches. `pocketable_pickup` ran `28584` calls (`202 ms total`) and the run logged `assigned proactive mule pickup for syringe_power_boost_pocketable` followed by `mule pickup success: syringe_power_boost_pocketable (bot=2)`.
+
 **v1.0.0 validation (Sprints 1-6)**: all sprint validation items are closed. See `docs/dev/status.md` for per-issue evidence.
 
 **Post-v1.0 validation (2026-04-29 / 2026-05-02)**: #17, #96, #100, #106, #107, #108 all closed with live log evidence. See `docs/dev/status.md` "Post-v1.0 validation" section.
@@ -72,6 +74,41 @@ Conclusion:
 ```
 
 ## Recorded Runs
+
+### Run 2026-06-27-v1.2.2-airgpu-pocketable-safe-hook
+
+```text
+Run ID: 2026-06-27-v1.2.2-airgpu-pocketable-safe-hook
+Date (local): 2026-06-27
+Date (UTC): 2026-06-27
+Git commit: 5ccc983 (v1.2.2-test.2, staged full test bundle)
+Log file: console-2026-06-27-15.03.17-28b4576c-7ef4-4e68-94a3-7db109049ce4.log
+Environment: airgpu Windows 11, SoloPlay + Tertium4Or5/Tertium6 setup from staged test bundle
+Bot lineup / abilities: mixed SoloPlay bot squad; log shows zealot_dash, psyker_overcharge_stance, ogryn_taunt_shout, zealot_fire_grenade, psyker_smite
+Map + difficulty: transit / mission_dm_rise segment; exact difficulty not recorded
+
+Regression checks:
+- fresh launch / startup load: PASS (`BetterBots loaded` at 15:03:23)
+- duplicate startup spam: no
+- old pocketable safe-hook spam: PASS
+  - `safe_hook`: 0
+  - `bad argument #1 to '__index'`: 0
+  - `pocketable_pickup.lua:110`: 0
+  - `[MOD][BetterBots][ERROR]`: 0
+- pocketable hot path: PASS
+  - perf report: `pocketable_pickup 202.000 ms total (28584 calls, 7.1 us/call)`
+  - pickup evidence: `assigned proactive mule pickup for syringe_power_boost_pocketable`; `mule pickup success: syringe_power_boost_pocketable (bot=2)`
+- ability/grenade smoke: PASS
+  - `fallback queued zealot_dash` x12, `charge consumed for zealot_targeted_dash_improved_double` x11
+  - `fallback queued psyker_overcharge_stance` x5, `charge consumed for psyker_overcharge_stance` x5
+  - `fallback queued ogryn_taunt_shout` x5, `charge consumed for ogryn_taunt_shout` x5
+  - `grenade external action confirmed for psyker_smite` x1
+  - `grenade charge consumed for zealot_fire_grenade` x3
+- Lua errors: no BetterBots traceback; unrelated engine/network `AdaptiveClockHandler` panic and shutdown PSO/resource warnings present
+
+Conclusion:
+- Promote v1.2.2 pocketable safe-hook fix to stable release.
+```
 
 ### Run 2026-05-02-daemonhost-hazard-smart-tag-closure
 
