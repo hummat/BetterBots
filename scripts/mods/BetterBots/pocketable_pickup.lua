@@ -108,13 +108,16 @@ local function _default_allied_units(unit)
 end
 
 local function _inventory_component(unit)
-	if unit and unit.inventory then
-		return unit.inventory
-	end
-
 	local unit_data_extension = _script_unit_has_extension and _script_unit_has_extension(unit, "unit_data_system")
 	if unit_data_extension and unit_data_extension.read_component then
 		return unit_data_extension:read_component("inventory")
+	end
+
+	local ok, inventory = pcall(function()
+		return unit and unit.inventory or nil
+	end)
+	if ok then
+		return inventory
 	end
 
 	return nil

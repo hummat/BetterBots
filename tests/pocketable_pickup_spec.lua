@@ -256,6 +256,35 @@ describe("pocketable_pickup", function()
 		assert.equals("bot_slot_full", reason)
 	end)
 
+	it("reads bot inventory from unit_data_system without indexing engine userdata fields", function()
+		local engine_unit = setmetatable({}, {
+			__index = function()
+				error("bad argument #1 to '__index' (Vector3 or Vector4 expected, got userdata)")
+			end,
+		})
+		unit = engine_unit
+		extension_map[unit] = extension_map.bot_unit
+		extension_map.bot_unit = nil
+		init_module()
+		inventory_component.slot_pocketable_small = "not_equipped"
+
+		human_units = {
+			{ inventory = { slot_pocketable_small = "stim_item" } },
+		}
+
+		local ok_call, allowed, reason = pcall(
+			PocketablePickup.should_allow_mule_pickup,
+			unit,
+			{ pickup_type = "syringe_corruption_pocketable" },
+			nil,
+			nil
+		)
+
+		assert.is_true(ok_call)
+		assert.is_true(allowed)
+		assert.is_nil(reason)
+	end)
+
 	it("does not block pickup orders for the supported corruption stim", function()
 		init_module()
 

@@ -69,6 +69,7 @@ Current status:
 - Add new shared builders to `tests/test_helper.lua` before spreading a new extension family across specs.
 - If production code reads a private engine field, the audit must record the exact file and line where that field exists.
 - If decompiled source does not prove a method/field exists, do not mock it. Get an in-game dump first.
+- Player inventory belongs behind `unit_data_system:read_component("inventory")`; do not mock or read a direct `unit.inventory` field on player/bot units. Lua `Unit` userdata can throw on arbitrary `__index` reads.
 - When mocking engine systems that have server-only initialization (e.g. `GroupSystem._bot_groups`), test both server and non-server paths if production code can reach both.
 - Audited shared builders in `tests/test_helper.lua` must reject unknown override keys at construction time. If a test needs a newly verified method, update this audit file and the builder allowlist in the same change.
 - `scripts/doc-check.sh` hard-fails on ad-hoc raw table literals for the audited `ScriptUnit` extension families above and for audited `Managers.state.extension:system(...)` doubles. Extend that check when a new audited family is added.
