@@ -14,7 +14,7 @@ local _grenade_aim
 local _equipped_grenade_ability
 local _normalize_grenade_context
 local _query_weapon_switch_lock
-local _grenade_charge_query_failure_logged
+local _grenade_charge_query_failure_logged = {}
 
 local DEFAULT_THROW_DELAY_S = 0.3
 local RETRY_COOLDOWN_S = 2.0

@@ -159,6 +159,20 @@ describe("heuristics", function()
 			assert.matches("daemonhost_nearby_target", rule)
 		end)
 
+		it("blocks activation when the target itself is a dormant daemonhost", function()
+			local ok, rule = evaluate(
+				T,
+				ctx({
+					target_enemy = "unit",
+					target_enemy_distance = 10,
+					target_is_elite_special = true,
+					target_is_dormant_daemonhost = true,
+				})
+			)
+			assert.is_false(ok)
+			assert.matches("daemonhost_dormant_target", rule)
+		end)
+
 		it("activates on combat gap close with multiple enemies", function()
 			local ok, rule = evaluate(
 				T,
@@ -267,6 +281,40 @@ describe("heuristics", function()
 	-- zealot_invisibility
 	describe("zealot_invisibility", function()
 		local T = "zealot_invisibility"
+
+		it("logs once when build-aware zealot heuristics receive a nil talents table", function()
+			local debug_logs = {}
+			local DiagnosticHeuristics = helper.load_split_heuristics({
+				combat_ability_identity = CombatAbilityIdentity,
+				debug_log = function(key, fixed_t, message)
+					debug_logs[#debug_logs + 1] = {
+						key = key,
+						fixed_t = fixed_t,
+						message = message,
+					}
+				end,
+				debug_enabled = function()
+					return true
+				end,
+			})
+			local first_context = ctx({ num_nearby = 1, health_pct = 0.20 })
+			local second_context = ctx({ num_nearby = 1, health_pct = 0.20 })
+
+			first_context.talents = nil
+			second_context.talents = nil
+
+			DiagnosticHeuristics.evaluate_heuristic(T, first_context)
+			DiagnosticHeuristics.evaluate_heuristic(T, second_context)
+
+			assert.equals(1, #debug_logs)
+			assert.equals("missing_talents_context:zealot", debug_logs[1].key)
+			assert.matches(
+				"zealot heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				debug_logs[1].message,
+				1,
+				true
+			)
+		end)
 
 		it("blocks with no enemies", function()
 			local ok, rule = evaluate(T, ctx({ num_nearby = 0 }))
@@ -2034,16 +2082,30 @@ describe("heuristics", function()
 		end)
 
 		describe("stimm_field", function()
-			it("activates unconditionally with ally interacting", function()
+			it("activates with ally interacting and 1 enemy", function()
 				local ok, rule = eval_item(
 					"broker_ability_stimm_field",
 					ctx({
 						ally_interacting = true,
 						allies_in_coherency = 1,
+						num_nearby = 1,
 					})
 				)
 				assert.is_true(ok)
 				assert.matches("stimm_protect_interactor", rule)
+			end)
+
+			it("holds with 0 enemies despite ally interacting", function()
+				local ok, rule = eval_item(
+					"broker_ability_stimm_field",
+					ctx({
+						ally_interacting = true,
+						allies_in_coherency = 1,
+						num_nearby = 0,
+					})
+				)
+				assert.is_false(ok)
+				assert.matches("stimm_hold", rule)
 			end)
 		end)
 

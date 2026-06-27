@@ -40,6 +40,20 @@ describe("shared_rules", function()
 		assert.is_true(ok)
 	end)
 
+	it("returns false instead of erroring when ability_extension is nil", function()
+		local ok = SharedRules.action_input_is_bot_queueable(
+			{},
+			nil,
+			"combat_ability_action",
+			"zealot_relic",
+			"channel",
+			nil,
+			0
+		)
+
+		assert.is_false(ok)
+	end)
+
 	it("treats unknown daemonhost state as non-aggroed", function()
 		local is_safe, aggro_state, stage = SharedRules.is_non_aggroed_daemonhost("daemonhost_1")
 

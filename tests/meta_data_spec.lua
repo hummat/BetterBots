@@ -26,6 +26,50 @@ describe("meta_data", function()
 	end)
 
 	describe("inject", function()
+		it("does not echo to screen when debug is disabled", function()
+			local mock_mod = make_mock_mod()
+			MetaData.init({
+				mod = mock_mod,
+				patched_ability_templates = {},
+				debug_log = noop_debug_log,
+				debug_enabled = function()
+					return false
+				end,
+				META_PATCH_VERSION = 1,
+			})
+
+			MetaData.inject({ zealot_dash = {} })
+
+			assert.equals(0, #mock_mod.messages, "inject must not echo with debug disabled")
+		end)
+
+		it("reports injections through debug_log when debug is enabled", function()
+			local mock_mod = make_mock_mod()
+			local debug_logs = {}
+			MetaData.init({
+				mod = mock_mod,
+				patched_ability_templates = {},
+				debug_log = function(key, _t, message)
+					debug_logs[#debug_logs + 1] = { key = key, message = message }
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				META_PATCH_VERSION = 1,
+			})
+
+			MetaData.inject({ zealot_dash = {} })
+
+			assert.equals(0, #mock_mod.messages, "inject must never echo to screen")
+			local found = false
+			for i = 1, #debug_logs do
+				if debug_logs[i].key:find("meta_data_injected:zealot_dash", 1, true) then
+					found = true
+				end
+			end
+			assert.is_true(found, "injection must be reported via debug_log")
+		end)
+
 		it("injects meta_data for tier 2 templates", function()
 			local templates = {
 				zealot_dash = {},

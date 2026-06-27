@@ -161,5 +161,48 @@ describe("event_log", function()
 			assert.is_nil(err)
 			assert.are.equal(0, #EventLog._get_buffer())
 		end)
+
+		it("warns instead of silently dropping events when io.open fails", function()
+			local warnings = {}
+			_G.Mods = {
+				lua = {
+					io = {
+						open = function()
+							return nil, "permission denied"
+						end,
+					},
+					os = {
+						execute = function() end,
+						time = function()
+							return 123
+						end,
+					},
+				},
+			}
+
+			EventLog._reset()
+			EventLog.init({
+				mod = {
+					warning = function(_, message)
+						warnings[#warnings + 1] = message
+					end,
+				},
+				context_snapshot = function(ctx)
+					return { num_nearby = ctx and ctx.num_nearby or 0 }
+				end,
+			})
+			EventLog.set_enabled(true)
+			EventLog.start_session(0)
+			EventLog.emit({ event = "test" })
+			EventLog.end_session()
+
+			local found = false
+			for i = 1, #warnings do
+				if warnings[i]:find("event_log", 1, true) and warnings[i]:find("open", 1, true) then
+					found = true
+				end
+			end
+			assert.is_true(found, "open failure must produce a warning, got: " .. table.concat(warnings, " | "))
+		end)
 	end)
 end)

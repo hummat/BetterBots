@@ -1,3 +1,7 @@
+local _debug_log
+local _debug_enabled
+local _missing_talents_context_logged = false
+
 local ZEALOT_DASH_THRESHOLDS = {
 	aggressive = {
 		low_toughness = 0.45,
@@ -34,7 +38,22 @@ local HARD_ALLY_AID_TYPES = {
 
 local function _has_talent(context, talent_name)
 	local talents = context and context.talents
-	return talents and talents[talent_name] ~= nil or false
+
+	if talents == nil then
+		if _debug_log and _debug_enabled and _debug_enabled() and not _missing_talents_context_logged then
+			_missing_talents_context_logged = true
+			_debug_log(
+				"missing_talents_context:zealot",
+				0,
+				"zealot heuristic context missing talents table; build-aware checks falling back to untuned defaults",
+				nil,
+				"debug"
+			)
+		end
+		return false
+	end
+
+	return talents[talent_name] ~= nil
 end
 
 local function _target_ally_needs_hard_aid(context)
@@ -199,6 +218,11 @@ local function _can_activate_zealot_relic(context, thresholds)
 end
 
 return {
+	init = function(deps)
+		_debug_log = deps and deps.debug_log or nil
+		_debug_enabled = deps and deps.debug_enabled or nil
+		_missing_talents_context_logged = false
+	end,
 	template_heuristics = {
 		zealot_dash = _can_activate_zealot_dash,
 		zealot_targeted_dash = _can_activate_zealot_dash,

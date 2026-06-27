@@ -80,6 +80,18 @@ describe("perf", function()
 		assert.is_nil(Perf.report_and_reset())
 	end)
 
+	it("accepts a pre-computed elapsed_s without a start clock", function()
+		_setting_enabled = true
+		Perf.enter_run()
+
+		Perf.mark_bot_frame()
+		Perf.finish("external_timing", nil, 0.0001)
+
+		local report = Perf.report_and_reset()
+		assert.is_not_nil(report)
+		assert.equals(100, math.floor(report.tags.external_timing.total_us + 0.5))
+	end)
+
 	it("records breakdown tags without inflating headline totals", function()
 		_setting_enabled = true
 		Perf.enter_run()

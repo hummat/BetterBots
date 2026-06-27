@@ -259,10 +259,11 @@ local function run_hooked_selection(opts)
 		target_ally = nil,
 	}
 	local invoke_count = opts.repeat_calls or 1
-	local side = {
-		aggroed_minion_target_units = { target_1 = true },
-		ai_target_units = { "target_1" },
-	}
+	local side = opts.side
+		or {
+			aggroed_minion_target_units = { target_1 = true },
+			ai_target_units = { "target_1" },
+		}
 
 	for _ = 1, invoke_count do
 		bot_perception_extension:_update_target_enemy("bot_1", { x = 0, y = 0, z = 0 }, perception_component, {
@@ -1483,5 +1484,27 @@ describe("target_type_hysteresis", function()
 		assert.is_truthy(log.message:find("bot 4", 1, true))
 		assert.is_truthy(log.message:find("wielded=slot_secondary", 1, true))
 		assert.is_truthy(log.message:find("wanted=slot_primary", 1, true))
+	end)
+
+	it("emits no hook-error warning when side.aggroed_minion_target_units is nil (dedicated-server client)", function()
+		local result = run_hooked_selection({
+			t = 1,
+			side = {
+				aggroed_minion_target_units = nil,
+				ai_target_units = { "target_1" },
+			},
+		})
+		assert.equals(0, #result.warnings)
+	end)
+
+	it("emits no hook-error warning when side.ai_target_units is nil (dedicated-server client)", function()
+		local result = run_hooked_selection({
+			t = 1,
+			side = {
+				aggroed_minion_target_units = { target_1 = true },
+				ai_target_units = nil,
+			},
+		})
+		assert.equals(0, #result.warnings)
 	end)
 end)

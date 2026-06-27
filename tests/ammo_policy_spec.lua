@@ -1150,6 +1150,179 @@ describe("ammo_policy", function()
 		assert.equals("small_grenade_pickup", bot_group._bot_data.bot1.ammo_pickup_order_unit)
 	end)
 
+	it("does not bind a grenade pickup another bot already reserved", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 0
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 1
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+						max_ability_charges = function(_, ability_type)
+							assert.equals("grenade_ability", ability_type)
+							return 2
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 3
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local bot_group = {
+			_bot_data = {
+				bot1 = {
+					ammo_pickup_order_unit = nil,
+				},
+				bot2 = {
+					ammo_pickup_order_unit = "small_grenade_pickup",
+					_bb_reserved_grenade_pickup = "small_grenade_pickup",
+				},
+			},
+			ammo_pickup_order_unit = function(self, unit)
+				return self._bot_data[unit].ammo_pickup_order_unit
+			end,
+		}
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = bot_group,
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.is_nil(self._pickup_component.ammo_pickup, "bot1 must not steal bot2's reserved pickup")
+		assert.is_nil(bot_group._bot_data.bot1.ammo_pickup_order_unit)
+	end)
+
+	it("ignores a stale reservation marker whose pickup order was already cleared", function()
+		install_module({
+			ammo_module = {
+				current_total_percentage = function()
+					return 0.90
+				end,
+				uses_ammo = function()
+					return true
+				end,
+			},
+			ability_extension = function(unit)
+				if unit == "bot1" then
+					return {
+						remaining_ability_charges = function()
+							return 0
+						end,
+						max_ability_charges = function()
+							return 1
+						end,
+					}
+				end
+
+				if unit == "human1" then
+					return {
+						remaining_ability_charges = function()
+							return 2
+						end,
+						max_ability_charges = function()
+							return 2
+						end,
+					}
+				end
+			end,
+			nearby_grenade_pickups = function(_, unit)
+				assert.equals("bot1", unit)
+				return "small_grenade_pickup", 3
+			end,
+			settings = {
+				bot_ranged_ammo_threshold = function()
+					return 0.20
+				end,
+				human_ammo_reserve_threshold = function()
+					return 0.80
+				end,
+				human_grenade_reserve_threshold = function()
+					return 1.0
+				end,
+			},
+		})
+
+		AmmoPolicy.install_behavior_ext_hooks({})
+		local bot_group = {
+			_bot_data = {
+				bot1 = {
+					ammo_pickup_order_unit = nil,
+				},
+				bot2 = {
+					-- Stale: marker left behind after the order was cleared
+					-- (e.g. vanilla cleared the order, or the bot died).
+					ammo_pickup_order_unit = nil,
+					_bb_reserved_grenade_pickup = "small_grenade_pickup",
+				},
+			},
+			ammo_pickup_order_unit = function(self, unit)
+				return self._bot_data[unit].ammo_pickup_order_unit
+			end,
+		}
+		local self = {
+			_side = { valid_human_units = { "human1" } },
+			_bot_group = bot_group,
+			_pickup_component = {
+				needs_ammo = false,
+				ammo_pickup = nil,
+				ammo_pickup_distance = math.huge,
+				ammo_pickup_valid_until = -math.huge,
+			},
+		}
+
+		update_hook(self, "bot1")
+
+		assert.equals(
+			"small_grenade_pickup",
+			self._pickup_component.ammo_pickup,
+			"a stale marker must not block the pickup forever"
+		)
+	end)
+
 	it("reserves tagged grenade pickup orders for eligible grenade bots", function()
 		local follow_component = {}
 		local pickup_component = {

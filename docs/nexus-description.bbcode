@@ -64,6 +64,15 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [size=3][b]Latest update[/b][/size]
 
+[b]v1.2.2[/b]
+
+[list]
+[*]Fixed the game-update safe-hook spam reported on Nexus when bot pocketable/resource pickup support was active. The failing path was the bot pocketable-pickup update, which could read engine userdata like an ordinary Lua table after Darktide 1.12.1.
+[*]Bots carrying med or ammo crates now answer [font=Courier New]Need Health[/font] / [font=Courier New]Need Ammo[/font] by dropping the matching crate when combat is quiet. If enemies are already close, they keep fighting instead of starting a vulnerable deploy sequence.
+[*]Hardened several hot paths around missing engine extensions, stale pickup/healing reservations, unsafe target-facing reads, and reload/packaging edge cases. Mostly boring work. Good.
+[*]Validated in a fresh Solo Play run after the fix: no BetterBots errors, no old safe-hook signature, and the pocketable-pickup path ran through a full mission segment without spamming the console.
+[/list]
+
 [b]v1.2.1[/b]
 
 [list]

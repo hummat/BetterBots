@@ -2308,6 +2308,15 @@ describe("startup regressions", function()
 		assert.is_nil(source:find("mod:save_unsaved_settings_to_file", 1))
 	end)
 
+	it("reports /bb_reset persistence failures instead of claiming success", function()
+		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
+		local source = assert(handle:read("*a"))
+		handle:close()
+
+		assert.is_truthy(source:find("local save_ok", 1, true))
+		assert.is_truthy(source:find("saving to disk failed", 1, true))
+	end)
+
 	it("refreshes human-likeness BotSettings patch when setting changes", function()
 		local handle = assert(io.open("scripts/mods/BetterBots/BetterBots.lua", "r"))
 		local source = assert(handle:read("*a"))

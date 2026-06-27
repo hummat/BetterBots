@@ -482,6 +482,180 @@ describe("healing_deferral", function()
 			assert.is_nil(HealingDeferral.reserved_health_station("bot2"))
 		end)
 
+		it("clears the interactor's reservation after a successful use of a multi-charge station", function()
+			local hook_handler
+			local health_by_unit = {
+				bot1 = 0.50,
+				bot2 = 0.50,
+			}
+			local permanent_health_by_unit = {
+				bot1 = 0.30,
+				bot2 = 0.30,
+			}
+			local damage_by_unit = {
+				bot1 = 50,
+				bot2 = 50,
+			}
+			local permanent_damage_by_unit = {
+				bot1 = 30,
+				bot2 = 30,
+			}
+			local charges_by_station = {
+				station1 = 2,
+			}
+			local saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "station1" and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return charges_by_station.station1
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return true
+						end
+					end,
+					hook = function(_, target, method_name, handler)
+						assert.equals("stop", method_name)
+						assert.is_table(target)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function(unit)
+						return health_by_unit[unit]
+					end,
+					permanent_damage_taken_percent = function(unit)
+						return permanent_health_by_unit[unit]
+					end,
+					damage_taken = function(unit)
+						return damage_by_unit[unit]
+					end,
+					permanent_damage_taken = function(unit)
+						return permanent_damage_by_unit[unit]
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot1", "station1"))
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot2", "station1"))
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function(_, _, interactor_unit)
+				health_by_unit[interactor_unit] = 1.0
+				permanent_health_by_unit[interactor_unit] = 0
+				damage_by_unit[interactor_unit] = 0
+				permanent_damage_by_unit[interactor_unit] = 0
+				charges_by_station.station1 = 1
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+			_G.ScriptUnit = saved_script_unit
+
+			assert.is_nil(
+				HealingDeferral.reserved_health_station("bot1"),
+				"healed interactor must release its reservation"
+			)
+			assert.equals("station1", HealingDeferral.reserved_health_station("bot2"))
+		end)
+
+		it("clears the interactor's reservation after a successful use even with debug disabled", function()
+			local hook_handler
+			local health_by_unit = { bot1 = 0.50 }
+			local charges_by_station = { station1 = 2 }
+			local saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "station1" and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return charges_by_station.station1
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return true
+						end
+					end,
+					hook = function(_, target, method_name, handler)
+						assert.equals("stop", method_name)
+						assert.is_table(target)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function(unit)
+						return health_by_unit[unit]
+					end,
+					permanent_damage_taken_percent = function()
+						return 0
+					end,
+					damage_taken = function()
+						return 0
+					end,
+					permanent_damage_taken = function()
+						return 0
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot1", "station1"))
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function(_, _, interactor_unit)
+				health_by_unit[interactor_unit] = 1.0
+				charges_by_station.station1 = 1
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+			_G.ScriptUnit = saved_script_unit
+
+			assert.is_nil(
+				HealingDeferral.reserved_health_station("bot1"),
+				"reservation cleanup must not depend on debug logging being enabled"
+			)
+		end)
+
 		it("does not log health-station stop details for non-bot interactors", function()
 			local hook_handler
 			local debug_logs = {}
@@ -568,6 +742,76 @@ describe("healing_deferral", function()
 				.. " damage=0.0->0.0 permanent_damage=0.0->0.0"
 				.. " charges=unknown->unknown duration=3.00s"
 			assert.equals(expected_log, debug_logs[1])
+		end)
+
+		it("clears the interactor's reservation after a successful no-op station use", function()
+			local hook_handler
+			local saved_script_unit = rawget(_G, "ScriptUnit")
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit == "station1" and system_name == "health_station_system" then
+						return {
+							charge_amount = function()
+								return 2
+							end,
+						}
+					end
+
+					return nil
+				end,
+			}
+			HealingDeferral.init({
+				mod = {
+					get = function(_, setting_id)
+						if setting_id == "healing_deferral_mode" then
+							return "stations_and_deployables"
+						end
+						if setting_id == "healing_deferral_require_station_tag" then
+							return true
+						end
+					end,
+					hook = function(_, _, _, handler)
+						hook_handler = handler
+					end,
+				},
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				health_module = {
+					current_health_percent = function()
+						return 0.5
+					end,
+					permanent_damage_taken_percent = function()
+						return 0
+					end,
+					damage_taken = function()
+						return 50
+					end,
+					permanent_damage_taken = function()
+						return 0
+					end,
+				},
+				bot_slot_for_unit = function(unit)
+					return unit == "bot1" and 5 or nil
+				end,
+			})
+			assert.is_true(HealingDeferral.reserve_tagged_health_station("bot1", "station1"))
+
+			local HealthStationInteraction = {}
+			HealingDeferral.install_interaction_hooks(HealthStationInteraction)
+			hook_handler(function()
+				return "engine_result"
+			end, {}, nil, "bot1", { target_unit = "station1", duration = 3 }, 20, "success", true)
+			_G.ScriptUnit = saved_script_unit
+
+			assert.is_nil(
+				HealingDeferral.reserved_health_station("bot1"),
+				"successful no-op interactions must still release the completed reservation"
+			)
 		end)
 
 		it("registers the health-station interaction hook through hook_require", function()

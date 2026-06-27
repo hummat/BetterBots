@@ -257,6 +257,47 @@ describe("weakspot_aim", function()
 			assert.equals("j_head", scratchpad.aim_at_node_charged)
 		end)
 
+		it("restores a nil vanilla baseline instead of leaking the override", function()
+			local breed_name = "renegade_executor"
+			install_minion_breed_mock(function()
+				return { name = breed_name }
+			end)
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+			}
+
+			local scratchpad = { aim_at_node = nil, aim_at_node_charged = nil }
+			WeakspotAim.apply_override("mauler_unit_a", scratchpad)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+
+			breed_name = "chaos_ogryn_gunner"
+			local node = WeakspotAim.apply_override("gunner_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.is_nil(scratchpad.aim_at_node, "must restore nil vanilla baseline, not leak j_spine")
+			assert.is_nil(scratchpad.aim_at_node_charged)
+		end)
+
+		it("skips the node lookup on a dead target instead of erroring", function()
+			install_minion_breed_mock({ name = "renegade_executor" })
+			_G.Unit = {
+				alive = function(unit)
+					return unit ~= "dead_unit"
+				end,
+				has_node = function()
+					error("node lookup on deleted unit")
+				end,
+			}
+
+			local scratchpad = { aim_at_node = "j_head", aim_at_node_charged = "j_head" }
+			local node = WeakspotAim.apply_override("dead_unit", scratchpad)
+
+			assert.is_nil(node)
+			assert.equals("j_head", scratchpad.aim_at_node)
+		end)
+
 		it("keeps override state isolated across bots with different targets", function()
 			local breeds_by_unit = {
 				mauler_unit = { name = "renegade_executor" },
@@ -378,6 +419,55 @@ describe("weakspot_aim", function()
 			}
 			local node = WeakspotAim.apply_override("target_unit", scratchpad)
 
+			assert.is_nil(node)
+			assert.equals("j_spine", scratchpad.aim_at_node)
+			assert.equals("j_spine", scratchpad.aim_at_node_charged)
+		end)
+
+		it("fails closed when target facing data cannot be read", function()
+			install_bulwark_math_globals()
+
+			local crusher_breed = { name = "chaos_ogryn_executor" }
+			local bad_forward = setmetatable({}, {
+				__index = function()
+					error("bad argument #1 to '__index' (Vector3 or Vector4 expected, got userdata)")
+				end,
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(unit, system_name)
+					if unit ~= "target_unit" then
+						return nil
+					end
+					if system_name == "unit_data_system" then
+						return test_helper.make_minion_unit_data_extension(crusher_breed)
+					end
+					return nil
+				end,
+			}
+			_G.Unit = {
+				has_node = function()
+					return true
+				end,
+				local_rotation = function()
+					return "opaque_rotation"
+				end,
+			}
+			_G.Quaternion.forward = function()
+				return bad_forward
+			end
+			_G.POSITION_LOOKUP = {
+				target_unit = vec(0, 0, 0),
+			}
+
+			local scratchpad = {
+				aim_at_node = "j_spine",
+				aim_at_node_charged = "j_spine",
+				first_person_component = { position = vec(0, -10, 0) },
+			}
+			local ok, node = pcall(WeakspotAim.apply_override, "target_unit", scratchpad)
+
+			assert.is_true(ok)
 			assert.is_nil(node)
 			assert.equals("j_spine", scratchpad.aim_at_node)
 			assert.equals("j_spine", scratchpad.aim_at_node_charged)

@@ -256,6 +256,35 @@ describe("pocketable_pickup", function()
 		assert.equals("bot_slot_full", reason)
 	end)
 
+	it("reads bot inventory from unit_data_system without indexing engine userdata fields", function()
+		local engine_unit = setmetatable({}, {
+			__index = function()
+				error("bad argument #1 to '__index' (Vector3 or Vector4 expected, got userdata)")
+			end,
+		})
+		unit = engine_unit
+		extension_map[unit] = extension_map.bot_unit
+		extension_map.bot_unit = nil
+		init_module()
+		inventory_component.slot_pocketable_small = "not_equipped"
+
+		human_units = {
+			{ inventory = { slot_pocketable_small = "stim_item" } },
+		}
+
+		local ok_call, allowed, reason = pcall(
+			PocketablePickup.should_allow_mule_pickup,
+			unit,
+			{ pickup_type = "syringe_corruption_pocketable" },
+			nil,
+			nil
+		)
+
+		assert.is_true(ok_call)
+		assert.is_true(allowed)
+		assert.is_nil(reason)
+	end)
+
 	it("does not block pickup orders for the supported corruption stim", function()
 		init_module()
 
@@ -500,7 +529,42 @@ describe("pocketable_pickup", function()
 		}, queued_inputs[1])
 	end)
 
-	it("deploys a carried medical crate immediately on explicit health request", function()
+	it("deploys a carried medical crate on explicit health request even below coherency minimum", function()
+		com_wheel = {
+			has_recent_health_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 0.95,
+				corruption_pct = 0,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			allies_in_coherency = 0,
+			target_enemy = nil,
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
+		assert.same({
+			component = "weapon_action",
+			input = "place",
+			raw_input = nil,
+		}, queued_inputs[1])
+	end)
+
+	it("holds a carried medical crate on explicit health request while enemies are nearby", function()
 		com_wheel = {
 			has_recent_health_request = function()
 				return true
@@ -528,6 +592,46 @@ describe("pocketable_pickup", function()
 
 		PocketablePickup.try_queue(unit, { perception = {} })
 
+		assert.equals(0, #queued_inputs)
+	end)
+
+	it("deploys a carried ammo crate on explicit ammo request even below coherency minimum", function()
+		com_wheel = {
+			has_recent_ammo_request = function()
+				return true
+			end,
+		}
+		init_module()
+
+		human_units = {
+			{
+				health_pct = 1,
+				uses_ammo = true,
+				ammo_pct = 0.95,
+				inventory = {
+					slot_pocketable = "crate_item",
+					slot_pocketable_small = "stim_item",
+				},
+			},
+		}
+		carried_templates.slot_pocketable = {
+			pickup_name = "ammo_cache_deployable",
+			swap_pickup_name = "ammo_cache_pocketable",
+			give_pickup_name = "ammo_cache_pocketable",
+			action_inputs = {
+				place = {},
+			},
+		}
+		build_context_result = test_helper.make_context({
+			num_nearby = 0,
+			allies_in_coherency = 0,
+			target_enemy = nil,
+		})
+		inventory_component.slot_pocketable_small = "not_equipped"
+		inventory_component.wielded_slot = "slot_pocketable"
+
+		PocketablePickup.try_queue(unit, { perception = {} })
+
 		assert.same({
 			component = "weapon_action",
 			input = "place",
@@ -535,7 +639,7 @@ describe("pocketable_pickup", function()
 		}, queued_inputs[1])
 	end)
 
-	it("deploys a carried ammo crate immediately on explicit ammo request", function()
+	it("holds a carried ammo crate on explicit ammo request while enemies are nearby", function()
 		com_wheel = {
 			has_recent_ammo_request = function()
 				return true
@@ -572,11 +676,7 @@ describe("pocketable_pickup", function()
 
 		PocketablePickup.try_queue(unit, { perception = {} })
 
-		assert.same({
-			component = "weapon_action",
-			input = "place",
-			raw_input = nil,
-		}, queued_inputs[1])
+		assert.equals(0, #queued_inputs)
 	end)
 
 	it("does not report success when the carried slot empties without a confirmed use transition", function()

@@ -42,8 +42,21 @@ local function _flush()
 	end
 
 	local ok, err = pcall(function()
-		local f = _io.open(_file_path, "a")
+		local f, open_err = _io.open(_file_path, "a")
 		if not f then
+			-- Buffer is still cleared below (bounded memory on persistent
+			-- failure), so make the data loss visible.
+			if _mod then
+				_mod:warning(
+					"BetterBots: event_log could not open "
+						.. tostring(_file_path)
+						.. " ("
+						.. tostring(open_err)
+						.. "); dropping "
+						.. #_buffer
+						.. " buffered events"
+				)
+			end
 			return
 		end
 

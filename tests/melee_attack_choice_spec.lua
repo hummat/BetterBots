@@ -585,6 +585,72 @@ describe("melee_attack_choice", function()
 		assert.equals(heavy_attack.max_range, chosen.max_range)
 	end)
 
+	it("wraps specials without erroring when init omits fixed_time", function()
+		local MeleeAttackChoice = load_module()
+		local choose_attack_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_attack_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return ARMORED
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+		})
+
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local light_attack = attack_meta({ arc = 0, penetrating = false })
+		local heavy_attack = attack_meta({
+			arc = 2,
+			penetrating = true,
+			action_inputs = {
+				{ action_input = "start_attack", timing = 0 },
+				{ action_input = "heavy_attack", timing = 0 },
+			},
+		})
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = {
+				name = "powersword_2h_p1_m2",
+				attack_meta_data = {
+					light_attack = light_attack,
+					heavy_attack = heavy_attack,
+				},
+			},
+			special_action_meta = {
+				action_input = "special_action",
+				chain_time = 0.65,
+				family = "powersword_2h",
+			},
+			inventory_slot_component = { special_active = false },
+			weapon_extension = {
+				action_input_is_currently_valid = function(_self, _id, action_input)
+					return action_input == "special_action"
+				end,
+			},
+		}
+
+		local chosen = choose_attack_handler(function()
+			error("original _choose_attack should not run")
+		end, nil, "target_unit", { tags = { elite = true } }, scratchpad)
+
+		assert.equals("special_action", chosen.action_inputs[1].action_input)
+	end)
+
 	it("resolves powersword_2h specials through enter when the template uses toggle_special", function()
 		local MeleeAttackChoice = load_module()
 		local enter_handler

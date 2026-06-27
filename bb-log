@@ -12,11 +12,12 @@ require_jq() {
     fi
 }
 
-LOG_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs"
+# Machine-specific defaults; override via BB_LOG_DIR / BB_EVENTS_DIR.
+LOG_DIR="${BB_LOG_DIR:-/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/compatdata/1361210/pfx/drive_c/users/steamuser/AppData/Roaming/Fatshark/Darktide/console_logs}"
 ERROR_LINE_PATTERN="<<Script Error>>|<<Lua Stack>>|<<Crash>>|\[Script Error\]|\[ERROR\]|Lua Stack:"
 BB_WARNING_PATTERN="\[MOD\]\[BetterBots\]\[WARNING\]"
 
-EVENTS_DIR="/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/common/Warhammer 40,000 DARKTIDE/binaries/dump"
+EVENTS_DIR="${BB_EVENTS_DIR:-/run/media/matthias/58ACC87DACC856E2/Program Files (x86)/Steam/steamapps/common/Warhammer 40,000 DARKTIDE/binaries/dump}"
 
 get_events_file() {
     local idx="${1:-0}"

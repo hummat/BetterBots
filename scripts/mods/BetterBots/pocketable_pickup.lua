@@ -108,13 +108,16 @@ local function _default_allied_units(unit)
 end
 
 local function _inventory_component(unit)
-	if unit and unit.inventory then
-		return unit.inventory
-	end
-
 	local unit_data_extension = _script_unit_has_extension and _script_unit_has_extension(unit, "unit_data_system")
 	if unit_data_extension and unit_data_extension.read_component then
 		return unit_data_extension:read_component("inventory")
+	end
+
+	local ok, inventory = pcall(function()
+		return unit and unit.inventory or nil
+	end)
+	if ok then
+		return inventory
 	end
 
 	return nil
@@ -376,8 +379,13 @@ local function _desired_action(unit, blackboard)
 		and not context.target_enemy
 
 	-- Command-wheel resource requests are team-wide; if multiple bots carry the
-	-- matching crate, all of them may respond during the request window.
-	if entry.kind == "medical_crate" and explicit_health_request then
+	-- matching crate, all of them may respond during the request window. The
+	-- explicit path skips the coherency minimum (the player asked for it) but
+	-- still requires combat safety: the wield+place sequence leaves the bot
+	-- defenseless for seconds, so never start it with enemies present.
+	local safe_for_explicit_deploy = context and context.num_nearby == 0 and not context.target_enemy
+
+	if entry.kind == "medical_crate" and explicit_health_request and safe_for_explicit_deploy then
 		return {
 			pickup_name = pickup_name,
 			slot_name = slot_name,
@@ -386,7 +394,7 @@ local function _desired_action(unit, blackboard)
 		}
 	end
 
-	if entry.kind == "ammo_crate" and explicit_ammo_request then
+	if entry.kind == "ammo_crate" and explicit_ammo_request and safe_for_explicit_deploy then
 		return {
 			pickup_name = pickup_name,
 			slot_name = slot_name,

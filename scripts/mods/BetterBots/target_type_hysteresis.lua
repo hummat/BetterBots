@@ -343,7 +343,7 @@ local function _collect_stabilized_choice(
 )
 	local melee_gestalt = behavior_component.melee_gestalt
 	local ranged_gestalt = behavior_component.ranged_gestalt
-	local aggroed_minion_target_units = side.aggroed_minion_target_units
+	local aggroed_minion_target_units = side.aggroed_minion_target_units or {}
 	local target_ally = perception_component.target_ally
 	local vector3_distance_squared = Vector3.distance_squared
 	local position_lookup = POSITION_LOOKUP
@@ -764,7 +764,7 @@ function M.post_update_target_enemy(
 			side,
 			reevaluation_view,
 			behavior_component,
-			side.ai_target_units,
+			side.ai_target_units or {},
 			t,
 			self._threat_units,
 			bot_group,

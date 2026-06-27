@@ -82,7 +82,7 @@ function M.begin()
 end
 
 function M.finish(tag, start_clock, elapsed_s, opts)
-	if not (tag and start_clock) then
+	if not tag or (not start_clock and not elapsed_s) then
 		return
 	end
 

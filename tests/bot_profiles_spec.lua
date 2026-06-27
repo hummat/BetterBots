@@ -732,6 +732,95 @@ describe("bot_profiles", function()
 			assert.is_true(ok, err)
 		end)
 
+		it("gives same-class bots independent loadout_item_data tables", function()
+			local saved_require = require
+
+			local ok, err = pcall(function()
+				local fake_master_items = {
+					get_cached = function()
+						return {
+							zealot_primary = { id = "zealot_primary" },
+							zealot_secondary = { id = "zealot_secondary" },
+						}
+					end,
+					get_item_or_fallback = function(item_id)
+						return {
+							name = item_id,
+						}
+					end,
+					get_item_instance = function(gear)
+						return {
+							name = gear.masterDataInstance.id,
+							gear_id = gear.masterDataInstance.id,
+						}
+					end,
+				}
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return fake_master_items
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return {
+							parse_profile = function()
+								return true
+							end,
+						}
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return { zealot = { name = "zealot", breed = "human" } }
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return {
+							thunderhammer_2h_p1_m1 = { base_stats = {} },
+							bolter_p1_m1 = { base_stats = {} },
+						}
+					end
+
+					return saved_require(modname)
+				end)
+
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_slot_2_profile = "zealot"
+
+				local function make_stub()
+					return {
+						archetype = "veteran",
+						name_list_id = "veteran_names",
+						current_level = 1,
+						gender = "male",
+						selected_voice = "veteran_male_a",
+						visual_loadout = {},
+						loadout = {
+							slot_primary = "bot_combatsword_linesman_p1",
+							slot_secondary = "bot_lasgun_killshot",
+						},
+						loadout_item_ids = {},
+						loadout_item_data = {},
+						bot_gestalts = {},
+						talents = {},
+					}
+				end
+
+				local profile_a = make_stub()
+				local profile_b = make_stub()
+				local _, swapped_a = BotProfiles.resolve_profile(profile_a)
+				local _, swapped_b = BotProfiles.resolve_profile(profile_b)
+
+				assert.is_true(swapped_a)
+				assert.is_true(swapped_b)
+				assert.is_not_nil(profile_a.loadout_item_data.slot_primary)
+				assert.is_not_nil(profile_b.loadout_item_data.slot_primary)
+				assert.is_false(
+					rawequal(profile_a.loadout_item_data.slot_primary, profile_b.loadout_item_data.slot_primary),
+					"same-class bots must not share loadout_item_data tables"
+				)
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
 		it("synthesizes authored weapon and gadget overrides through MasterItems.get_item_instance", function()
 			local saved_require = require
 			local seen_gears = {}

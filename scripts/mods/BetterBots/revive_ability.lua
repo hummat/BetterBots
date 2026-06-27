@@ -861,7 +861,7 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 	end
 
 	if _EventLog and _EventLog.is_enabled() then
-		local bot_slot = _Debug and _Debug.bot_slot_for_unit(unit) or nil
+		local bot_slot = _Debug and _Debug.bot_slot_for_unit and _Debug.bot_slot_for_unit(unit) or nil
 		_EventLog.emit({
 			t = fixed_t,
 			event = "revive_ability",

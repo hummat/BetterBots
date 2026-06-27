@@ -6,6 +6,8 @@ None currently. `#17`, `#96`, `#100`, `#106`, `#107`, and `#108` are closed from
 
 ## High severity
 
+1. ~~Pocketable pickup safe-hook spam after Darktide 1.12.1~~ **Fixed in v1.2.2**. Nexus reports by skullsridge and MFL87 showed `[MOD][BetterBots][ERROR] (safe_hook): ...:110: bad argument #1 to '__index' (Vector3 or Vector4 expected, got userdata)`. Full callstacks pointed to `pocketable_pickup.lua:110` in `_inventory_component`, called every bot update through `try_queue`. The fix removes the direct `unit.inventory` read on engine userdata and uses the unit-data inventory component path instead. The 2026-06-27 airgpu validation log has zero old safe-hook signatures and `pocketable_pickup` ran `28584` times without reproducing the crash.
+
 1. ~~DMF `hook_require` clobbering~~ **Fixed in v0.9.1** (#67). The melee hooks now install through one consolidated `bt_bot_melee_action` hook, restoring both melee light bias and poxburster push behavior. `#54` and `#74` validated in the 2026-04-11 live run (full push chain at 16:33:12), so the related follow-ups are also closed.
 
 2. ~~Veteran bots replaced by wrong class~~ **Validated and closed** (#68). Run `0` (`console-2026-04-07-15.36.11-a46f7c58-38a2-401c-aefc-1e4e4dfcc9f5.log`) logged preserved external profiles with real `character_id` values for bot slots 1-4, confirming BetterBots yielded to Tertium/SoloPlay profiles instead of overwriting them.

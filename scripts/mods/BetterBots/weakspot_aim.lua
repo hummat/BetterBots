@@ -86,6 +86,25 @@ local function flat_normalized_xy(x, y)
 	return Vector3.normalize(vector)
 end
 
+local function vector_component(value, key)
+	if value == nil then
+		return nil
+	end
+
+	local ok, component = pcall(function()
+		return value[key]
+	end)
+	if not ok then
+		return nil
+	end
+
+	return component
+end
+
+local function vector_xy(value)
+	return vector_component(value, "x"), vector_component(value, "y")
+end
+
 local function target_forward_angle_to_bot(target_unit, scratchpad)
 	local target_position = POSITION_LOOKUP and POSITION_LOOKUP[target_unit] or nil
 	if
@@ -104,25 +123,44 @@ local function target_forward_angle_to_bot(target_unit, scratchpad)
 
 	local target_rotation = nil
 	if Unit.local_rotation then
-		target_rotation = Unit.local_rotation(target_unit, 1)
+		local ok, rotation = pcall(Unit.local_rotation, target_unit, 1)
+		if ok then
+			target_rotation = rotation
+		end
 	elseif Unit.world_rotation then
-		target_rotation = Unit.world_rotation(target_unit, 1)
+		local ok, rotation = pcall(Unit.world_rotation, target_unit, 1)
+		if ok then
+			target_rotation = rotation
+		end
 	end
-	local target_forward = target_rotation and Quaternion.forward(target_rotation)
+
+	local target_forward = nil
+	if target_rotation then
+		local ok, forward = pcall(Quaternion.forward, target_rotation)
+		if ok then
+			target_forward = forward
+		end
+	end
 	if not target_forward then
 		return nil
 	end
 
-	local target_forward_flat_normalized = flat_normalized_xy(target_forward.x or 0, target_forward.y or 0)
+	local target_forward_x, target_forward_y = vector_xy(target_forward)
+	if not (target_forward_x and target_forward_y) then
+		return nil
+	end
+	local target_forward_flat_normalized = flat_normalized_xy(target_forward_x, target_forward_y)
 	if not target_forward_flat_normalized then
 		return nil
 	end
 
 	local bot_position = scratchpad.first_person_component.position
-	local to_bot_flat_normalized = flat_normalized_xy(
-		(bot_position.x or 0) - (target_position.x or 0),
-		(bot_position.y or 0) - (target_position.y or 0)
-	)
+	local bot_x, bot_y = vector_xy(bot_position)
+	local target_x, target_y = vector_xy(target_position)
+	if not (bot_x and bot_y and target_x and target_y) then
+		return nil
+	end
+	local to_bot_flat_normalized = flat_normalized_xy(bot_x - target_x, bot_y - target_y)
 
 	if not to_bot_flat_normalized then
 		return nil
@@ -273,10 +311,12 @@ local function current_breed_name(target_unit, scratchpad)
 end
 
 local function restore_baseline(scratchpad)
-	local baseline = scratchpad.__bb_weakspot_baseline_aim_at_node
-	if baseline == nil then
+	-- Keyed on the captured flag, not the captured value: a nil vanilla
+	-- baseline is legitimate and must be restored as nil, not skipped.
+	if not scratchpad.__bb_weakspot_baseline_captured then
 		return
 	end
+	local baseline = scratchpad.__bb_weakspot_baseline_aim_at_node
 	if scratchpad.aim_at_node ~= baseline then
 		scratchpad.aim_at_node = baseline
 	end
@@ -297,6 +337,9 @@ function M.apply_override(target_unit, scratchpad, self_unit)
 	end
 	local breed_name = current_breed_name(target_unit, scratchpad)
 	local override = resolve_override(target_unit, scratchpad, breed_name)
+	if override and Unit and Unit.alive and not Unit.alive(target_unit) then
+		override = nil
+	end
 	if override and Unit and Unit.has_node and not Unit.has_node(target_unit, override) then
 		log_missing_override_node_once(breed_name, override)
 		override = nil
