@@ -151,6 +151,13 @@ Expected evidence:
 
 - `grenade queued wield`, `grenade queued aim_hold`, `grenade releasing`, and
   `charge consumed for <grenade_or_blitz>`.
+- When ability and grenade requests collide, one path defers with
+  `fallback ability blocked: grenade sequence active`, `BT enter blocked ...
+  grenade sequence active`, or `grenade blocked: combat ability active`;
+  the deferred action may proceed after the owned slot is released.
+- Catapult, ledge, disabled, and interaction transitions can log
+  `released weapon lock for forced slot_unarmed` and must complete without an
+  `animation_event failed` crash.
 - Aim diagnostics such as `grenade aim ballistic` or flat/direct aim.
 - Holds that match context, such as `grenade_krak_hold`,
   `grenade_fire_hold`, `grenade_smite_hold`, or peril/melee/no-LOS blocks.

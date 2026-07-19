@@ -27,16 +27,17 @@ This mod targets bot ability activation in three paths:
    - template fallback: queue ability action input directly on `combat_ability_action`
    - item fallback: queue explicit `weapon_action` sequence (`combat_ability` wield + cast follow-ups + unwind)
    - item sequence selection is profile-driven (shared profile catalog + per-ability priority order)
+   - combat abilities and grenade/blitz sequences are mutually exclusive: new combat activations defer while a grenade sequence owns the slot, while active or just-queued combat activations prevent grenade fallback from starting in the same input-parser window
 5. Tracks charge consumption + state-transition recovery:
    - `charge_tracker.lua` wraps `PlayerUnitAbilityExtension.use_ability_charge` for bot-only consumed events, semantic-key routing, team-cooldown recording, and grenade/item fallback completion
    - hook `ActionCharacterStateChange.finish`
    - if bot combat ability did not reach wanted character state, schedule a fast fallback retry
-6. Adds queue-level weapon-switch protection for item abilities (via `weapon_action.lua`):
+6. Adds queue-level weapon-switch protection for item and grenade abilities (via `weapon_action.lua`):
    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`
-   - block bot `weapon_action:wield` while protected item abilities are active/in-sequence
-7. Adds `wield_slot` redirect for item abilities (via `weapon_action.lua`):
-   - redirects non-combat-ability wield calls back to `slot_combat_ability` during item sequences (prevents cancel loop)
-   - exempts pending/active interactions so relic slot locking cannot override `slot_unarmed` on interaction entry
+   - block bot `weapon_action:wield` while protected item or grenade abilities are active/in-sequence
+7. Adds `wield_slot` redirect for protected ability sequences (via `weapon_action.lua`):
+   - redirects conflicting wield calls back to the slot owned by the active item or grenade sequence (prevents cancel loops)
+   - always permits the engine's forced `slot_unarmed` transition for interactions and disruptive character states such as catapulted, ledge, or disabled; animation events otherwise run against the stale ability/grenade state machine and can crash
 8. Guards against overheat crash (via `weapon_action.lua`):
    - prevents crash when bots wield plasma guns with nested threshold config
 9. Guards against perils achievement crash (via `weapon_action.lua`):

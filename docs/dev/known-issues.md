@@ -2,9 +2,11 @@
 
 ## Current post-release validation gates
 
-None currently. `#17`, `#96`, `#100`, `#106`, `#107`, and `#108` are closed from the April 29 / May 2 post-v1 validation logs.
+The v1.2.3 animation-slot fix still needs the mandatory cold-boot checks in both mod load orders. The unit and startup regression suites cover the reported coordination failures, but only an in-game run can verify the Ogryn animation state machines.
 
 ## High severity
+
+1. ~~Ogryn animation-event crashes when grenade use overlaps a combat ability or disruptive state~~ **Fixed for v1.2.3; in-game validation pending.** Two Nexus logs showed invalid events on Ogryn grenade state machines: `airtime_bwd` after a Poxburster catapulted a Rock-using bot, and `mid_reload_finished` when Gunlugger stance overlapped the grenade slot. BetterBots kept the grenade slot locked while the engine tried to force `slot_unarmed` or enter the combat ability, so the next event reached the wrong animation state machine. The fix releases the lock for forced unarmed transitions and prevents combat abilities and grenade sequences from entering the same input-parser window.
 
 1. ~~Pocketable pickup safe-hook spam after Darktide 1.12.1~~ **Fixed in v1.2.2**. Nexus reports by skullsridge and MFL87 showed `[MOD][BetterBots][ERROR] (safe_hook): ...:110: bad argument #1 to '__index' (Vector3 or Vector4 expected, got userdata)`. Full callstacks pointed to `pocketable_pickup.lua:110` in `_inventory_component`, called every bot update through `try_queue`. The fix removes the direct `unit.inventory` read on engine userdata and uses the unit-data inventory component path instead. The 2026-06-27 airgpu validation log has zero old safe-hook signatures and `pocketable_pickup` ran `28584` times without reproducing the crash.
 

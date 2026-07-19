@@ -121,6 +121,10 @@ tail -f "<path>/console_logs/console-*.log" | grep --line-buffered "BetterBots\|
 | `grenade pickup success` | Actual pickup interaction completed and bot grenade charges increased |
 | `grenade blocked during <stage> by <ability> <reason>` | Grenade fallback hit the shared BetterBots slot-lock fast retry instead of idling into a wield timeout |
 | `grenade deferred during active weapon charge` | Grenade fallback saw a non-grenade charged weapon action in progress and skipped starting a new grenade/blitz sequence for that tick |
+| `grenade blocked: combat ability active` | Grenade fallback deferred a new grenade/blitz because a combat ability is active or was queued in the same input-parser window |
+| `fallback ability blocked: grenade sequence active for <grenade>` | The template fallback deferred a new combat ability until the current grenade/blitz sequence releases its weapon slot |
+| `BT enter blocked <ability> (grenade sequence active for <grenade>)` | The vanilla BT ability path deferred a combat ability for the same grenade-slot exclusion rule |
+| `released weapon lock for forced slot_unarmed during <ability>` | An interaction or disruptive character state forced the bot unarmed; BetterBots released its item/grenade slot lock so the engine animation event runs on the correct state machine |
 | `grenade held <grenade> (rule=*_block_recent_use` | Non-explosive reuse pacing suppressed a second fire/smoke-style grenade too soon after the last confirmed spend |
 | `fallback item blocked <ability> (slot locked by <ability> <reason>)` | Item fallback hit the same shared slot-lock fast retry path |
 | `blackboard utility unavailable; mule pickup destination refresh skipped` / `blackboard utility unavailable; grenade pickup order refresh skipped` | BetterBots could not load the blackboard helper for an explicit pickup order; reservation metadata still ran, but immediate destination refresh became a no-op for that session |

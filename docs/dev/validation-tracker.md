@@ -11,6 +11,13 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 3. Tier 3 item-ability fallback validation (`#3`)
 4. Regression sanity checks (revive/rescue/navigation/basic combat)
 5. Post-v1.1.0 `needs-testing` issues: #8, #13, #43, #56, #88, #92, #97, #101
+6. v1.2.3 Ogryn animation-slot regression: cold boot with BetterBots first and last in the mod order; exercise a Rock/grenade Ogryn with Gunlugger stance and a Poxburster catapult; require zero `animation_event failed`, `airtime_bwd`, `mid_reload_finished`, Lua errors, or crash lines
+
+Expected v1.2.3 coordination markers when the collision paths occur:
+
+- `fallback ability blocked: grenade sequence active for <grenade>` or `BT enter blocked <ability> (grenade sequence active for <grenade>)`
+- `released weapon lock for forced slot_unarmed during <ability>` when an interaction, catapult, ledge, or disabled state interrupts an owned ability/grenade slot
+- normal grenade and combat-ability activation after the conflicting sequence finishes
 
 ## Completed validation queues
 

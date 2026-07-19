@@ -3992,6 +3992,39 @@ describe("weapon_action", function()
 		assert.equals("slot_combat_ability", wielded_slot)
 	end)
 
+	it("allows forced slot_unarmed while a weapon switch lock is active", function()
+		local wielded_slot
+		local PlayerUnitVisualLoadout = {
+			wield_slot = function(slot_to_wield)
+				wielded_slot = slot_to_wield
+				return slot_to_wield
+			end,
+		}
+
+		reset({
+			mod = make_hooking_mod({
+				["scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout"] = PlayerUnitVisualLoadout,
+			}),
+		})
+
+		WeaponAction.register_hooks({
+			should_lock_weapon_switch = function()
+				return true, "ogryn_grenade_friend_rock", "sequence", "slot_grenade_ability"
+			end,
+			should_block_wield_input = function()
+				return false
+			end,
+			should_block_weapon_action_input = function()
+				return false
+			end,
+			observe_queued_weapon_action = function() end,
+		})
+
+		PlayerUnitVisualLoadout.wield_slot("slot_unarmed", "bot_1", 0, false)
+
+		assert.equals("slot_unarmed", wielded_slot)
+	end)
+
 	it("does not redirect wield_slot when the feature is disabled", function()
 		local wielded_slot
 		local PlayerUnitVisualLoadout = {

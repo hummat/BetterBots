@@ -821,6 +821,25 @@ function M.register_hooks(deps)
 					local perf_t0 = _perf and _perf.begin()
 					local should_lock, ability_name, lock_reason, slot_to_keep = should_lock_weapon_switch(player_unit)
 					if should_lock then
+						-- Disruptive character states (catapulted, ledge, disabled)
+						-- explicitly wield slot_unarmed before emitting their animation
+						-- events. That engine transition must override any BetterBots
+						-- item/grenade lock or the event hits the wrong state machine.
+						if slot_to_wield == "slot_unarmed" then
+							if _debug_enabled() then
+								_debug_log(
+									"lock_wield_unarmed:" .. tostring(ability_name) .. ":" .. tostring(player_unit),
+									_fixed_time(),
+									"released weapon lock for forced slot_unarmed during " .. tostring(ability_name)
+								)
+							end
+							local result = func(slot_to_wield, player_unit, t, skip_wield_action)
+							if perf_t0 then
+								_perf.finish("weapon_action.wield_slot", perf_t0)
+							end
+							return result
+						end
+
 						slot_to_keep = slot_to_keep or "slot_combat_ability"
 						if slot_to_wield ~= slot_to_keep then
 							if _debug_enabled() then

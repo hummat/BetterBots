@@ -127,6 +127,154 @@ describe("ability_queue", function()
 	end)
 
 	describe("template fallback fast paths", function()
+		it("defers a new combat ability while a grenade sequence is active", function()
+			saved_script_unit = _G.ScriptUnit
+			saved_require = require
+
+			local decision_calls = 0
+			local queued_inputs = 0
+			local debug_messages = {}
+			local ability_extension = test_helper.make_player_ability_extension({
+				can_use_ability = function()
+					return true
+				end,
+				action_input_is_currently_valid = function()
+					return true
+				end,
+			})
+			local action_input_extension = test_helper.make_player_action_input_extension({
+				bot_queue_action_input = function()
+					queued_inputs = queued_inputs + 1
+				end,
+				action_input_parsers = {
+					combat_ability_action = {
+						_ACTION_INPUT_SEQUENCE_CONFIGS = {
+							ogryn_gunlugger_stance = {
+								stance_pressed = {},
+							},
+						},
+					},
+				},
+			})
+			local unit_data_extension = test_helper.make_player_unit_data_extension({
+				combat_ability_action = { template_name = "ogryn_gunlugger_stance" },
+			})
+
+			_G.ScriptUnit = {
+				has_extension = function(_, system_name)
+					if system_name == "unit_data_system" then
+						return unit_data_extension
+					end
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+				extension = function(_, system_name)
+					if system_name == "ability_system" then
+						return ability_extension
+					end
+					if system_name == "action_input_system" then
+						return action_input_extension
+					end
+					return nil
+				end,
+			}
+			rawset(_G, "require", function(path)
+				if path == "scripts/settings/ability/ability_templates/ability_templates" then
+					return {
+						ogryn_gunlugger_stance = {
+							ability_meta_data = {
+								activation = { action_input = "stance_pressed" },
+							},
+						},
+					}
+				end
+				if path == "scripts/extension_systems/behavior/utilities/conditions/bt_bot_conditions" then
+					return {}
+				end
+				return saved_require(path)
+			end)
+
+			AbilityQueue.init({
+				mod = { echo = function() end, dump = function() end },
+				debug_log = function(_, _, message)
+					debug_messages[#debug_messages + 1] = message
+				end,
+				debug_enabled = function()
+					return true
+				end,
+				fixed_time = function()
+					return 10
+				end,
+				equipped_combat_ability = function()
+					return ability_extension, { name = "ogryn_ranged_stance" }
+				end,
+				equipped_combat_ability_name = function()
+					return "ogryn_ranged_stance"
+				end,
+				is_suppressed = function()
+					return false
+				end,
+				fallback_state_by_unit = {},
+				fallback_queue_dumped_by_key = {},
+				DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 20,
+				shared_rules = SharedRules,
+			})
+			AbilityQueue.wire({
+				Heuristics = {
+					resolve_decision = function()
+						decision_calls = decision_calls + 1
+						return true, "ogryn_gunlugger_stance_close", { num_nearby = 3 }
+					end,
+				},
+				MetaData = { inject = function() end },
+				ItemFallback = {
+					try_queue_item = function() end,
+					reset_item_sequence_state = function() end,
+				},
+				Debug = {
+					bot_slot_for_unit = function()
+						return 1
+					end,
+					context_snapshot = function(context)
+						return context
+					end,
+					fallback_state_snapshot = function(state)
+						return state
+					end,
+				},
+				EventLog = {
+					is_enabled = function()
+						return false
+					end,
+				},
+				EngagementLeash = {
+					is_movement_ability = function()
+						return false
+					end,
+				},
+				is_combat_template_enabled = function()
+					return true
+				end,
+				is_grenade_sequence_active = function(unit)
+					return unit == "bot_unit", "ogryn_grenade_friend_rock"
+				end,
+			})
+
+			AbilityQueue.try_queue("bot_unit", {})
+
+			assert.equals(0, decision_calls)
+			assert.equals(0, queued_inputs)
+			assert.equals(
+				"fallback ability blocked: grenade sequence active for ogryn_grenade_friend_rock",
+				debug_messages[1]
+			)
+		end)
+
 		it("skips heuristic dispatch while combat ability is not usable", function()
 			saved_script_unit = _G.ScriptUnit
 			saved_require = require

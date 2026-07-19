@@ -34,6 +34,8 @@ local _super_armor_breed_flag_by_name = {}
 local _log_level = 0
 local _bot_settings
 local PERF_SETTING_ID = "enable_perf_timing"
+local COMBAT_ACTIVATION_PENDING_S = 0.25
+local _recent_bt_combat_activation_t_by_unit = setmetatable({}, { __mode = "k" })
 local Settings
 local Sprint
 local TIMING_SETTING_IDS = {
@@ -371,7 +373,26 @@ GrenadeFallback.wire({
 	evaluate_grenade_heuristic = Heuristics.evaluate_grenade_heuristic,
 	equipped_grenade_ability = _equipped_grenade_ability,
 	is_combat_ability_active = function(unit)
-		return (ItemFallback.should_lock_weapon_switch(unit))
+		local item_active, item_name = ItemFallback.should_lock_weapon_switch(unit)
+		if item_active then
+			return true, item_name
+		end
+
+		local fallback_state = _fallback_state_by_unit[unit]
+		if fallback_state and fallback_state.active then
+			return true, _equipped_combat_ability_name(unit)
+		end
+
+		local queued_t = _recent_bt_combat_activation_t_by_unit[unit]
+		if queued_t then
+			local elapsed = _fixed_time() - queued_t
+			if elapsed >= 0 and elapsed <= COMBAT_ACTIVATION_PENDING_S then
+				return true, _equipped_combat_ability_name(unit)
+			end
+			_recent_bt_combat_activation_t_by_unit[unit] = nil
+		end
+
+		return false
 	end,
 	is_grenade_enabled = Settings.is_grenade_enabled,
 	bot_targeting = BotTargeting,
@@ -753,8 +774,8 @@ mod:hook_require_now(
 					local gate_unit_data = ScriptUnit.has_extension(unit, "unit_data_system")
 					local gate_comp = gate_unit_data and gate_unit_data:read_component(gate_comp_name)
 					local gate_template = gate_comp and gate_comp.template_name
+					local is_grenade = string.find(gate_comp_name, "grenade", 1, true) ~= nil
 					if gate_template and gate_template ~= "none" then
-						local is_grenade = string.find(gate_comp_name, "grenade", 1, true) ~= nil
 						local enabled = is_grenade and Settings.is_grenade_enabled(gate_template)
 							or not is_grenade
 								and Settings.is_combat_template_enabled(
@@ -769,6 +790,23 @@ mod:hook_require_now(
 								nil,
 								"info"
 							)
+							return
+						end
+					end
+					if not is_grenade then
+						local grenade_active, grenade_name = GrenadeFallback.should_block_wield_input(unit)
+						if grenade_active then
+							if _debug_enabled() then
+								_debug_log(
+									"bt_enter_grenade_active:" .. tostring(gate_template) .. ":" .. tostring(unit),
+									_fixed_time(),
+									"BT enter blocked "
+										.. tostring(gate_template)
+										.. " (grenade sequence active for "
+										.. tostring(grenade_name)
+										.. ")"
+								)
+							end
 							return
 						end
 					end
@@ -811,6 +849,12 @@ mod:hook_require_now(
 				end
 
 				func(self, unit, breed, blackboard, scratchpad, action_data, t)
+				if gate_comp_name == "combat_ability_action" then
+					-- Grenade fallback runs after the vanilla BT update. Preserve a
+					-- short reservation until the action-input parser consumes this
+					-- just-queued activation on a later fixed frame.
+					_recent_bt_combat_activation_t_by_unit[unit] = _fixed_time()
+				end
 
 				-- Engagement leash (#47): record movement ability for post-charge grace
 				if unit then

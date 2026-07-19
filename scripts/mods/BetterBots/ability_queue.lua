@@ -24,6 +24,7 @@ local _HumanLikeness
 local _perf
 local _is_team_cooldown_enabled
 local _is_combat_template_enabled
+local _is_grenade_sequence_active
 local _ability_templates
 local _ability_templates_injected
 
@@ -251,6 +252,21 @@ local function _fallback_try_queue_combat_ability(unit, blackboard)
 	end
 
 	-- Guards: only block NEW activations (after state machine cleanup above)
+	local grenade_active, grenade_name
+	if _is_grenade_sequence_active then
+		grenade_active, grenade_name = _is_grenade_sequence_active(unit)
+	end
+	if grenade_active then
+		if _debug_enabled() then
+			_debug_log(
+				"fallback_grenade_active:" .. tostring(unit),
+				fixed_t,
+				"fallback ability blocked: grenade sequence active for " .. tostring(grenade_name)
+			)
+		end
+		return
+	end
+
 	local behavior = blackboard and blackboard.behavior
 	if behavior and behavior.current_interaction_unit ~= nil then
 		return
@@ -558,6 +574,7 @@ function M.wire(deps)
 	_HumanLikeness = deps.HumanLikeness
 	_is_team_cooldown_enabled = deps.is_team_cooldown_enabled
 	_is_combat_template_enabled = deps.is_combat_template_enabled
+	_is_grenade_sequence_active = deps.is_grenade_sequence_active
 end
 
 function M.try_queue(unit, blackboard)

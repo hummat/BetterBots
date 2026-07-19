@@ -1720,6 +1720,99 @@ describe("startup regressions", function()
 		}, emitted_events)
 	end)
 
+	it("blocks BtBotActivateAbilityAction.enter while a grenade sequence is active", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		harness.modules.GrenadeFallback.should_block_wield_input = function(unit)
+			return unit == "bot_unit", "ogryn_grenade_friend_rock"
+		end
+
+		local called = 0
+		local action = {
+			enter = function()
+				called = called + 1
+			end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "ogryn_gunlugger_stance" },
+		})
+
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+			},
+		})
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		assert.equals(0, called)
+	end)
+
+	it("defers grenade fallback after a template combat ability was queued", function()
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local ability_init = find_named_call(harness.init_calls, "AbilityQueue")
+		local grenade_wire = find_named_call(harness.wire_calls, "GrenadeFallback")
+		local fallback_state_by_unit = ability_init.deps.fallback_state_by_unit
+		fallback_state_by_unit.bot_unit = { active = true }
+
+		assert.is_true(grenade_wire.refs.is_combat_ability_active("bot_unit"))
+	end)
+
+	it("defers grenade fallback immediately after BT combat ability entry", function()
+		local fixed_t = 10
+		local harness = make_bootstrap_harness({
+			__fixed_frame = {
+				get_latest_fixed_time = function()
+					return fixed_t
+				end,
+			},
+		})
+		harness:load()
+		local saved_managers = rawget(_G, "Managers")
+		rawset(_G, "Managers", {
+			state = {
+				extension = {
+					latest_fixed_t = true,
+				},
+			},
+		})
+
+		local action = {
+			enter = function() end,
+		}
+		local unit_data_extension = test_helper.make_player_unit_data_extension({
+			combat_ability_action = { template_name = "ogryn_gunlugger_stance" },
+		})
+		_G.ScriptUnit = test_helper.make_script_unit_mock({
+			bot_unit = {
+				unit_data_system = unit_data_extension,
+			},
+		})
+
+		harness:invoke_hook_require(
+			"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
+			action
+		)
+		action:enter("bot_unit", nil, {}, {}, { ability_component_name = "combat_ability_action" }, 10)
+
+		local grenade_wire = find_named_call(harness.wire_calls, "GrenadeFallback")
+		local immediate_active = grenade_wire.refs.is_combat_ability_active("bot_unit")
+
+		fixed_t = 0
+		local active_after_clock_reset = grenade_wire.refs.is_combat_ability_active("bot_unit")
+		rawset(_G, "Managers", saved_managers)
+
+		assert.is_true(immediate_active)
+		assert.is_false(active_after_clock_reset)
+	end)
+
 	it("does not mutate rescue aim before bt_enter charge validation blocks the action", function()
 		local harness = make_bootstrap_harness()
 		harness:load()

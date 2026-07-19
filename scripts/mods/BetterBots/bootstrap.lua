@@ -824,6 +824,7 @@ function M.load_and_init(ctx)
 		CombatAbilityIdentity = CombatAbilityIdentity,
 		HumanLikeness = HumanLikeness,
 		is_combat_template_enabled = Settings.is_combat_template_enabled,
+		is_grenade_sequence_active = GrenadeFallback.should_block_wield_input,
 		is_team_cooldown_enabled = function()
 			return Settings.is_feature_enabled("team_cooldown")
 		end,
