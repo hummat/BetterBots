@@ -22,6 +22,8 @@ Expected v1.2.3 coordination markers when the collision paths occur:
 ## Completed validation queues
 
 **v1.2.2 release-candidate validation (2026-06-27)**: airgpu Windows 11 cold-launch run with the staged full test bundle confirmed the v1.2.2 pocketable safe-hook fix under SoloPlay + Tertium setup. The copied log `console-2026-06-27-15.03.17-28b4576c-7ef4-4e68-94a3-7db109049ce4.log` has `BetterBots loaded`, zero `safe_hook`, zero `bad argument #1 to '__index'`, zero `pocketable_pickup.lua:110`, zero `[MOD][BetterBots][ERROR]`, and zero `Script Error` matches. `pocketable_pickup` ran `28584` calls (`202 ms total`) and the run logged `assigned proactive mule pickup for syringe_power_boost_pocketable` followed by `mule pickup success: syringe_power_boost_pocketable (bot=2)`.
+The recovered AirGPU, Moonlight, RDP transfer, and log-return procedure is now
+documented in `docs/dev/remote-validation.md`.
 
 **v1.0.0 validation (Sprints 1-6)**: all sprint validation items are closed. See `docs/dev/status.md` for per-issue evidence.
 

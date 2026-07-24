@@ -33,6 +33,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 2. Check for `BetterBots loaded` in game chat
 3. After mission: `bb-log summary` to verify activations and hold rules
 4. See `docs/dev/validation-tracker.md` for structured run entries and the heuristic validation matrix
+5. For AirGPU testing, use `docs/dev/remote-validation.md`
 
 Hot-reload with `Ctrl+Shift+R` when dev mode is enabled in DMF settings.
 
@@ -337,6 +338,7 @@ Do not jump to web search first for Darktide mechanics or patch-impact questions
 | Understand meta builds, weapon/ability popularity | `docs/classes/meta-builds-research.md` |
 | Update Nexus mod page or release text | `docs/nexus-description.bbcode` |
 | Verify a change in-game | `docs/dev/debugging.md` (debug commands, verification workflow) |
+| Verify a change on AirGPU | `docs/dev/remote-validation.md` + `docs/dev/validation-tracker.md` |
 | Understand the module architecture | `docs/dev/architecture.md` |
 | Create branches, batch test, or merge | Branching workflow section (this file) |
 | Add per-frame logic, hooks, or engine queries | `docs/dev/architecture.md` (Performance section) |

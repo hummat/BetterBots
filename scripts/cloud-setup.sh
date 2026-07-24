@@ -6,7 +6,7 @@
 set -eu
 
 LOG=/tmp/bb-cloud-setup.log
-exec > >(tee -a "$LOG") 2>&1
+exec >>"$LOG" 2>&1
 
 echo "[cloud-setup] $(date -Iseconds) SessionStart fired"
 echo "[cloud-setup] CLAUDE_CODE_REMOTE=${CLAUDE_CODE_REMOTE:-unset}"
@@ -18,12 +18,8 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-if [ -z "${CLAUDE_PROJECT_DIR:-}" ]; then
-  echo "[cloud-setup] CLAUDE_PROJECT_DIR unset, cannot place sibling clone; exiting 0"
-  exit 0
-fi
-
-PARENT="$(dirname "$CLAUDE_PROJECT_DIR")"
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+PARENT="$(dirname "$PROJECT_DIR")"
 TARGET="$PARENT/Darktide-Source-Code"
 
 if [ -d "$TARGET/.git" ]; then

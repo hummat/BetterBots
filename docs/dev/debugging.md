@@ -296,6 +296,10 @@ If a future branch misses that bar or produces a real user-visible perf complain
 
 Static checks (`make check`) and hot-reload testing (`Ctrl+Shift+R`) do **not** surface hook-registration issues, load-order crashes, or DMF warnings. A clean test run is not sufficient to ship to Nexus.
 
+When the game runs on AirGPU, follow `docs/dev/remote-validation.md` for packaging,
+RDP transfer, Moonlight sequencing, and returning the logs before applying this
+checklist.
+
 1. **Cold boot** — fully quit Darktide and relaunch. Do not rely on a hot reload.
 2. **Run a mission** — booting to the hub is not enough; at least one mission load exercises the full hook chain.
 3. **Test both mod load orders** when the change touches shared engine tables (`attack_meta_data`, `ability_meta_data`, breed data). Run once with BetterBots near the top of `mod_load_order.txt` and once with it near the bottom. Sibling mods that pre-mutate shared state (Tertium4Or5, SoloPlay) can mask or reveal crashes depending on order.

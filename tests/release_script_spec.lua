@@ -5,6 +5,16 @@ local function read_file(path)
 	return source
 end
 
+local function run_command(command)
+	local handle = assert(io.popen(command))
+	local output = assert(handle:read("*a"))
+	local ok = handle:close()
+
+	assert.is_true(ok)
+
+	return output
+end
+
 describe("release script", function()
 	it("waits for CI to attach the package before falling back to local upload", function()
 		local source = read_file("scripts/release.sh")
@@ -39,5 +49,21 @@ describe("release script", function()
 		assert.is_truthy(source:find("ReleaseAsset.name already exists", 1, true))
 		assert.is_truthy(source:find("release_asset_exists", 1, true))
 		assert.is_truthy(source:find("appeared during upload fallback", 1, true))
+	end)
+end)
+
+describe("session start hook", function()
+	it("does not require CLAUDE_PROJECT_DIR to locate the project script", function()
+		local source = read_file(".claude/settings.json")
+
+		assert.is_truthy(
+			source:find([["command": "bash \"${CLAUDE_PROJECT_DIR:-.}/scripts/cloud-setup.sh\""]], 1, true)
+		)
+	end)
+
+	it("keeps diagnostics out of the SessionStart stdout protocol", function()
+		local output = run_command("env -u CLAUDE_PROJECT_DIR -u CLAUDE_CODE_REMOTE bash scripts/cloud-setup.sh")
+
+		assert.equals("", output)
 	end)
 end)
