@@ -81,6 +81,31 @@ check_anchor_multiline() {
 	ok "$label -> ${match%%:*}:${match#*:}"
 }
 
+# Count an engine call surface when new call sites require manual compatibility
+# review, even if the existing pinned call sites remain unchanged.
+check_anchor_count() {
+	local relative_path="$1"
+	local anchor="$2"
+	local expected_count="$3"
+	local label="$4"
+	local path="$DECOMPILE_ROOT/$relative_path"
+	local actual_count
+
+	if [[ ! -e "$path" ]]; then
+		err "$label missing path: $relative_path"
+		return
+	fi
+
+	actual_count=$({ rg -nF -- "$anchor" "$path" 2>/dev/null || true; } | wc -l)
+
+	if ((actual_count != expected_count)); then
+		err "$label expected $expected_count anchor(s) in $relative_path, found $actual_count: $anchor"
+		return
+	fi
+
+	ok "$label -> $actual_count call sites"
+}
+
 check_talent_and_special_rule_strings() {
 	# BetterBots heuristics dispatch on talent / special_rule names by string
 	# literal — e.g. `_has_talent(context, "psyker_smite_on_hit")` and
@@ -408,6 +433,23 @@ check_anchor \
 	"scripts/extension_systems/action_input/player_unit_action_input_extension.lua" \
 	"PlayerUnitActionInputExtension.bot_queue_action_input = function" \
 	"action input bot queue"
+check_anchor_multiline \
+	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout.lua" \
+	'PlayerUnitVisualLoadout\.wield_slot = function \(slot_to_wield, player_unit, t, skip_wield_action\)[\s\S]*?visual_loadout_extension:wield_slot\(slot_to_wield\)\s+local weapon_template = visual_loadout_extension:weapon_template_from_slot\(slot_to_wield\)\s+animation_extension:inventory_slot_wielded\(weapon_template, t\)' \
+	"visual loadout wield updates animation state machine"
+check_anchor_multiline \
+	"scripts/extension_systems/character_state_machine/character_states/player_character_state_catapulted.lua" \
+	'PlayerUnitVisualLoadout\.wield_slot\("slot_unarmed", unit, t\)\s+end\s+Fall\.set_fall_height\(locomotion, inair_state\)\s+self:_trigger_anim_event\(catapulted_direction, "enter"\)' \
+	"catapult forced-unarmed wield precedes enter animation"
+check_anchor_count \
+	"scripts/extension_systems/character_state_machine/character_states" \
+	"PlayerUnitVisualLoadout.wield_slot(" \
+	19 \
+	"character-state visual-loadout wield surface"
+check_anchor_multiline \
+	"scripts/settings/ability/ability_templates/ogryn_gunlugger_stance.lua" \
+	'action_stance_change = \{[\s\S]*?anim = "mid_reload_finished",[\s\S]*?auto_wield_slot = "slot_secondary",[\s\S]*?start_input = "stance_pressed",' \
+	"Gunlugger stance animation and auto-wield contract"
 check_anchor \
 	"scripts/extension_systems/input/bot_unit_input.lua" \
 	"BotUnitInput.set_aim_position = function" \
