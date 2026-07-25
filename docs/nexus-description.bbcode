@@ -69,6 +69,9 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 [list]
 [*]Fixed two Ogryn animation crashes reported on Nexus: one after a Poxburster launched a bot during Rock use, and one when Gunlugger stance collided with the grenade slot.
 [*]Combat abilities and grenade throws now wait for each other instead of trying to take the same slot at once. Forced unarmed states can also interrupt a grenade lock, as the game expects.
+[*]Bots now let go of the grenade slot when they start reviving someone or picking something up. That collision has the same shape as the Poxburster one and happens a lot more often, so it is my best guess for anyone who was crashing every mission.
+[*]Added a backstop. If a bot animation still ends up somewhere the game does not expect, BetterBots logs a warning instead of taking the whole run down with it.
+[*]Checked across four Solo Play missions on Damnation with Ogryn bots running Rock and Point-Blank Barrage: no crashes, no errors, and the two abilities correctly waiting for each other. I could not get a Poxburster to launch a bot on command, though, so the original crash is fixed by reasoning rather than by reproduction. If you still hit it, please send me the log.
 [/list]
 
 [b]v1.2.2[/b]

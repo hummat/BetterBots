@@ -509,6 +509,37 @@ describe("grenade_fallback", function()
 			local should_lock = GrenadeFallback.should_lock_weapon_switch(unit)
 			assert.is_false(should_lock)
 		end)
+
+		-- Interaction entry wields slot_unarmed for most templates, but
+		-- setup_decoding, scanning, servo_skull_activator, and
+		-- setup_breach_charge wield slot_device instead. Redirecting either back
+		-- to the grenade slot leaves the interaction animation events running
+		-- against the grenade state machine, which crashes the engine.
+		it("does not lock while an interaction is pending or active", function()
+			advance_to_stage("wait_aim")
+			_component_state_by_name.interaction = { target_unit = "door_1" }
+			_debug_enabled_result = true
+			local should_lock = GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.is_false(should_lock)
+			local log = find_debug_log("released grenade weapon lock for interaction")
+			assert.is_not_nil(log)
+			assert.equals("grenade_interaction_unlock:" .. tostring(unit), log.key)
+
+			GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.equals(1, #_debug_logs)
+
+			_component_state_by_name.interaction.target_unit = "door_2"
+			GrenadeFallback.should_lock_weapon_switch(unit)
+			assert.equals(2, #_debug_logs)
+		end)
+
+		it("locks again once the interaction target clears", function()
+			advance_to_stage("wait_aim")
+			_component_state_by_name.interaction = { target_unit = "door_1" }
+			assert.is_false(GrenadeFallback.should_lock_weapon_switch(unit))
+			_component_state_by_name.interaction = { target_unit = nil }
+			assert.is_true(GrenadeFallback.should_lock_weapon_switch(unit))
+		end)
 	end)
 
 	describe("should_block_weapon_action_input", function()

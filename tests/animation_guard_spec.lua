@@ -39,8 +39,9 @@ describe("animation_guard", function()
 				callback({})
 			end,
 			hook = function(_, _, method_name, handler)
-				assert.equals("anim_event_with_variable_float", method_name)
-				hook_handler = handler
+				if method_name == "anim_event_with_variable_float" then
+					hook_handler = handler
+				end
 			end,
 			warning = function(_, message)
 				warnings[#warnings + 1] = message
@@ -95,8 +96,10 @@ describe("animation_guard", function()
 			hook_require = function(_, _, callback)
 				callback({})
 			end,
-			hook = function(_, _, _, handler)
-				hook_handler = handler
+			hook = function(_, _, method_name, handler)
+				if method_name == "anim_event_with_variable_float" then
+					hook_handler = handler
+				end
 			end,
 			warning = function() end,
 		}
@@ -146,8 +149,10 @@ describe("animation_guard", function()
 			hook_require = function(_, _, callback)
 				callback({})
 			end,
-			hook = function(_, _, _, handler)
-				hook_handler = handler
+			hook = function(_, _, method_name, handler)
+				if method_name == "anim_event_with_variable_float" then
+					hook_handler = handler
+				end
 			end,
 			warning = function()
 				error("warning should not run for humans")
@@ -193,5 +198,146 @@ describe("animation_guard", function()
 		end, self, "swing", "swing_speed", 1.5)
 
 		assert.is_true(original_called)
+	end)
+
+	-- Disruptive character states emit anim events straight after wielding a
+	-- different slot. If the wielded state machine lacks the event, the engine
+	-- raises through DMF's hook chain and takes the session down. Bots must
+	-- degrade to a wrong-looking animation instead of a crash.
+	describe("anim_event crash guard", function()
+		local missing_event_error = "stingray::plugin_api::unit::animation_event failed, "
+			.. "state machine `#ID[f70fd69d9db3e65e]` does not have an event with name `#ID[14a07e0f]`"
+
+		local function setup(method_name)
+			local AnimationGuard = load_animation_guard()
+			local handlers = {}
+			local warnings = {}
+			local stub_mod = {
+				hook_require = function(_, _, callback)
+					callback({})
+				end,
+				hook = function(_, _, hooked_name, handler)
+					handlers[hooked_name] = handler
+				end,
+				warning = function(_, message)
+					warnings[#warnings + 1] = message
+				end,
+			}
+
+			AnimationGuard.init({
+				mod = stub_mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+			})
+			AnimationGuard.register_hooks()
+
+			return handlers[method_name], warnings
+		end
+
+		local function bot_self()
+			return {
+				_unit = "bot_unit",
+				_player = {
+					is_human_controlled = function()
+						return false
+					end,
+				},
+			}
+		end
+
+		it("swallows a failed bot anim_event and warns once per event name", function()
+			local handler, warnings = setup("anim_event")
+			assert.is_function(handler)
+
+			local raising = function()
+				error(missing_event_error)
+			end
+
+			assert.has_no.errors(function()
+				handler(raising, bot_self(), "airtime_bwd")
+			end)
+			assert.equals(1, #warnings)
+			assert.is_truthy(warnings[1]:find("airtime_bwd", 1, true))
+
+			handler(raising, bot_self(), "airtime_bwd")
+			assert.equals(1, #warnings)
+
+			handler(raising, bot_self(), "airtime_fwd")
+			assert.equals(2, #warnings)
+		end)
+
+		it("passes a successful bot anim_event through untouched", function()
+			local handler, warnings = setup("anim_event")
+			local seen_event
+			local result = handler(function(_self, event_name)
+				seen_event = event_name
+				return 42
+			end, bot_self(), "swing")
+
+			assert.equals("swing", seen_event)
+			assert.equals(42, result)
+			assert.equals(0, #warnings)
+		end)
+
+		-- player_character_state_catapulted.lua:106 fires anim_event_1p before
+		-- anim_event, so guarding only the third-person call leaves the crash
+		-- reachable one line earlier.
+		it("swallows a failed bot anim_event_1p", function()
+			local handler, warnings = setup("anim_event_1p")
+			assert.is_function(handler)
+
+			assert.has_no.errors(function()
+				handler(function()
+					error(missing_event_error)
+				end, bot_self(), "airtime_bwd_1p")
+			end)
+			assert.equals(1, #warnings)
+			assert.is_truthy(warnings[1]:find("airtime_bwd_1p", 1, true))
+		end)
+
+		it("does not depend on the Stingray error detail wording", function()
+			local handler, warnings = setup("anim_event")
+
+			assert.has_no.errors(function()
+				handler(function()
+					error("stingray::plugin_api::unit::animation_event failed, rejected animation event")
+				end, bot_self(), "airtime_bwd")
+			end)
+			assert.equals(1, #warnings)
+		end)
+
+		it("lets unrelated bot anim_event errors raise", function()
+			local handler, warnings = setup("anim_event")
+
+			assert.has_error(function()
+				handler(function()
+					error("animation state recorder failed")
+				end, bot_self(), "airtime_bwd")
+			end)
+			assert.equals(0, #warnings)
+		end)
+
+		it("lets a failed human anim_event raise so vanilla bugs stay visible", function()
+			local handler = setup("anim_event")
+			local human_self = {
+				_unit = "human_unit",
+				_player = {
+					is_human_controlled = function()
+						return true
+					end,
+				},
+			}
+
+			assert.has_error(function()
+				handler(function()
+					error("boom")
+				end, human_self, "airtime_bwd")
+			end)
+		end)
 	end)
 end)

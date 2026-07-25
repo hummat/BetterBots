@@ -434,6 +434,14 @@ check_anchor \
 	"PlayerUnitActionInputExtension.bot_queue_action_input = function" \
 	"action input bot queue"
 check_anchor_multiline \
+	"scripts/extension_systems/animation/authoritative_player_unit_animation_extension.lua" \
+	'AuthoritativePlayerUnitAnimationExtension\.anim_event = function \(self, event_name\)\s+local unit = self\._unit\s+local event_index = Unit\.animation_event\(unit, event_name\)' \
+	"third-person animation event hook contract"
+check_anchor_multiline \
+	"scripts/extension_systems/animation/authoritative_player_unit_animation_extension.lua" \
+	'AuthoritativePlayerUnitAnimationExtension\.anim_event_1p = function \(self, event_name\)\s+local fp_unit = self\._first_person_unit\s+local event_index = Unit\.animation_event\(fp_unit, event_name\)' \
+	"first-person animation event hook contract"
+check_anchor_multiline \
 	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout.lua" \
 	'PlayerUnitVisualLoadout\.wield_slot = function \(slot_to_wield, player_unit, t, skip_wield_action\)[\s\S]*?visual_loadout_extension:wield_slot\(slot_to_wield\)\s+local weapon_template = visual_loadout_extension:weapon_template_from_slot\(slot_to_wield\)\s+animation_extension:inventory_slot_wielded\(weapon_template, t\)' \
 	"visual loadout wield updates animation state machine"
@@ -441,11 +449,24 @@ check_anchor_multiline \
 	"scripts/extension_systems/character_state_machine/character_states/player_character_state_catapulted.lua" \
 	'PlayerUnitVisualLoadout\.wield_slot\("slot_unarmed", unit, t\)\s+end\s+Fall\.set_fall_height\(locomotion, inair_state\)\s+self:_trigger_anim_event\(catapulted_direction, "enter"\)' \
 	"catapult forced-unarmed wield precedes enter animation"
+check_anchor_multiline \
+	"scripts/extension_systems/character_state_machine/character_states/player_character_state_catapulted.lua" \
+	'PlayerCharacterStateCatapulted\._trigger_anim_event = function \(self, direction, reason\)[\s\S]*?anim_extension:anim_event_1p\(anim_event\)\s+anim_extension:anim_event\(anim_event_3p\)' \
+	"catapult first-person then third-person animation events"
 check_anchor_count \
 	"scripts/extension_systems/character_state_machine/character_states" \
 	"PlayerUnitVisualLoadout.wield_slot(" \
 	19 \
 	"character-state visual-loadout wield surface"
+check_anchor_multiline \
+	"scripts/extension_systems/character_state_machine/character_states/player_character_state_interacting.lua" \
+	'local interaction_component = self\._interaction_component\s+local interactee_unit = interaction_component\.target_unit[\s\S]*?PlayerUnitVisualLoadout\.wield_slot\(wield_slot, self\._unit, t\)' \
+	"interaction target is set before forced wield"
+check_anchor_count \
+	"scripts/settings/interaction/interaction_templates.lua" \
+	'wield_slot = "slot_device"' \
+	4 \
+	"device-wield interaction template surface"
 check_anchor_multiline \
 	"scripts/settings/ability/ability_templates/ogryn_gunlugger_stance.lua" \
 	'action_stance_change = \{[\s\S]*?anim = "mid_reload_finished",[\s\S]*?auto_wield_slot = "slot_secondary",[\s\S]*?start_input = "stance_pressed",' \

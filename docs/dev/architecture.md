@@ -102,6 +102,7 @@ This mod targets bot ability activation in three paths:
 18. Animation variable guard (#50, via `animation_guard.lua`):
     - hook `AuthoritativePlayerUnitAnimationExtension.anim_event_with_variable_float`
     - for bot units only, degrades invalid animation variable IDs (`nil` / `4294967295`) or lookup failures to a plain `anim_event`, matching vanilla's multi-variable fallback instead of crashing the animation path
+    - hooks `anim_event` and `anim_event_1p` as well: for bot units only, a failed Stingray `Unit.animation_event` call is reported as a one-shot warning per method+event name instead of ending the session. Errors outside that API call still raise. Disruptive character states wield a slot and then emit an event immediately (`player_character_state_catapulted.lua:106`), so a state machine that lacks the event would otherwise raise through DMF's hook chain. Human units keep the raise so vanilla animation bugs stay visible.
 19. Smart-target seeding (#61/#62, via `smart_targeting.lua`):
     - hook `SmartTargetingActionModule.fixed_update`
     - swaps bot perception's selected target into `smart_targeting_extension:targeting_data().unit` only for the duration of vanilla `fixed_update()`

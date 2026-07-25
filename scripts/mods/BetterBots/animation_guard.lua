@@ -21,6 +21,11 @@ local _fixed_time
 
 local INVALID_ANIMATION_VARIABLE_INDEX = 4294967295
 local ANIMATION_EXTENSION_SENTINEL = "__bb_animation_guard_installed"
+local ANIMATION_EVENT_API_ERROR = "stingray::plugin_api::unit::animation_event failed"
+
+-- Event names come from a fixed engine set, so a plain string-keyed table
+-- cannot grow without bound.
+local _warned_anim_events = {}
 
 local function is_valid_variable_index(variable_index)
 	return variable_index ~= nil and variable_index ~= INVALID_ANIMATION_VARIABLE_INDEX
@@ -44,6 +49,51 @@ local function _safe_animation_find_variable(unit, variable_name)
 	return variable_index
 end
 
+local function _is_animation_event_api_error(err)
+	local message = tostring(err)
+	return message:find(ANIMATION_EVENT_API_ERROR, 1, true) ~= nil
+end
+
+-- Disruptive character states (catapulted, pounced, netted, grabbed, ledge) wield
+-- a slot and then immediately emit an anim event. If the wielded state machine
+-- lacks that event, `Unit.animation_event` raises through DMF's hook chain and
+-- ends the session. A wrong-looking bot animation is always better than a crash,
+-- so bots degrade to a logged warning. Humans keep the raise: their path is
+-- vanilla and a swallowed error there would hide a real bug.
+local function _guard_bot_anim_event(method_name)
+	return function(func, self, event_name, ...)
+		if not _is_bot_unit(self) then
+			return func(self, event_name, ...)
+		end
+
+		local ok, result = pcall(func, self, event_name, ...)
+		if ok then
+			return result
+		end
+		if not _is_animation_event_api_error(result) then
+			error(result, 0)
+		end
+
+		local warn_key = method_name .. ":" .. tostring(event_name)
+		if not _warned_anim_events[warn_key] then
+			_warned_anim_events[warn_key] = true
+			if _mod and _mod.warning then
+				_mod:warning(
+					"BetterBots: suppressed failed bot "
+						.. method_name
+						.. " '"
+						.. tostring(event_name)
+						.. "' ("
+						.. tostring(result)
+						.. ")"
+				)
+			end
+		end
+
+		return nil
+	end
+end
+
 local function register_hooks()
 	_hook_require_now(
 		"scripts/extension_systems/animation/authoritative_player_unit_animation_extension",
@@ -56,6 +106,14 @@ local function register_hooks()
 			end
 
 			AuthoritativePlayerUnitAnimationExtension[ANIMATION_EXTENSION_SENTINEL] = true
+
+			_mod:hook(AuthoritativePlayerUnitAnimationExtension, "anim_event", _guard_bot_anim_event("anim_event"))
+
+			_mod:hook(
+				AuthoritativePlayerUnitAnimationExtension,
+				"anim_event_1p",
+				_guard_bot_anim_event("anim_event_1p")
+			)
 
 			_mod:hook(
 				AuthoritativePlayerUnitAnimationExtension,

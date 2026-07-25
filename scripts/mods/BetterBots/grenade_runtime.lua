@@ -130,6 +130,7 @@ function M.reset_state(unit, state, next_try_t)
 	state.aim_unit = nil
 	state.aim_distance = nil
 	state.precision_target_retained_logged = nil
+	state.interaction_unlock_target = nil
 	state.attempt_id = nil
 	if next_try_t then
 		state.next_try_t = next_try_t
@@ -239,6 +240,28 @@ function M.should_lock_weapon_switch(unit)
 	if not inventory_component or inventory_component.wielded_slot ~= "slot_grenade_ability" then
 		return false
 	end
+
+	-- Interaction entry wields a slot of its own before the interacting state
+	-- settles: slot_unarmed for most templates, slot_device for setup_decoding,
+	-- scanning, servo_skull_activator, and setup_breach_charge. Redirecting
+	-- either back to the grenade slot leaves the interaction's animation events
+	-- running against the grenade state machine. Mirrors the item-ability
+	-- exemption in item_fallback.lua.
+	local interaction_component = unit_data_extension:read_component("interaction")
+	local interaction_target = interaction_component and interaction_component.target_unit
+	if interaction_target ~= nil then
+		if _debug_enabled() and state.interaction_unlock_target ~= interaction_target then
+			state.interaction_unlock_target = interaction_target
+			local interaction_grenade_name = state.grenade_name or "grenade_ability"
+			_debug_log(
+				"grenade_interaction_unlock:" .. tostring(unit),
+				_fixed_time(),
+				"released grenade weapon lock for interaction during " .. interaction_grenade_name
+			)
+		end
+		return false
+	end
+	state.interaction_unlock_target = nil
 
 	local grenade_name = state.grenade_name
 	if not grenade_name and _equipped_grenade_ability then
