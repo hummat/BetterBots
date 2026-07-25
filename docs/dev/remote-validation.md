@@ -4,7 +4,9 @@
 
 Use this workflow when the local machine cannot run the required Darktide test. The
 June 27 v1.2.2 run used an AirGPU Windows 11 machine, Moonlight for gameplay, and
-FreeRDP folder redirection for file transfer.
+FreeRDP folder redirection for file transfer. A short functional test can stay in
+RDP if Darktide starts and renders correctly; use Moonlight when RDP cannot provide
+a usable game session.
 
 The connection workflow is recovered from the June session history. The original
 helper script and transfer directory no longer exist, so the commands below replace
@@ -15,8 +17,9 @@ but the original pairing steps were not recorded.
 
 - AirGPU dashboard: start and stop the Windows machine; obtain its current host,
   username, and password.
-- Moonlight: launch Darktide and play the validation mission.
-- FreeRDP: move the test build and logs between Linux and Windows.
+- Moonlight: run the validation mission when RDP is unsuitable for gameplay.
+- FreeRDP: install the game and mods, move the test build and logs, and run short
+  functional tests when the game works in the RDP session.
 - `bb-log`: analyze the returned console logs on Linux.
 
 Do not put the AirGPU password on the command line. FreeRDP prompts for it when
@@ -71,8 +74,10 @@ xfreerdp3 \
   /network:auto
 ```
 
-Use the current host and username from the AirGPU dashboard. Leave the domain blank
-unless the dashboard supplies one. Enter the password at FreeRDP's prompt.
+Use the current host and username from the AirGPU dashboard. The IP address changes
+between machine sessions, so refresh the dashboard after each start. Leave the
+domain blank unless the dashboard supplies one. Enter the password at FreeRDP's
+prompt.
 
 The redirected folder appears in Windows as:
 
@@ -83,6 +88,15 @@ The redirected folder appears in Windows as:
 The June run established one important sequencing constraint: opening RDP ended the
 active Moonlight session. Use RDP for transfer, disconnect it, and then reconnect
 with Moonlight for the game. Do not leave both sessions open.
+
+If FreeRDP exits, check the machine status and current IP in the dashboard before
+changing client options. A stopped machine or stale IP cannot be repaired from the
+RDP client.
+
+A machine restart can replace its RDP certificate. If `/cert:tofu` reports a changed
+certificate, verify that the new certificate CN matches the AirGPU machine name,
+archive `~/.config/freerdp/server/HOST_3389.pem`, and reconnect. Do not bypass the
+check with `/cert:ignore`.
 
 ## Install and cold boot
 
@@ -96,15 +110,25 @@ need an entry.
 
 The pre-release gate requires two independent cold boots:
 
-1. Put BetterBots before the sibling gameplay mods, exit Darktide, relaunch
-   through Moonlight, and run the mission.
+1. Put BetterBots before the sibling gameplay mods, exit Darktide, relaunch, and
+   run the mission.
 2. Put BetterBots after the sibling gameplay mods, exit Darktide, relaunch,
    and repeat the mission.
 
 Follow the active checklist in `docs/dev/validation-tracker.md`. For the v1.2.3
-animation-slot regression, use an Ogryn bot with Rock and Gunlugger stance. Run
-`/bb_scenario poxburster_push` to force a bot-targeted Poxburster test, and try to
-interrupt a grenade wield with the catapult.
+animation-slot regression, use an Ogryn bot with Rock and Gunlugger stance. A bot's
+build comes from BetterBots' own profile template unless Tertium assigns a real
+character to that slot, and the built-in Ogryn template is Loyal Protector plus frag
+bomb. Assign the Ogryn character in the Tertium mod's `character_N` dropdown, then
+respec it in the Psykhanium to `ogryn_special_ammo` (Point-Blank Barrage) and
+`ogryn_grenade_friend_rock` (Big Friendly Rock) with a reload-heavy ranged weapon.
+Run `/bb_scenario poxburster_push` to force a bot-targeted Poxburster test, and try
+to interrupt a grenade wield with the catapult.
+
+For the interaction path, down the player while the Ogryn bots are throwing Rocks
+under horde pressure. A successful collision prints `released grenade weapon lock
+for interaction during ogryn_grenade_friend_rock`. Any `suppressed failed bot
+anim_event` warning keeps the session alive but fails the release test.
 
 Quit Darktide before reopening RDP so the console log is complete.
 
@@ -141,14 +165,20 @@ filename, bot build, load order, and result.
 
 ## Finish
 
-Stop the AirGPU machine in its dashboard and confirm that its status changes from
-running. Remove credentials from copied commands or notes. Keep the console logs
-until the release decision is recorded.
+Stopping the AirGPU machine ends compute use but leaves its persistent storage
+allocated and billable. After retrieving the logs, delete the machine from the
+AirGPU dashboard if the installed environment is no longer needed. Keeping the
+machine for another run also keeps the daily storage charge.
+
+Remove credentials from copied commands or notes. Keep the console logs until the
+release decision is recorded.
 
 ## Recovered June reference
 
-The June 27 run used a local-only, game-root-shaped
-`BetterBots-full-modpack-v1.2.2-test.2.zip` with this user-mod order:
+The June 27 staging directory, `~/Downloads/darktide_mods/`, contained the mod
+loader, DMF, SoloPlay, Tertium4Or5, and Tertium6 archives. BetterBots was packaged
+separately and added to the local game-root bundle. The final bundle name was not
+recovered. Its user-mod order was:
 
 ```text
 SoloPlay

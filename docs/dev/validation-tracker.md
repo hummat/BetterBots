@@ -16,8 +16,48 @@ Track manual Darktide validation runs with consistent evidence so issue decision
 Expected v1.2.3 coordination markers when the collision paths occur:
 
 - `fallback ability blocked: grenade sequence active for <grenade>` or `BT enter blocked <ability> (grenade sequence active for <grenade>)`
-- `released weapon lock for forced slot_unarmed during <ability>` when an interaction, catapult, ledge, or disabled state interrupts an owned ability/grenade slot
+- `released weapon lock for forced slot_unarmed during <ability>` when a catapult, ledge, or disabled state interrupts an owned ability/grenade slot
+- `released grenade weapon lock for interaction during <grenade>` when an interaction starts during an active grenade sequence
 - normal grenade and combat-ability activation after the conflicting sequence finishes
+
+**v1.2.3 hardening candidate (2026-07-25)**: based on commit
+`60fe30c715254360500f4aec45fed6da3589ac54` plus the reviewed, uncommitted
+animation and interaction guards. `BetterBots.zip` SHA-256:
+`d64bf05329eb970edcad0b0c506d47c25892fb734206d92c7b337771c891d76c`.
+`make check-ci` passed with 1718 tests. This checksum identifies the exact runtime
+artifact; replace the base-commit wording after the changes are committed.
+
+**v1.2.3 candidate (2026-07-24)**: commit
+`60fe30c715254360500f4aec45fed6da3589ac54`; `BetterBots.zip` SHA-256
+`e1aa09180ed7263cc568db3f8431bad90a3e5e5e85a25f467aa3e4ec898dcb72`.
+The local-only game-root bundle
+`BetterBots-airgpu-v1.2.3-test.zip` has SHA-256
+`ea0dcdbd1c5fd31e4639cd2fb45c56b4bf9e6982c2f7eb3684726ad8a6429319`
+and starts with BetterBots first in the user-mod order. `make check-ci`, archive
+integrity, and the staged Tertium Lua load check passed. The BetterBots-first cold
+boot ran on 2026-07-24 with zero errors but could not exercise either reported crash
+path, because the Ogryn bot used the built-in profile template (Loyal Protector +
+frag bomb) instead of Point-Blank Barrage + Big Friendly Rock. Both cold-boot runs
+therefore remain outstanding and the release gate is still closed.
+
+To reach the reported paths, assign a real Ogryn character to a bot slot through the
+Tertium `character_N` dropdown and give that character `ogryn_special_ammo`
+(Point-Blank Barrage), `ogryn_grenade_friend_rock` (Big Friendly Rock), and a
+reload-heavy ranged weapon. BetterBots preserves any bot profile that carries a
+backend `name`, so its own slot template no longer applies to that bot.
+
+The 2026-07-25 runs did this and cleared the stance/grenade collision twice. Two
+gaps remain: the BetterBots-last cold boot, and the forced `slot_unarmed` release.
+
+Catapults are a poor way to reach the release. The window is only the ~0.8 s a bot
+spends holding `slot_grenade_ability` between `grenade queued wield` and `grenade
+releasing`, and lining a Poxburster detonation up with it is chance. Interactions
+provide a repeatable target: `player_character_state_interacting.lua:88` wields
+`slot_unarmed` for most interactions and `slot_device` for four templates. The
+grenade lock now yields while `interaction.target_unit` is set and prints `released
+grenade weapon lock for interaction during <grenade>`. Force the overlap by getting
+downed while the Ogryn bots throw Rocks under horde pressure, so a bot begins a
+revive inside the throw window.
 
 ## Completed validation queues
 
@@ -83,6 +123,187 @@ Conclusion:
 ```
 
 ## Recorded Runs
+
+### Run 2026-07-25-v1.2.3-airgpu-hardened-build
+
+```text
+Run ID: 2026-07-25-v1.2.3-airgpu-hardened-build
+Date (local): 2026-07-25
+Date (UTC): 2026-07-25
+Git commit: 60fe30c plus the uncommitted interaction-exemption and animation-event
+guard changes. The transferred `BetterBots.zip` was CRC-compared file by file
+against a fresh `make package` of the working tree and matches exactly, so the run
+did exercise the hardened code. It does not correspond to any commit hash.
+Log file: console-2026-07-25-13.16.17-5352d88b-ea15-4e9d-bb55-1bac35cab614.log
+Load order: dmf, BetterBots, SoloPlay, Tertium4Or5 (BetterBots first AGAIN)
+Bot lineup / abilities: three Ogryn bots, Point-Blank Barrage + Big Friendly Rock
+Map + difficulty: dm_rise, challenge 5 / resistance 4, second mission in session
+
+Startup and error checks: PASS
+- `BetterBots loaded` at 13:16:23.147, no rehook or hook-install warnings
+- Error lines: 0, BB warnings: 0
+- zero `animation_event failed`, `airtime_bwd`, `mid_reload_finished`, `Lua Error`,
+  `CRASH`, `[ERROR]`
+- zero `suppressed failed bot anim_event`, so the new guard never had to act
+
+Ability activity: 7 Rock throws, 3 stance activations, 39 combat holds
+
+Stance-vs-grenade exclusion: PASS, third independent confirmation
+- 6 x `fallback ability blocked: grenade sequence active for
+  ogryn_grenade_friend_rock`
+- the reverse direction (`grenade blocked: combat ability active`) did not appear
+  in this run; it has live evidence from the 12:03 and 12:23 runs
+
+Still not exercised:
+- `released weapon lock for forced slot_unarmed`
+- `released grenade weapon lock for interaction` (new exemption; needs a bot
+  interaction that starts inside a throw window)
+- `BT enter blocked … grenade sequence active`
+
+Conclusion: the hardened build is clean across a cold boot and a full mission, but
+this is the fourth consecutive BetterBots-first run. The load order gate is still
+open. The observed order is exactly alphabetical, which is what a regenerated
+`mod_load_order.txt` would produce, so verify the file was not rewritten by
+`toggle_darktide_mods.bat` after being edited.
+```
+
+### Run 2026-07-25-v1.2.3-airgpu-poxburster-push-disabled
+
+```text
+Run ID: 2026-07-25-v1.2.3-airgpu-poxburster-push-disabled
+Date (local): 2026-07-25
+Date (UTC): 2026-07-25
+Git commit: 60fe30c715254360500f4aec45fed6da3589ac54
+Log file: console-2026-07-25-12.23.16-c61c5c42-d526-46b4-bbf8-5be1ed1ce24d.log
+Load order: dmf, BetterBots, SoloPlay, Tertium4Or5 (BetterBots first)
+Bot lineup / abilities: same three Ogryn bots, Point-Blank Barrage + Big Friendly
+Rock
+Map + difficulty: dm_rise, challenge 5 / resistance 4, with `/bb_scenario`
+`crusher_pack`, `mauler_weakspot` (x3), and `poxburster_push` (x4)
+Settings deviation: `enable_poxburster` off — the four `poxburster_push` spawns
+produced no `pushing poxburster` or `suppressed poxburster` lines, unlike the
+12:03 run
+
+Startup and error checks: PASS
+- Error lines: 0, BB warnings: 0
+- zero `animation_event failed`, `airtime_bwd`, `mid_reload_finished`, `Lua Error`,
+  `CRASH`, `[ERROR]`
+
+Ability activity: 12 Rock throws, 3 stance activations, 62 combat holds (58
+`ogryn_gunlugger_block_melee_pressure`)
+
+Stance-vs-grenade exclusion: PASS, second independent confirmation
+- 2 x `grenade blocked: combat ability active`
+- 4 x `fallback ability blocked: grenade sequence active for
+  ogryn_grenade_friend_rock`
+
+Forced `slot_unarmed` release: STILL NOT EXERCISED
+- zero `released weapon lock for forced slot_unarmed` despite the poxburster
+  defence being off
+- three bot revives of the downed player completed normally (bots 2, 3, 4), so
+  interactions did occur, but none began while a bot held the grenade slot
+
+Regression checks:
+- revive/rescue: PASS (`rescue interaction succeeded` x3)
+- second mission without restart: PASS
+- Lua errors: no
+
+Conclusion: the stance/grenade exclusion is confirmed twice on independent runs.
+The release branch remains unobserved in game. The marker only prints when the lock
+is actually held at the moment of the forced wield, so its absence means the
+collision never occurred, not that the branch failed.
+```
+
+### Run 2026-07-25-v1.2.3-airgpu-rock-gunlugger-betterbots-first
+
+```text
+Run ID: 2026-07-25-v1.2.3-airgpu-rock-gunlugger-betterbots-first
+Date (local): 2026-07-25
+Date (UTC): 2026-07-25
+Git commit: 60fe30c715254360500f4aec45fed6da3589ac54
+Log file: console-2026-07-25-12.03.35-9349ee8c-80de-4105-8f72-a9eabb97c94f.log
+Load order: dmf, BetterBots, SoloPlay, Tertium4Or5 (BetterBots first)
+Bot lineup / abilities: all three Tertium slots assigned the same Ogryn character
+(`Sumsi`, character_id `aef1aa3b-…`) with `ogryn_ranged_stance` (Point-Blank
+Barrage) and `ogryn_grenade_friend_rock` (Big Friendly Rock). BetterBots logged
+`preserving external profile` for slots 1-3, so its own template did not apply.
+Map + difficulty: dm_rise, challenge 5 / resistance 4, two missions in one session,
+plus `/bb_scenario mixed_horde_pressure`, `poxburster_push`, and `crusher_pack`
+
+Startup and error checks: PASS
+- `BetterBots loaded` at 12:03:40.625, no rehook or hook-install warnings
+- Error lines: 0, BB warnings: 0
+- zero `animation_event failed`, `airtime_bwd`, `mid_reload_finished`, `Lua Error`,
+  `CRASH`, `[ERROR]`
+
+Ability activity: 7 stance activations (5 `ogryn_gunlugger_armor_pen_target`,
+2 `ogryn_gunlugger_fire_shots_pressure`), 8 Rock throws, 23 combat holds
+
+Stance-vs-grenade exclusion (the `mid_reload_finished` path): PASS
+- 5 x `grenade blocked: combat ability active`
+- 2 x `fallback ability blocked: grenade sequence active for
+  ogryn_grenade_friend_rock`
+- tightest interleave at 12:14:19: grenade blocked at .751, stance charge consumed
+  at .780, ability blocked at .890, grenade wield queued at .890, Rock released at
+  12:14:20.671 and its charge consumed at .912 — the two sequences serialized
+  inside 150 ms instead of sharing the slot
+
+Forced `slot_unarmed` release (the `airtime_bwd` path): NOT EXERCISED
+- zero `released weapon lock for forced slot_unarmed`
+- `/bb_scenario poxburster_push` ran three times and every attempt ended in
+  `pushing poxburster (bypassed outnumbered gate)`, so no bomber ever detonated on
+  a bot. The mod's own poxburster defence blocks the state that triggers this path.
+
+BT-enter gate: NOT EXERCISED
+- zero `BT enter blocked … grenade sequence active`; all 7 stance activations came
+  through the template fallback path, so the vanilla BT enter hook never contended
+  with a live grenade sequence.
+
+Conclusion: the reported stance/grenade collision is covered by live evidence. The
+disruptive-state release and the BT-enter gate are still only covered by unit tests,
+and the BetterBots-last cold boot has not run. Release gate stays closed.
+```
+
+### Run 2026-07-24-v1.2.3-airgpu-cold-boot-betterbots-first
+
+```text
+Run ID: 2026-07-24-v1.2.3-airgpu-cold-boot-betterbots-first
+Date (local): 2026-07-24
+Date (UTC): 2026-07-24
+Git commit: 60fe30c715254360500f4aec45fed6da3589ac54
+Log file: console-2026-07-24-06.56.15-59af983b-57cf-4daa-a94e-b01b877dfd70.log
+Load order: dmf, BetterBots, SoloPlay, Tertium4Or5 (BetterBots first)
+Bot lineup / abilities: BetterBots profile templates only (no Tertium character
+assigned) — bot 2 Zealot (dash + fire grenade), bot 3 Psyker (stance + smite),
+bot 4 Ogryn (`ogryn_taunt_shout` + `ogryn_grenade_frag`)
+Map + difficulty: dm_rise, challenge 5 / resistance 4
+
+Startup and error checks: PASS
+- `BetterBots loaded` at 06:56:21.876, no rehook or hook-install warnings
+- Error lines: 0, BB warnings: 0
+- zero `animation_event failed`, `airtime_bwd`, `mid_reload_finished`, `Lua Error`,
+  `CRASH`
+
+Ability smoke: PASS
+- 3 activations / 3 charge consumes: `zealot_targeted_dash_improved_double`,
+  `psyker_overcharge_stance`, `ogryn_taunt_shout`
+- 10 combat holds with expected rule names
+
+v1.2.3 coordination markers: PARTIAL
+- grenade-vs-ability exclusion fired once for a Zealot fire grenade
+- no `released weapon lock for forced slot_unarmed` — the catapult/ledge/disabled
+  release path was never entered
+
+Conclusion: INCONCLUSIVE for the v1.2.3 gate.
+- The Ogryn bot came from BetterBots' own `ogryn` profile template
+  (`bot_slot_3_profile` default), which is Loyal Protector + frag bomb. The two
+  reported crash signatures need Point-Blank Barrage (`ogryn_special_ammo`) and
+  Big Friendly Rock (`ogryn_grenade_friend_rock`), so neither reported path could
+  run. Assigning a real Ogryn character through the Tertium `character_N` setting
+  is the only way to change a bot's build; BetterBots yields any slot whose profile
+  has a backend `name`.
+- The BetterBots-last cold boot is still outstanding.
+```
 
 ### Run 2026-06-27-v1.2.2-airgpu-pocketable-safe-hook
 
