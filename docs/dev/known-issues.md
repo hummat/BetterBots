@@ -71,6 +71,19 @@ The v1.2.3 animation-slot fix still needs the mandatory cold-boot checks in both
    - Idle hold counts in `bb-log summary` will show 0 for new runs.
    - See `docs/dev/logging.md` for details and how to re-enable.
 
+9. Respawned/hogtied allies are not selected for rescue.
+   - Darktide keeps hogtied units in `side.player_units` but excludes them from
+     `side.valid_player_units`. Vanilla bot perception searches only
+     `valid_player_units`, so its existing `hogtied` need-type branch is unreachable
+     through the normal target-selection path.
+   - BetterBots' rescue-priority selector currently searches the same filtered
+     collection. Its bot-to-bot regression coverage exercises a netted bot, not a
+     hogtied bot.
+   - Fix direction: add a source-faithful failing test where the hogtied ally is
+     present in `player_units` but absent from `valid_player_units`, then select from
+     the broader collection with the existing alive, distance, interaction, and
+     path-safety gates.
+
 ## Low severity
 
 1. Perception target vs. aggregate field inconsistency.

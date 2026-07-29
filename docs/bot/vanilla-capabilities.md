@@ -267,7 +267,10 @@ The one exception is `adamant_whistle` (Ogryn rock throw), which has an `ability
 
 **Ledge rescue** (priority 4): need_type `ledge` — **additional check**: `_is_there_threat_to_aid` blocks rescue if enemies target the bot (unless `force_aid`)
 
-**Hogtied rescue** (priority 5): need_type `hogtied`
+**Hogtied rescue** (priority 5): the BT node and `hogtied` need type exist, but
+the normal perception path cannot reach them. `SideSystem` excludes hogtied units
+from `side.valid_player_units`, while `BotPerceptionExtension` searches only that
+collection for allies needing aid.
 
 **Ally aid navigation** — destination computed by `_refresh_destination` in `BotBehaviorExtension`, stored in `behavior.target_ally_aid_destination`. Flat distance + z-offset thresholds for "reached" check.
 
@@ -278,6 +281,7 @@ The one exception is `adamant_whistle` (Ogryn rock throw), which has an `ability
 | Problem | Cause | Source |
 |---|---|---|
 | Start-stop revive loop | Enemies interrupt → bot breaks off → re-evaluates → restarts | Community reports (Steam, Oct 2023) |
+| Respawned/hogtied ally is never selected | `SideSystem` removes hogtied units from `valid_player_units` before bot perception evaluates its `hogtied` branch | Decompiled `side_system.lua` and `bot_perception_extension.lua` |
 | No blocking during revive | Revive is an interaction, not a combat action — no defense | `BtBotInteractAction` has no block logic |
 | Chain-death cascade | All bots hard-focus first downed ally | BotGroup prioritization doesn't prevent simultaneous attempts well enough |
 | Poor disabler rescue | Trash mobs draw melee action over rescue | Melee action priority can override rescue when enemies nearby |

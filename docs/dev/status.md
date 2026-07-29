@@ -184,7 +184,7 @@ User-reported regressions, behavior issues from Nexus feedback (2026-04-05/07), 
 
 All post-v1.0 validation items are closed with live evidence:
 
-- `#108` rescue priority — closed from `console-2026-04-29-17.10.48...`; later hardened so the forced nearest-bot path covers netted bot allies and disabler-target rescues while keeping humans ahead of bots.
+- `#108` rescue priority — closed from `console-2026-04-29-17.10.48...`; later hardened so the forced nearest-bot path covers netted bot allies and disabler-target rescues while keeping humans ahead of bots. This does not cover respawned/hogtied allies: Darktide filters them out of `valid_player_units` before the BetterBots selector runs.
 - `#17` daemonhost avoidance — closed from `console-2026-05-02-14.33.58...`
 - `#106` perf cap — closed from April 29 runs (median 95.7 us/bot/frame)
 - `#100` scenario harness — closed from April 29 live scenario rows
