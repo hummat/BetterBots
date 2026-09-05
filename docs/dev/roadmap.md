@@ -282,7 +282,7 @@ not shipped behavior changes.
 | 113 | Dedicated Skitarii support | Audit combat/blitz variants and validate each supported path; existing generic activation is not class-wide validation. |
 | 114 | Servo-skull objective hacking | Test bot-owned command routing through the engine decoding/hacking path, separately from combat support. |
 | 115 | Longer ranged engagements | Identify the blocking selection, follow, or firing decision before choosing a setting. |
-| 28 | Four-person team with DLC profiles | Current Tertium 7 archive or settings screenshot; older Tertium 6 controls do not establish Tertium 7 behavior. |
+| 28 | Four-person team with DLC profiles | Archive question resolved: uncheck Tertium 7's **Enable 4 bots**; profile assignment remains active. Source/hook verification only; broader profile-management proposal stays open. |
 
 ## Design principles
 

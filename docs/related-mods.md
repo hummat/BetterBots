@@ -115,13 +115,36 @@ independent of that toggle (`Tertium4Or5.lua`, `Tertium4Or5_data.lua`, and
 `Tertium4Or5_localization.lua` inside the archive). This is evidence for that
 archive only, not for the current Tertium 6 or Tertium 7 downloads.
 
-### Tertium 7 squad-size question
+### Tertium 7 squad-size control (verified from supplied archive)
 
-The September 2 Nexus report asks for a four-person team while retaining DLC
-profiles. The current Tertium 7 archive is not available locally; its public
-download redirects to Nexus login and the browser relay was unavailable during
-the September 3 audit. Obtain the archive or settings screenshot before giving
-exact toggle instructions. Follow-up: #28.
+The supplied `Tertium 7 725 1 2026-06-26T02-48Z NBtE5B0oL.rar` exposes the
+English mod name `Tertium 6... or 7` and checkbox **Enable 4 bots**. The label is
+misleading: `four_bots = true` adds three slots; false returns the upstream count.
+Keep the mod enabled, uncheck that checkbox, assign characters to Bot 1–3, and
+start a fresh mission. With the standard four-player baseline and one human, this
+means three bots plus the player, provided no other mod changes the count.
+
+`Tertium4Or5.lua` registers profile assignment independently of `four_bots`, so
+disabling extra slots does not disable the selected characters. The `None` choice
+passes the incoming profile through; it does not suppress the spawn.
+`Tertium4Or5_data.lua` defines six character dropdowns and defaults the checkbox
+to false; `Tertium4Or5_localization.lua` supplies the labels above. All three files
+are under `Tertium4Or5/scripts/mods/Tertium4Or5/` inside the archive.
+
+The supplied Tertium 5 archive (`Tertium4Or5-183-26-02-08-1-1770575305.zip`) uses
+the same checkbox label but adds one slot when enabled, with four dropdowns.
+Both archives identify themselves internally as `Tertium4Or5`; they are
+alternative installations, not independent mods to stack.
+
+A throwaway Lua smoke check executed both archives with an upstream count of
+three: Tertium 5 returned 3/4 slots with the checkbox off/on; Tertium 7 returned
+3/6. Selected-profile assignment remained active with extra slots off, and `None`
+preserved the incoming profile. This checks the hooks, not live DLC profile
+loading or mission spawning. Engine baseline evidence:
+`default_game_parameters.lua:19` (`max_players = 4`) and
+`player_unit_spawn_manager.lua:413-425` (desired count minus existing/queued bots).
+The source-access blocker on #28 is resolved; the broader profile-management
+proposal remains open.
 
 BetterBots does not remove bot slots. `bot_profiles.lua:453-499` preserves real
 external profiles and returns the incoming profile for its `none` choice. Profile

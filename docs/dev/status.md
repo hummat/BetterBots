@@ -11,9 +11,10 @@
   still needed. Historical charge validation does not resolve this new report.
 - New work: #113 dedicated Skitarii support, #114 servo-skull objective hacking,
   and #115 ranged-engagement diagnosis before choosing a distance control.
-- Four-person/DLC-profile request recorded under #28. Tertium 7 file 5878 requires
-  Nexus login; the browser relay was unavailable. Exact controls remain unverified
-  until its archive or a settings screenshot is available.
+- Four-person/DLC-profile question under #28 resolved from the supplied Tertium 7
+  archive: uncheck the misleading **Enable 4 bots** option while leaving the mod
+  enabled. Its count hook returns the upstream count and profile assignment stays
+  active. Archive-hook smoke check passed; no in-game validation performed.
 
 ### Unreleased (after v1.1.1)
 - **Hotfix pending**: smart-tag pickup routing and BetterBots pickup-order policy hooks now exit outside local SoloPlay before touching bot pickup state. The local-session guard consumes SoloPlay's `is_soloplay()` helper and Darktide's `Managers.multiplayer_session:host_type()` (`singleplay` / `singleplay_backend_session`), with `host_singleplay` only as a fallback because real SoloPlay mission logs can leave that game-mode flag false. This fixes a Nexus report where marking ammo in public/Havoc could call `Ammo.reserve_ammo_is_full` on a dedicated-server client husk visual-loadout extension that lacks `slot_configuration_by_type`, and also hardens the adjacent `BotOrder.pickup` hook against the same public-match leakage class.
