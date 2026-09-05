@@ -2,6 +2,19 @@
 
 ## Current work
 
+### September 3, 2026: Nexus report triage
+
+- Repaired the visual-loadout patch-check anchor for engine `0f0cb459` (1.12.5),
+  with red/green cases for a moved lookup and cross-function false matches. No
+  gameplay code changed.
+- Arbites charge report tracked under #13; current-session logs and settings are
+  still needed. Historical charge validation does not resolve this new report.
+- New work: #113 dedicated Skitarii support, #114 servo-skull objective hacking,
+  and #115 ranged-engagement diagnosis before choosing a distance control.
+- Four-person/DLC-profile request recorded under #28. Tertium 7 file 5878 requires
+  Nexus login; the browser relay was unavailable. Exact controls remain unverified
+  until its archive or a settings screenshot is available.
+
 ### Unreleased (after v1.1.1)
 - **Hotfix pending**: smart-tag pickup routing and BetterBots pickup-order policy hooks now exit outside local SoloPlay before touching bot pickup state. The local-session guard consumes SoloPlay's `is_soloplay()` helper and Darktide's `Managers.multiplayer_session:host_type()` (`singleplay` / `singleplay_backend_session`), with `host_singleplay` only as a fallback because real SoloPlay mission logs can leave that game-mode flag false. This fixes a Nexus report where marking ammo in public/Havoc could call `Ammo.reserve_ammo_is_full` on a dedicated-server client husk visual-loadout extension that lacks `slot_configuration_by_type`, and also hardens the adjacent `BotOrder.pickup` hook against the same public-match leakage class.
 - **Tag-follow-up pending**: latest SoloPlay validation showed ammo, stims, books, and crates working through smart-tags, while tagged medicae stations and `small_grenade` pickups still needed follow-up. Explicit `small_grenade` smart-tags now survive the later human-reserve scan without transferring tag permission to a different nearby grenade. Tagged medicae stations now become per-bot explicit station reservations, so the selected bot can keep the specific station after the short global tag window expires; once the bot passes medicae state checks and is within its engine interaction-distance radius, BetterBots opens the vanilla health-station interaction instead of refreshing the path again, and server-side `HealthStationInteraction.stop(result == "success")` now logs whether a bot heal was applied or the stop was a no-op, with precise health/corruption/charge deltas. Normal bot-health, human-priority, bot-priority, and Martyrdom guards still apply before station use.

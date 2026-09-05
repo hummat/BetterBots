@@ -271,6 +271,19 @@ Lower ROI for now: `#80` and `#22` are architectural follow-ups; `#86` is cool b
 |---|-------|---------|
 | 8 | Hive Scum ability support | DLC-blocked (Hive Scum / `broker` archetype not owned) |
 
+## September 2026 Nexus follow-ups
+
+Source audit: engine `0f0cb459` (1.12.5). These are investigation/support tasks,
+not shipped behavior changes.
+
+| # | Scope | Next evidence |
+|---|-------|---------------|
+| 13 | Arbites charge report | Fresh mission log, versions, Break the Line build and settings; distinguish heuristic holds from nav rejection and failed execution. |
+| 113 | Dedicated Skitarii support | Audit combat/blitz variants and validate each supported path; existing generic activation is not class-wide validation. |
+| 114 | Servo-skull objective hacking | Test bot-owned command routing through the engine decoding/hacking path, separately from combat support. |
+| 115 | Longer ranged engagements | Identify the blocking selection, follow, or firing decision before choosing a setting. |
+| 28 | Four-person team with DLC profiles | Current Tertium 7 archive or settings screenshot; older Tertium 6 controls do not establish Tertium 7 behavior. |
+
 ## Design principles
 
 1. **Don't break what works.** Vanilla bot combat (melee, shoot, revive, rescue, follow) must remain functional. Every change is additive.

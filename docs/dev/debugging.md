@@ -390,6 +390,19 @@ Tests are enforced by CI — `make check-ci` depends on `test`, and CI installs
 busted via luarocks. Engine contracts are also enforced by CI through
 `patch-check`, which requires a sibling `../Darktide-Source-Code` checkout.
 
+**Visual-loadout anchor fails after a harmless lookup move:** engine 1.12.5
+(`0f0cb459`) resolves `weapon_template` before changing the wielded slot; the old
+anchor required the reverse order. BetterBots redirects the slot argument before
+calling the engine function (`weapon_action.lua:817-868`), so the earlier lookup
+still receives the redirected slot. The check accepts either lookup position but
+requires lookup and wield before animation setup, within the same function body.
+`runtime_contracts_spec.lua` exercises the actual ripgrep pattern against both
+layouts, missing/reordered steps, and a later-function decoy. The prior suite
+passed 1718 tests without covering this checker; the new cases failed on both the
+lookup move and the cross-function false match before the anchor repair. This
+format-aware anchor follows the decompiler's indented bodies; it is not a Lua
+semantic proof or a substitute for the cold-boot animation checks.
+
 ### Engine stubs
 
 Phase 1 tests need no engine stubs for the pure heuristic functions. The `resolve_decision` tests use a minimal `ScriptUnit` stub (returns nil for all extensions, so `build_context` produces default zeros). See `test_helper.setup_engine_stubs()`.

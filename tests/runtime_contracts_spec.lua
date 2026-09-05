@@ -157,3 +157,53 @@ describe("runtime contracts", function()
 		assert.equals(0.35, scheduled[1].retry_delay_s)
 	end)
 end)
+
+describe("visual-loadout patch contract", function()
+	local function accepts(body)
+		local script = assert(io.open("scripts/patch-check.sh", "r"))
+		local source = script:read("*a")
+		script:close()
+		local anchor = assert(
+			source:match(
+				[["scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout.lua"%s*\%s*'(.-)']]
+			)
+		)
+		local path = os.tmpname()
+		local fixture = assert(io.open(path, "w"))
+		fixture:write(
+			"PlayerUnitVisualLoadout.wield_slot = function (slot_to_wield, player_unit, t, skip_wield_action)\n",
+			body,
+			"\nend\n"
+		)
+		fixture:close()
+		local function quote(value)
+			return "'" .. value:gsub("'", "'\"'\"'") .. "'"
+		end
+		local ok, _, status = os.execute("rg -qU -e " .. quote(anchor) .. " -- " .. quote(path))
+		os.remove(path)
+		assert.is_true(ok == true or status == 1, "ripgrep failed to evaluate the contract")
+		return ok == true
+	end
+
+	local lookup = "\tlocal weapon_template = visual_loadout_extension:weapon_template_from_slot(slot_to_wield)"
+	local wield = "\tvisual_loadout_extension:wield_slot(slot_to_wield)"
+	local animate = "\tanimation_extension:inventory_slot_wielded(weapon_template, t)"
+
+	it("accepts the template lookup before or after the slot change", function()
+		assert.is_true(accepts(lookup .. "\n\t-- intervening engine work\n\n" .. wield .. "\n" .. animate))
+		assert.is_true(accepts(wield .. "\n" .. lookup .. "\n" .. animate))
+	end)
+
+	it("rejects missing steps and animation before the slot change", function()
+		assert.is_false(accepts(wield .. "\n" .. animate))
+		assert.is_false(accepts(lookup .. "\n" .. animate))
+		assert.is_false(accepts(lookup .. "\n" .. wield))
+		assert.is_false(accepts(lookup .. "\n" .. animate .. "\n" .. wield))
+	end)
+
+	it("cannot borrow the required operations from a later function", function()
+		assert.is_false(
+			accepts("end\nPlayerUnitVisualLoadout.other = function ()\n" .. wield .. "\n" .. lookup .. "\n" .. animate)
+		)
+	end)
+end)

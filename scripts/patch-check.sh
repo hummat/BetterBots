@@ -441,9 +441,11 @@ check_anchor_multiline \
 	"scripts/extension_systems/animation/authoritative_player_unit_animation_extension.lua" \
 	'AuthoritativePlayerUnitAnimationExtension\.anim_event_1p = function \(self, event_name\)\s+local fp_unit = self\._first_person_unit\s+local event_index = Unit\.animation_event\(fp_unit, event_name\)' \
 	"first-person animation event hook contract"
+# Keep all three steps inside the indented wield_slot body. The template lookup
+# may precede or follow the slot change, but both must precede animation setup.
 check_anchor_multiline \
 	"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout.lua" \
-	'PlayerUnitVisualLoadout\.wield_slot = function \(slot_to_wield, player_unit, t, skip_wield_action\)[\s\S]*?visual_loadout_extension:wield_slot\(slot_to_wield\)\s+local weapon_template = visual_loadout_extension:weapon_template_from_slot\(slot_to_wield\)\s+animation_extension:inventory_slot_wielded\(weapon_template, t\)' \
+	'(?m)^PlayerUnitVisualLoadout\.wield_slot = function \(slot_to_wield, player_unit, t, skip_wield_action\)\n(?:[ \t]+[^\n]*\n|\n)*[ \t]+(?:local weapon_template = visual_loadout_extension:weapon_template_from_slot\(slot_to_wield\)\n(?:[ \t]+[^\n]*\n|\n)*[ \t]+visual_loadout_extension:wield_slot\(slot_to_wield\)|visual_loadout_extension:wield_slot\(slot_to_wield\)\n(?:[ \t]+[^\n]*\n|\n)*[ \t]+local weapon_template = visual_loadout_extension:weapon_template_from_slot\(slot_to_wield\))\n(?:[ \t]+[^\n]*\n|\n)*[ \t]+animation_extension:inventory_slot_wielded\(weapon_template, t\)' \
 	"visual loadout wield updates animation state machine"
 check_anchor_multiline \
 	"scripts/extension_systems/character_state_machine/character_states/player_character_state_catapulted.lua" \

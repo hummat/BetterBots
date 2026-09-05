@@ -99,24 +99,34 @@ Maps bot slot number → mod setting dropdown → cached profile. Falls back to 
 
 ---
 
-## 3. Tertium 6 (KristopherPrime) — MEDIUM
+## 3. Tertium 6 / Tertium 7 (KristopherPrime) — MEDIUM
 
-**What it does:** Fork of Tertium 5 (temporary, pending upstream update). Supports all 6 classes including Arbites and Hive Scum. Adds player character + 5 bots. Named "temporary" by author.
+**Source:** [Nexus Mods #725](https://www.nexusmods.com/warhammer40kdarktide/mods/725?tab=files).
+The June 26, 2026 files list Tertium 6 (file 5880, six-person team) and
+Tertium 7 (file 5878, seven-person team).
 
-**Source:** [Nexus Mods #725](https://www.nexusmods.com/warhammer40kdarktide/mods/725)
+### Verified older Tertium 6 implementation
 
-### Key findings
+The local `Tertium_6_1_ke28WeoFq.rar` archive contains character-profile dropdowns
+and a separate `four_bots` checkbox. Its English label is `Enable 6 bots`, but its
+`PlayerUnitSpawnManager._num_available_bot_slots` hook adds **two** slots when
+enabled and otherwise returns the upstream count. Character assignment is
+independent of that toggle (`Tertium4Or5.lua`, `Tertium4Or5_data.lua`, and
+`Tertium4Or5_localization.lua` inside the archive). This is evidence for that
+archive only, not for the current Tertium 6 or Tertium 7 downloads.
 
-- Fixes the Arbites/Hive Scum crash in Tertium 5's `fetch_all_profiles` path
-- Same `attack_meta_data` injection approach as Tertium 5
-- No ability-related code — strictly weapons + profiles
-- Recommended alternative when Tertium 5 crashes on newer classes
+### Tertium 7 squad-size question
 
-### Relevance to BetterBots
+The September 2 Nexus report asks for a four-person team while retaining DLC
+profiles. The current Tertium 7 archive is not available locally; its public
+download redirects to Nexus login and the browser relay was unavailable during
+the September 3 audit. Obtain the archive or settings screenshot before giving
+exact toggle instructions. Follow-up: #28.
 
-- Drop-in replacement for Tertium 5 when testing Arbites/Hive Scum bots
-- No conflicts with BetterBots
-- Monitors same mod settings pattern for bot slot → profile mapping
+BetterBots does not remove bot slots. `bot_profiles.lua:453-499` preserves real
+external profiles and returns the incoming profile for its `none` choice. Profile
+selection and team size are separate concerns; leaving a profile unassigned is
+not a verified way to remove a bot.
 
 ---
 
