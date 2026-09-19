@@ -1955,10 +1955,11 @@ describe("startup regressions", function()
 		assert.equals(1, count)
 	end)
 
-	it("is idempotent on _update_target_enemy install across hot-reload (file re-execution)", function()
-		-- Simulates Ctrl+Shift+R: BetterBots.lua re-executes, module-level
-		-- locals reset, but BotPerceptionExtension class table persists.
-		-- Sentinel must live on the class, not in a module-level local.
+	it("reinstalls the _update_target_enemy hook after a hot reload (file re-execution)", function()
+		-- Simulates Ctrl+Shift+R: DMF's hooks_unload restores every engine method
+		-- and drops all mod hooks, then BetterBots.lua re-executes while the
+		-- BotPerceptionExtension class table survives. The install guard must die
+		-- with the load, otherwise the bot runs unhooked vanilla code (#116).
 		local perception_ext = { _update_target_enemy = function() end }
 
 		local harness1 = make_bootstrap_harness()
@@ -1969,17 +1970,11 @@ describe("startup regressions", function()
 		harness2:load()
 		harness2:invoke_hook_require("scripts/extension_systems/perception/bot_perception_extension", perception_ext)
 
-		local count = 0
-		for _, reg in ipairs(harness2.hook_registrations) do
-			if reg.target == perception_ext and reg.method == "_update_target_enemy" then
-				count = count + 1
-			end
-		end
-
-		assert.equals(0, count)
+		assert.equals(1, count_hooks(harness1.hook_registrations, perception_ext, "_update_target_enemy", "hook"))
+		assert.equals(1, count_hooks(harness2.hook_registrations, perception_ext, "_update_target_enemy", "hook"))
 	end)
 
-	it("is idempotent on _refresh_destination install across hot-reload (file re-execution)", function()
+	it("reinstalls _refresh_destination hooks after a hot reload (file re-execution)", function()
 		local behavior_ext = {
 			_refresh_destination = function() end,
 			_verify_target_ally_aid_destination = function() end,
@@ -1995,16 +1990,17 @@ describe("startup regressions", function()
 		harness2:load()
 		harness2:invoke_hook_require("scripts/extension_systems/behavior/bot_behavior_extension", behavior_ext)
 
-		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(1, count_hooks(harness1.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
+		assert.equals(1, count_hooks(harness2.hook_registrations, behavior_ext, "_refresh_destination", "hook_safe"))
 		assert.equals(
-			0,
+			1,
 			count_hooks(harness2.hook_registrations, behavior_ext, "_verify_target_ally_aid_destination", "hook_safe")
 		)
-		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
-		assert.equals(0, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
+		assert.equals(1, count_hooks(harness2.hook_registrations, behavior_ext, "_init_blackboard_components", "hook"))
+		assert.equals(1, count_hooks(harness2.hook_registrations, behavior_ext, "update", "hook_safe"))
 	end)
 
-	it("is idempotent on BotGroup hook installation across hot-reload (file re-execution)", function()
+	it("reinstalls BotGroup hooks after a hot reload (file re-execution)", function()
 		local bot_group = {
 			init = function() end,
 			_update_mule_pickups = function() end,
@@ -2019,17 +2015,70 @@ describe("startup regressions", function()
 		harness2:load()
 		harness2:invoke_hook_require("scripts/extension_systems/group/bot_group", bot_group)
 
-		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "init", "hook_safe"))
-		assert.equals(0, count_hooks(harness2.hook_registrations, bot_group, "_update_mule_pickups", "hook_safe"))
-		assert.equals(
-			0,
-			count_hooks(
-				harness2.hook_registrations,
-				bot_group,
-				"_update_pickups_and_deployables_near_player",
-				"hook_safe"
+		assert.equals(1, count_install_calls(harness1.install_calls, "HealingDeferral", "install_bot_group_hooks"))
+		assert.equals(1, count_install_calls(harness2.install_calls, "HealingDeferral", "install_bot_group_hooks"))
+		assert.equals(1, count_install_calls(harness2.install_calls, "MulePickup", "install_bot_group_hooks"))
+		assert.equals(1, count_install_calls(harness2.install_calls, "HazardAvoidance", "install_bot_group_hooks"))
+	end)
+
+	it("wires the pristine engine value registry into every raw-replacement module (#116)", function()
+		-- These modules replace engine fields outright instead of using
+		-- mod:hook, so DMF never restores them. Without the shared registry
+		-- each reload wraps the previous load's wrapper.
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		for _, module_name in ipairs({
+			"HumanLikeness",
+			"SuppressionGuard",
+			"WeaponAction",
+			"ConditionPatch",
+			"ReviveAbility",
+		}) do
+			local init_call = find_named_call(harness.init_calls, module_name)
+			assert.is_truthy(init_call, module_name .. " was never initialised")
+			assert.is_function(
+				init_call.deps.pristine_engine_value,
+				module_name .. " is missing the pristine_engine_value dep"
 			)
-		)
+		end
+	end)
+
+	it("never stores a process-lifetime boolean in a hook-install sentinel (#116)", function()
+		-- DMF removes every mod hook on reload but the engine class table keeps
+		-- whatever we wrote on it. A `true` sentinel therefore permanently
+		-- disables the installer; the value must be the per-load module table.
+		local offenders = {}
+
+		each_mod_source_file(function(path)
+			local line_number = 0
+			for line in read_file(path):gmatch("[^\n]*") do
+				line_number = line_number + 1
+				if line:match("%[[%w_]*SENTINEL[%w_]*%]%s*=%s*true") then
+					offenders[#offenders + 1] = path .. ":" .. line_number
+				end
+			end
+		end)
+
+		assert.same({}, offenders)
+	end)
+
+	it("compares hook-install sentinels against a per-load token (#116)", function()
+		local offenders = {}
+
+		each_mod_source_file(function(path)
+			local line_number = 0
+			for line in read_file(path):gmatch("[^\n]*") do
+				line_number = line_number + 1
+				local reads_sentinel = line:match("%[[%w_]*SENTINEL[%w_]*%]")
+					and not line:match("%[[%w_]*SENTINEL[%w_]*%]%s*=")
+				if reads_sentinel and not line:match("==") then
+					offenders[#offenders + 1] = path .. ":" .. line_number
+				end
+			end
+		end)
+
+		assert.same({}, offenders)
 	end)
 
 	it("fails bootstrap when a required module API is missing", function()

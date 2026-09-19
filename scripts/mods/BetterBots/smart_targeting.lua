@@ -2,6 +2,7 @@
 -- Keeps vanilla sticky/range validation by swapping the candidate unit only
 -- for the duration of SmartTargetingActionModule.fixed_update().
 local _mod -- luacheck: ignore 231
+local M
 
 local function _hook_require_now(path, callback)
 	local hook_require_now = _mod and _mod.hook_require_now
@@ -61,11 +62,11 @@ local function resolve_precision_target_unit(perception_component)
 end
 
 local function install_fixed_update_hook(TargetingActionModule)
-	if not TargetingActionModule or rawget(TargetingActionModule, SMART_TARGETING_PATCH_SENTINEL) then
+	if not TargetingActionModule or rawget(TargetingActionModule, SMART_TARGETING_PATCH_SENTINEL) == M then
 		return
 	end
 
-	TargetingActionModule[SMART_TARGETING_PATCH_SENTINEL] = true
+	TargetingActionModule[SMART_TARGETING_PATCH_SENTINEL] = M
 
 	_mod:hook(TargetingActionModule, "fixed_update", function(func, self, dt, t)
 		if _is_enabled and not _is_enabled() then
@@ -138,7 +139,7 @@ local function register_hooks()
 	end
 end
 
-return {
+M = {
 	init = function(deps)
 		_mod = deps.mod
 		_debug_log = deps.debug_log
@@ -153,3 +154,5 @@ return {
 	resolve_bot_target_unit = resolve_bot_target_unit,
 	resolve_precision_target_unit = resolve_precision_target_unit,
 }
+
+return M

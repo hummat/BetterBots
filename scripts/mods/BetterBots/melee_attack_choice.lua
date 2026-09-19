@@ -860,11 +860,14 @@ end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
 function M.install_melee_hooks(BtBotMeleeAction)
-	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) then
+	-- The sentinel stores this module instance, not `true`: DMF drops every mod
+	-- hook on Ctrl+Shift+R while the engine class table survives, so only a guard
+	-- that dies with the module load reinstalls after a reload (#116).
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = true
+	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = M
 
 	_mod:hook(BtBotMeleeAction, "enter", function(func, self, unit, breed, blackboard, scratchpad, action_data, t)
 		func(self, unit, breed, blackboard, scratchpad, action_data, t)
@@ -885,7 +888,12 @@ function M.install_melee_hooks(BtBotMeleeAction)
 
 	_mod:hook(BtBotMeleeAction, "_choose_attack", function(func, self, target_unit, target_breed, scratchpad)
 		if _is_enabled and not _is_enabled() then
-			return func(self, target_unit, target_breed, scratchpad)
+			-- Vanilla scores every entry of weapon_template.attack_meta_data, so a
+			-- ranged template's string fields (unaim_action_name = "action_unzoom")
+			-- can win and crash _calculate_melee_range on max_range (#116).
+			local vanilla_choice = func(self, target_unit, target_breed, scratchpad)
+
+			return normalize_attack_meta_data(vanilla_choice) or DEFAULT_ATTACK_META_DATA.light_attack
 		end
 		local num_enemies = scratchpad.num_enemies_in_proximity or 0
 		local armor = _armor_api()

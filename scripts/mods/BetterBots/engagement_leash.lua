@@ -170,11 +170,11 @@ end
 
 -- Called from the consolidated bt_bot_melee_action hook_require in BetterBots.lua (#67).
 function M.install_melee_hooks(BtBotMeleeAction)
-	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) then
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, MELEE_HOOK_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = true
+	BtBotMeleeAction[MELEE_HOOK_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		BtBotMeleeAction,

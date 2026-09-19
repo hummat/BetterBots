@@ -555,11 +555,11 @@ function M.init(deps)
 end
 
 function M.install_hazard_prop_hooks(HazardPropExtension)
-	if not HazardPropExtension or rawget(HazardPropExtension, HAZARD_PROP_SENTINEL) then
+	if not HazardPropExtension or rawget(HazardPropExtension, HAZARD_PROP_SENTINEL) == M then
 		return
 	end
 
-	HazardPropExtension[HAZARD_PROP_SENTINEL] = true
+	HazardPropExtension[HAZARD_PROP_SENTINEL] = M
 
 	_mod:hook(HazardPropExtension, "set_current_state", function(func, self, state)
 		local previous_state = self and self.current_state and self:current_state() or self and self._state
@@ -575,11 +575,11 @@ function M.install_hazard_prop_hooks(HazardPropExtension)
 end
 
 function M.install_bot_group_hooks(BotGroup)
-	if not BotGroup or rawget(BotGroup, BOT_GROUP_SENTINEL) then
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_SENTINEL) == M then
 		return
 	end
 
-	BotGroup[BOT_GROUP_SENTINEL] = true
+	BotGroup[BOT_GROUP_SENTINEL] = M
 
 	_mod:hook(BotGroup, "aoe_threat_created", function(func, self, position, shape, size, rotation, duration)
 		if not _is_debug_enabled() then

@@ -1593,4 +1593,102 @@ describe("condition_patch", function()
 			assert.is_false(call(conditions, false))
 		end)
 	end)
+
+	describe("hot reload", function()
+		it("re-wraps pristine conditions instead of the previous load's wrappers (#116)", function()
+			local store = setmetatable({}, { __mode = "k" })
+			local function pristine_engine_value(target, key)
+				local captured = store[target]
+				if not captured then
+					captured = {}
+					store[target] = captured
+				end
+				if captured[key] == nil then
+					captured[key] = target[key]
+				end
+
+				return captured[key]
+			end
+
+			local avoidance_checks = 0
+			local conditions = {
+				bot_in_melee_range = function()
+					return true
+				end,
+				can_activate_ability = function()
+					return false
+				end,
+			}
+
+			-- Condition tables are patched by direct field replacement, which
+			-- DMF never restores, so a reload must take the wrapper over rather
+			-- than wrap the previous load's wrapper again.
+			local function load_and_install()
+				local Reloaded = dofile("scripts/mods/BetterBots/condition_patch.lua")
+				Reloaded.init({
+					shared_rules = SharedRules,
+					mod = { echo = function() end, hook_require = function() end },
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+					fixed_time = function()
+						return 0
+					end,
+					pristine_engine_value = pristine_engine_value,
+					is_near_daemonhost = function()
+						return false
+					end,
+					is_position_near_daemonhost = function()
+						return false
+					end,
+					is_suppressed = function()
+						return false
+					end,
+					equipped_combat_ability_name = function()
+						return "none"
+					end,
+					is_daemonhost_avoidance_enabled = function()
+						avoidance_checks = avoidance_checks + 1
+						return true
+					end,
+					patched_bt_bot_conditions = {},
+					patched_bt_conditions = {},
+					rescue_intent = {},
+					DEBUG_SKIP_RELIC_LOG_INTERVAL_S = 5,
+					CONDITIONS_PATCH_VERSION = "test",
+				})
+				Reloaded.wire({
+					Heuristics = {
+						resolve_decision = function()
+							return false
+						end,
+					},
+					MetaData = { inject = function() end },
+					Debug = {
+						log_ability_decision = function() end,
+						bot_slot_for_unit = function()
+							return 1
+						end,
+					},
+					EventLog = {
+						is_enabled = function()
+							return false
+						end,
+					},
+				})
+				Reloaded._install_condition_patch(conditions, {}, "test_reload")
+			end
+
+			load_and_install()
+			local first_wrapper = conditions.bot_in_melee_range
+			load_and_install()
+
+			avoidance_checks = 0
+			conditions.bot_in_melee_range("bot1", make_blackboard("enemy_1"), {}, {}, {}, false)
+
+			assert.are_not.equals(first_wrapper, conditions.bot_in_melee_range)
+			assert.equals(1, avoidance_checks)
+		end)
+	end)
 end)

@@ -220,7 +220,7 @@ end
 -- Kept for unit tests; production registration lives in BetterBots.lua.
 -- DMF dedupes hook registrations by (mod, obj, method).
 function M.install_bot_perception_hooks(BotPerceptionExtension)
-	if not BotPerceptionExtension or rawget(BotPerceptionExtension, POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL) then
+	if not BotPerceptionExtension or rawget(BotPerceptionExtension, POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL) == M then
 		return
 	end
 
@@ -229,7 +229,7 @@ function M.install_bot_perception_hooks(BotPerceptionExtension)
 		return
 	end
 
-	BotPerceptionExtension[POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL] = true
+	BotPerceptionExtension[POXBURSTER_BOT_PERCEPTION_PATCH_SENTINEL] = M
 
 	_mod:hook_safe(
 		BotPerceptionExtension,
@@ -246,11 +246,11 @@ end
 -- pushes during lunge within 5m, a power=2000 counter-hit triggers
 -- staggered_during_lunge → instakill → attributed explosion.
 function M.install_melee_hooks(BtBotMeleeAction)
-	if not BtBotMeleeAction or rawget(BtBotMeleeAction, POXBURSTER_MELEE_PATCH_SENTINEL) then
+	if not BtBotMeleeAction or rawget(BtBotMeleeAction, POXBURSTER_MELEE_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BtBotMeleeAction[POXBURSTER_MELEE_PATCH_SENTINEL] = true
+	BtBotMeleeAction[POXBURSTER_MELEE_PATCH_SENTINEL] = M
 
 	-- Defend gate: vanilla requires num_melee_attackers > 0, but an
 	-- approaching poxburster hasn't attacked yet. Override so the bot

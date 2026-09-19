@@ -27,6 +27,18 @@ local _weapon_action_logging
 local _weapon_action_shoot
 local _weapon_action_voidblast
 local _missing_shoot_extension_warned = {}
+local _pristine_engine_value
+
+-- Overheat.slot_percentage is replaced outright instead of hooked, so DMF's
+-- hooks_unload leaves our wrapper in place across a reload. Re-wrap the
+-- remembered vanilla function rather than the previous wrapper (#116).
+local function _pristine(target, key)
+	if _pristine_engine_value then
+		return _pristine_engine_value(target, key)
+	end
+
+	return target[key]
+end
 
 local OVERHEAT_PATCH_SENTINEL = "__bb_overheat_slot_percentage_installed"
 local SHOOT_ACTION_PATCH_SENTINEL = "__bb_weapon_action_bt_bot_shoot_action_installed"
@@ -67,6 +79,7 @@ function M.init(deps)
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
 	_perf = deps.perf
+	_pristine_engine_value = deps.pristine_engine_value
 	_is_enabled = deps.is_enabled
 	_close_range_ranged_policy = deps.close_range_ranged_policy
 	_warp_weapon_peril_threshold = deps.warp_weapon_peril_threshold
@@ -128,12 +141,14 @@ function M.register_hooks(deps)
 	-- warp_charge.current_percentage so should_vent_overheat triggers for peril.
 	-- Also guards against plasma-style nested thresholds that crash vanilla.
 	_hook_require_now("scripts/utilities/overheat", function(Overheat)
-		if not Overheat or rawget(Overheat, OVERHEAT_PATCH_SENTINEL) then
+		if not Overheat or rawget(Overheat, OVERHEAT_PATCH_SENTINEL) == M then
 			return
 		end
-		Overheat[OVERHEAT_PATCH_SENTINEL] = true
+		Overheat[OVERHEAT_PATCH_SENTINEL] = M
 
-		local _orig_slot_percentage = Overheat.slot_percentage
+		-- Raw replacement, not a DMF hook: a reload leaves our old wrapper in
+		-- place, so re-wrap the remembered vanilla function instead (#116).
+		local _orig_slot_percentage = _pristine(Overheat, "slot_percentage")
 		Overheat.slot_percentage = function(unit, slot_name, threshold_type)
 			local vis_ext = ScriptUnit.has_extension(unit, "visual_loadout_system")
 			if vis_ext then
@@ -171,11 +186,11 @@ function M.register_hooks(deps)
 				end
 				return
 			end
-			if _shoot_action_hooks_installed or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) then
+			if _shoot_action_hooks_installed or rawget(BtBotShootAction, SHOOT_ACTION_PATCH_SENTINEL) == M then
 				return
 			end
 			_shoot_action_hooks_installed = true
-			BtBotShootAction[SHOOT_ACTION_PATCH_SENTINEL] = true
+			BtBotShootAction[SHOOT_ACTION_PATCH_SENTINEL] = M
 
 			local PlayerUnitVisualLoadout =
 				require("scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout")
@@ -611,12 +626,12 @@ function M.register_hooks(deps)
 		function(PlayerUnitActionInputExtension)
 			if
 				not PlayerUnitActionInputExtension
-				or rawget(PlayerUnitActionInputExtension, ACTION_INPUT_PATCH_SENTINEL)
+				or rawget(PlayerUnitActionInputExtension, ACTION_INPUT_PATCH_SENTINEL) == M
 			then
 				return
 			end
 
-			PlayerUnitActionInputExtension[ACTION_INPUT_PATCH_SENTINEL] = true
+			PlayerUnitActionInputExtension[ACTION_INPUT_PATCH_SENTINEL] = M
 
 			_mod:hook_safe(PlayerUnitActionInputExtension, "extensions_ready", function(self, _world, unit)
 				self._betterbots_player_unit = unit
@@ -805,11 +820,11 @@ function M.register_hooks(deps)
 	_hook_require_now(
 		"scripts/extension_systems/visual_loadout/utilities/player_unit_visual_loadout",
 		function(PlayerUnitVisualLoadout)
-			if not PlayerUnitVisualLoadout or rawget(PlayerUnitVisualLoadout, VISUAL_LOADOUT_PATCH_SENTINEL) then
+			if not PlayerUnitVisualLoadout or rawget(PlayerUnitVisualLoadout, VISUAL_LOADOUT_PATCH_SENTINEL) == M then
 				return
 			end
 
-			PlayerUnitVisualLoadout[VISUAL_LOADOUT_PATCH_SENTINEL] = true
+			PlayerUnitVisualLoadout[VISUAL_LOADOUT_PATCH_SENTINEL] = M
 
 			_mod:hook(
 				PlayerUnitVisualLoadout,
@@ -878,11 +893,11 @@ function M.register_hooks(deps)
 	-- WeaponSystem.queue_perils_of_the_warp_elite_kills_achievement calls
 	-- player:account_id() unconditionally; bot-backed player objects can return nil.
 	_hook_require_now("scripts/extension_systems/weapon/weapon_system", function(WeaponSystem)
-		if not WeaponSystem or rawget(WeaponSystem, WEAPON_SYSTEM_PATCH_SENTINEL) then
+		if not WeaponSystem or rawget(WeaponSystem, WEAPON_SYSTEM_PATCH_SENTINEL) == M then
 			return
 		end
 
-		WeaponSystem[WEAPON_SYSTEM_PATCH_SENTINEL] = true
+		WeaponSystem[WEAPON_SYSTEM_PATCH_SENTINEL] = M
 
 		_mod:hook(
 			WeaponSystem,

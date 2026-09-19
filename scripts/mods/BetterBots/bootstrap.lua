@@ -219,6 +219,7 @@ function M.load_and_init(ctx)
 		mod = mod,
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
+		pristine_engine_value = ctx.pristine_engine_value,
 		get_timing_config = Settings.resolve_human_timing_config,
 		get_pressure_leash_config = Settings.resolve_pressure_leash_config,
 	})
@@ -507,6 +508,7 @@ function M.load_and_init(ctx)
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
 		fixed_time = ctx.fixed_time,
+		pristine_engine_value = ctx.pristine_engine_value,
 	})
 
 	SmartTargeting.init({
@@ -531,6 +533,7 @@ function M.load_and_init(ctx)
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
 		fixed_time = ctx.fixed_time,
+		pristine_engine_value = ctx.pristine_engine_value,
 		bot_slot_for_unit = Debug.bot_slot_for_unit,
 		perf = Perf,
 		close_range_ranged_policy = RangedMetaData.close_range_ranged_policy,
@@ -582,6 +585,7 @@ function M.load_and_init(ctx)
 		patched_bt_bot_conditions = ctx.patched_bt_bot_conditions,
 		patched_bt_conditions = ctx.patched_bt_conditions,
 		rescue_intent = ctx.rescue_intent,
+		pristine_engine_value = ctx.pristine_engine_value,
 		DEBUG_SKIP_RELIC_LOG_INTERVAL_S = ctx.DEBUG_SKIP_RELIC_LOG_INTERVAL_S,
 		CONDITIONS_PATCH_VERSION = ctx.CONDITIONS_PATCH_VERSION,
 		perf = Perf,
@@ -617,6 +621,7 @@ function M.load_and_init(ctx)
 		debug_log = ctx.debug_log,
 		debug_enabled = ctx.debug_enabled,
 		fixed_time = ctx.fixed_time,
+		pristine_engine_value = ctx.pristine_engine_value,
 		is_suppressed = ctx.is_suppressed,
 		equipped_combat_ability_name = ctx.equipped_combat_ability_name,
 		fallback_state_by_unit = ctx.fallback_state_by_unit,

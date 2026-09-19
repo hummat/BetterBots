@@ -167,11 +167,11 @@ function M.has_recent_health_request(human_units)
 end
 
 function M.install_hooks(Vo)
-	if not Vo or rawget(Vo, VO_PATCH_SENTINEL) then
+	if not Vo or rawget(Vo, VO_PATCH_SENTINEL) == M then
 		return
 	end
 
-	Vo[VO_PATCH_SENTINEL] = true
+	Vo[VO_PATCH_SENTINEL] = M
 
 	_mod:hook(Vo, "on_demand_vo_event", function(func, unit, concept, trigger_id, target_unit)
 		local result = func(unit, concept, trigger_id, target_unit)

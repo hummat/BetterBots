@@ -136,6 +136,64 @@ describe("human_likeness", function()
 		assert.equals(20, BotSettings.opportunity_target_reaction_times.normal.max)
 	end)
 
+	it("restores true vanilla reaction times after a hot reload (#116)", function()
+		-- A reload re-runs patch_bot_settings against already patched values;
+		-- without a baseline that outlives the load, 2/4 becomes the "vanilla"
+		-- restore target and toggling the feature off never comes back to 10/20.
+		local store = setmetatable({}, { __mode = "k" })
+		local function pristine_engine_value(target, key)
+			local captured = store[target]
+			if not captured then
+				captured = {}
+				store[target] = captured
+			end
+			if captured[key] == nil then
+				captured[key] = target[key]
+			end
+
+			return captured[key]
+		end
+
+		local BotSettings = {
+			opportunity_target_reaction_times = {
+				normal = { min = 10, max = 20 },
+			},
+		}
+		local enabled = true
+		local function load_and_patch()
+			local Reloaded = dofile("scripts/mods/BetterBots/human_likeness.lua")
+			Reloaded.init({
+				pristine_engine_value = pristine_engine_value,
+				get_timing_config = function()
+					return {
+						enabled = enabled,
+						reaction_min = 2,
+						reaction_max = 4,
+						defensive_jitter_min_s = 0.10,
+						defensive_jitter_max_s = 0.25,
+						opportunistic_jitter_min_s = 0.25,
+						opportunistic_jitter_max_s = 0.70,
+					}
+				end,
+				get_pressure_leash_config = function()
+					return { enabled = false }
+				end,
+			})
+			Reloaded.patch_bot_settings(BotSettings)
+
+			return Reloaded
+		end
+
+		load_and_patch()
+		local Reloaded = load_and_patch()
+
+		enabled = false
+		Reloaded.patch_bot_settings(BotSettings)
+
+		assert.equals(10, BotSettings.opportunity_target_reaction_times.normal.min)
+		assert.equals(20, BotSettings.opportunity_target_reaction_times.normal.max)
+	end)
+
 	it("classifies emergency rules as immediate timing", function()
 		HumanLikeness.init({})
 

@@ -1,7 +1,24 @@
 local M = {}
 
 local _mod
+local _pristine_engine_value
+-- Fallback only: without the persistent registry a reload would capture our own
+-- patched reaction times as the "vanilla" baseline (#116).
 local _original_bot_settings = setmetatable({}, { __mode = "k" })
+
+local function _vanilla_reaction_time(normal, key)
+	if _pristine_engine_value then
+		return _pristine_engine_value(normal, key)
+	end
+
+	local original = _original_bot_settings[normal]
+	if not original then
+		original = { min = normal.min, max = normal.max }
+		_original_bot_settings[normal] = original
+	end
+
+	return original[key]
+end
 local _warned_missing_reaction_times_shape = false
 
 local _debug_log
@@ -37,6 +54,7 @@ end
 
 function M.init(deps)
 	_mod = deps.mod
+	_pristine_engine_value = deps.pristine_engine_value
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_get_timing_config = deps.get_timing_config
@@ -60,14 +78,14 @@ local function _pressure_leash_config()
 	return DEFAULT_PRESSURE_LEASH_CONFIG
 end
 
-local function _restore_original_bot_settings(bot_settings, normal)
-	local original = _original_bot_settings[bot_settings]
-	if not original then
+local function _restore_original_bot_settings(normal)
+	local min, max = _vanilla_reaction_time(normal, "min"), _vanilla_reaction_time(normal, "max")
+	if min == nil or max == nil then
 		return false
 	end
 
-	normal.min = original.min
-	normal.max = original.max
+	normal.min = min
+	normal.max = max
 
 	return true
 end
@@ -90,17 +108,16 @@ function M.patch_bot_settings(bot_settings)
 		return
 	end
 
-	if not _original_bot_settings[bot_settings] then
-		_original_bot_settings[bot_settings] = {
-			min = normal.min,
-			max = normal.max,
-		}
-	end
+	-- Capture the vanilla values before the first overwrite; on later loads the
+	-- registry already holds them, so the restore path stays truthful.
+	local original = {
+		min = _vanilla_reaction_time(normal, "min"),
+		max = _vanilla_reaction_time(normal, "max"),
+	}
 
 	local config = _timing_config()
 	if not config.enabled then
-		local original = _original_bot_settings[bot_settings]
-		if _restore_original_bot_settings(bot_settings, normal) and _debug_enabled and _debug_enabled() then
+		if _restore_original_bot_settings(normal) and _debug_enabled and _debug_enabled() then
 			_debug_log(
 				"human_likeness_restore",
 				0,

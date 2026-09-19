@@ -180,7 +180,7 @@ local function _install_minion_attack_damage_hook(MinionAttack, spec)
 end
 
 local function _install_game_mode_buff_hook(GameMode)
-	if not GameMode or GameMode[GAME_MODE_SENTINEL] then
+	if not GameMode or GameMode[GAME_MODE_SENTINEL] == M then
 		return
 	end
 
@@ -194,7 +194,7 @@ local function _install_game_mode_buff_hook(GameMode)
 		return func(self, player, unit, is_respawn)
 	end)
 
-	GameMode[GAME_MODE_SENTINEL] = true
+	GameMode[GAME_MODE_SENTINEL] = M
 end
 
 function M.init(deps)
@@ -209,7 +209,7 @@ end
 
 function M.register_hooks()
 	_hook_require_now(BOT_SPAWNING_PATH, function(BotSpawning)
-		if not BotSpawning or BotSpawning[BOT_SPAWNING_SENTINEL] then
+		if not BotSpawning or BotSpawning[BOT_SPAWNING_SENTINEL] == M then
 			return
 		end
 
@@ -231,11 +231,11 @@ function M.register_hooks()
 			return identifier
 		end)
 
-		BotSpawning[BOT_SPAWNING_SENTINEL] = true
+		BotSpawning[BOT_SPAWNING_SENTINEL] = M
 	end)
 
 	_hook_require_now(MINION_ATTACK_PATH, function(MinionAttack)
-		if not MinionAttack or MinionAttack[MINION_ATTACK_SENTINEL] then
+		if not MinionAttack or MinionAttack[MINION_ATTACK_SENTINEL] == M then
 			return
 		end
 
@@ -243,7 +243,7 @@ function M.register_hooks()
 			_install_minion_attack_damage_hook(MinionAttack, MINION_ATTACK_DAMAGE_HOOKS[i])
 		end
 
-		MinionAttack[MINION_ATTACK_SENTINEL] = true
+		MinionAttack[MINION_ATTACK_SENTINEL] = M
 	end)
 
 	for i = 1, #GAME_MODE_BUFF_HOOK_PATHS do

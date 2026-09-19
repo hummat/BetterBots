@@ -7,6 +7,17 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _fixed_time
+local _pristine_engine_value
+
+-- Raw field replacement, so DMF's hooks_unload never restores it on reload.
+-- Re-wrap the remembered vanilla function instead of the previous wrapper (#116).
+local function _pristine(target, key)
+	if _pristine_engine_value then
+		return _pristine_engine_value(target, key)
+	end
+
+	return target[key]
+end
 
 local SUPPRESSION_PATH = "scripts/utilities/attack/suppression"
 local SUPPRESSION_SENTINEL = "__bb_suppression_guard_installed"
@@ -94,20 +105,21 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
+	_pristine_engine_value = deps.pristine_engine_value
 end
 
 function M.install(Suppression)
-	if not Suppression or rawget(Suppression, SUPPRESSION_SENTINEL) then
+	if not Suppression or rawget(Suppression, SUPPRESSION_SENTINEL) == M then
 		return
 	end
 
-	local original_apply_suppression = Suppression.apply_suppression
-	local original_area_minion_suppression = Suppression.apply_area_minion_suppression
+	local original_apply_suppression = _pristine(Suppression, "apply_suppression")
+	local original_area_minion_suppression = _pristine(Suppression, "apply_area_minion_suppression")
 	if type(original_apply_suppression) ~= "function" or type(original_area_minion_suppression) ~= "function" then
 		return
 	end
 
-	Suppression[SUPPRESSION_SENTINEL] = true
+	Suppression[SUPPRESSION_SENTINEL] = M
 
 	Suppression.apply_suppression = function(hit_unit, attacking_unit, ...)
 		return _call_guarded(original_apply_suppression, attacking_unit, hit_unit, attacking_unit, ...)

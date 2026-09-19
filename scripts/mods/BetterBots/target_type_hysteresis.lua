@@ -655,7 +655,7 @@ end
 -- (DMF dedupes hook registrations by (mod, obj, method), so per-feature install functions
 -- would silently discard all but the first).
 function M.install_bot_perception_hooks(BotPerceptionExtension)
-	if not BotPerceptionExtension or rawget(BotPerceptionExtension, BOT_PERCEPTION_PATCH_SENTINEL) then
+	if not BotPerceptionExtension or rawget(BotPerceptionExtension, BOT_PERCEPTION_PATCH_SENTINEL) == M then
 		return
 	end
 
@@ -664,7 +664,7 @@ function M.install_bot_perception_hooks(BotPerceptionExtension)
 		return
 	end
 
-	BotPerceptionExtension[BOT_PERCEPTION_PATCH_SENTINEL] = true
+	BotPerceptionExtension[BOT_PERCEPTION_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		BotPerceptionExtension,
@@ -884,12 +884,12 @@ function M.register_hooks()
 		function(BtBotInventorySwitchAction)
 			if
 				not BtBotInventorySwitchAction
-				or rawget(BtBotInventorySwitchAction, INVENTORY_SWITCH_PATCH_SENTINEL)
+				or rawget(BtBotInventorySwitchAction, INVENTORY_SWITCH_PATCH_SENTINEL) == M
 			then
 				return
 			end
 
-			BtBotInventorySwitchAction[INVENTORY_SWITCH_PATCH_SENTINEL] = true
+			BtBotInventorySwitchAction[INVENTORY_SWITCH_PATCH_SENTINEL] = M
 
 			_mod:hook_safe(
 				BtBotInventorySwitchAction,

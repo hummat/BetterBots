@@ -23,7 +23,24 @@ local function with_unit_api(has_node, fn)
 	end
 end
 
-local function init_guard(Suppression, debug_logs)
+local function make_pristine_registry()
+	local store = setmetatable({}, { __mode = "k" })
+
+	return function(target, key)
+		local captured = store[target]
+		if not captured then
+			captured = {}
+			store[target] = captured
+		end
+		if captured[key] == nil then
+			captured[key] = target[key]
+		end
+
+		return captured[key]
+	end
+end
+
+local function init_guard(Suppression, debug_logs, pristine_engine_value)
 	local Guard = load_module()
 
 	Guard.init({
@@ -42,6 +59,7 @@ local function init_guard(Suppression, debug_logs)
 		fixed_time = function()
 			return 12.5
 		end,
+		pristine_engine_value = pristine_engine_value,
 	})
 	Guard.install(Suppression)
 
@@ -158,7 +176,7 @@ describe("suppression_guard", function()
 		end)
 	end)
 
-	it("installs only once on a shared suppression table", function()
+	it("keeps a single wrapper when the same module instance reinstalls", function()
 		with_unit_api(true, function()
 			local debug_logs = {}
 			local Suppression = {
@@ -170,14 +188,39 @@ describe("suppression_guard", function()
 				end,
 			}
 
-			init_guard(Suppression, debug_logs)
+			local Guard = init_guard(Suppression, debug_logs)
 			local first_apply = Suppression.apply_suppression
 			local first_area = Suppression.apply_area_minion_suppression
 
-			load_module().install(Suppression)
+			Guard.install(Suppression)
 
 			assert.equals(first_apply, Suppression.apply_suppression)
 			assert.equals(first_area, Suppression.apply_area_minion_suppression)
+		end)
+	end)
+
+	it("re-wraps the pristine functions after a hot reload instead of its own wrapper (#116)", function()
+		with_unit_api(false, function()
+			-- Stacked wrappers would route the guard log into the dead load's
+			-- logger and add a redundant pcall layer on every suppression call.
+			local pristine = make_pristine_registry()
+			local stale_logs, live_logs = {}, {}
+			local Suppression = {
+				apply_suppression = function()
+					error(MISSING_NODE_ERROR, 0)
+				end,
+				apply_area_minion_suppression = function()
+					return "area"
+				end,
+			}
+
+			init_guard(Suppression, stale_logs, pristine)
+			init_guard(Suppression, live_logs, pristine)
+
+			Suppression.apply_suppression("hit_unit", "attacker_unit", {}, "hit_position")
+
+			assert.equals(0, #stale_logs)
+			assert.equals(1, #live_logs)
 		end)
 	end)
 end)

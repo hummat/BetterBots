@@ -1,4 +1,5 @@
 local _mod
+local M
 local _debug_log
 local _debug_enabled
 local _fixed_time
@@ -566,10 +567,10 @@ local function install_combat_utility_diagnostics(BtRandomUtilityNode)
 		return
 	end
 
-	if rawget(BtRandomUtilityNode, COMBAT_UTILITY_DIAGNOSTIC_SENTINEL) then
+	if rawget(BtRandomUtilityNode, COMBAT_UTILITY_DIAGNOSTIC_SENTINEL) == M then
 		return
 	end
-	BtRandomUtilityNode[COMBAT_UTILITY_DIAGNOSTIC_SENTINEL] = true
+	BtRandomUtilityNode[COMBAT_UTILITY_DIAGNOSTIC_SENTINEL] = M
 
 	_mod:hook(
 		BtRandomUtilityNode,
@@ -639,7 +640,7 @@ local function install_combat_utility_diagnostics(BtRandomUtilityNode)
 	)
 end
 
-return {
+M = {
 	init = function(deps)
 		_mod = deps.mod
 		_debug_log = deps.debug_log
@@ -667,3 +668,5 @@ return {
 	bot_slot_for_unit = bot_slot_for_unit,
 	collect_alive_bots = _collect_alive_bots,
 }
+
+return M

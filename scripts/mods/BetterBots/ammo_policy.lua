@@ -656,10 +656,10 @@ function M.init(deps)
 end
 
 function M.install_interaction_hooks(AmmunitionInteraction)
-	if not AmmunitionInteraction or rawget(AmmunitionInteraction, INTERACTION_PATCH_SENTINEL) then
+	if not AmmunitionInteraction or rawget(AmmunitionInteraction, INTERACTION_PATCH_SENTINEL) == M then
 		return
 	end
-	AmmunitionInteraction[INTERACTION_PATCH_SENTINEL] = true
+	AmmunitionInteraction[INTERACTION_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		AmmunitionInteraction,
@@ -704,11 +704,11 @@ function M.register_hooks()
 end
 
 function M.install_behavior_ext_hooks(BotBehaviorExtension)
-	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_EXT_PATCH_SENTINEL) then
+	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_EXT_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BotBehaviorExtension[BEHAVIOR_EXT_PATCH_SENTINEL] = true
+	BotBehaviorExtension[BEHAVIOR_EXT_PATCH_SENTINEL] = M
 
 	_mod:hook_safe(BotBehaviorExtension, "_update_ammo", function(self, unit)
 		local pickup_component = self._pickup_component

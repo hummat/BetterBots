@@ -385,10 +385,10 @@ function M.install_on_shoot_action(BtBotShootAction)
 	if not _mod or not BtBotShootAction then
 		return
 	end
-	if rawget(BtBotShootAction, SENTINEL) then
+	if rawget(BtBotShootAction, SENTINEL) == M then
 		return
 	end
-	BtBotShootAction[SENTINEL] = true
+	BtBotShootAction[SENTINEL] = M
 
 	_mod:hook_safe(BtBotShootAction, "_set_new_aim_target", function(_self, _t, target_unit, scratchpad, _action_data)
 		M.apply_override(target_unit, scratchpad, scratchpad and scratchpad.__bb_weakspot_self_unit or nil)

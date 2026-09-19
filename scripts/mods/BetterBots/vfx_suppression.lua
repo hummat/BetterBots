@@ -39,11 +39,11 @@ end
 
 -- Called from the consolidated player_unit_ability_extension hook_require in BetterBots.lua (#67).
 function M.install_ability_ext_hooks(PlayerUnitAbilityExtension)
-	if not PlayerUnitAbilityExtension or rawget(PlayerUnitAbilityExtension, ABILITY_EXTENSION_SENTINEL) then
+	if not PlayerUnitAbilityExtension or rawget(PlayerUnitAbilityExtension, ABILITY_EXTENSION_SENTINEL) == M then
 		return
 	end
 
-	PlayerUnitAbilityExtension[ABILITY_EXTENSION_SENTINEL] = true
+	PlayerUnitAbilityExtension[ABILITY_EXTENSION_SENTINEL] = M
 
 	_mod:hook_safe(PlayerUnitAbilityExtension, "init", function(self, _context, unit, extension_init_data)
 		local player = extension_init_data.player
@@ -75,12 +75,12 @@ function M.register_hooks()
 		function(PlayerUnitVisualLoadoutExtension)
 			if
 				not PlayerUnitVisualLoadoutExtension
-				or rawget(PlayerUnitVisualLoadoutExtension, VISUAL_LOADOUT_EXTENSION_SENTINEL)
+				or rawget(PlayerUnitVisualLoadoutExtension, VISUAL_LOADOUT_EXTENSION_SENTINEL) == M
 			then
 				return
 			end
 
-			PlayerUnitVisualLoadoutExtension[VISUAL_LOADOUT_EXTENSION_SENTINEL] = true
+			PlayerUnitVisualLoadoutExtension[VISUAL_LOADOUT_EXTENSION_SENTINEL] = M
 
 			_mod:hook(
 				PlayerUnitVisualLoadoutExtension,
@@ -136,12 +136,12 @@ function M.register_hooks()
 		function(CharacterStateMachineExtension)
 			if
 				not CharacterStateMachineExtension
-				or rawget(CharacterStateMachineExtension, CHARACTER_STATE_MACHINE_SENTINEL)
+				or rawget(CharacterStateMachineExtension, CHARACTER_STATE_MACHINE_SENTINEL) == M
 			then
 				return
 			end
 
-			CharacterStateMachineExtension[CHARACTER_STATE_MACHINE_SENTINEL] = true
+			CharacterStateMachineExtension[CHARACTER_STATE_MACHINE_SENTINEL] = M
 
 			_mod:hook_safe(CharacterStateMachineExtension, "init", function(self, _context, unit, extension_init_data)
 				local player = extension_init_data.player

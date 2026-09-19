@@ -7,6 +7,7 @@
 -- commonly hit this edge case.
 
 local _mod
+local M
 
 local function _hook_require_now(path, callback)
 	local hook_require_now = _mod and _mod.hook_require_now
@@ -35,11 +36,11 @@ end
 
 local function register_hooks()
 	_hook_require_now("scripts/extension_systems/door/door_extension", function(DoorExtension)
-		if not DoorExtension or rawget(DoorExtension, DOOR_EXTENSION_SENTINEL) then
+		if not DoorExtension or rawget(DoorExtension, DOOR_EXTENSION_SENTINEL) == M then
 			return
 		end
 
-		DoorExtension[DOOR_EXTENSION_SENTINEL] = true
+		DoorExtension[DOOR_EXTENSION_SENTINEL] = M
 
 		_mod:hook(DoorExtension, "teleport_bots", function(func, self)
 			local ok, err = pcall(func, self)
@@ -70,7 +71,7 @@ local function register_hooks()
 	end)
 end
 
-return {
+M = {
 	init = function(deps)
 		_mod = deps.mod
 		_debug_log = deps.debug_log
@@ -79,3 +80,5 @@ return {
 	end,
 	register_hooks = register_hooks,
 }
+
+return M

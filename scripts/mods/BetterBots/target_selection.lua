@@ -249,11 +249,11 @@ function M.register_hooks()
 		}
 
 	_hook_require_now("scripts/utilities/bot_target_selection", function(BotTargetSelection)
-		if not BotTargetSelection or rawget(BotTargetSelection, BOT_TARGET_SELECTION_SENTINEL) then
+		if not BotTargetSelection or rawget(BotTargetSelection, BOT_TARGET_SELECTION_SENTINEL) == M then
 			return
 		end
 
-		BotTargetSelection[BOT_TARGET_SELECTION_SENTINEL] = true
+		BotTargetSelection[BOT_TARGET_SELECTION_SENTINEL] = M
 
 		_mod:hook(
 			BotTargetSelection,

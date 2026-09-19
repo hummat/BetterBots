@@ -901,11 +901,11 @@ function M.install_behavior_ext_hooks(BotBehaviorExtension)
 end
 
 function M.install_interaction_hooks(HealthStationInteraction)
-	if not HealthStationInteraction or rawget(HealthStationInteraction, INTERACTION_PATCH_SENTINEL) then
+	if not HealthStationInteraction or rawget(HealthStationInteraction, INTERACTION_PATCH_SENTINEL) == M then
 		return
 	end
 
-	HealthStationInteraction[INTERACTION_PATCH_SENTINEL] = true
+	HealthStationInteraction[INTERACTION_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		HealthStationInteraction,
@@ -984,11 +984,11 @@ function M.register_hooks()
 end
 
 function M.install_bot_group_hooks(BotGroup)
-	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) then
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BotGroup[BOT_GROUP_PATCH_SENTINEL] = true
+	BotGroup[BOT_GROUP_PATCH_SENTINEL] = M
 
 	_mod:hook_safe(BotGroup, "_update_pickups_and_deployables_near_player", function(self, bot_data)
 		local perf_t0 = _perf and _perf.begin()

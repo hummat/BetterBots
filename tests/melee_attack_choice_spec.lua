@@ -347,6 +347,99 @@ describe("melee_attack_choice", function()
 		assert.equals(2, #hook_calls)
 	end)
 
+	it("reinstalls melee hooks for a freshly loaded module on the same engine class (#116)", function()
+		-- Ctrl+Shift+R: DMF restores every engine method and drops all mod hooks,
+		-- then BetterBots re-executes. The engine class table survives, so an
+		-- install guard that outlives the module load leaves the bot unhooked.
+		local hook_calls = {}
+		local stub_mod = {
+			hook = function(_, target, method_name)
+				hook_calls[#hook_calls + 1] = {
+					target = target,
+					method = method_name,
+				}
+			end,
+		}
+		local BtBotMeleeAction = {}
+		local function load_and_install()
+			local MeleeAttackChoice = load_module()
+			MeleeAttackChoice.init({
+				mod = stub_mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				ARMOR_TYPE_ARMORED = ARMORED,
+			})
+			MeleeAttackChoice.install_melee_hooks(BtBotMeleeAction)
+		end
+
+		load_and_install()
+		load_and_install()
+
+		assert.equals(4, #hook_calls)
+	end)
+
+	it("returns usable attack metadata for ranged string metadata while disabled (#116)", function()
+		-- Vanilla _choose_attack iterates weapon_template.attack_meta_data and can
+		-- return a ranged string field such as unaim_action_name = "action_unzoom".
+		-- _calculate_melee_range then does nil arithmetic on attack_meta_data.max_range.
+		local MeleeAttackChoice = load_module()
+		local choose_handler
+		local stub_mod = {
+			hook = function(_, _, method_name, handler)
+				if method_name == "_choose_attack" then
+					choose_handler = handler
+				end
+			end,
+		}
+
+		_G.Armor = {
+			armor_type = function()
+				return 1
+			end,
+		}
+
+		MeleeAttackChoice.init({
+			mod = stub_mod,
+			debug_log = function() end,
+			debug_enabled = function()
+				return false
+			end,
+			fixed_time = function()
+				return 0
+			end,
+			ARMOR_TYPE_ARMORED = ARMORED,
+			is_enabled = function()
+				return false
+			end,
+		})
+		MeleeAttackChoice.install_melee_hooks({})
+
+		local ranged_meta_data = {
+			aim_action_name = "action_zoom",
+			aim_fire_action_name = "action_shoot_zoomed",
+			fire_action_name = "action_shoot_hip",
+			unaim_action_name = "action_unzoom",
+		}
+		local scratchpad = {
+			num_enemies_in_proximity = 1,
+			weapon_template = { attack_meta_data = ranged_meta_data },
+		}
+		local vanilla = function()
+			return ranged_meta_data.unaim_action_name
+		end
+
+		local chosen = choose_handler(vanilla, {}, "target_unit", nil, scratchpad)
+
+		assert.equals("table", type(chosen))
+		assert.equals("number", type(chosen.max_range))
+		assert.equals("table", type(chosen.action_inputs))
+	end)
+
 	it(
 		"requests vanilla defend suppression for a high-value armored melee commit when the target is not attacking",
 		function()

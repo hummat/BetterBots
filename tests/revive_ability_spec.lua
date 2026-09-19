@@ -1331,6 +1331,94 @@ describe("revive_ability", function()
 			assert.equals(1, #_recorded_inputs)
 		end)
 
+		it("re-wraps the pristine BtBotInteractAction.enter after a hot reload (#116)", function()
+			local unit = make_unit("bot_1")
+			local blackboard = make_blackboard()
+			local store = setmetatable({}, { __mode = "k" })
+			local function pristine_engine_value(target, key)
+				local captured = store[target]
+				if not captured then
+					captured = {}
+					store[target] = captured
+				end
+				if captured[key] == nil then
+					captured[key] = target[key]
+				end
+
+				return captured[key]
+			end
+
+			setup_unit(unit, "ogryn_taunt_shout")
+			_ability_templates.ogryn_taunt_shout = {
+				ability_meta_data = {
+					activation = { action_input = "shout_pressed", min_hold_time = 0.075 },
+					wait_action = { action_input = "shout_released" },
+				},
+			}
+
+			local fake_action = {
+				enter = function()
+					return "orig_enter"
+				end,
+			}
+
+			-- BtBotInteractAction.enter is replaced outright, so DMF's
+			-- hooks_unload leaves the previous load's wrapper installed. The
+			-- new load must take it over without stacking a second pre-revive.
+			local function load_and_install()
+				local Reloaded = dofile("scripts/mods/BetterBots/revive_ability.lua")
+				Reloaded.init({
+					mod = make_hooking_mod(),
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+					fixed_time = function()
+						return 100
+					end,
+					pristine_engine_value = pristine_engine_value,
+					is_suppressed = function()
+						return false
+					end,
+					equipped_combat_ability_name = function()
+						return "test_ability"
+					end,
+					fallback_state_by_unit = _fallback_state,
+					shared_rules = SharedRules,
+					combat_ability_identity = CombatAbilityIdentity,
+				})
+				Reloaded.wire({
+					MetaData = { inject = function() end },
+					EventLog = {
+						is_enabled = function()
+							return false
+						end,
+					},
+					Debug = {
+						bot_slot_for_unit = function()
+							return 1
+						end,
+					},
+					is_combat_template_enabled = function()
+						return true
+					end,
+				})
+				Reloaded.register_hooks()
+				_hook_require_callbacks["scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action"](
+					fake_action
+				)
+			end
+
+			load_and_install()
+			local first_wrapper = fake_action.enter
+			load_and_install()
+
+			fake_action.enter(fake_action, unit, nil, blackboard, {}, { interaction_type = "revive" }, 0)
+
+			assert.are_not.equals(first_wrapper, fake_action.enter)
+			assert.equals(1, #_recorded_inputs)
+		end)
+
 		it("logs successful rescue interactions from the interaction stop hook", function()
 			local fake_mod = make_hooking_mod()
 			local bot = make_unit("bot_1")

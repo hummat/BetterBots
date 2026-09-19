@@ -700,11 +700,11 @@ end
 
 function M.register_hooks()
 	_hook_require_now("scripts/extension_systems/smart_tag/smart_tag_system", function(SmartTagSystem)
-		if not SmartTagSystem or rawget(SmartTagSystem, SMART_TAG_SYSTEM_SENTINEL) then
+		if not SmartTagSystem or rawget(SmartTagSystem, SMART_TAG_SYSTEM_SENTINEL) == M then
 			return
 		end
 
-		SmartTagSystem[SMART_TAG_SYSTEM_SENTINEL] = true
+		SmartTagSystem[SMART_TAG_SYSTEM_SENTINEL] = M
 
 		if type(SmartTagSystem.set_tag) == "function" then
 			_mod:hook(

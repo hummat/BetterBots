@@ -882,11 +882,11 @@ function M.on_refresh_destination(self)
 end
 
 function M.install_bot_group_hooks(BotGroup)
-	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) then
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_PATCH_SENTINEL) == M then
 		return
 	end
 
-	BotGroup[BOT_GROUP_PATCH_SENTINEL] = true
+	BotGroup[BOT_GROUP_PATCH_SENTINEL] = M
 
 	_mod:hook_safe(BotGroup, "init", function(self)
 		M.patch_pickups()
@@ -913,11 +913,11 @@ function M.register_hooks()
 	)
 
 	_hook_require_now("scripts/utilities/bot_order", function(BotOrder)
-		if not BotOrder or rawget(BotOrder, BOT_ORDER_PATCH_SENTINEL) then
+		if not BotOrder or rawget(BotOrder, BOT_ORDER_PATCH_SENTINEL) == M then
 			return
 		end
 
-		BotOrder[BOT_ORDER_PATCH_SENTINEL] = true
+		BotOrder[BOT_ORDER_PATCH_SENTINEL] = M
 
 		_mod:hook(BotOrder, "pickup", function(func, bot_unit, pickup_unit, ordering_player)
 			if not _host_singleplay() then
@@ -939,11 +939,11 @@ function M.register_hooks()
 end
 
 function M.install_interaction_hooks(PocketableInteraction)
-	if not PocketableInteraction or rawget(PocketableInteraction, INTERACTION_PATCH_SENTINEL) then
+	if not PocketableInteraction or rawget(PocketableInteraction, INTERACTION_PATCH_SENTINEL) == M then
 		return
 	end
 
-	PocketableInteraction[INTERACTION_PATCH_SENTINEL] = true
+	PocketableInteraction[INTERACTION_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		PocketableInteraction,

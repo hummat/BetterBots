@@ -64,6 +64,36 @@ local _patched_weapon_templates = _persistent_weak_table("bb_patched_weapon_temp
 local _patched_weapon_templates_ranged = _persistent_weak_table("bb_patched_weapon_templates_ranged")
 local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
 
+-- Hook-install guard identity (#116). DMF's hooks_unload restores every engine
+-- method and drops all mod hooks on Ctrl+Shift+R, then every mod re-executes.
+-- Engine class tables survive that, so install sentinels store this per-load
+-- table instead of `true`: an in-load hook_require replay still dedupes, while
+-- a reload reinstalls. Modules use their own module table for the same purpose.
+local LOAD_TOKEN = {}
+
+-- Patches applied by raw field replacement are *not* restored by DMF, so each
+-- reload would otherwise wrap the previous BetterBots wrapper. Remember the
+-- pristine engine value the first time we see it and always re-wrap that.
+local _pristine_engine_values = _persistent_weak_table("bb_pristine_engine_values")
+
+local function _pristine_engine_value(target, key)
+	if type(target) ~= "table" then
+		return nil
+	end
+
+	local captured = _pristine_engine_values[target]
+	if not captured then
+		captured = {}
+		_pristine_engine_values[target] = captured
+	end
+
+	if captured[key] == nil then
+		captured[key] = target[key]
+	end
+
+	return captured[key]
+end
+
 -- Rescue aim (#10): when a charge/dash activates for ally rescue, store the
 -- ally unit so the enter hook can aim the bot toward it before the lunge fires.
 local _rescue_intent = setmetatable({}, { __mode = "k" })
@@ -309,6 +339,7 @@ local Modules = Bootstrap.load_and_init({
 	super_armor_breed_flag_by_name = _super_armor_breed_flag_by_name,
 	gestalt_injected_units = _gestalt_injected_units,
 	rescue_intent = _rescue_intent,
+	pristine_engine_value = _pristine_engine_value,
 	ARMOR_TYPES = ARMOR_TYPES,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	DEFAULT_RANGED_GESTALT = DEFAULT_RANGED_GESTALT,
@@ -551,14 +582,14 @@ ReviveAbility.register_hooks()
 -- calls both post-process functions (#90).
 local PERCEPTION_DISPATCHER_SENTINEL = "__bb_perception_dispatcher_installed"
 local function _install_bot_perception_extension_hooks(BotPerceptionExtension)
-	if not BotPerceptionExtension or rawget(BotPerceptionExtension, PERCEPTION_DISPATCHER_SENTINEL) then
+	if not BotPerceptionExtension or rawget(BotPerceptionExtension, PERCEPTION_DISPATCHER_SENTINEL) == LOAD_TOKEN then
 		return
 	end
 	local original = BotPerceptionExtension._update_target_enemy
 	if type(original) ~= "function" then
 		return
 	end
-	BotPerceptionExtension[PERCEPTION_DISPATCHER_SENTINEL] = true
+	BotPerceptionExtension[PERCEPTION_DISPATCHER_SENTINEL] = LOAD_TOKEN
 
 	mod:hook(
 		BotPerceptionExtension,
@@ -701,11 +732,11 @@ mod:hook_require_now(WEAPON_TEMPLATES_PATH, _install_weapon_template_patches)
 -- BotUnitInput hooks through one callback so sprint and sustained-fire coexist.
 local BOT_UNIT_INPUT_DISPATCHER_SENTINEL = "__bb_bot_unit_input_dispatcher_installed"
 mod:hook_require_now("scripts/extension_systems/input/bot_unit_input", function(BotUnitInput)
-	if not BotUnitInput or rawget(BotUnitInput, BOT_UNIT_INPUT_DISPATCHER_SENTINEL) then
+	if not BotUnitInput or rawget(BotUnitInput, BOT_UNIT_INPUT_DISPATCHER_SENTINEL) == LOAD_TOKEN then
 		return
 	end
 
-	BotUnitInput[BOT_UNIT_INPUT_DISPATCHER_SENTINEL] = true
+	BotUnitInput[BOT_UNIT_INPUT_DISPATCHER_SENTINEL] = LOAD_TOKEN
 	SustainedFire.install_bot_unit_input_hooks(BotUnitInput)
 	Sprint.install_bot_unit_input_hooks(BotUnitInput)
 end)
@@ -716,11 +747,11 @@ end)
 -- diagnostics all survive.
 local BOT_GROUP_DISPATCHER_SENTINEL = "__bb_bot_group_dispatcher_installed"
 mod:hook_require_now("scripts/extension_systems/group/bot_group", function(BotGroup)
-	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) then
+	if not BotGroup or rawget(BotGroup, BOT_GROUP_DISPATCHER_SENTINEL) == LOAD_TOKEN then
 		return
 	end
 
-	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = true
+	BotGroup[BOT_GROUP_DISPATCHER_SENTINEL] = LOAD_TOKEN
 	HealingDeferral.install_bot_group_hooks(BotGroup)
 	MulePickup.install_bot_group_hooks(BotGroup)
 	Modules.HazardAvoidance.install_bot_group_hooks(BotGroup)
@@ -736,12 +767,13 @@ mod:hook_require_now(
 	"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_activate_ability_action",
 	function(BtBotActivateAbilityAction)
 		if
-			not BtBotActivateAbilityAction or rawget(BtBotActivateAbilityAction, BT_ACTIVATE_ABILITY_ACTION_SENTINEL)
+			not BtBotActivateAbilityAction
+			or rawget(BtBotActivateAbilityAction, BT_ACTIVATE_ABILITY_ACTION_SENTINEL) == LOAD_TOKEN
 		then
 			return
 		end
 
-		BtBotActivateAbilityAction[BT_ACTIVATE_ABILITY_ACTION_SENTINEL] = true
+		BtBotActivateAbilityAction[BT_ACTIVATE_ABILITY_ACTION_SENTINEL] = LOAD_TOKEN
 		mod:hook(
 			BtBotActivateAbilityAction,
 			"enter",
@@ -922,11 +954,14 @@ local PLAYER_ABILITY_DISPATCHER_SENTINEL = "__bb_player_ability_dispatcher_insta
 mod:hook_require_now(
 	"scripts/extension_systems/ability/player_unit_ability_extension",
 	function(PlayerUnitAbilityExtension)
-		if not PlayerUnitAbilityExtension or rawget(PlayerUnitAbilityExtension, PLAYER_ABILITY_DISPATCHER_SENTINEL) then
+		if
+			not PlayerUnitAbilityExtension
+			or rawget(PlayerUnitAbilityExtension, PLAYER_ABILITY_DISPATCHER_SENTINEL) == LOAD_TOKEN
+		then
 			return
 		end
 
-		PlayerUnitAbilityExtension[PLAYER_ABILITY_DISPATCHER_SENTINEL] = true
+		PlayerUnitAbilityExtension[PLAYER_ABILITY_DISPATCHER_SENTINEL] = LOAD_TOKEN
 		local ok, err = pcall(VfxSuppression.install_ability_ext_hooks, PlayerUnitAbilityExtension)
 		if not ok then
 			mod:warning("BetterBots: vfx_suppression ability hook install failed: " .. tostring(err))
@@ -948,12 +983,12 @@ mod:hook_require_now(
 	function(ActionCharacterStateChange)
 		if
 			not ActionCharacterStateChange
-			or rawget(ActionCharacterStateChange, ACTION_CHARACTER_STATE_CHANGE_SENTINEL)
+			or rawget(ActionCharacterStateChange, ACTION_CHARACTER_STATE_CHANGE_SENTINEL) == LOAD_TOKEN
 		then
 			return
 		end
 
-		ActionCharacterStateChange[ACTION_CHARACTER_STATE_CHANGE_SENTINEL] = true
+		ActionCharacterStateChange[ACTION_CHARACTER_STATE_CHANGE_SENTINEL] = LOAD_TOKEN
 		mod:hook(ActionCharacterStateChange, "finish", function(func, self, reason, data, t, time_in_action)
 			return ItemFallback.on_state_change_finish(func, self, reason, data, t, time_in_action)
 		end)
@@ -965,10 +1000,10 @@ mod:hook_require_now(
 -- Consolidated: multiple modules hook this path (#67).
 local BEHAVIOR_DISPATCHER_SENTINEL = "__bb_behavior_dispatcher_installed"
 mod:hook_require_now("scripts/extension_systems/behavior/bot_behavior_extension", function(BotBehaviorExtension)
-	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_DISPATCHER_SENTINEL) then
+	if not BotBehaviorExtension or rawget(BotBehaviorExtension, BEHAVIOR_DISPATCHER_SENTINEL) == LOAD_TOKEN then
 		return
 	end
-	BotBehaviorExtension[BEHAVIOR_DISPATCHER_SENTINEL] = true
+	BotBehaviorExtension[BEHAVIOR_DISPATCHER_SENTINEL] = LOAD_TOKEN
 	local ok, err
 	ok, err = pcall(HealingDeferral.install_behavior_ext_hooks, BotBehaviorExtension)
 	if not ok then

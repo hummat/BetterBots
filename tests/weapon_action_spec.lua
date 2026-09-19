@@ -2964,6 +2964,78 @@ describe("weapon_action", function()
 		assert.equals(1, configuration_calls)
 	end)
 
+	it("re-wraps the pristine Overheat.slot_percentage after a hot reload (#116)", function()
+		local unit = "bot_1"
+		local configuration_calls = 0
+		local Overheat = {
+			slot_percentage = function()
+				return 0.41
+			end,
+			configuration = function()
+				configuration_calls = configuration_calls + 1
+				return { venting = true }
+			end,
+		}
+
+		local store = setmetatable({}, { __mode = "k" })
+		local function pristine_engine_value(target, key)
+			local captured = store[target]
+			if not captured then
+				captured = {}
+				store[target] = captured
+			end
+			if captured[key] == nil then
+				captured[key] = target[key]
+			end
+
+			return captured[key]
+		end
+
+		-- Each hot reload re-executes weapon_action.lua; the previous load's
+		-- wrapper is still installed because DMF never restores directly
+		-- replaced fields. The new load must take over (fresh deps) without
+		-- stacking another Overheat layer on top of the old wrapper.
+		local function load_and_install()
+			local Reloaded = dofile("scripts/mods/BetterBots/weapon_action.lua")
+			Reloaded.init({
+				mod = make_hooking_mod({ ["scripts/utilities/overheat"] = Overheat }),
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 12
+				end,
+				pristine_engine_value = pristine_engine_value,
+				weapon_action_logging = WeaponActionLogging,
+				weapon_action_shoot = WeaponActionShoot,
+				weapon_action_voidblast = WeaponActionVoidblast,
+			})
+			Reloaded.register_hooks({
+				should_lock_weapon_switch = function()
+					return false
+				end,
+				should_block_wield_input = function()
+					return false
+				end,
+				should_block_weapon_action_input = function()
+					return false
+				end,
+				observe_queued_weapon_action = function() end,
+			})
+		end
+
+		load_and_install()
+		local first_wrapper = Overheat.slot_percentage
+		load_and_install()
+
+		_extensions[unit] = { visual_loadout_system = {} }
+		Overheat.slot_percentage(unit, "slot_secondary", "venting")
+
+		assert.are_not.equals(first_wrapper, Overheat.slot_percentage)
+		assert.equals(1, configuration_calls)
+	end)
+
 	it("blocks non-vent warp actions at critical peril", function()
 		local forwarded_calls = 0
 		local PlayerUnitActionInputExtension = {

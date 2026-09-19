@@ -38,6 +38,18 @@ local _ability_templates_injected
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
 local _rescue_intent
+local _pristine_engine_value
+
+-- Condition tables are patched by direct field replacement (DMF convention for
+-- required condition tables), so DMF never restores them on reload. Re-wrap the
+-- remembered vanilla function so reloads cannot stack wrappers (#116).
+local function _pristine(target, key)
+	if _pristine_engine_value then
+		return _pristine_engine_value(target, key)
+	end
+
+	return target[key]
+end
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 local CONDITIONS_PATCH_VERSION
@@ -554,7 +566,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	-- Mixed-target melee stays available so bots can still defend themselves;
 	-- ranged, blitzes, abilities, and charge endpoints carry the broader
 	-- daemonhost safety gates.
-	local orig_bot_in_melee_range = conditions.bot_in_melee_range
+	local orig_bot_in_melee_range = _pristine(conditions, "bot_in_melee_range")
 	if orig_bot_in_melee_range then
 		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
@@ -583,7 +595,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	local orig_has_target_and_ammo = conditions.has_target_and_ammo_greater_than
+	local orig_has_target_and_ammo = _pristine(conditions, "has_target_and_ammo_greater_than")
 	if orig_has_target_and_ammo then
 		conditions.has_target_and_ammo_greater_than = function(
 			unit,
@@ -642,7 +654,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 		end
 	end
 
-	local orig_wrong_slot_for_target_type = conditions.wrong_slot_for_target_type
+	local orig_wrong_slot_for_target_type = _pristine(conditions, "wrong_slot_for_target_type")
 	if orig_wrong_slot_for_target_type then
 		conditions.wrong_slot_for_target_type = function(
 			unit,
@@ -745,6 +757,7 @@ function M.init(deps)
 	_patched_bt_bot_conditions = deps.patched_bt_bot_conditions
 	_patched_bt_conditions = deps.patched_bt_conditions
 	_rescue_intent = deps.rescue_intent
+	_pristine_engine_value = deps.pristine_engine_value
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf

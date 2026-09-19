@@ -24,6 +24,18 @@ local _equipped_combat_ability_name
 local _fallback_state_by_unit
 local _perf
 local _is_feature_enabled
+local _pristine_engine_value
+
+-- BtBotInteractAction.enter is replaced outright rather than hooked, so DMF's
+-- hooks_unload never restores it. Always re-wrap the remembered vanilla
+-- function so a reload cannot chain wrappers onto each other (#116).
+local function _pristine(target, key)
+	if _pristine_engine_value then
+		return _pristine_engine_value(target, key)
+	end
+
+	return target[key]
+end
 
 local _MetaData
 local _EventLog
@@ -133,6 +145,7 @@ function M.init(deps)
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_perf = deps.perf
 	_is_feature_enabled = deps.is_feature_enabled
+	_pristine_engine_value = deps.pristine_engine_value
 	local shared_rules = deps.shared_rules or {}
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_combat_ability_identity = deps.combat_ability_identity
@@ -878,11 +891,11 @@ function M.try_pre_revive(unit, _blackboard, action_data) -- luacheck: ignore 21
 end
 
 function M.install_interaction_success_hooks(Interaction, interaction_type)
-	if not Interaction or rawget(Interaction, INTERACTION_SUCCESS_PATCH_SENTINEL) then
+	if not Interaction or rawget(Interaction, INTERACTION_SUCCESS_PATCH_SENTINEL) == M then
 		return
 	end
 
-	Interaction[INTERACTION_SUCCESS_PATCH_SENTINEL] = true
+	Interaction[INTERACTION_SUCCESS_PATCH_SENTINEL] = M
 
 	_mod:hook(
 		Interaction,
@@ -925,12 +938,12 @@ function M.register_hooks()
 	_hook_require_now(
 		"scripts/extension_systems/behavior/nodes/actions/bot/bt_bot_interact_action",
 		function(BtBotInteractAction)
-			if not BtBotInteractAction or rawget(BtBotInteractAction, INTERACT_ACTION_PATCH_SENTINEL) then
+			if not BtBotInteractAction or rawget(BtBotInteractAction, INTERACT_ACTION_PATCH_SENTINEL) == M then
 				return
 			end
-			BtBotInteractAction[INTERACT_ACTION_PATCH_SENTINEL] = true
+			BtBotInteractAction[INTERACT_ACTION_PATCH_SENTINEL] = M
 
-			local orig_enter = BtBotInteractAction.enter
+			local orig_enter = _pristine(BtBotInteractAction, "enter")
 			BtBotInteractAction.enter = function(self, unit, breed, blackboard, scratchpad, action_data, t)
 				local perf_t0 = _perf and _perf.begin()
 				local ok, err = pcall(M.try_pre_revive, unit, blackboard, action_data)
