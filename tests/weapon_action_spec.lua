@@ -2977,18 +2977,23 @@ describe("weapon_action", function()
 			end,
 		}
 
-		local store = setmetatable({}, { __mode = "k" })
-		local function pristine_engine_value(target, key)
-			local captured = store[target]
-			if not captured then
-				captured = {}
-				store[target] = captured
+		local wrappers = setmetatable({}, { __mode = "k" })
+		local function wrap_engine_field(target, key, make_wrapper)
+			local original = target[key]
+			while wrappers[original] ~= nil do
+				original = wrappers[original]
 			end
-			if captured[key] == nil then
-				captured[key] = target[key]
+			if original == nil then
+				return nil
 			end
 
-			return captured[key]
+			local wrapper = make_wrapper(original)
+			if type(wrapper) == "function" then
+				target[key] = wrapper
+				wrappers[wrapper] = original
+			end
+
+			return original
 		end
 
 		-- Each hot reload re-executes weapon_action.lua; the previous load's
@@ -3006,7 +3011,7 @@ describe("weapon_action", function()
 				fixed_time = function()
 					return 12
 				end,
-				pristine_engine_value = pristine_engine_value,
+				wrap_engine_field = wrap_engine_field,
 				weapon_action_logging = WeaponActionLogging,
 				weapon_action_shoot = WeaponActionShoot,
 				weapon_action_voidblast = WeaponActionVoidblast,

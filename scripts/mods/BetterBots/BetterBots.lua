@@ -71,9 +71,16 @@ local _gestalt_injected_units = setmetatable({}, { __mode = "k" })
 -- a reload reinstalls. Modules use their own module table for the same purpose.
 local LOAD_TOKEN = {}
 
--- Patches applied by raw field replacement are *not* restored by DMF, so each
--- reload would otherwise wrap the previous BetterBots wrapper. Remember the
--- pristine engine value the first time we see it and always re-wrap that.
+-- Patches applied by raw field replacement are *not* restored by DMF, so on a
+-- reload the live field still holds the previous load's wrapper and wrapping it
+-- again would chain wrappers (#116). Remember what each BetterBots wrapper
+-- wraps, so the next load can unwrap back to the value we found originally.
+-- Anything we did not install is taken as-is: another mod may legitimately own
+-- the field now, and its wrapper must stay in the chain.
+local _bb_engine_wrappers = _persistent_weak_table("bb_engine_wrappers")
+
+-- Snapshot of plain (non-function) engine values we overwrite, for modules that
+-- restore rather than wrap.
 local _pristine_engine_values = _persistent_weak_table("bb_pristine_engine_values")
 
 local function _pristine_engine_value(target, key)
@@ -92,6 +99,32 @@ local function _pristine_engine_value(target, key)
 	end
 
 	return captured[key]
+end
+
+-- Install `make_wrapper(original)` over `target[key]`, unwrapping any wrapper a
+-- previous BetterBots load left behind first. Returns the wrapped original, or
+-- nil when there was nothing to wrap.
+local function _wrap_engine_field(target, key, make_wrapper)
+	if type(target) ~= "table" then
+		return nil
+	end
+
+	local original = target[key]
+	while _bb_engine_wrappers[original] ~= nil do
+		original = _bb_engine_wrappers[original]
+	end
+
+	if original == nil then
+		return nil
+	end
+
+	local wrapper = make_wrapper(original)
+	if type(wrapper) == "function" then
+		target[key] = wrapper
+		_bb_engine_wrappers[wrapper] = original
+	end
+
+	return original
 end
 
 -- Rescue aim (#10): when a charge/dash activates for ally rescue, store the
@@ -340,6 +373,7 @@ local Modules = Bootstrap.load_and_init({
 	gestalt_injected_units = _gestalt_injected_units,
 	rescue_intent = _rescue_intent,
 	pristine_engine_value = _pristine_engine_value,
+	wrap_engine_field = _wrap_engine_field,
 	ARMOR_TYPES = ARMOR_TYPES,
 	ARMOR_TYPE_SUPER_ARMOR = ARMOR_TYPE_SUPER_ARMOR,
 	DEFAULT_RANGED_GESTALT = DEFAULT_RANGED_GESTALT,

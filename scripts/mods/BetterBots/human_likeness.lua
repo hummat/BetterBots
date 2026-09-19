@@ -5,10 +5,18 @@ local _pristine_engine_value
 -- Fallback only: without the persistent registry a reload would capture our own
 -- patched reaction times as the "vanilla" baseline (#116).
 local _original_bot_settings = setmetatable({}, { __mode = "k" })
+local _pristine_fallback_warned = false
 
 local function _vanilla_reaction_time(normal, key)
 	if _pristine_engine_value then
 		return _pristine_engine_value(normal, key)
+	end
+
+	if not _pristine_fallback_warned then
+		_pristine_fallback_warned = true
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: human_likeness missing pristine_engine_value dep; reload safety disabled")
+		end
 	end
 
 	local original = _original_bot_settings[normal]

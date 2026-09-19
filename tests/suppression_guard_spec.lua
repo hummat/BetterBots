@@ -23,24 +23,31 @@ local function with_unit_api(has_node, fn)
 	end
 end
 
-local function make_pristine_registry()
-	local store = setmetatable({}, { __mode = "k" })
+-- Mirrors the production `wrap_engine_field` contract: wrap what we originally
+-- wrapped, leave anything a foreign mod installed in the chain.
+local function make_wrap_engine_field()
+	local wrappers = setmetatable({}, { __mode = "k" })
 
-	return function(target, key)
-		local captured = store[target]
-		if not captured then
-			captured = {}
-			store[target] = captured
+	return function(target, key, make_wrapper)
+		local original = target[key]
+		while wrappers[original] ~= nil do
+			original = wrappers[original]
 		end
-		if captured[key] == nil then
-			captured[key] = target[key]
+		if original == nil then
+			return nil
 		end
 
-		return captured[key]
+		local wrapper = make_wrapper(original)
+		if type(wrapper) == "function" then
+			target[key] = wrapper
+			wrappers[wrapper] = original
+		end
+
+		return original
 	end
 end
 
-local function init_guard(Suppression, debug_logs, pristine_engine_value)
+local function init_guard(Suppression, debug_logs, wrap_engine_field)
 	local Guard = load_module()
 
 	Guard.init({
@@ -59,7 +66,7 @@ local function init_guard(Suppression, debug_logs, pristine_engine_value)
 		fixed_time = function()
 			return 12.5
 		end,
-		pristine_engine_value = pristine_engine_value,
+		wrap_engine_field = wrap_engine_field,
 	})
 	Guard.install(Suppression)
 
@@ -203,7 +210,7 @@ describe("suppression_guard", function()
 		with_unit_api(false, function()
 			-- Stacked wrappers would route the guard log into the dead load's
 			-- logger and add a redundant pcall layer on every suppression call.
-			local pristine = make_pristine_registry()
+			local wrap = make_wrap_engine_field()
 			local stale_logs, live_logs = {}, {}
 			local Suppression = {
 				apply_suppression = function()
@@ -214,13 +221,43 @@ describe("suppression_guard", function()
 				end,
 			}
 
-			init_guard(Suppression, stale_logs, pristine)
-			init_guard(Suppression, live_logs, pristine)
+			init_guard(Suppression, stale_logs, wrap)
+			init_guard(Suppression, live_logs, wrap)
 
 			Suppression.apply_suppression("hit_unit", "attacker_unit", {}, "hit_position")
 
 			assert.equals(0, #stale_logs)
 			assert.equals(1, #live_logs)
+		end)
+	end)
+
+	it("keeps a foreign mod's wrapper in the chain across a reload (#116)", function()
+		with_unit_api(true, function()
+			-- Another mod re-hooking between our loads owns the field now; we
+			-- must wrap what is live, not unwrap past it back to vanilla.
+			local wrap = make_wrap_engine_field()
+			local foreign_calls = 0
+			local Suppression = {
+				apply_suppression = function()
+					return "normal"
+				end,
+				apply_area_minion_suppression = function()
+					return "area"
+				end,
+			}
+
+			init_guard(Suppression, {}, wrap)
+
+			local ours = Suppression.apply_suppression
+			Suppression.apply_suppression = function(...)
+				foreign_calls = foreign_calls + 1
+				return ours(...)
+			end
+
+			init_guard(Suppression, {}, wrap)
+
+			assert.equals("normal", Suppression.apply_suppression("hit_unit", "attacker_unit", {}, "hit_position"))
+			assert.equals(1, foreign_calls)
 		end)
 	end)
 end)

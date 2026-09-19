@@ -2021,41 +2021,86 @@ describe("startup regressions", function()
 		assert.equals(1, count_install_calls(harness2.install_calls, "HazardAvoidance", "install_bot_group_hooks"))
 	end)
 
-	it("wires the pristine engine value registry into every raw-replacement module (#116)", function()
+	it("wires the reload-safe field registries into every raw-replacement module (#116)", function()
 		-- These modules replace engine fields outright instead of using
-		-- mod:hook, so DMF never restores them. Without the shared registry
-		-- each reload wraps the previous load's wrapper.
+		-- mod:hook, so DMF never restores them. Without the shared registries
+		-- each reload wraps the previous load's wrapper (functions) or adopts
+		-- our own patched values as vanilla (plain values).
 		local harness = make_bootstrap_harness()
 		harness:load()
 
-		for _, module_name in ipairs({
-			"HumanLikeness",
-			"SuppressionGuard",
-			"WeaponAction",
-			"ConditionPatch",
-			"ReviveAbility",
-		}) do
+		local required_dep = {
+			SuppressionGuard = "wrap_engine_field",
+			WeaponAction = "wrap_engine_field",
+			ConditionPatch = "wrap_engine_field",
+			ReviveAbility = "wrap_engine_field",
+			HumanLikeness = "pristine_engine_value",
+		}
+
+		for module_name, dep_name in pairs(required_dep) do
 			local init_call = find_named_call(harness.init_calls, module_name)
 			assert.is_truthy(init_call, module_name .. " was never initialised")
-			assert.is_function(
-				init_call.deps.pristine_engine_value,
-				module_name .. " is missing the pristine_engine_value dep"
-			)
+			assert.is_function(init_call.deps[dep_name], module_name .. " is missing the " .. dep_name .. " dep")
 		end
 	end)
 
-	it("never stores a process-lifetime boolean in a hook-install sentinel (#116)", function()
+	it("unwraps its own wrapper but never a foreign one when re-wrapping a field (#116)", function()
+		-- Exercises the real registry from BetterBots.lua, not a spec double.
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local wrap_engine_field = find_named_call(harness.init_calls, "WeaponAction").deps.wrap_engine_field
+		local vanilla_calls = 0
+		local target = {
+			fn = function()
+				vanilla_calls = vanilla_calls + 1
+				return "vanilla"
+			end,
+		}
+		local vanilla = target.fn
+
+		local function install()
+			return wrap_engine_field(target, "fn", function(original)
+				return function(...)
+					return original(...)
+				end
+			end)
+		end
+
+		assert.equals(vanilla, install())
+		assert.equals(vanilla, install(), "a reload must unwrap back past our own wrapper")
+
+		local ours = target.fn
+		local foreign_calls = 0
+		target.fn = function(...)
+			foreign_calls = foreign_calls + 1
+			return ours(...)
+		end
+		local foreign = target.fn
+
+		assert.equals(foreign, install(), "a foreign wrapper must stay in the chain")
+		assert.equals("vanilla", target.fn())
+		assert.equals(1, vanilla_calls)
+		assert.equals(1, foreign_calls)
+	end)
+
+	local PER_LOAD_TOKENS = { M = true, LOAD_TOKEN = true }
+
+	it("stores the per-load token in every hook-install sentinel (#116)", function()
 		-- DMF removes every mod hook on reload but the engine class table keeps
-		-- whatever we wrote on it. A `true` sentinel therefore permanently
-		-- disables the installer; the value must be the per-load module table.
+		-- whatever we wrote on it. Any process-lifetime value (`true`, a string,
+		-- a number) therefore permanently disables the installer; the value must
+		-- be the current load's table identity.
 		local offenders = {}
 
 		each_mod_source_file(function(path)
 			local line_number = 0
 			for line in read_file(path):gmatch("[^\n]*") do
 				line_number = line_number + 1
-				if line:match("%[[%w_]*SENTINEL[%w_]*%]%s*=%s*true") then
-					offenders[#offenders + 1] = path .. ":" .. line_number
+				local written = line:match("%[[%w_]*SENTINEL[%w_]*%]%s*=%s*([%w_]+)")
+					or line:match("rawset%(%s*[%w_.]+%s*,%s*[%w_]*SENTINEL[%w_]*%s*,%s*([%w_]+)%s*%)")
+				if written and not PER_LOAD_TOKENS[written] then
+					offenders[#offenders + 1] = path .. ":" .. line_number .. " = " .. written
 				end
 			end
 		end)
@@ -2064,15 +2109,23 @@ describe("startup regressions", function()
 	end)
 
 	it("compares hook-install sentinels against a per-load token (#116)", function()
+		-- A truthy-only read (`if rawget(T, SENTINEL) then`) reintroduces #116
+		-- even when the write side stores the right value, so every read has to
+		-- compare against this load's token.
 		local offenders = {}
 
 		each_mod_source_file(function(path)
 			local line_number = 0
 			for line in read_file(path):gmatch("[^\n]*") do
 				line_number = line_number + 1
-				local reads_sentinel = line:match("%[[%w_]*SENTINEL[%w_]*%]")
-					and not line:match("%[[%w_]*SENTINEL[%w_]*%]%s*=")
-				if reads_sentinel and not line:match("==") then
+				local reads_sentinel = (
+					line:match("rawget%(%s*[%w_.]+%s*,%s*[%w_]*SENTINEL[%w_]*%s*%)")
+					or (line:match("%[[%w_]*SENTINEL[%w_]*%]") and not line:match("%[[%w_]*SENTINEL[%w_]*%]%s*="))
+				)
+						and true
+					or false
+				local compared = line:match("==%s*([%w_]+)")
+				if reads_sentinel and not (compared and PER_LOAD_TOKENS[compared]) then
 					offenders[#offenders + 1] = path .. ":" .. line_number
 				end
 			end

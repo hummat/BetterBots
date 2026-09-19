@@ -24,17 +24,35 @@ local _equipped_combat_ability_name
 local _fallback_state_by_unit
 local _perf
 local _is_feature_enabled
-local _pristine_engine_value
+local _wrap_engine_field
+local _wrap_fallback_warned = false
 
 -- BtBotInteractAction.enter is replaced outright rather than hooked, so DMF's
--- hooks_unload never restores it. Always re-wrap the remembered vanilla
--- function so a reload cannot chain wrappers onto each other (#116).
-local function _pristine(target, key)
-	if _pristine_engine_value then
-		return _pristine_engine_value(target, key)
+-- hooks_unload never restores it and a reload finds our previous wrapper still
+-- installed. The registry behind this dep unwraps back to vanilla (#116).
+local function _wrap(target, key, make_wrapper)
+	if _wrap_engine_field then
+		return _wrap_engine_field(target, key, make_wrapper)
 	end
 
-	return target[key]
+	if not _wrap_fallback_warned then
+		_wrap_fallback_warned = true
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: revive_ability missing wrap_engine_field dep; reload safety disabled")
+		end
+	end
+
+	local original = target[key]
+	if original == nil then
+		return nil
+	end
+
+	local wrapper = make_wrapper(original)
+	if type(wrapper) == "function" then
+		target[key] = wrapper
+	end
+
+	return original
 end
 
 local _MetaData
@@ -145,7 +163,7 @@ function M.init(deps)
 	_fallback_state_by_unit = deps.fallback_state_by_unit
 	_perf = deps.perf
 	_is_feature_enabled = deps.is_feature_enabled
-	_pristine_engine_value = deps.pristine_engine_value
+	_wrap_engine_field = deps.wrap_engine_field
 	local shared_rules = deps.shared_rules or {}
 	_action_input_is_bot_queueable = shared_rules.action_input_is_bot_queueable
 	_combat_ability_identity = deps.combat_ability_identity
@@ -943,22 +961,23 @@ function M.register_hooks()
 			end
 			BtBotInteractAction[INTERACT_ACTION_PATCH_SENTINEL] = M
 
-			local orig_enter = _pristine(BtBotInteractAction, "enter")
-			BtBotInteractAction.enter = function(self, unit, breed, blackboard, scratchpad, action_data, t)
-				local perf_t0 = _perf and _perf.begin()
-				local ok, err = pcall(M.try_pre_revive, unit, blackboard, action_data)
-				if not ok and _debug_enabled and _debug_enabled() then
-					_debug_log(
-						"revive_ability_error:" .. tostring(unit),
-						_fixed_time(),
-						"try_pre_revive error: " .. tostring(err)
-					)
+			_wrap(BtBotInteractAction, "enter", function(orig_enter)
+				return function(self, unit, breed, blackboard, scratchpad, action_data, t)
+					local perf_t0 = _perf and _perf.begin()
+					local ok, err = pcall(M.try_pre_revive, unit, blackboard, action_data)
+					if not ok and _debug_enabled and _debug_enabled() then
+						_debug_log(
+							"revive_ability_error:" .. tostring(unit),
+							_fixed_time(),
+							"try_pre_revive error: " .. tostring(err)
+						)
+					end
+					if perf_t0 and _perf then
+						_perf.finish("revive_ability", perf_t0)
+					end
+					return orig_enter(self, unit, breed, blackboard, scratchpad, action_data, t)
 				end
-				if perf_t0 and _perf then
-					_perf.finish("revive_ability", perf_t0)
-				end
-				return orig_enter(self, unit, breed, blackboard, scratchpad, action_data, t)
-			end
+			end)
 
 			if _debug_enabled and _debug_enabled() then
 				_debug_log("revive_ability:hook_installed", 0, "installed BtBotInteractAction.enter hook")

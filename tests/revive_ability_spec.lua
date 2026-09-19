@@ -1334,18 +1334,23 @@ describe("revive_ability", function()
 		it("re-wraps the pristine BtBotInteractAction.enter after a hot reload (#116)", function()
 			local unit = make_unit("bot_1")
 			local blackboard = make_blackboard()
-			local store = setmetatable({}, { __mode = "k" })
-			local function pristine_engine_value(target, key)
-				local captured = store[target]
-				if not captured then
-					captured = {}
-					store[target] = captured
+			local wrappers = setmetatable({}, { __mode = "k" })
+			local function wrap_engine_field(target, key, make_wrapper)
+				local original = target[key]
+				while wrappers[original] ~= nil do
+					original = wrappers[original]
 				end
-				if captured[key] == nil then
-					captured[key] = target[key]
+				if original == nil then
+					return nil
 				end
 
-				return captured[key]
+				local wrapper = make_wrapper(original)
+				if type(wrapper) == "function" then
+					target[key] = wrapper
+					wrappers[wrapper] = original
+				end
+
+				return original
 			end
 
 			setup_unit(unit, "ogryn_taunt_shout")
@@ -1376,7 +1381,7 @@ describe("revive_ability", function()
 					fixed_time = function()
 						return 100
 					end,
-					pristine_engine_value = pristine_engine_value,
+					wrap_engine_field = wrap_engine_field,
 					is_suppressed = function()
 						return false
 					end,

@@ -1596,18 +1596,23 @@ describe("condition_patch", function()
 
 	describe("hot reload", function()
 		it("re-wraps pristine conditions instead of the previous load's wrappers (#116)", function()
-			local store = setmetatable({}, { __mode = "k" })
-			local function pristine_engine_value(target, key)
-				local captured = store[target]
-				if not captured then
-					captured = {}
-					store[target] = captured
+			local wrappers = setmetatable({}, { __mode = "k" })
+			local function wrap_engine_field(target, key, make_wrapper)
+				local original = target[key]
+				while wrappers[original] ~= nil do
+					original = wrappers[original]
 				end
-				if captured[key] == nil then
-					captured[key] = target[key]
+				if original == nil then
+					return nil
 				end
 
-				return captured[key]
+				local wrapper = make_wrapper(original)
+				if type(wrapper) == "function" then
+					target[key] = wrapper
+					wrappers[wrapper] = original
+				end
+
+				return original
 			end
 
 			local avoidance_checks = 0
@@ -1635,7 +1640,7 @@ describe("condition_patch", function()
 					fixed_time = function()
 						return 0
 					end,
-					pristine_engine_value = pristine_engine_value,
+					wrap_engine_field = wrap_engine_field,
 					is_near_daemonhost = function()
 						return false
 					end,

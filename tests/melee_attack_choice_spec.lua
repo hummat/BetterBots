@@ -383,62 +383,108 @@ describe("melee_attack_choice", function()
 		assert.equals(4, #hook_calls)
 	end)
 
-	it("returns usable attack metadata for ranged string metadata while disabled (#116)", function()
-		-- Vanilla _choose_attack iterates weapon_template.attack_meta_data and can
-		-- return a ranged string field such as unaim_action_name = "action_unzoom".
-		-- _calculate_melee_range then does nil arithmetic on attack_meta_data.max_range.
-		local MeleeAttackChoice = load_module()
-		local choose_handler
-		local stub_mod = {
-			hook = function(_, _, method_name, handler)
-				if method_name == "_choose_attack" then
-					choose_handler = handler
-				end
-			end,
-		}
+	-- Transcribed from ../Darktide-Source-Code/scripts/extension_systems/behavior/
+	-- nodes/actions/bot/bt_bot_melee_action.lua:289-318. Scoring every pairs()
+	-- entry is what makes string metadata lethal, so the test has to run the real
+	-- shape rather than a stub that returns a canned value.
+	local function vanilla_choose_attack(_self, target_unit, target_breed, scratchpad)
+		local num_enemies = scratchpad.num_enemies_in_proximity
+		local outnumbered = num_enemies > 1
+		local massively_outnumbered = num_enemies > 3
+		local target_armor = _G.Armor.armor_type(target_unit, target_breed)
+		local weapon_meta_data = scratchpad.weapon_template.attack_meta_data or {}
+		local best_attack_meta_data, best_utility = nil, -math.huge
 
-		_G.Armor = {
-			armor_type = function()
-				return 1
-			end,
-		}
+		for _, attack_meta_data in pairs(weapon_meta_data) do
+			local utility = 0
 
-		MeleeAttackChoice.init({
-			mod = stub_mod,
-			debug_log = function() end,
-			debug_enabled = function()
-				return false
-			end,
-			fixed_time = function()
-				return 0
-			end,
-			ARMOR_TYPE_ARMORED = ARMORED,
-			is_enabled = function()
-				return false
-			end,
-		})
-		MeleeAttackChoice.install_melee_hooks({})
+			if outnumbered and attack_meta_data.arc == 1 then
+				utility = utility + 1
+			elseif attack_meta_data.no_damage and massively_outnumbered and attack_meta_data.arc > 1 then
+				utility = utility + 2
+			elseif
+				not attack_meta_data.no_damage
+				and (outnumbered and attack_meta_data.arc > 1 or not outnumbered and attack_meta_data.arc == 0)
+			then
+				utility = utility + 4
+			end
 
-		local ranged_meta_data = {
-			aim_action_name = "action_zoom",
-			aim_fire_action_name = "action_shoot_zoomed",
-			fire_action_name = "action_shoot_hip",
-			unaim_action_name = "action_unzoom",
-		}
-		local scratchpad = {
-			num_enemies_in_proximity = 1,
-			weapon_template = { attack_meta_data = ranged_meta_data },
-		}
-		local vanilla = function()
-			return ranged_meta_data.unaim_action_name
+			if target_armor ~= ARMORED or attack_meta_data.penetrating then
+				utility = utility + 8
+			end
+
+			if best_utility < utility then
+				best_attack_meta_data, best_utility = attack_meta_data, utility
+			end
 		end
 
-		local chosen = choose_handler(vanilla, {}, "target_unit", nil, scratchpad)
+		return best_attack_meta_data
+	end
 
-		assert.equals("table", type(chosen))
-		assert.equals("number", type(chosen.max_range))
-		assert.equals("table", type(chosen.action_inputs))
-	end)
+	for _, num_enemies in ipairs({ 1, 3 }) do
+		it("survives ranged string metadata while disabled with " .. num_enemies .. " enemies nearby (#116)", function()
+			-- Vanilla scores unaim_action_name = "action_unzoom" like an attack:
+			-- solo it wins and crashes _calculate_melee_range on max_range,
+			-- outnumbered it crashes the scoring loop itself on arc > 1.
+			local MeleeAttackChoice = load_module()
+			local choose_handler
+			local stub_mod = {
+				hook = function(_, _, method_name, handler)
+					if method_name == "_choose_attack" then
+						choose_handler = handler
+					end
+				end,
+			}
+
+			_G.Armor = {
+				armor_type = function()
+					return 1
+				end,
+			}
+
+			MeleeAttackChoice.init({
+				mod = stub_mod,
+				debug_log = function() end,
+				debug_enabled = function()
+					return false
+				end,
+				fixed_time = function()
+					return 0
+				end,
+				ARMOR_TYPE_ARMORED = ARMORED,
+				is_enabled = function()
+					return false
+				end,
+			})
+			MeleeAttackChoice.install_melee_hooks({})
+
+			local light_attack = {
+				arc = 0,
+				penetrating = false,
+				max_range = 2.1,
+				action_inputs = { { action_input = "light_attack", timing = 0 } },
+			}
+			local ranged_meta_data = {
+				light_attack = light_attack,
+				aim_action_name = "action_zoom",
+				aim_fire_action_name = "action_shoot_zoomed",
+				fire_action_name = "action_shoot_hip",
+				unaim_action_name = "action_unzoom",
+			}
+			local weapon_template = { attack_meta_data = ranged_meta_data }
+			local scratchpad = {
+				num_enemies_in_proximity = num_enemies,
+				weapon_template = weapon_template,
+			}
+
+			local chosen = choose_handler(vanilla_choose_attack, {}, "target_unit", nil, scratchpad)
+
+			assert.equals(light_attack, chosen)
+			assert.equals("number", type(chosen.max_range))
+			assert.equals(weapon_template, scratchpad.weapon_template)
+			assert.equals(ranged_meta_data, weapon_template.attack_meta_data)
+		end)
+	end
 
 	it(
 		"requests vanilla defend suppression for a high-value armored melee commit when the target is not attacking",

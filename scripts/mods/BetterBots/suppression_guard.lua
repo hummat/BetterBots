@@ -7,16 +7,35 @@ local _mod
 local _debug_log
 local _debug_enabled
 local _fixed_time
-local _pristine_engine_value
+local _wrap_engine_field
+local _wrap_fallback_warned = false
 
--- Raw field replacement, so DMF's hooks_unload never restores it on reload.
--- Re-wrap the remembered vanilla function instead of the previous wrapper (#116).
-local function _pristine(target, key)
-	if _pristine_engine_value then
-		return _pristine_engine_value(target, key)
+-- Raw field replacement, so DMF's hooks_unload never restores it on reload and
+-- the live field still holds the previous load's wrapper. The registry behind
+-- this dep unwraps back to what we originally wrapped (#116).
+local function _wrap(target, key, make_wrapper)
+	if _wrap_engine_field then
+		return _wrap_engine_field(target, key, make_wrapper)
 	end
 
-	return target[key]
+	if not _wrap_fallback_warned then
+		_wrap_fallback_warned = true
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: suppression_guard missing wrap_engine_field dep; reload safety disabled")
+		end
+	end
+
+	local original = target[key]
+	if original == nil then
+		return nil
+	end
+
+	local wrapper = make_wrapper(original)
+	if type(wrapper) == "function" then
+		target[key] = wrapper
+	end
+
+	return original
 end
 
 local SUPPRESSION_PATH = "scripts/utilities/attack/suppression"
@@ -105,7 +124,7 @@ function M.init(deps)
 	_debug_log = deps.debug_log
 	_debug_enabled = deps.debug_enabled
 	_fixed_time = deps.fixed_time
-	_pristine_engine_value = deps.pristine_engine_value
+	_wrap_engine_field = deps.wrap_engine_field
 end
 
 function M.install(Suppression)
@@ -113,21 +132,26 @@ function M.install(Suppression)
 		return
 	end
 
-	local original_apply_suppression = _pristine(Suppression, "apply_suppression")
-	local original_area_minion_suppression = _pristine(Suppression, "apply_area_minion_suppression")
-	if type(original_apply_suppression) ~= "function" or type(original_area_minion_suppression) ~= "function" then
+	if
+		type(Suppression.apply_suppression) ~= "function"
+		or type(Suppression.apply_area_minion_suppression) ~= "function"
+	then
 		return
 	end
 
 	Suppression[SUPPRESSION_SENTINEL] = M
 
-	Suppression.apply_suppression = function(hit_unit, attacking_unit, ...)
-		return _call_guarded(original_apply_suppression, attacking_unit, hit_unit, attacking_unit, ...)
-	end
+	_wrap(Suppression, "apply_suppression", function(original)
+		return function(hit_unit, attacking_unit, ...)
+			return _call_guarded(original, attacking_unit, hit_unit, attacking_unit, ...)
+		end
+	end)
 
-	Suppression.apply_area_minion_suppression = function(attacking_unit, ...)
-		return _call_guarded(original_area_minion_suppression, attacking_unit, attacking_unit, ...)
-	end
+	_wrap(Suppression, "apply_area_minion_suppression", function(original)
+		return function(attacking_unit, ...)
+			return _call_guarded(original, attacking_unit, attacking_unit, ...)
+		end
+	end)
 end
 
 function M.register_hooks()

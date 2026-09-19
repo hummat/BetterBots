@@ -38,17 +38,36 @@ local _ability_templates_injected
 local _patched_bt_bot_conditions
 local _patched_bt_conditions
 local _rescue_intent
-local _pristine_engine_value
+local _wrap_engine_field
+local _wrap_fallback_warned = false
 
 -- Condition tables are patched by direct field replacement (DMF convention for
--- required condition tables), so DMF never restores them on reload. Re-wrap the
--- remembered vanilla function so reloads cannot stack wrappers (#116).
-local function _pristine(target, key)
-	if _pristine_engine_value then
-		return _pristine_engine_value(target, key)
+-- required condition tables), so DMF never restores them on reload and the live
+-- field still holds the previous load's wrapper. The registry behind this dep
+-- unwraps back to what we originally wrapped (#116).
+local function _wrap(target, key, make_wrapper)
+	if _wrap_engine_field then
+		return _wrap_engine_field(target, key, make_wrapper)
 	end
 
-	return target[key]
+	if not _wrap_fallback_warned then
+		_wrap_fallback_warned = true
+		if _mod and _mod.warning then
+			_mod:warning("BetterBots: condition_patch missing wrap_engine_field dep; reload safety disabled")
+		end
+	end
+
+	local original = target[key]
+	if original == nil then
+		return nil
+	end
+
+	local wrapper = make_wrapper(original)
+	if type(wrapper) == "function" then
+		target[key] = wrapper
+	end
+
+	return original
 end
 
 local DEBUG_SKIP_RELIC_LOG_INTERVAL_S
@@ -566,9 +585,8 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 	-- Mixed-target melee stays available so bots can still defend themselves;
 	-- ranged, blitzes, abilities, and charge endpoints carry the broader
 	-- daemonhost safety gates.
-	local orig_bot_in_melee_range = _pristine(conditions, "bot_in_melee_range")
-	if orig_bot_in_melee_range then
-		conditions.bot_in_melee_range = function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
+	_wrap(conditions, "bot_in_melee_range", function(orig_bot_in_melee_range)
+		return function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
 			if not dh_avoidance and not _logged_dh_avoidance_off and _debug_enabled() then
 				_logged_dh_avoidance_off = true
@@ -593,18 +611,10 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			end
 			return orig_bot_in_melee_range(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 		end
-	end
+	end)
 
-	local orig_has_target_and_ammo = _pristine(conditions, "has_target_and_ammo_greater_than")
-	if orig_has_target_and_ammo then
-		conditions.has_target_and_ammo_greater_than = function(
-			unit,
-			blackboard,
-			scratchpad,
-			condition_args,
-			action_data,
-			is_running
-		)
+	_wrap(conditions, "has_target_and_ammo_greater_than", function(orig_has_target_and_ammo)
+		return function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			local dh_avoidance = not _is_daemonhost_avoidance_enabled or _is_daemonhost_avoidance_enabled()
 			if _is_close_to_dormant_daemonhost(unit) then
 				if _debug_enabled() then
@@ -652,18 +662,10 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 			end
 			return result
 		end
-	end
+	end)
 
-	local orig_wrong_slot_for_target_type = _pristine(conditions, "wrong_slot_for_target_type")
-	if orig_wrong_slot_for_target_type then
-		conditions.wrong_slot_for_target_type = function(
-			unit,
-			blackboard,
-			scratchpad,
-			condition_args,
-			action_data,
-			is_running
-		)
+	_wrap(conditions, "wrong_slot_for_target_type", function(orig_wrong_slot_for_target_type)
+		return function(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 			local result =
 				orig_wrong_slot_for_target_type(unit, blackboard, scratchpad, condition_args, action_data, is_running)
 
@@ -732,7 +734,7 @@ local function _install_condition_patch(conditions, patched_set, patch_label)
 
 			return result
 		end
-	end
+	end)
 
 	patched_set[conditions] = true
 
@@ -757,7 +759,7 @@ function M.init(deps)
 	_patched_bt_bot_conditions = deps.patched_bt_bot_conditions
 	_patched_bt_conditions = deps.patched_bt_conditions
 	_rescue_intent = deps.rescue_intent
-	_pristine_engine_value = deps.pristine_engine_value
+	_wrap_engine_field = deps.wrap_engine_field
 	DEBUG_SKIP_RELIC_LOG_INTERVAL_S = deps.DEBUG_SKIP_RELIC_LOG_INTERVAL_S
 	CONDITIONS_PATCH_VERSION = deps.CONDITIONS_PATCH_VERSION
 	_perf = deps.perf

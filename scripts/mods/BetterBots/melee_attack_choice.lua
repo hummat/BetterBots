@@ -80,6 +80,38 @@ local function normalize_attack_meta_data(attack_meta_data)
 	return attack_meta_data
 end
 
+-- Vanilla `_choose_attack` reads `attack_meta_data.arc` numerically for every
+-- `pairs` entry, so a string field (a ranged template's `unaim_action_name`) or
+-- an arc-less table crashes it outright with `attempt to compare number with
+-- nil` as soon as the bot is outnumbered (#116). Returns a scoreable subset
+-- when the live metadata would crash vanilla, or nil when it is already safe.
+local function _vanilla_safe_attack_meta_data(weapon_meta_data)
+	if type(weapon_meta_data) ~= "table" then
+		return nil
+	end
+
+	local needs_sanitizing = false
+	for _, attack_meta_data in pairs(weapon_meta_data) do
+		if type(attack_meta_data) ~= "table" or type(attack_meta_data.arc) ~= "number" then
+			needs_sanitizing = true
+			break
+		end
+	end
+
+	if not needs_sanitizing then
+		return nil
+	end
+
+	local sanitized = {}
+	for attack_input, attack_meta_data in pairs(weapon_meta_data) do
+		if normalize_attack_meta_data(attack_meta_data) then
+			sanitized[attack_input] = attack_meta_data
+		end
+	end
+
+	return sanitized
+end
+
 local function _is_armored_bucket(target_armor, armored_type, super_armor_type)
 	return target_armor == armored_type or (super_armor_type ~= nil and target_armor == super_armor_type)
 end
@@ -890,8 +922,25 @@ function M.install_melee_hooks(BtBotMeleeAction)
 		if _is_enabled and not _is_enabled() then
 			-- Vanilla scores every entry of weapon_template.attack_meta_data, so a
 			-- ranged template's string fields (unaim_action_name = "action_unzoom")
-			-- can win and crash _calculate_melee_range on max_range (#116).
-			local vanilla_choice = func(self, target_unit, target_breed, scratchpad)
+			-- both crash the scoring loop when the bot is outnumbered and can win
+			-- and crash _calculate_melee_range on max_range (#116). Let vanilla
+			-- score a scoreable subset when the live metadata would kill it, and
+			-- normalize whatever comes back.
+			local weapon_template = scratchpad.weapon_template
+			local sanitized = _vanilla_safe_attack_meta_data(weapon_template and weapon_template.attack_meta_data)
+			local vanilla_choice
+
+			if sanitized then
+				scratchpad.weapon_template = setmetatable(
+					{ attack_meta_data = sanitized },
+					{ __index = weapon_template }
+				)
+				local ok, result = pcall(func, self, target_unit, target_breed, scratchpad)
+				scratchpad.weapon_template = weapon_template
+				vanilla_choice = ok and result or nil
+			else
+				vanilla_choice = func(self, target_unit, target_breed, scratchpad)
+			end
 
 			return normalize_attack_meta_data(vanilla_choice) or DEFAULT_ATTACK_META_DATA.light_attack
 		end
