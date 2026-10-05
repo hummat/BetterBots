@@ -1,0 +1,64 @@
+name: Engine drift
+
+# Runs patch-check against the newest decompiled Darktide source so a game patch
+# that breaks BetterBots' engine contracts is reported without a push to main.
+# Results are tracked in a single `engine-drift` issue (see scripts/engine-drift-report.sh).
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: engine-drift
+  cancel-in-progress: false
+
+jobs:
+  patch-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout latest decompiled Darktide source
+        run: git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git ../Darktide-Source-Code
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4 ripgrep
+
+      - name: Run patch-check
+        id: check
+        run: |
+          {
+            echo "sha=$(git -C ../Darktide-Source-Code rev-parse HEAD)"
+            echo "subject=$(git -C ../Darktide-Source-Code log -1 --format=%s)"
+          } >> "$GITHUB_OUTPUT"
+          status=0
+          scripts/patch-check.sh > patch-check.log 2>&1 || status=$?
+          cat patch-check.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Report drift
+        id: report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECK_STATUS: ${{ steps.check.outputs.status }}
+          UPSTREAM_SHA: ${{ steps.check.outputs.sha }}
+          UPSTREAM_SUBJECT: ${{ steps.check.outputs.subject }}
+          LOG_FILE: patch-check.log
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NOTIFY_USER: ${{ github.repository_owner }}
+        run: scripts/engine-drift-report.sh
+
+      # Fail only when this run reported new drift, so GitHub's failed-workflow
+      # email fires once per broken source version, not every day.
+      - name: Fail on new drift
+        if: steps.report.outputs.reported == 'true'
+        run: |
+          echo "::error::patch-check fails on ${{ steps.check.outputs.subject }}; see the engine-drift issue"
+          exit 1

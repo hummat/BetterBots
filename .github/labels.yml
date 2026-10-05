@@ -96,6 +96,11 @@
   color: "000000"
   description: Pull requests that update GitHub Actions code
 
+# Auto-managed (Engine drift workflow)
+- name: engine-drift
+  color: "B60205"
+  description: Scheduled patch-check fails on the latest decompiled Darktide source
+
 # Ability tier
 - name: "tier: 1"
   color: "0E8A16"

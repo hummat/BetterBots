@@ -25,6 +25,7 @@ After changes, re-run `toggle_darktide_mods.bat` (Windows) or `handle_darktide_m
 - `make patch-check` — verify BetterBots' engine anchor contracts, plus every engine-extension method/field it calls directly and every audited mock-builder member (`scripts/engine_api_check.lua`), against the current `../Darktide-Source-Code` checkout
 - `make patch-check-refresh` — `git pull --ff-only` the decompiled source, then rerun the engine anchor checks
 - `make patch-audit` — refresh the decompiled source, then run the full non-mutating local gate
+- `Engine drift` GitHub workflow — daily `patch-check` against the newest decompiled source; failures open or update one `engine-drift` issue (`scripts/engine-drift-report.sh`). Check that issue first after a Darktide patch.
 - `make check` — local quality gate: auto-format, then lint + lsp + test + patch-check + doc-check
 - `make check-ci` — CI quality gate: format-check + lint + lsp + test + patch-check + doc-check
 
