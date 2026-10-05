@@ -196,6 +196,34 @@ check_engine_module_paths() {
 	rm -f "$tmp_file"
 }
 
+# Direct engine-extension calls and private-field reads in production code, and the
+# member allowlists of the audited mock builders in tests/test_helper.lua. Hook
+# anchors above only cover functions BetterBots wraps; this covers what it calls.
+check_engine_api_usage() {
+	local lua_bin output status line
+
+	lua_bin="$(command -v lua5.4 || command -v lua || command -v luajit || true)"
+	if [[ -z "$lua_bin" ]]; then
+		err "engine API usage check needs a Lua interpreter (lua5.4, lua, or luajit) in PATH"
+		return
+	fi
+
+	status=0
+	output=$("$lua_bin" "$REPO_ROOT/scripts/engine_api_check.lua" "$REPO_ROOT" "$DECOMPILE_ROOT" 2>&1) || status=$?
+
+	while IFS= read -r line; do
+		if [[ "$line" == ERROR:\ * ]]; then
+			err "${line#ERROR: }"
+		elif [[ -n "$line" ]]; then
+			echo "$line"
+		fi
+	done <<< "$output"
+
+	if ((status != 0 && status != 1)); then
+		err "engine API usage check crashed (exit $status)"
+	fi
+}
+
 check_minion_attack_damage_hooks() {
 	local minion_file="$DECOMPILE_ROOT/scripts/utilities/minion_attack.lua"
 	local hooks_file="$REPO_ROOT/scripts/mods/BetterBots/bot_compensation.lua"
@@ -332,6 +360,8 @@ echo "Using decompiled source: $(git -C "$DECOMPILE_ROOT" log -1 --format='%h %s
 check_engine_module_paths
 
 check_talent_and_special_rule_strings
+
+check_engine_api_usage
 
 check_anchor \
 	"scripts/extension_systems/ability/player_unit_ability_extension.lua" \

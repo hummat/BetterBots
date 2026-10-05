@@ -17,6 +17,7 @@ Current status:
 
 - Current test surface audited against decompiled source
 - No current mock requires an in-game dump to disambiguate behavior
+- `make patch-check` enforces the builder allowlists: every member allowed by `_apply_audited_overrides(...)` in `tests/test_helper.lua` must exist on the engine class mapped in `BUILDER_CLASSES` (`scripts/engine_api_check.lua`), inherited members included. Line numbers in the tables below are historical evidence, not the enforced contract.
 
 ## Audited extension surfaces
 
@@ -45,7 +46,7 @@ Current status:
 
 | Surface | Real class/system | BetterBots-tested API | Decompiled proof | Notes |
 |---|---|---|---|---|
-| `side_system` | `SideSystem` + `Side` | `side_by_unit`, `sides()`, `get_side_from_name()`, `relation_side_names()` | `scripts/extension_systems/side/side_system.lua:21`, `:130`, `:142`; `scripts/extension_systems/side/side.lua:273` | Sprint, heuristics, and hazard tests |
+| `side_system` | `SideSystem` | `side_by_unit`, `sides()`, `get_side_from_name()` | `scripts/extension_systems/side/side_system.lua:21`, `:130`, `:142` | Sprint, heuristics, and hazard tests. `relation_side_names()` / `relation_units()` belong to `Side` (`side.lua`), so tests put them on the side tables inside `side_by_unit`, never on the system double |
 | `liquid_area_system` | `LiquidAreaSystem` | `find_liquid_areas_in_position()`, `is_position_in_liquid()` | `scripts/extension_systems/liquid_area/liquid_area_system.lua:176`, `:162` | Hazard detection tests |
 | `group_system` | `GroupSystem` | `_is_server`, `_bot_groups`, `bot_groups_from_sides()` | `scripts/extension_systems/group/group_system.lua:37`, `:53`, `:217` | `_bot_groups` only initialized when `_is_server == true`; nil on dedicated-server clients |
 

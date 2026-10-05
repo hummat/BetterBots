@@ -122,15 +122,11 @@ describe("test_helper audited builders", function()
 			get_side_from_name = function(_, name)
 				return name == "heroes" and side or nil
 			end,
-			relation_side_names = function(_, relation)
-				return relation == "enemy" and { "villains" } or {}
-			end,
 		})
 
 		assert.same({ side }, side_system:sides())
 		assert.same(side, side_system.side_by_unit.bot)
 		assert.same(side, side_system:get_side_from_name("heroes"))
-		assert.same({ "villains" }, side_system:relation_side_names("enemy"))
 
 		local group = { name = "group" }
 		local group_system = test_helper.make_group_system_double({

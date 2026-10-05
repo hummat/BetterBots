@@ -114,7 +114,7 @@ All new features and fixes should ship with busted coverage under `tests/`. The 
 
 ### Patch-day workflow
 
-Darktide patches regularly break hook anchors. The repo keeps a manual link to a decompiled-source checkout (the maintainer uses `../Darktide-Source-Code`) and `make patch-check` validates that every anchor BetterBots hooks is still present with the expected surrounding context.
+Darktide patches regularly break hook anchors. The repo keeps a manual link to a decompiled-source checkout (the maintainer uses `../Darktide-Source-Code`) and `make patch-check` validates that every anchor BetterBots hooks is still present with the expected surrounding context, and that every engine-extension method or field BetterBots calls directly (and every member the test mocks allow) still exists.
 
 When a patch lands:
 

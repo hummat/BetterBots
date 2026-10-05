@@ -390,6 +390,19 @@ Tests are enforced by CI — `make check-ci` depends on `test`, and CI installs
 busted via luarocks. Engine contracts are also enforced by CI through
 `patch-check`, which requires a sibling `../Darktide-Source-Code` checkout.
 
+**Engine method removed but every check green:** hook anchors only cover functions
+BetterBots wraps, so 1.13.0 removing `PlayerUnitAbilityExtension.remaining_ability_cooldown`
+left `/bb_state` (`debug.lua`) calling a nil method with no static signal.
+`scripts/engine_api_check.lua`, run inside `patch-check`, now resolves every
+receiver bound to `ScriptUnit.(has_)extension(unit, "<system>")` (same-file binding
+first, else the one system that variable name is bound to elsewhere in the mod) and
+requires each `:method(` call and `.field` read to exist on a class under
+`scripts/extension_systems/<system dir>/`, base classes included. It also checks the
+`tests/test_helper.lua` builder allowlists against their engine classes. Receivers that
+are table fields (`state.ext:call()`) and `_betterbots_*` / `__bb*` markers are not
+checked. A new system whose directory differs from its name goes in `SYSTEM_DIRS`; a
+new audited builder goes in `BUILDER_CLASSES`.
+
 **Visual-loadout anchor fails after a harmless lookup move:** engine 1.12.5
 (`0f0cb459`) resolves `weapon_template` before changing the wielded slot; the old
 anchor required the reverse order. BetterBots redirects the slot argument before

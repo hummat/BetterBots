@@ -547,16 +547,12 @@ function M.make_side_system_double(opts)
 		get_side_from_name = opts.get_side_from_name or function()
 			return nil
 		end,
-		relation_side_names = opts.relation_side_names or function()
-			return {}
-		end,
 	}
 
 	_apply_audited_overrides("make_side_system_double", ext, opts.overrides, {
 		side_by_unit = true,
 		sides = true,
 		get_side_from_name = true,
-		relation_side_names = true,
 	})
 
 	return ext
