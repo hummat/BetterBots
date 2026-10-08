@@ -76,6 +76,25 @@ describe("engine API usage check", function()
 		}, errors)
 	end)
 
+	it("flags removed methods when the call is wrapped before the colon or the parenthesis", function()
+		local errors = run({
+			["debug.lua"] = table.concat({
+				'local ability_extension = ScriptUnit.extension(unit, "ability_system")',
+				"local cooldown = ability_extension",
+				'\t:remaining_ability_cooldown("combat_ability")',
+				"local max = ability_extension:max_ability_cooldown",
+				'\t("combat_ability")',
+			}, "\n"),
+		})
+
+		assert.same({
+			"scripts/mods/BetterBots/debug.lua:3: ability_extension.remaining_ability_cooldown"
+				.. " not found on any ability_system engine class",
+			"scripts/mods/BetterBots/debug.lua:4: ability_extension.max_ability_cooldown"
+				.. " not found on any ability_system engine class",
+		}, errors)
+	end)
+
 	it("resolves parameters by a name bound elsewhere and accepts inherited methods and fields", function()
 		local errors = run({
 			["binder.lua"] = 'local ability_extension = ScriptUnit.extension(unit, "ability_system")\n',

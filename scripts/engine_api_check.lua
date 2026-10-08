@@ -148,21 +148,31 @@ end
 -- Returns { { name, member, line }, ... } for `name:member(` calls and `name.member`
 -- reads. Assignments are writes, not API reads, and are skipped. Receivers that
 -- are themselves fields (`Managers.state.extension:system()`) are skipped: their
--- variable name says nothing about which engine object they hold.
+-- variable name says nothing about which engine object they hold. Matching runs on
+-- the whole file so calls wrapped before `:` or `(` are still seen; `line` is the
+-- line holding the member name.
 function M.collect_accesses(source)
-	local accesses = {}
-	local line_number = 0
+	local stripped = {}
 	for raw in (source .. "\n"):gmatch("([^\n]*)\n") do
-		line_number = line_number + 1
-		local code = raw:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''"):gsub("%-%-.*$", "")
-		for start, name, separator, member, rest in code:gmatch("()([%a_][%w_]*)%s*([.:])%s*([%a_][%w_]*)()") do
-			local receiver_is_field = start > 1 and code:sub(1, start - 1):match("[.:]%s*$")
-			local tail = code:sub(rest)
-			local is_read = separator == "." and not tail:match("^%s*=[^=]")
-			local is_call = separator == ":" and tail:match("^%s*%(")
-			if not receiver_is_field and (is_read or is_call) and not is_mod_owned(member) then
-				accesses[#accesses + 1] = { name = name, member = member, line = line_number }
-			end
+		stripped[#stripped + 1] = raw:gsub('"[^"]*"', '""'):gsub("'[^']*'", "''"):gsub("%-%-.*$", "")
+	end
+	local code = table.concat(stripped, "\n")
+
+	local accesses = {}
+	local line_number = 1
+	local counted_to = 0
+	for start, name, separator, member_start, member, rest in
+		code:gmatch("()([%a_][%w_]*)%s*([.:])%s*()([%a_][%w_]*)()")
+	do
+		local receiver_is_field = code:sub(math.max(1, start - 256), start - 1):match("[.:]%s*$")
+		local tail = code:sub(rest, rest + 64)
+		local is_read = separator == "." and not tail:match("^%s*=[^=]")
+		local is_call = separator == ":" and tail:match("^%s*%(")
+		if not receiver_is_field and (is_read or is_call) and not is_mod_owned(member) then
+			local _, newlines = code:sub(counted_to + 1, member_start - 1):gsub("\n", "")
+			line_number = line_number + newlines
+			counted_to = member_start - 1
+			accesses[#accesses + 1] = { name = name, member = member, line = line_number }
 		end
 	end
 	return accesses

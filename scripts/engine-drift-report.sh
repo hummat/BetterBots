@@ -77,8 +77,10 @@ if [[ -z "$open_issue" ]]; then
 	exit 0
 fi
 
-already_reported=$(gh issue view "$open_issue" --json body,comments --jq '[.body, .comments[].body] | join("\n")' | grep -cF "$marker" || true)
-if [[ "$already_reported" == "0" ]]; then
+# Fetch separately so a failed `gh` read aborts (set -e) instead of looking like
+# "marker not found" and re-posting a version that was already reported.
+thread=$(gh issue view "$open_issue" --json body,comments --jq '[.body, .comments[].body] | join("\n")')
+if ! grep -qF "$marker" <<< "$thread"; then
 	gh issue comment "$open_issue" --body "$(
 		printf '@%s patch-check still fails on a newer decompiled source.\n\n' "$NOTIFY_USER"
 		source_line

@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Checkout latest decompiled Darktide source
         run: git clone --depth 1 https://github.com/Aussiemon/Darktide-Source-Code.git ../Darktide-Source-Code
@@ -59,6 +61,8 @@ jobs:
       # email fires once per broken source version, not every day.
       - name: Fail on new drift
         if: steps.report.outputs.reported == 'true'
+        env:
+          UPSTREAM_SUBJECT: ${{ steps.check.outputs.subject }}
         run: |
-          echo "::error::patch-check fails on ${{ steps.check.outputs.subject }}; see the engine-drift issue"
+          printf '::error::patch-check fails on %s; see the engine-drift issue\n' "$UPSTREAM_SUBJECT"
           exit 1

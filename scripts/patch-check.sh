@@ -200,7 +200,7 @@ check_engine_module_paths() {
 # member allowlists of the audited mock builders in tests/test_helper.lua. Hook
 # anchors above only cover functions BetterBots wraps; this covers what it calls.
 check_engine_api_usage() {
-	local lua_bin output status line
+	local lua_bin output status line reported=0
 
 	lua_bin="$(command -v lua5.4 || command -v lua || command -v luajit || true)"
 	if [[ -z "$lua_bin" ]]; then
@@ -214,12 +214,15 @@ check_engine_api_usage() {
 	while IFS= read -r line; do
 		if [[ "$line" == ERROR:\ * ]]; then
 			err "${line#ERROR: }"
+			reported=$((reported + 1))
 		elif [[ -n "$line" ]]; then
 			echo "$line"
 		fi
 	done <<< "$output"
 
-	if ((status != 0 && status != 1)); then
+	# The checker exits 1 when it reports contract errors, but an uncaught Lua error
+	# or syntax error also exits 1; without ERROR lines that is a crash, not a pass.
+	if ((status != 0 && (status != 1 || reported == 0))); then
 		err "engine API usage check crashed (exit $status)"
 	fi
 }
