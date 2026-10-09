@@ -6,13 +6,19 @@
 -- Fatshark removes one, Lua raises "attempt to call a nil value" at runtime and
 -- no static check notices (1.13.0 removed `remaining_ability_cooldown`).
 --
--- Two surfaces are verified against the decompiled source:
+-- Three surfaces are verified against the decompiled source:
 --   1. Production accesses: every `name:member(` / `name.member` where `name` is
 --      bound to `ScriptUnit.(has_)extension(unit, "<system>")` must resolve to a
 --      method or `self.<field>` of a class under
 --      scripts/extension_systems/<system dir>/ (or one of its base classes).
 --   2. Mock builder allowlists in tests/test_helper.lua must name members that
 --      exist on the specific engine class each builder stands in for.
+--   3. Queued inputs: every literal action input BetterBots queues or stores in a
+--      sequence profile must be a key of some `action_inputs` table under
+--      scripts/settings/, and every literal raw input must be a slot wield input in
+--      player_character_constants.lua. When an action input is missing,
+--      ActionInputParser only logs "Could not find matching input_sequence" and drops
+--      the request (1.13.0 removed the `combat_ability` / `grenade_ability` inputs).
 --
 -- Receiver resolution: a binding in the same file wins; otherwise a name bound to
 -- exactly one system anywhere in the mod is used, which covers parameters and
@@ -263,11 +269,149 @@ function M.system_members(index, system)
 	return found_class and members or nil, dir
 end
 
--- Runs both checks. Returns errors (list of strings) and a summary table.
+-- Field or constant names (any case) ending in `_input` hold one input: a raw input
+-- when a whole `_`-separated suffix is one of RAW_INPUT_SUFFIXES (`raw_input`,
+-- `wield_input`, `GRENADE_WIELD_RAW_INPUT`), otherwise an action input
+-- (`action_input`, `start_input`, `unwield_input`, ...). Lowercase `*_inputs`
+-- lists hold action inputs.
+M.RAW_INPUT_SUFFIXES = { "raw_input", "wield_input" }
+
+local function input_kind(name)
+	local lowered = name:lower()
+	if not lowered:match("^[a-z][a-z_]*_input$") then
+		return nil
+	end
+	for _, suffix in ipairs(M.RAW_INPUT_SUFFIXES) do
+		if lowered == suffix or lowered:sub(-#suffix - 1) == "_" .. suffix then
+			return "raw"
+		end
+	end
+	return "action"
+end
+
+-- Queue helpers -> argument positions holding the action input and the raw input.
+M.QUEUE_CALLS = {
+	bot_queue_action_input = { action = 2, raw = 3 },
+	_queue_weapon_action_input = { action = 2, raw = 3 },
+	queue_weapon_input = { action = 2 },
+}
+
+local function line_at(source, position)
+	local _, newlines = source:sub(1, position - 1):gsub("\n", "")
+	return newlines + 1
+end
+
+-- Splits a parenthesised argument list on top-level commas.
+local function split_arguments(list)
+	local arguments = {}
+	local depth, quote, start = 0, nil, 2
+	for i = 2, #list - 1 do
+		local char = list:sub(i, i)
+		if quote then
+			if char == quote and list:sub(i - 1, i - 1) ~= "\\" then
+				quote = nil
+			end
+		elseif char == '"' or char == "'" then
+			quote = char
+		elseif char == "(" or char == "{" then
+			depth = depth + 1
+		elseif char == ")" or char == "}" then
+			depth = depth - 1
+		elseif char == "," and depth == 0 then
+			arguments[#arguments + 1] = list:sub(start, i - 1)
+			start = i + 1
+		end
+	end
+	arguments[#arguments + 1] = list:sub(start, #list - 1)
+	return arguments
+end
+
+-- Returns { { kind = "action" | "raw", name, line }, ... } for literal inputs in
+-- `*_input = "x"` fields and constants, `*_inputs = { "x", ... }` lists, and
+-- QUEUE_CALLS arguments.
+function M.collect_queued_inputs(source)
+	local lines = {}
+	for raw in (source .. "\n"):gmatch("([^\n]*)\n") do
+		lines[#lines + 1] = raw:gsub("%-%-[^\"']*$", "")
+	end
+	local code = table.concat(lines, "\n")
+	local inputs = {}
+
+	for position, field, name in code:gmatch('()([%a_][%w_]*)%s*=%s*"([%w_]+)"') do
+		local kind = input_kind(field)
+		if kind then
+			inputs[#inputs + 1] = { kind = kind, name = name, line = line_at(code, position) }
+		end
+	end
+
+	for position, body in code:gmatch("()[a-z][a-z_]*_inputs%s*=%s*(%b{})") do
+		for name in body:gmatch('"([%w_]+)"') do
+			inputs[#inputs + 1] = { kind = "action", name = name, line = line_at(code, position) }
+		end
+	end
+
+	for helper, positions in pairs(M.QUEUE_CALLS) do
+		for position, list in code:gmatch("()%f[%w_]" .. helper .. "%s*(%b())") do
+			local arguments = split_arguments(list)
+			for kind, index in pairs(positions) do
+				local name = arguments[index] and arguments[index]:match('^%s*"([%w_]+)"%s*$')
+				if name then
+					inputs[#inputs + 1] = { kind = kind, name = name, line = line_at(code, position) }
+				end
+			end
+		end
+	end
+
+	return inputs
+end
+
+-- Action inputs: keys of every `action_inputs = { ... }` table (including
+-- `combat_ability_action_inputs`, generator `base_template.action_inputs`) and
+-- `action_inputs.<name> =` additions under scripts/settings/.
+function M.collect_defined_action_inputs(decompile_root)
+	local defined = {}
+	local files =
+		command_lines("rg --files -g '*.lua' " .. shell_quote(decompile_root .. "/scripts/settings") .. " 2>/dev/null")
+	for _, path in ipairs(files) do
+		local source = read_file(path)
+		for body in source:gmatch("action_inputs%s*=%s*(%b{})") do
+			local top_level = body:sub(2, -2):gsub("%b{}", "{}")
+			for name in top_level:gmatch("([%a_][%w_]*)%s*=") do
+				defined[name] = true
+			end
+		end
+		for name in source:gmatch("action_inputs%.([%a_][%w_]*)%s*=[^=]") do
+			defined[name] = true
+		end
+	end
+	return defined
+end
+
+-- Raw inputs: every string in a `wield_inputs = { ... }` table of
+-- player_character_constants.lua (per-slot pressed/hold/released and the shared
+-- wield list).
+function M.collect_raw_wield_inputs(decompile_root)
+	local defined = {}
+	local path = decompile_root .. "/scripts/settings/player_character/player_character_constants.lua"
+	local handle = io.open(path, "r")
+	if not handle then
+		return defined
+	end
+	local source = handle:read("*a")
+	handle:close()
+	for body in source:gmatch("wield_inputs%s*=%s*(%b{})") do
+		for name in body:gmatch('"([%w_]+)"') do
+			defined[name] = true
+		end
+	end
+	return defined
+end
+
+-- Runs all three checks. Returns errors (list of strings) and a summary table.
 function M.run(repo_root, decompile_root)
 	local index = M.new_engine_index(decompile_root)
 	local errors = {}
-	local summary = { accesses = 0, systems = 0, builder_members = 0 }
+	local summary = { accesses = 0, systems = 0, builder_members = 0, queued_inputs = 0 }
 
 	local mod_files =
 		command_lines("rg --files -g '*.lua' " .. shell_quote(repo_root .. "/scripts/mods/BetterBots") .. " | sort")
@@ -360,6 +504,37 @@ function M.run(repo_root, decompile_root)
 		end
 	end
 
+	local defined_actions = M.collect_defined_action_inputs(decompile_root)
+	local defined_raw = M.collect_raw_wield_inputs(decompile_root)
+	if next(defined_actions) == nil then
+		errors[#errors + 1] = "found no action_inputs tables under scripts/settings/ (parser drift)"
+	end
+	if next(defined_raw) == nil then
+		errors[#errors + 1] =
+			"found no wield_inputs in scripts/settings/player_character/player_character_constants.lua"
+	end
+	for _, file in ipairs(sources) do
+		local relative = file.path:sub(#repo_root + 2)
+		for _, input in ipairs(M.collect_queued_inputs(file.source)) do
+			summary.queued_inputs = summary.queued_inputs + 1
+			if input.kind == "action" and not defined_actions[input.name] then
+				errors[#errors + 1] = string.format(
+					'%s:%d: action input "%s" is not defined by any weapon or ability template',
+					relative,
+					input.line,
+					input.name
+				)
+			elseif input.kind == "raw" and not defined_raw[input.name] then
+				errors[#errors + 1] = string.format(
+					'%s:%d: raw input "%s" is not a slot wield input in player_character_constants.lua',
+					relative,
+					input.line,
+					input.name
+				)
+			end
+		end
+	end
+
 	table.sort(errors)
 	return errors, summary
 end
@@ -376,11 +551,13 @@ if arg and arg[0] and arg[0]:match("engine_api_check%.lua$") then
 	end
 	print(
 		string.format(
-			"  %s:  engine API usage -> %d production accesses across %d systems, %d mock allowlist members",
+			"  %s:  engine API usage -> %d production accesses across %d systems, %d mock allowlist members,"
+				.. " %d queued inputs",
 			#errors == 0 and "ok" or "--",
 			summary.accesses,
 			summary.systems,
-			summary.builder_members
+			summary.builder_members,
+			summary.queued_inputs
 		)
 	)
 	os.exit(#errors == 0 and 0 or 1)

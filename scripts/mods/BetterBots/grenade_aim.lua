@@ -104,7 +104,10 @@ function M.resolve_grenade_projectile_data(unit, grenade_name)
 	end
 
 	local grenade_ability = _equipped_grenade_ability and select(2, _equipped_grenade_ability(unit))
-	local inventory_item_name = grenade_ability and grenade_ability.inventory_item_name
+	-- 1.13.0 moved Zealot knives and Broker quick flash to inventory_item_reference;
+	-- the engine reads either field (ActionUtility, PackageSynchronizerClient).
+	local inventory_item_name = grenade_ability
+		and (grenade_ability.inventory_item_name or grenade_ability.inventory_item_reference)
 	if not inventory_item_name then
 		return {
 			mode = "flat",

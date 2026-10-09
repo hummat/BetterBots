@@ -66,12 +66,12 @@ BLOCK IF allies_in_coherency == 0 AND num_nearby > 2  -- don't dump aggro if tea
 
 ## Chorus of Spiritual Fortitude / Relic (`zealot_relic`)
 
-**Cooldown:** 60s | **Channel duration:** 5.5s, uninterruptible | **Buff radius:** 10m | **Stagger radius:** 4m / 2s stagger | **Role:** Team toughness support + boss/elite stagger (Tier 3 item-based)
+**Cooldown:** 60s | **Channel duration:** 3.67s after a 0.5s wield (5.5s before 1.13.0), uninterruptible | **Buff radius:** 10m | **Stagger radius:** 4m / 2s stagger | **Role:** Team toughness support + boss/elite stagger (Tier 3 item-based)
 
 > Renamed from "Bolstering Prayer" — `zealot_bolstering_prayer` is the talent name; in-game UI calls it Chorus of Spiritual Fortitude. The `_relic` suffix matches the inventory item.
 
-### Mechanics (decompiled source, `zealot_relic.lua:L134-L175`)
-- Channel is **uninterruptible** (`uninterruptible = true`) for the full 5.5s
+### Mechanics (decompiled source, `zealot_relic.lua:L93-L158`, 1.13.2)
+- Channel is **uninterruptible** (`uninterruptible = true`) for the full 3.67s (`total_time = 3.6666666666666665`); `action_wield` (0.5s) chains into it automatically and the channel queues `wield_previous` when it ends. The charge is spent at channel start (`action_zealot_channel.lua:118`)
 - Self toughness restore on activation: 100% (`toughness_restored = 1`)
 - Self bonus toughness during channel: +400 flat (`toughness_bonus_flat = 400`)
 - 40% TDR during channel (`toughness_damage_taken_multiplier = 0.6`)
@@ -89,8 +89,8 @@ BLOCK IF allies_in_coherency == 0 AND num_nearby > 2  -- don't dump aggro if tea
 
 ### DON'T USE WHEN
 - `allies_in_coherency == 0` — no allies inside the 10m buff radius
-- `num_nearby >= 3 AND no_monstrosity` — vulnerable during 5.5s commit; only acceptable if a monstrosity threat justifies the trade
-- About to engage at melee range — bot will be locked into the relic for 5.5s; ranged enemies at >10m will continue firing freely
+- `num_nearby >= 3 AND no_monstrosity` — vulnerable during the ~4s commit; only acceptable if a monstrosity threat justifies the trade
+- About to engage at melee range — bot will be locked into the relic for ~4s; ranged enemies at >10m will continue firing freely
 
 ### PROPOSED BOT RULES
 ```
@@ -104,7 +104,7 @@ BLOCK IF allies_in_coherency == 0
 ```
 **Confidence:** HIGH on monstrosity trigger; existing `cumulative_challenge_rating >= 1.75` proxy in code roughly captures this but doesn't explicitly identify monstrosities. A future refinement: gate the threshold on `boss_monstrosity_active` flag for a cleaner trigger.
 
-**Commit warning:** the bot must hold the relic for the full 5.5s channel. If a higher-priority decision flips mid-channel (e.g., ally suddenly downed), the bot cannot abort — the channel is `uninterruptible`. Bot-level heuristics that try to cancel the relic mid-cast will silently fail.
+**Commit warning:** the bot holds the relic for the full channel (~4.2s including the wield). Damage cannot interrupt it (`uninterruptible`); since 1.13.0 the channel has `stop_input = "cancel_channeling"`, which BetterBots does not queue.
 
 ---
 

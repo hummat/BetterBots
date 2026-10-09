@@ -729,7 +729,7 @@ Logs when a bot enters the ability activation node.
 
 ### Hook 4: Charge consumption tracking (lines 1290-1327)
 
-**Target:** `PlayerUnitAbilityExtension.use_ability_charge` (via `hook_safe`)
+**Target:** `PlayerUnitAbilityExtension.consume_ability_usage_cost` (via `hook_safe`; `use_ability_charge` before 1.13.0)
 
 Records charge consumption events per unit for item-ability fallback confirmation.
 

@@ -2,6 +2,9 @@ local EngineApiCheck = dofile("scripts/engine_api_check.lua")
 
 local ENGINE_ABILITY_FILE = "scripts/extension_systems/ability/player_unit_ability_extension.lua"
 local ENGINE_ABILITY_BASE_FILE = "scripts/extension_systems/ability/ability_extension_base.lua"
+local BASE_TEMPLATE_FILE = "scripts/settings/equipment/weapon_templates/base_template_settings.lua"
+local GENERATOR_FILE = "scripts/settings/equipment/weapon_templates/weapon_template_generators/drone_generator.lua"
+local CONSTANTS_FILE = "scripts/settings/player_character/player_character_constants.lua"
 
 local function write_tree(root, files)
 	for relative, content in pairs(files) do
@@ -37,10 +40,34 @@ local function engine_tree()
 			"PlayerUnitAbilityExtension.remaining_ability_charges = function (self, ability_type)",
 			"end",
 		}, "\n"),
+		[BASE_TEMPLATE_FILE] = table.concat({
+			"local base_template_settings = {}",
+			"base_template_settings.action_inputs = {",
+			"\twield = {",
+			"\t\tbuffer_time = 0.4,",
+			"\t\tinput_sequence = {",
+			"\t\t\t{ inputs = wield_inputs },",
+			"\t\t},",
+			"\t},",
+			"}",
+		}, "\n"),
+		[GENERATOR_FILE] = table.concat({
+			"base_template.action_inputs = {",
+			"\t\taim_drone = { buffer_time = 0 },",
+			"\t}",
+			"weapon_template.action_inputs.channel = { buffer_time = 0.2 }",
+		}, "\n"),
+		[CONSTANTS_FILE] = table.concat({
+			"slot_combat_ability = {",
+			"\twield_inputs = {",
+			'\t\tpressed = { "combat_ability_pressed" },',
+			"\t},",
+			"}",
+		}, "\n"),
 	}
 end
 
-local function run(mod_files, test_helper_source)
+local function run(mod_files, test_helper_source, engine_files)
 	local repo_root = make_root()
 	local decompile_root = make_root()
 	local files = {
@@ -51,7 +78,7 @@ local function run(mod_files, test_helper_source)
 		files["scripts/mods/BetterBots/" .. name] = source
 	end
 	write_tree(repo_root, files)
-	write_tree(decompile_root, engine_tree())
+	write_tree(decompile_root, engine_files or engine_tree())
 
 	local errors = EngineApiCheck.run(repo_root, decompile_root)
 	os.execute("rm -rf '" .. repo_root .. "' '" .. decompile_root .. "'")
@@ -159,6 +186,62 @@ describe("engine API usage check", function()
 				.. " (add it to BUILDER_CLASSES in scripts/engine_api_check.lua)",
 			"tests/test_helper.lua: make_player_ability_extension allows remaining_ability_cooldown,"
 				.. " which PlayerUnitAbilityExtension does not define",
+		}, errors)
+	end)
+
+	it("flags queued action inputs no template defines and raw inputs no slot wields", function()
+		local errors = run({
+			["queue.lua"] = table.concat({
+				'action_input_extension:bot_queue_action_input("weapon_action", "combat_ability", nil)',
+				"_queue_weapon_action_input(",
+				"\tstate,",
+				'\t"grenade_ability"',
+				")",
+				'local PROFILE = { required_inputs = { "channel", "removed_input" }, aim_input = "buffer_time" }',
+				'ext:bot_queue_action_input("weapon_action", "wield", "wield_9")',
+				'M.SLOT_WIELD_RAW_INPUT = "wield_8"',
+			}, "\n"),
+		})
+
+		local prefix = "scripts/mods/BetterBots/queue.lua:"
+		assert.same({
+			prefix .. '1: action input "combat_ability" is not defined by any weapon or ability template',
+			prefix .. '2: action input "grenade_ability" is not defined by any weapon or ability template',
+			prefix .. '6: action input "buffer_time" is not defined by any weapon or ability template',
+			prefix .. '6: action input "removed_input" is not defined by any weapon or ability template',
+			prefix .. '7: raw input "wield_9" is not a slot wield input in player_character_constants.lua',
+			prefix .. '8: raw input "wield_8" is not a slot wield input in player_character_constants.lua',
+		}, errors)
+	end)
+
+	it("accepts generator and appended template inputs and ignores comparisons, components, and log text", function()
+		local errors = run({
+			["queue.lua"] = table.concat({
+				'ext:bot_queue_action_input("weapon_action", "wield", "combat_ability_pressed")',
+				'_queue_weapon_action_input(state, "aim_drone")',
+				'local PROFILE = { start_input = "channel", wield_input = "combat_ability_pressed" }',
+				'local ITEM = { unwield_input = "aim_drone" }',
+				'queue_weapon_input(unit, "aim_drone", "grenade_ability_action")',
+				'if action_input == "removed_input" then end',
+				'local text = ", fire_input=" .. tostring(fire_input)',
+				'local COMBAT_ABILITY_WIELD_RAW_INPUT = "combat_ability_pressed"',
+			}, "\n"),
+		})
+
+		assert.same({}, errors)
+	end)
+
+	it("fails closed when the decompiled tree has no input tables to check against", function()
+		local engine_files = engine_tree()
+		engine_files[BASE_TEMPLATE_FILE] = nil
+		engine_files[GENERATOR_FILE] = nil
+		engine_files[CONSTANTS_FILE] = nil
+
+		local errors = run({}, nil, engine_files)
+
+		assert.same({
+			"found no action_inputs tables under scripts/settings/ (parser drift)",
+			"found no wield_inputs in scripts/settings/player_character/player_character_constants.lua",
 		}, errors)
 	end)
 end)

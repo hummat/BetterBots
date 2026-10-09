@@ -20,6 +20,11 @@ local DEFAULT_THROW_DELAY_S = 0.3
 local RETRY_COOLDOWN_S = 2.0
 local SLOT_LOCK_RETRY_S = 0.35
 local ACTIVE_WEAPON_CHARGE_ACTION = "action_charge"
+-- Item grenades and blitzes enter slot_grenade_ability through the shared `wield`
+-- action input with this raw input (slot_configuration.slot_grenade_ability
+-- .wield_inputs.pressed[1]); 1.13.0 removed the per-template `grenade_ability` input.
+-- Quick-throw templates (Zealot knives, Broker flash) fire straight from this request.
+M.GRENADE_WIELD_RAW_INPUT = "grenade_ability_pressed"
 
 local function copy_context(context)
 	local copy = {}
@@ -199,9 +204,14 @@ function M.resolve_stop_followup_peril_pct(state)
 	return threshold
 end
 
-function M.should_block_wield_input(unit)
+-- raw_input is only passed by the bot_queue_action_input guard; the grenade's own
+-- slot-switch request during the `wield` stage must get through it.
+function M.should_block_wield_input(unit, raw_input)
 	local state = _grenade_state_by_unit[unit]
 	if not state or not state.stage then
+		return false
+	end
+	if state.stage == "wield" and not state.component and raw_input == M.GRENADE_WIELD_RAW_INPUT then
 		return false
 	end
 	if state.stage == "wait_unwield" and state.allow_external_wield_cleanup then
@@ -297,10 +307,6 @@ local function expected_weapon_action_input(state)
 
 	if state.stage == "wait_aim" then
 		return state.aim_input
-	end
-
-	if state.stage == "wield" and not state.component then
-		return "grenade_ability"
 	end
 
 	if state.stage == "wait_followup" then

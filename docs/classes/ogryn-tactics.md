@@ -34,7 +34,7 @@ BLOCK IF num_nearby == 0 AND priority_target == nil
 
 ## Loyal Protector (`ogryn_taunt_shout`)
 
-**Cooldown:** 30s | **Duration:** 15s taunt | **Role:** AoE taunt, +20% damage debuff on taunted enemies, full toughness restore on shout
+**Cooldown:** 25s (30s before 1.13.0) | **Duration:** 15s taunt | **Role:** AoE taunt, +20% damage debuff on taunted enemies, full toughness restore on shout
 
 ### USE WHEN
 - Ally needs aid AND `num_nearby >= 2 AND toughness_pct > 0.30` — protect/revive
@@ -60,18 +60,18 @@ IF count_elites >= 2 AND big_box_of_hurt_ready THEN activate, then throw grenade
 BLOCK IF num_nearby <= 2 AND challenge_rating_sum < 1.5
 BLOCK IF toughness_pct < 0.20 AND health_pct < 0.30
 ```
-**Confidence:** HIGH — 30s CD makes Taunt an opportunity-gated tool, not an emergency-only one. Community top play uses it as a +20% team damage amp combo, with the toughness refill as a free defensive byproduct.
+**Confidence:** HIGH — 25s CD makes Taunt an opportunity-gated tool, not an emergency-only one. Community top play uses it as a +20% team damage amp combo, with the toughness refill as a free defensive byproduct.
 
 **Mechanics:**
 - The taunted enemy gets `damage_taken_multiplier = 1.2` (+20% incoming damage) for 15s — applies to *all* damage sources, not just the Ogryn's
 - The Ogryn also gets `toughness_replenish_percent = 1` on shout (100% toughness refill)
 - Talents granting `damage_taken_vs_taunted` stack on top of the +20% base debuff
-- Cooldown was previously documented as 50s — corrected against `talent_settings_ogryn.lua:283` (`ogryn_2.combat_ability.cooldown = 30`)
+- Cooldown was previously documented as 50s, then 30s; 1.13.0 sets `talent_settings_ogryn.lua:287` `ogryn_2.combat_ability.cooldown = 25`
 
 **Boss timing:**
 - Against monstrosities, fire Taunt during the boss's recovery / idle phase, not mid-charge or mid-slam — the 15s debuff window aligns with the team's damage burst after the boss exits its active animation
 - Bots cannot reliably read boss animation state. Practical proxy: `target_is_monster AND target_velocity < 2 AND no_recent_boss_attack` (heuristic for "boss is idling"). Without a reliable proxy, default to firing Taunt when a monstrosity *first becomes attackable* — community top play also accepts this opener as second-best timing.
-- Cooldown is 30s, so a single boss fight will see 2-3 Taunt windows — no need to save the first cast for the perfect moment
+- Cooldown is 25s, so a single boss fight will see 2-3 Taunt windows — no need to save the first cast for the perfect moment
 
 ---
 

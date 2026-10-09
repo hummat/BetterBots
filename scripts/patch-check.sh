@@ -368,8 +368,8 @@ check_engine_api_usage
 
 check_anchor \
 	"scripts/extension_systems/ability/player_unit_ability_extension.lua" \
-	"PlayerUnitAbilityExtension.use_ability_charge = function" \
-	"ability charge hook"
+	"PlayerUnitAbilityExtension.consume_ability_usage_cost = function (self, ability_type, optional_usage_cost_override" \
+	"ability usage-cost hook"
 check_anchor \
 	"scripts/extension_systems/ability/actions/action_character_state_change.lua" \
 	'_character_sate_component = unit_data_extension:read_component("character_state")' \
@@ -380,8 +380,12 @@ check_anchor \
 	"state-change wanted state"
 check_anchor \
 	"scripts/extension_systems/ability/actions/action_character_state_change.lua" \
-	"ability_extension:use_ability_charge(ability_type)" \
-	"state-change charge consume"
+	"local consume_ability_usage_cost = action_settings.consume_ability_usage_cost" \
+	"state-change usage-cost flag"
+check_anchor \
+	"scripts/extension_systems/ability/actions/action_character_state_change.lua" \
+	"ability_extension:consume_ability_usage_cost(self._ability_type)" \
+	"state-change usage-cost consume"
 check_anchor \
 	"scripts/extension_systems/behavior/bot_behavior_extension.lua" \
 	"BotBehaviorExtension._init_blackboard_components = function" \
@@ -578,8 +582,8 @@ check_anchor \
 # Ability cooldown anchors — pin specific CDs our heuristics docs/tuning rely on.
 check_anchor_multiline \
 	"scripts/settings/talent/talent_settings_ogryn.lua" \
-	'ogryn_2 = \{\s+combat_ability = \{\s+active_duration = 5,\s+cooldown = 30,' \
-	"Ogryn Loyal Protector (taunt) cooldown = 30s"
+	'ogryn_2 = \{\s+combat_ability = \{\s+active_duration = 5,\s+cooldown = 25,' \
+	"Ogryn Loyal Protector (taunt) cooldown = 25s"
 
 check_minion_attack_damage_hooks
 

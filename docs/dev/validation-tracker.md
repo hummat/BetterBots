@@ -20,6 +20,13 @@ Expected v1.2.3 coordination markers when the collision paths occur:
 - `released grenade weapon lock for interaction during <grenade>` when an interaction starts during an active grenade sequence
 - normal grenade and combat-ability activation after the conflicting sequence finishes
 
+7. v1.2.4 Darktide 1.13 slot-switch fix (#118): cold boot on 1.13.x with a Zealot relic (Chorus) bot, a Psyker force-field or Arbites drone bot, and an item-grenade bot (frag/krak/fire/Rock); Zealot knives and Broker flash when available. Expected markers per ability:
+
+- `fallback item queued <ability> input=wield raw_input=combat_ability_pressed (wield slot_combat_ability)`, then the profile's start input, then `charge consumed for <ability>`
+- `grenade queued wield for <grenade>`, then `grenade wield confirmed, waiting for aim` (or `grenade auto-fire complete without stable grenade slot` for knives/flash), then `grenade charge consumed for <grenade>`
+- `/bb_state` prints `cd=x/y` for a bot on cooldown without a Lua error
+- zero `Could not find matching input_sequence for queued action_input "combat_ability"` / `"grenade_ability"` engine lines, and zero `blocked weapon switch while keeping <grenade> sequence (raw_input=grenade_ability_pressed)`
+
 **v1.2.3 hardening candidate (2026-07-25)**: based on commit
 `60fe30c715254360500f4aec45fed6da3589ac54` plus the reviewed, uncommitted
 animation and interaction guards. `BetterBots.zip` SHA-256:

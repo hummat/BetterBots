@@ -93,7 +93,7 @@ local function reset()
 	_weapon_templates = {
 		dummy_primary = {
 			action_inputs = {
-				combat_ability = {},
+				wield = {},
 			},
 		},
 		zealot_relic = {
@@ -244,7 +244,11 @@ describe("item_fallback", function()
 		)
 		assert.equals("waiting_wield", state.item_stage)
 		assert.equals("zealot_relic_hazard", state.item_rule)
-		assert.equals("combat_ability", _queued_inputs[1].input)
+		assert.same({
+			component = "weapon_action",
+			input = "wield",
+			raw_input = "combat_ability_pressed",
+		}, _queued_inputs[1])
 
 		_inventory_component.wielded_slot = "slot_combat_ability"
 		_weapon_action_component.template_name = "zealot_relic"
@@ -707,7 +711,8 @@ describe("item_fallback", function()
 			end
 
 			local self = {
-				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_ability_type = "combat_ability",
+				_action_settings = { consume_ability_usage_cost = true },
 				_player = {
 					is_human_controlled = function()
 						return false
@@ -728,7 +733,8 @@ describe("item_fallback", function()
 
 		it("does not schedule retry when human-controlled", function()
 			local self = {
-				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_ability_type = "combat_ability",
+				_action_settings = { consume_ability_usage_cost = true },
 				_player = {
 					is_human_controlled = function()
 						return true
@@ -746,7 +752,8 @@ describe("item_fallback", function()
 
 		it("does not schedule retry when state transition succeeded", function()
 			local self = {
-				_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+				_ability_type = "combat_ability",
+				_action_settings = { consume_ability_usage_cost = true },
 				_player = {
 					is_human_controlled = function()
 						return false
@@ -764,7 +771,8 @@ describe("item_fallback", function()
 
 		it("does not schedule retry for non-combat ability type", function()
 			local self = {
-				_action_settings = { ability_type = "grenade_ability", use_ability_charge = true },
+				_ability_type = "grenade_ability",
+				_action_settings = { consume_ability_usage_cost = true },
 				_player = {
 					is_human_controlled = function()
 						return false
@@ -780,9 +788,10 @@ describe("item_fallback", function()
 			assert.is_nil(scheduled)
 		end)
 
-		it("does not schedule retry when use_ability_charge is false", function()
+		it("does not schedule retry when the action does not consume its usage cost", function()
 			local self = {
-				_action_settings = { ability_type = "combat_ability", use_ability_charge = false },
+				_ability_type = "combat_ability",
+				_action_settings = { consume_ability_usage_cost = false },
 				_player = {
 					is_human_controlled = function()
 						return false

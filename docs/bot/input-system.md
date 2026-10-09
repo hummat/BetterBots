@@ -645,6 +645,20 @@ BetterBots also implements a fallback path that hooks into the BT condition chec
 
 This duplicates the BT node's logic but runs outside the BT, providing a safety net when the normal BT path fails.
 
+### Item-Slot Switch (1.13.0+)
+
+Item abilities (relic, force field, drone) and item grenades/blitzes first switch into their slot. Before 1.13.0 every weapon template had its own `combat_ability` / `grenade_ability` action input for that. 1.13.0 removed them; the switch is now the shared `wield` action input (added to every template through `table.add_missing(..., BaseTemplateSettings.action_inputs)`) with the slot's pressed input as `raw_input`:
+
+```lua
+action_input_extension:bot_queue_action_input("weapon_action", "wield", "combat_ability_pressed")
+action_input_extension:bot_queue_action_input("weapon_action", "wield", "grenade_ability_pressed")
+```
+
+These are `slot_configuration.<slot>.wield_inputs.pressed[1]` in `player_character_constants.lua`, the same request `BtBotInventorySwitchAction` builds via `wield_input_from_slot_name`. Two consequences:
+
+- Zealot throwing knives and Broker flash grenades no longer switch slots at all. The base actions `grenade_ability_zealot_throwing_knives` / `grenade_ability_quick_flash_grenade` (`base_template_settings.lua`) start on `wield` when the raw input is the grenade slot's pressed input and throw from the current weapon; the base `action_wield` condition excludes those blitzes.
+- A queued input the template no longer defines produces only the `Could not find matching input_sequence` info log above. `make patch-check` verifies every literal input BetterBots queues against the decompiled templates.
+
 ### BetterBots Sustained-Fire Bridge
 
 Held-fire ranged weapons split across both bot input pathways:

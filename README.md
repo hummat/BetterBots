@@ -114,7 +114,7 @@ All new features and fixes should ship with busted coverage under `tests/`. The 
 
 ### Patch-day workflow
 
-Darktide patches regularly break hook anchors. The repo keeps a manual link to a decompiled-source checkout (the maintainer uses `../Darktide-Source-Code`) and `make patch-check` validates that every anchor BetterBots hooks is still present with the expected surrounding context, and that every engine-extension method or field BetterBots calls or reads through a variable bound to `ScriptUnit.(has_)extension(...)` (and every member the test mocks allow) still exists. Extensions stored in table fields (`state.action_input_extension`) are not checked.
+Darktide patches regularly break hook anchors. The repo keeps a manual link to a decompiled-source checkout (the maintainer uses `../Darktide-Source-Code`) and `make patch-check` validates that every anchor BetterBots hooks is still present with the expected surrounding context, and that every engine-extension method or field BetterBots calls or reads through a variable bound to `ScriptUnit.(has_)extension(...)` (and every member the test mocks allow) still exists. Extensions stored in table fields (`state.action_input_extension`) are not checked. It also checks that every literal action input BetterBots queues is defined by some weapon or ability template, and every raw input is a slot wield input in `player_character_constants.lua`.
 
 The `Engine drift` workflow (`.github/workflows/engine-drift.yml`) runs `patch-check` once a day (06:17 UTC) against the newest [Aussiemon/Darktide-Source-Code](https://github.com/Aussiemon/Darktide-Source-Code) commit. When it fails, it opens one issue labeled `engine-drift` that mentions the repo owner, adds a comment only when a newer source version still fails, and closes the issue once the check passes again. The run is marked failed only when it reports something new, so GitHub's failed-workflow email arrives once per broken version. GitHub disables scheduled workflows in public repos after 60 days without repository activity; re-enable it from the Actions tab if that happens.
 
@@ -197,7 +197,7 @@ scripts/mods/BetterBots/          # Mod source
   bootstrap.lua                   #   Module loading, initialization, and cross-module wiring
   condition_patch.lua             #   BT condition evaluation + vent hysteresis + DH suppression
   ability_queue.lua               #   Fallback combat ability activation (Tier 1/2)
-  charge_tracker.lua              #   use_ability_charge dispatch, team cooldown, fallback completion
+  charge_tracker.lua              #   consume_ability_usage_cost dispatch, team cooldown, fallback completion
   combat_ability_identity.lua     #   Semantic ability identity (shout vs stance, etc.)
   heuristics.lua                  #   Thin public API + dispatcher for split heuristic modules
   heuristics_context.lua          #   Shared context builder + target/breed helpers

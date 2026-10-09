@@ -705,7 +705,7 @@ The lock is intentionally disabled once the unit has a live interaction target. 
 
 #### 7. Charge event tracking (lines 1290-1327)
 
-`hook_safe` on `PlayerUnitAbilityExtension.use_ability_charge` tracks when a bot's combat ability charge is consumed, enabling the item sequence fallback to confirm its activation succeeded.
+`hook_safe` on `PlayerUnitAbilityExtension.consume_ability_usage_cost` (`use_ability_charge` before 1.13.0) tracks when a bot's combat ability charge is consumed, enabling the item sequence fallback to confirm its activation succeeded.
 
 ### Opportunities for future enhancement
 

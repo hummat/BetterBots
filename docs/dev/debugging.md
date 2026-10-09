@@ -323,7 +323,7 @@ For item-based grenade regressions, check the grenade state-machine phases befor
 4. `grenade charge consumed for <grenade>` appears:
    - authoritative success for item-based grenades.
 
-If you instead see repeated `grenade queued wield for <grenade>` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, the blocker is killing the initial `grenade_ability` queue during the grenade `wield` stage. That is a sequence-allowlist bug, not an aim bug.
+If you instead see repeated `grenade queued wield for <grenade>` plus `blocked weapon switch while keeping <grenade> sequence (raw_input=grenade_ability_pressed)`, with no `grenade wield confirmed, waiting for aim`, a BetterBots blocker is killing the grenade's own slot-switch request (`wield` + raw input `grenade_ability_pressed`) during the grenade `wield` stage. `grenade_runtime.should_block_wield_input` must let exactly that raw input through. That is a sequence-allowlist bug, not an aim bug.
 
 ### Reading context dumps (deep verification)
 
@@ -402,6 +402,19 @@ requires each `:method(` call and `.field` read to exist on a class under
 are table fields (`state.ext:call()`) and `_betterbots_*` / `__bb*` markers are not
 checked. A new system whose directory differs from its name goes in `SYSTEM_DIRS`; a
 new audited builder goes in `BUILDER_CLASSES`.
+
+**Ability or blitz never fires, no error, log says "queued":** 1.13.0 removed the per-template
+`combat_ability` / `grenade_ability` action inputs that BetterBots queued to switch into the
+item slot. The engine drops an unknown queued input with only a `Could not find matching
+input_sequence` line (`ActionInputParser._update_bot_action_input_requests`), so Chorus,
+force field, drone, and every item grenade silently stopped. The slot switch is now the
+shared `wield` input with raw input `combat_ability_pressed` / `grenade_ability_pressed`
+(what `BtBotInventorySwitchAction` queues). `engine_api_check.lua` now collects every literal
+queued input (`*_input = "x"` fields and constants, `*_inputs` lists, `bot_queue_action_input`
+/ `_queue_weapon_action_input` / `queue_weapon_input` arguments) and requires action inputs
+to be defined in some `action_inputs` table under `scripts/settings/` and raw inputs to be
+slot `wield_inputs` in `player_character_constants.lua`. Inputs built at runtime (profile
+lookups, string concatenation) are not checked.
 
 **Visual-loadout anchor fails after a harmless lookup move:** engine 1.12.5
 (`0f0cb459`) resolves `weapon_template` before changing the wielded slot; the old

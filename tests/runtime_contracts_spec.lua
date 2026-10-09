@@ -141,7 +141,8 @@ describe("runtime contracts", function()
 
 	it("schedules a retry after a failed combat-ability state transition", function()
 		ItemFallback.on_state_change_finish(function() end, {
-			_action_settings = { ability_type = "combat_ability", use_ability_charge = true },
+			_ability_type = "combat_ability",
+			_action_settings = { consume_ability_usage_cost = true },
 			_player = {
 				is_human_controlled = function()
 					return false

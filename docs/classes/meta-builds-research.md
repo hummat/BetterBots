@@ -628,7 +628,7 @@ Syringe: `broker_ability_syringe` (pocketable item, 15-75s CD)
 | **Stance/buff on engage** | Vet (Exec Stance), Psyker (Scrier's), Hive Scum (Desperado/Rampage), Arbites (Castigator's Stance — 1.11 reframe) | Activate when combat starts, not preemptively. Opportunity-gated, not toughness-gated. |
 | **Team support on pressure** | Vet (VoC), Zealot (Chorus), Psyker (Dome), Ogryn (Taunt) | Activate on team-pressure signal (toughness drop, monstrosity spawn, corruption modifier). Ogryn Taunt is *also* a proactive damage-amp combo (+20% damage debuff to taunted) — not only pressure-reactive. |
 | **Dash/charge to gap-close** | Zealot (Fury), Ogryn (Bull Rush), Arbites (Break the Line) | Close distance to elites/specials or rescue downed allies |
-| **Emergency panic button** | Zealot (Stealth), Vet (Infiltrate) | Low health/toughness when surrounded. Note: Ogryn Taunt is NOT a panic button (30s CD; primary use is engagement-gated damage amp). |
+| **Emergency panic button** | Zealot (Stealth), Vet (Infiltrate) | Low health/toughness when surrounded. Note: Ogryn Taunt is NOT a panic button (25s CD since 1.13.0, 30s before; primary use is engagement-gated damage amp). |
 | **Cooldown-gated nuke** | Ogryn (PBB at 80s) | Long CD = conservative, save for high-value moments. (Hive Scum Desperado at 45s is now opportunity-gated, not panic-gated — moved up to Stance/buff on engage row.) |
 
 ### Most Popular Ability Per Class (Havoc meta)

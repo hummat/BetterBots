@@ -26,7 +26,9 @@ function M.init(deps)
 	_bot_slot_for_unit = deps.bot_slot_for_unit
 end
 
-function M.handle(self, ability_type, optional_num_charges)
+-- hook_safe on PlayerUnitAbilityExtension.consume_ability_usage_cost, the single
+-- cost-spending entry point for ability, item, and grenade actions since 1.13.0.
+function M.handle(self, ability_type, optional_usage_cost_override)
 	if ability_type ~= "combat_ability" and ability_type ~= "grenade_ability" then
 		return
 	end
@@ -56,7 +58,7 @@ function M.handle(self, ability_type, optional_num_charges)
 				"grenade charge consumed for "
 					.. grenade_name
 					.. " (charges="
-					.. tostring(optional_num_charges or 1)
+					.. tostring(optional_usage_cost_override or 1)
 					.. ")"
 			)
 		end
@@ -101,7 +103,7 @@ function M.handle(self, ability_type, optional_num_charges)
 				event = "consumed",
 				bot = bot_slot,
 				ability = ability_name,
-				charges = optional_num_charges or 1,
+				charges = optional_usage_cost_override or 1,
 				rule = fb_state and fb_state.item_rule or nil,
 				attempt_id = fb_state and fb_state.attempt_id or nil,
 			})
@@ -115,7 +117,7 @@ function M.handle(self, ability_type, optional_num_charges)
 	_debug_log(
 		"charge:" .. ability_name,
 		fixed_t,
-		"charge consumed for " .. ability_name .. " (charges=" .. tostring(optional_num_charges or 1) .. ")"
+		"charge consumed for " .. ability_name .. " (charges=" .. tostring(optional_usage_cost_override or 1) .. ")"
 	)
 end
 

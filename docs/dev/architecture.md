@@ -25,16 +25,16 @@ This mod targets bot ability activation in three paths:
 4. Adds a fallback in `BotBehaviorExtension:update` (via `update_dispatcher.lua` coordinating `ability_queue.lua` for Tier 1/2 and `grenade_fallback.lua` for grenade/blitz paths):
    - per-frame order is stable: perf sync → session-start event → ability queue → grenade fallback → ping/companion updates → event-log flush → snapshot emit
    - template fallback: queue ability action input directly on `combat_ability_action`
-   - item fallback: queue explicit `weapon_action` sequence (`combat_ability` wield + cast follow-ups + unwind)
+   - item fallback: queue explicit `weapon_action` sequence (slot switch via shared `wield` input with raw input `combat_ability_pressed`, the request `BtBotInventorySwitchAction` queues since 1.13.0, then cast follow-ups + unwind); item grenades switch the same way with `grenade_ability_pressed`
    - item sequence selection is profile-driven (shared profile catalog + per-ability priority order)
    - combat abilities and grenade/blitz sequences are mutually exclusive: new combat activations defer while a grenade sequence owns the slot, while active or just-queued combat activations prevent grenade fallback from starting in the same input-parser window
 5. Tracks charge consumption + state-transition recovery:
-   - `charge_tracker.lua` wraps `PlayerUnitAbilityExtension.use_ability_charge` for bot-only consumed events, semantic-key routing, team-cooldown recording, and grenade/item fallback completion
+   - `charge_tracker.lua` wraps `PlayerUnitAbilityExtension.consume_ability_usage_cost` (the single cost-spending entry point since 1.13.0) for bot-only consumed events, semantic-key routing, team-cooldown recording, and grenade/item fallback completion
    - hook `ActionCharacterStateChange.finish`
    - if bot combat ability did not reach wanted character state, schedule a fast fallback retry
 6. Adds queue-level weapon-switch protection for item and grenade abilities (via `weapon_action.lua`):
    - hook `PlayerUnitActionInputExtension.bot_queue_action_input`
-   - block bot `weapon_action:wield` while protected item or grenade abilities are active/in-sequence
+   - block bot `weapon_action:wield` while protected item or grenade abilities are active/in-sequence; the grenade's own slot-switch request (raw input `grenade_ability_pressed` during its `wield` stage) passes
 7. Adds `wield_slot` redirect for protected ability sequences (via `weapon_action.lua`):
    - redirects conflicting wield calls back to the slot owned by the active item or grenade sequence (prevents cancel loops)
    - always permits the engine's forced `slot_unarmed` transition for interactions and disruptive character states such as catapulted, ledge, or disabled; animation events otherwise run against the stale ability/grenade state machine and can crash
@@ -279,7 +279,7 @@ This mod targets bot ability activation in three paths:
     - 3 categories: `taunt` (8s window), `aoe_shout` (6s), `dash` (4s) — roughly half the ability cooldown
     - stances and grenades excluded: stances are self-buffs (independent benefit), grenades are consumable charges (no regeneration)
     - emergency overrides bypass suppression: `psyker_shout_high_peril`, `zealot_stealth_emergency`, `ogryn_charge_escape`, any `_ally_aid` rule
-    - gated by `enable_team_cooldown`; recording happens in the `use_ability_charge` hook and suppression runs in both `condition_patch._can_activate_ability` and `ability_queue.lua`
+    - gated by `enable_team_cooldown`; recording happens in the `consume_ability_usage_cost` hook and suppression runs in both `condition_patch._can_activate_ability` and `ability_queue.lua`
     - reset on game state change (hot-reload safe)
 
 ## DMF module loading pattern
@@ -511,7 +511,7 @@ The same reliability rules apply across relic/force-field/drone-style abilities:
    - If not, abort and retry instead of sending invalid parser input.
 
 3. **Use charge-consume as success signal**
-   - Track `use_ability_charge(combat_ability)` for bots per unit.
+   - Track `consume_ability_usage_cost(combat_ability)` for bots per unit.
    - Confirm sequence success via charge consumption, not only via queued inputs.
 
 4. **Support multiple valid input profiles**

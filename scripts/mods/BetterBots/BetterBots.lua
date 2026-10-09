@@ -483,13 +483,14 @@ end
 -- Block BT wield inputs for the full grenade sequence (including wait_unwield).
 -- Separate from should_lock_weapon_switch so the wield_slot redirect can be
 -- lifted in wait_unwield without also letting the BT switch weapons mid-throw.
-local function _should_block_wield_input(unit)
+-- raw_input lets the grenade's own slot-switch request through.
+local function _should_block_wield_input(unit, raw_input)
 	local should_lock, ability_name = ItemFallback.should_lock_weapon_switch(unit)
 	if should_lock then
 		return true, ability_name
 	end
 
-	return GrenadeFallback.should_block_wield_input(unit)
+	return GrenadeFallback.should_block_wield_input(unit, raw_input)
 end
 
 local DAEMONHOST_SAFE_WEAPON_ACTION_INPUTS = {
@@ -1002,9 +1003,9 @@ mod:hook_require_now(
 		end
 		mod:hook_safe(
 			PlayerUnitAbilityExtension,
-			"use_ability_charge",
-			function(self, ability_type, optional_num_charges)
-				ChargeTracker.handle(self, ability_type, optional_num_charges)
+			"consume_ability_usage_cost",
+			function(self, ability_type, optional_usage_cost_override)
+				ChargeTracker.handle(self, ability_type, optional_usage_cost_override)
 			end
 		)
 	end

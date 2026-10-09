@@ -377,8 +377,17 @@ local function register_commands()
 			local ability_name = _equipped_combat_ability_name(unit)
 			local charges = ability_extension and ability_extension:remaining_ability_charges("combat_ability") or nil
 			local max_charges = ability_extension and ability_extension:max_ability_charges("combat_ability") or nil
-			local cooldown = ability_extension and ability_extension:remaining_ability_cooldown("combat_ability") or nil
-			local max_cooldown = ability_extension and ability_extension:max_ability_cooldown("combat_ability") or nil
+			-- 1.13.0 replaced cooldowns with regenerating resource: seconds per charge and
+			-- the missing fraction of the charge currently regenerating.
+			local max_cooldown = ability_extension
+					and ability_extension:max_regen_time_for_ability_charge("combat_ability")
+				or nil
+			local _, missing_charge_fraction
+			if ability_extension then
+				_, missing_charge_fraction =
+					ability_extension:missing_ability_resource_until_next_charge("combat_ability")
+			end
+			local cooldown = max_cooldown and missing_charge_fraction and max_cooldown * missing_charge_fraction or nil
 			local can_use = ability_extension and ability_extension:can_use_ability("combat_ability") or false
 			local fb_state = fallback_state_snapshot(_fallback_state_by_unit[unit], fixed_t)
 			local last_charge = _last_charge_event_by_unit[unit]

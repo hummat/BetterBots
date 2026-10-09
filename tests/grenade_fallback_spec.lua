@@ -547,11 +547,11 @@ describe("grenade_fallback", function()
 			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
 		end)
 
-		it("allows the initial grenade wield input during item-based grenade wield stage", function()
+		it("blocks foreign weapon actions during item-based grenade wield stage", function()
 			advance_to_stage("wield")
 
-			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "grenade_ability"))
 			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "zoom"))
+			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "wield"))
 		end)
 
 		it("blocks foreign weapon actions during Assail cleanup", function()
@@ -601,7 +601,7 @@ describe("grenade_fallback", function()
 			assert.is_nil(_grenade_state_by_unit[unit].stage)
 			assert.is_truthy(find_debug_log("grenade aim unavailable for veteran_frag_grenade"))
 			assert.equals(1, #_recorded_inputs)
-			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("wield", _recorded_inputs[1].input)
 		end)
 
 		it("never enters state machine when no target_enemy is available", function()
@@ -685,7 +685,7 @@ describe("grenade_fallback", function()
 			assert.is_true(seen_context.target_is_elite_special)
 			assert.equals(1, #_recorded_inputs)
 			assert.equals("weapon_action", _recorded_inputs[1].component)
-			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("wield", _recorded_inputs[1].input)
 			assert.equals("zoom", _grenade_state_by_unit[unit].aim_input)
 		end)
 
@@ -825,6 +825,54 @@ describe("grenade_fallback", function()
 
 			assert.is_false(GrenadeFallback.should_block_weapon_action_input(unit, "shoot_heavy_hold_release"))
 			assert.is_true(GrenadeFallback.should_block_weapon_action_input(unit, "charge_release"))
+		end)
+	end)
+
+	describe("should_block_wield_input", function()
+		it("lets only the grenade slot-switch request through during the wield stage", function()
+			advance_to_stage("wield")
+
+			assert.is_false(GrenadeFallback.should_block_wield_input(unit, "grenade_ability_pressed"))
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit, "wield_1"))
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit, "combat_ability_pressed"))
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit))
+		end)
+
+		it("blocks the grenade slot-switch raw input once the grenade is wielded", function()
+			advance_to_stage("wait_aim")
+
+			assert.is_true(GrenadeFallback.should_block_wield_input(unit, "grenade_ability_pressed"))
+		end)
+	end)
+
+	describe("grenade projectile data", function()
+		it("resolves the item from inventory_item_reference (1.13 Zealot knives, Broker quick flash)", function()
+			local item = "content/items/weapons/player/zealot_throwing_knives"
+			GrenadeAim.prime_weapon_templates({
+				zealot_throwing_knives = {
+					actions = {
+						action_throw = {
+							projectile_template = {
+								item_name = item,
+								locomotion_template = {
+									integrator_parameters = { gravity = 6 },
+									trajectory_parameters = { throw = { speed_maximal = 40 } },
+								},
+							},
+						},
+					},
+				},
+			})
+			GrenadeAim.wire({
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "zealot_throwing_knives", inventory_item_reference = item }
+				end,
+			})
+
+			assert.same(
+				{ mode = "ballistic", speed = 40, gravity = 6 },
+				GrenadeAim.resolve_grenade_projectile_data(unit, "zealot_throwing_knives")
+			)
 		end)
 	end)
 
@@ -998,12 +1046,12 @@ describe("grenade_fallback", function()
 		assert.truthy(find_debug_log("rule=grenade_fire_block_recent_use"))
 	end)
 
-	it("queues grenade_ability wield when idle and heuristic passes", function()
+	it("queues the grenade slot switch through the shared wield input when idle and heuristic passes", function()
 		GrenadeFallback.try_queue(unit, blackboard)
 		assert.equals(1, #_recorded_inputs)
 		assert.equals("weapon_action", _recorded_inputs[1].component)
-		assert.equals("grenade_ability", _recorded_inputs[1].input)
-		assert.is_nil(_recorded_inputs[1].extra)
+		assert.equals("wield", _recorded_inputs[1].input)
+		assert.equals("grenade_ability_pressed", _recorded_inputs[1].extra)
 		local state = _grenade_state_by_unit[unit]
 		assert.equals("wield", state.stage)
 	end)
@@ -1064,7 +1112,7 @@ describe("grenade_fallback", function()
 
 		assert.equals(1, #_recorded_inputs)
 		assert.equals("weapon_action", _recorded_inputs[1].component)
-		assert.equals("grenade_ability", _recorded_inputs[1].input)
+		assert.equals("wield", _recorded_inputs[1].input)
 		assert.equals("wield", _grenade_state_by_unit[unit].stage)
 	end)
 
@@ -2030,7 +2078,7 @@ describe("grenade_fallback", function()
 			})
 			GrenadeFallback.try_queue(unit, blackboard)
 			assert.equals(1, #_recorded_inputs)
-			assert.equals("grenade_ability", _recorded_inputs[1].input)
+			assert.equals("wield", _recorded_inputs[1].input)
 			assert.equals("wield", _grenade_state_by_unit[unit].stage)
 		end)
 
@@ -2169,6 +2217,37 @@ describe("grenade_fallback", function()
 
 			_mock_time = _mock_time + 0.2
 			GrenadeFallback.record_charge_event(unit, "zealot_throwing_knives", _mock_time)
+
+			_recorded_inputs = {}
+			_mock_time = _mock_time + 0.05
+			GrenadeFallback.try_queue(unit, blackboard)
+
+			assert.equals(0, #_recorded_inputs)
+			assert.is_nil(_grenade_state_by_unit[unit].stage)
+			assert.truthy(_grenade_state_by_unit[unit].next_try_t)
+		end)
+
+		it("completes 1.13 quick-throw blitzes that consume a charge without leaving the current slot", function()
+			-- broker_flash_grenade keeps an aim profile, but since 1.13 the wield request
+			-- itself fires grenade_ability_quick_flash_grenade from the current weapon.
+			GrenadeFallback.wire({
+				build_context = function()
+					return { target_enemy = "enemy_1", num_nearby = 3 }
+				end,
+				evaluate_grenade_heuristic = function()
+					return true, "grenade_generic"
+				end,
+				equipped_grenade_ability = function()
+					return mock_ability_extension, { name = "broker_flash_grenade" }
+				end,
+			})
+
+			GrenadeFallback.try_queue(unit, blackboard)
+			assert.equals("wield", _grenade_state_by_unit[unit].stage)
+			assert.is_not_nil(_grenade_state_by_unit[unit].aim_input)
+
+			_mock_time = _mock_time + 0.2
+			GrenadeFallback.record_charge_event(unit, "broker_flash_grenade", _mock_time)
 
 			_recorded_inputs = {}
 			_mock_time = _mock_time + 0.05
@@ -3044,7 +3123,7 @@ describe("grenade_fallback", function()
 			assert.equals("grenade", queued[1].source)
 			assert.equals("slot1", queued[1].bot)
 			assert.equals(7, queued[1].attempt_id)
-			assert.equals("grenade_ability", queued[1].input)
+			assert.equals("wield", queued[1].input)
 			assert.equals("wield", queued[1].stage)
 		end)
 

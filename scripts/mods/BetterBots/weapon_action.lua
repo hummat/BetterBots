@@ -667,7 +667,7 @@ function M.register_hooks(deps)
 					local unit = self._betterbots_player_unit
 					local original_action_input = action_input
 					if unit and id == "weapon_action" and action_input == "wield" then
-						local should_block, ability_name = should_block_wield_input(unit)
+						local should_block, ability_name = should_block_wield_input(unit, raw_input)
 						if should_block then
 							if _debug_enabled() then
 								local fixed_t = _fixed_time()

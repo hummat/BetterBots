@@ -18,6 +18,11 @@ local _query_weapon_switch_lock
 local _item_profiles
 
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
+-- Since 1.13.0 weapon templates switch slots through the shared `wield` action input
+-- with the slot's pressed input as raw input (PlayerCharacterConstants
+-- slot_configuration.slot_combat_ability.wield_inputs.pressed[1]), the same request
+-- BtBotInventorySwitchAction queues. The per-template `combat_ability` input is gone.
+local COMBAT_ABILITY_WIELD_RAW_INPUT = "combat_ability_pressed"
 
 -- Late-bound cross-module refs, set via wire()
 local _build_context
@@ -115,8 +120,8 @@ end
 
 local function on_state_change_finish(func, self, reason, data, t, time_in_action)
 	local action_settings = self._action_settings
-	local ability_type = action_settings and action_settings.ability_type
-	local use_ability_charge = action_settings and action_settings.use_ability_charge
+	local ability_type = self._ability_type
+	local consumes_usage_cost = action_settings and action_settings.consume_ability_usage_cost
 	local player = self._player
 	local unit = self._player_unit
 	local wanted_state_name = self._wanted_state_name
@@ -131,7 +136,7 @@ local function on_state_change_finish(func, self, reason, data, t, time_in_actio
 		not is_bot
 		or not unit
 		or ability_type ~= "combat_ability"
-		or not use_ability_charge
+		or not consumes_usage_cost
 		or not failed_state_transition
 	then
 		return
@@ -264,13 +269,13 @@ local function _item_attempt_charge_confirmed(unit, state, ability_name)
 	return charge_event.ability_name == ability_name
 end
 
-local function _queue_weapon_action_input(state, input_name)
+local function _queue_weapon_action_input(state, input_name, raw_input)
 	local action_input_extension = state.action_input_extension
 	if not action_input_extension then
 		return
 	end
 
-	action_input_extension:bot_queue_action_input("weapon_action", input_name, nil)
+	action_input_extension:bot_queue_action_input("weapon_action", input_name, raw_input)
 end
 
 local function _sanitize_dump_name_fragment(value)
@@ -746,7 +751,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	if wielded_slot == "slot_combat_ability" then
 		state.item_stage = "waiting_wield"
 		state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
-		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "combat_ability" })
+		_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "wield" })
 		return
 	end
 
@@ -755,7 +760,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		not (
 			current_weapon_template
 			and current_weapon_template.action_inputs
-			and current_weapon_template.action_inputs.combat_ability
+			and current_weapon_template.action_inputs.wield
 		)
 	then
 		if _debug_enabled() then
@@ -764,7 +769,7 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 				fixed_t,
 				"fallback item blocked "
 					.. ability_name
-					.. " (weapon template lacks combat_ability input: "
+					.. " (weapon template lacks wield input: "
 					.. tostring(weapon_template_name)
 					.. ")"
 			)
@@ -779,16 +784,20 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 		return
 	end
 
-	_queue_weapon_action_input(state, "combat_ability")
+	_queue_weapon_action_input(state, "wield", COMBAT_ABILITY_WIELD_RAW_INPUT)
 	state.item_stage = "waiting_wield"
 	state.item_wield_deadline_t = fixed_t + _ITEM_WIELD_TIMEOUT_S
-	_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "combat_ability" })
+	_emit_item_event("item_stage", unit, ability_name, state, fixed_t, { input = "wield" })
 
 	if _debug_enabled() then
 		_debug_log(
 			"fallback_item_wield:" .. ability_name,
 			fixed_t,
-			"fallback item queued " .. ability_name .. " input=combat_ability (wield slot_combat_ability)"
+			"fallback item queued "
+				.. ability_name
+				.. " input=wield raw_input="
+				.. COMBAT_ABILITY_WIELD_RAW_INPUT
+				.. " (wield slot_combat_ability)"
 		)
 	end
 end

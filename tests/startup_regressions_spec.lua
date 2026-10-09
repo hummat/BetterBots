@@ -1574,27 +1574,27 @@ describe("startup regressions", function()
 		assert.equals(1, count_warnings(harness.warnings, "cached module is boolean"))
 	end)
 
-	it("dispatches use_ability_charge through ChargeTracker.handle", function()
+	it("dispatches consume_ability_usage_cost through ChargeTracker.handle", function()
 		local harness = make_bootstrap_harness()
 		harness:load()
 
 		local handled = {}
-		harness.modules.ChargeTracker.handle = function(self, ability_type, optional_num_charges)
+		harness.modules.ChargeTracker.handle = function(self, ability_type, optional_usage_cost_override)
 			handled[#handled + 1] = {
 				self = self,
 				ability_type = ability_type,
-				charges = optional_num_charges,
+				charges = optional_usage_cost_override,
 			}
 		end
 
 		local ability_ext = {
-			use_ability_charge = function(_self, ability_type, optional_num_charges)
-				return "orig", ability_type, optional_num_charges
+			consume_ability_usage_cost = function(_self, ability_type, optional_usage_cost_override)
+				return "orig", ability_type, optional_usage_cost_override
 			end,
 		}
 
 		harness:invoke_hook_require("scripts/extension_systems/ability/player_unit_ability_extension", ability_ext)
-		local tag, ability_type, charges = ability_ext:use_ability_charge("combat_ability", 2)
+		local tag, ability_type, charges = ability_ext:consume_ability_usage_cost("combat_ability", 2)
 
 		assert.equals("orig", tag)
 		assert.equals("combat_ability", ability_type)

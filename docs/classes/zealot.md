@@ -185,8 +185,8 @@ Increases cooldown (flat reduction is negative = increase), but adds extra fines
 
 **What it does** (from talent settings and buff templates, decompiled source 1.11.6):
 - Channels a prayer that restores toughness to self and nearby allies
-- **Channel duration**: 5.5s (`zealot_relic.lua:L134`)
-- **Uninterruptible**: yes (`uninterruptible = true`) — bot cannot abort mid-channel
+- **Channel duration**: 3.67s after a 0.5s `action_wield` that auto-chains into it (`zealot_relic.lua:L99,L126`, 1.13.2; 5.5s before 1.13.0)
+- **Uninterruptible**: yes (`uninterruptible = true`) — damage cannot interrupt it; 1.13.0 added `stop_input = "cancel_channeling"` (not used by BetterBots)
 - **Buff radius**: 10m (`radius = 10`) — allies inside this radius receive toughness benefits
 - **Stagger radius**: 4m (`force_stagger_radius = 4`), `force_stagger_duration = 2` — enemies inside this smaller radius are staggered for 2s on channel start (used to cancel monstrosity grabs/slams)
 - **Suppression aura**: 15m (`explosion_area_suppression.distance = 15`) with `instant_aggro = true`

@@ -156,7 +156,14 @@ local function try_queue(unit, blackboard)
 	end
 
 	if state.stage == "wield" then
-		if not state.aim_input and _grenade_runtime.has_confirmed_charge(state, unit) then
+		-- A charge consumed before the grenade slot is wielded means the wield request
+		-- itself threw (auto-fire templates, and 1.13 quick-throw base actions for
+		-- Zealot knives and Broker flash, which fire from the current weapon even
+		-- when the profile has an aim input).
+		if
+			_grenade_runtime.has_confirmed_charge(state, unit)
+			and (not state.aim_input or wielded_slot ~= "slot_grenade_ability")
+		then
 			if wielded_slot == "slot_grenade_ability" then
 				state.stage = "wait_unwield"
 				state.deadline_t = fixed_t + UNWIELD_TIMEOUT_S
@@ -841,16 +848,20 @@ local function try_queue(unit, blackboard)
 			return
 		end
 
-		-- Item-based grenade: wield the grenade slot first.
+		-- Item-based grenade: wield the grenade slot first. Charges from here on count
+		-- for this attempt (auto-fire and quick-throw templates throw from the wield
+		-- request); aim templates move release_t to their actual release.
 		state.stage = "wield"
 		state.deadline_t = fixed_t + WIELD_TIMEOUT_S
-		if not aim_input then
-			state.release_t = fixed_t
-		end
-		action_input_extension:bot_queue_action_input("weapon_action", "grenade_ability", nil)
+		state.release_t = fixed_t
+		action_input_extension:bot_queue_action_input(
+			"weapon_action",
+			"wield",
+			_grenade_runtime.GRENADE_WIELD_RAW_INPUT
+		)
 		_grenade_runtime.emit_event("queued", unit, grenade_name, state, fixed_t, {
 			rule = rule,
-			input = "grenade_ability",
+			input = "wield",
 		})
 		if _debug_enabled() then
 			_debug_log(
@@ -863,7 +874,7 @@ local function try_queue(unit, blackboard)
 	_grenade_runtime.finish_child_perf("grenade_fallback.launch", launch_t0)
 end
 
--- Called from BetterBots.lua use_ability_charge hook for grenade_ability.
+-- Called from ChargeTracker via the consume_ability_usage_cost hook for grenade_ability.
 -- Used by _grenade_runtime.has_confirmed_charge() to confirm blitz/grenade completion.
 local function record_charge_event(unit, grenade_name, fixed_t)
 	_grenade_runtime.record_charge_event(unit, grenade_name, fixed_t)
@@ -935,8 +946,8 @@ return {
 	prime_weapon_templates = function(WeaponTemplates)
 		return _grenade_aim.prime_weapon_templates(WeaponTemplates)
 	end,
-	should_block_wield_input = function(unit)
-		return _grenade_runtime.should_block_wield_input(unit)
+	should_block_wield_input = function(unit, raw_input)
+		return _grenade_runtime.should_block_wield_input(unit, raw_input)
 	end,
 	should_lock_weapon_switch = function(unit)
 		return _grenade_runtime.should_lock_weapon_switch(unit)

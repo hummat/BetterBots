@@ -254,9 +254,13 @@ The following were removed/throttled to reduce chat spam during testing:
   - add a new item sequence mapping in `BetterBots.lua`.
 - repeated `fallback item continuing charge confirmation ... lost combat-ability wield ...`:
   - another behavior node is switching away during cast/channel; verify whether lock lines (`blocked weapon switch while keeping ...`) are present.
-- repeated `grenade queued wield for <grenade> ...` plus `blocked foreign weapon action grenade_ability while keeping <grenade> wield`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input> for <grenade>`, `grenade releasing toward ...`, or `grenade charge consumed`:
-  - the grenade weapon-action blocker is swallowing the **initial** item-grenade `grenade_ability` input during `state.stage == "wield"`.
-  - this is an allowlist/sequence bug in `grenade_fallback._expected_weapon_action_input()`, not a ballistic/gravity-aim failure.
+- repeated `grenade queued wield for <grenade> ...` plus `blocked weapon switch while keeping <grenade> sequence (raw_input=grenade_ability_pressed)`, with no `grenade wield confirmed, waiting for aim`, `grenade queued <aim_input> for <grenade>`, `grenade releasing toward ...`, or `grenade charge consumed`:
+  - the wield blocker is swallowing the grenade's **own** slot-switch request (`wield` + raw input `grenade_ability_pressed`) during `state.stage == "wield"`.
+  - this is an allowlist/sequence bug in `grenade_runtime.should_block_wield_input()`, not a ballistic/gravity-aim failure.
+- `grenade auto-fire complete without stable grenade slot (slot=slot_primary|...)` for Zealot knives or Broker flash:
+  - expected since 1.13.0: those blitzes throw from the current weapon through the base quick-throw actions, so the grenade slot is never wielded.
+- `Could not find matching input_sequence for queued action_input ...` in the engine console log:
+  - BetterBots queued an input the current weapon template no longer defines; the engine drops it silently. `make patch-check` should have caught a literal one (see `docs/dev/debugging.md`).
   - do not blame the gravity-aware aim path unless the log first reaches `grenade wield confirmed, waiting for aim` and then starts emitting `grenade aim ballistic for <grenade>` / `grenade aim flat fallback for <grenade>`.
 
 ## Writing debug logging for new features
