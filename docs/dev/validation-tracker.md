@@ -26,6 +26,10 @@ Expected v1.2.3 coordination markers when the collision paths occur:
 - `grenade queued wield for <grenade>`, then `grenade wield confirmed, waiting for aim` (or `grenade auto-fire complete without stable grenade slot` for knives/flash), then `grenade charge consumed for <grenade>`
 - `/bb_state` prints `cd=x/y` for a bot on cooldown without a Lua error
 - zero `Could not find matching input_sequence for queued action_input "combat_ability"` / `"grenade_ability"` engine lines, and zero `blocked weapon switch while keeping <grenade> sequence (raw_input=grenade_ability_pressed)`
+- the item bot returns to its weapon after each relic channel, force-field placement, and drone release (no stuck `slot_combat_ability`)
+- a grenade or blitz interrupted mid-sequence (stagger, catapult, ledge) resets cleanly; Assail, Smite, and Chain Lightning sequences still end without a stuck grenade lock
+- team cooldown still staggers same-category abilities (`suppressed <template> (<reason>)` or rule `team_cooldown_suppressed` after another bot's `charge consumed`)
+- after `Ctrl+Shift+R`, the `consume_ability_usage_cost` hook still fires (`charge consumed` lines resume, zero rehook warnings in `bb-log warnings`)
 
 **v1.2.3 hardening candidate (2026-07-25)**: based on commit
 `60fe30c715254360500f4aec45fed6da3589ac54` plus the reviewed, uncommitted

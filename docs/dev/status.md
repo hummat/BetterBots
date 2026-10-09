@@ -2,6 +2,17 @@
 
 ## Current work
 
+### Darktide 1.13 compatibility (v1.2.4, unreleased)
+
+- Branch `fix/118-slot-wield-input`, tracked under #118. 1.13.0 removed the
+  slot-switch inputs and `use_ability_charge`; item abilities (relic, force field,
+  drone) and every item grenade/blitz stopped firing. Fixed in `5471574`, with the
+  queued-input check in `engine_api_check.lua` (`ef227cd` adds single-quote
+  literals after an Astra cross-model review). `make check` green; no in-game run
+  yet. Checklist: `docs/dev/validation-tracker.md` item 7.
+- The 1.13.0 Mourningstar crash from the same Nexus report is unexplained and needs
+  a log.
+
 ### September 3, 2026: Nexus report triage
 
 - Repaired the visual-loadout patch-check anchor for engine `0f0cb459` (1.12.5),
