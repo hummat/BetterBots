@@ -214,6 +214,24 @@ describe("engine API usage check", function()
 		}, errors)
 	end)
 
+	it("flags single-quoted queued inputs the same as double-quoted ones", function()
+		local errors = run({
+			["queue.lua"] = table.concat({
+				"ext:bot_queue_action_input('weapon_action', 'combat_ability', nil)",
+				"ext:bot_queue_action_input('weapon_action', 'wield', 'wield_9')",
+				"local PROFILE = { required_inputs = { 'removed_input' }, aim_input = 'buffer_time' }",
+			}, "\n"),
+		})
+
+		local prefix = "scripts/mods/BetterBots/queue.lua:"
+		assert.same({
+			prefix .. '1: action input "combat_ability" is not defined by any weapon or ability template',
+			prefix .. '2: raw input "wield_9" is not a slot wield input in player_character_constants.lua',
+			prefix .. '3: action input "buffer_time" is not defined by any weapon or ability template',
+			prefix .. '3: action input "removed_input" is not defined by any weapon or ability template',
+		}, errors)
+	end)
+
 	it("accepts generator and appended template inputs and ignores comparisons, components, and log text", function()
 		local errors = run({
 			["queue.lua"] = table.concat({

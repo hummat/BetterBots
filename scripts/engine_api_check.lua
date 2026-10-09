@@ -337,7 +337,7 @@ function M.collect_queued_inputs(source)
 	local code = table.concat(lines, "\n")
 	local inputs = {}
 
-	for position, field, name in code:gmatch('()([%a_][%w_]*)%s*=%s*"([%w_]+)"') do
+	for position, field, _, name in code:gmatch("()([%a_][%w_]*)%s*=%s*([\"'])([%w_]+)%3") do
 		local kind = input_kind(field)
 		if kind then
 			inputs[#inputs + 1] = { kind = kind, name = name, line = line_at(code, position) }
@@ -345,7 +345,7 @@ function M.collect_queued_inputs(source)
 	end
 
 	for position, body in code:gmatch("()[a-z][a-z_]*_inputs%s*=%s*(%b{})") do
-		for name in body:gmatch('"([%w_]+)"') do
+		for _, name in body:gmatch("([\"'])([%w_]+)%1") do
 			inputs[#inputs + 1] = { kind = "action", name = name, line = line_at(code, position) }
 		end
 	end
@@ -354,7 +354,7 @@ function M.collect_queued_inputs(source)
 		for position, list in code:gmatch("()%f[%w_]" .. helper .. "%s*(%b())") do
 			local arguments = split_arguments(list)
 			for kind, index in pairs(positions) do
-				local name = arguments[index] and arguments[index]:match('^%s*"([%w_]+)"%s*$')
+				local name = arguments[index] and select(2, arguments[index]:match("^%s*([\"'])([%w_]+)%1%s*$"))
 				if name then
 					inputs[#inputs + 1] = { kind = kind, name = name, line = line_at(code, position) }
 				end
