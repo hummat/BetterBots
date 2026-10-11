@@ -15,6 +15,7 @@ local _ITEM_DEFAULT_START_DELAY_S
 local _event_log
 local _bot_slot_for_unit
 local _query_weapon_switch_lock
+local _is_grenade_sequence_active
 local _item_profiles
 
 local ABILITY_STATE_FAIL_RETRY_S = 0.35
@@ -214,6 +215,24 @@ local function _block_item_for_slot_lock(unit, state, ability_name, fixed_t, blo
 	_schedule_item_fast_retry(state, fixed_t)
 end
 
+local function _item_attempt_charge_confirmed(unit, state, ability_name)
+	local attempt_t = state.item_attempt_t
+	if not attempt_t then
+		return false
+	end
+
+	local charge_event = _last_charge_event_by_unit[unit]
+	if not charge_event then
+		return false
+	end
+
+	if charge_event.fixed_t < attempt_t then
+		return false
+	end
+
+	return charge_event.ability_name == ability_name
+end
+
 local function should_lock_weapon_switch(unit)
 	local unit_data_extension = ScriptUnit.has_extension(unit, "unit_data_system")
 	if not unit_data_extension then
@@ -245,28 +264,22 @@ local function should_lock_weapon_switch(unit)
 		and staged_ability_name
 		and _item_profiles.should_lock_sequence(staged_ability_name)
 	then
+		-- Profiles without an unwield input (relic channel) leave the exit to the engine's
+		-- action_end -> wield_previous. Once the charge is spent the "active" lock above covers
+		-- the channel; holding the sequence lock longer redirects that exit back into the relic,
+		-- which re-channels on a remaining charge (Darktide 1.13 shortened the channel to 3.67 s).
+		if
+			state.item_stage == "waiting_unwield"
+			and not state.item_unwield_input
+			and _item_attempt_charge_confirmed(unit, state, staged_ability_name)
+		then
+			return false
+		end
+
 		return true, staged_ability_name, "sequence", "slot_combat_ability"
 	end
 
 	return false
-end
-
-local function _item_attempt_charge_confirmed(unit, state, ability_name)
-	local attempt_t = state.item_attempt_t
-	if not attempt_t then
-		return false
-	end
-
-	local charge_event = _last_charge_event_by_unit[unit]
-	if not charge_event then
-		return false
-	end
-
-	if charge_event.fixed_t < attempt_t then
-		return false
-	end
-
-	return charge_event.ability_name == ability_name
 end
 
 local function _queue_weapon_action_input(state, input_name, raw_input)
@@ -409,6 +422,27 @@ local function try_queue_item(unit, unit_data_extension, ability_extension, stat
 	end
 
 	if not state.item_stage then
+		-- A wield queued now would be swallowed by the grenade's weapon-switch block and the
+		-- attempt would sit in waiting_wield until it timed out.
+		local grenade_active, grenade_name
+		if _is_grenade_sequence_active then
+			grenade_active, grenade_name = _is_grenade_sequence_active(unit)
+		end
+		if grenade_active then
+			if _debug_enabled() then
+				_debug_log(
+					"fallback_item_grenade_active:" .. ability_name .. ":" .. tostring(unit),
+					fixed_t,
+					"fallback item blocked "
+						.. ability_name
+						.. " (grenade sequence active for "
+						.. tostring(grenade_name)
+						.. ")"
+				)
+			end
+			return
+		end
+
 		local can_use, rule = can_use_item_fallback(unit, ability_extension, ability_name, blackboard)
 		if not can_use then
 			return
@@ -828,6 +862,7 @@ M.wire = function(refs)
 	_evaluate_item_heuristic = refs.evaluate_item_heuristic
 	_is_item_ability_enabled = refs.is_item_ability_enabled
 	_query_weapon_switch_lock = refs.query_weapon_switch_lock
+	_is_grenade_sequence_active = refs.is_grenade_sequence_active
 end
 
 M.try_queue_item = try_queue_item

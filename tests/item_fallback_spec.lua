@@ -21,6 +21,7 @@ local _interaction_component
 local _weapon_action_component
 local _weapon_templates
 local _query_weapon_switch_lock
+local _grenade_sequence_active
 
 local unit = "bot_unit_1"
 
@@ -88,6 +89,9 @@ local function reset()
 	_interaction_component = { target_unit = nil }
 	_weapon_action_component = { template_name = "dummy_primary" }
 	_query_weapon_switch_lock = function()
+		return false
+	end
+	_grenade_sequence_active = function()
 		return false
 	end
 	_weapon_templates = {
@@ -183,6 +187,9 @@ local function reset()
 		end,
 		query_weapon_switch_lock = function(unit_arg)
 			return _query_weapon_switch_lock(unit_arg)
+		end,
+		is_grenade_sequence_active = function(unit_arg)
+			return _grenade_sequence_active(unit_arg)
 		end,
 	})
 end
@@ -356,6 +363,57 @@ describe("item_fallback", function()
 		assert.is_false(should_lock)
 	end)
 
+	it("releases the relic sequence lock once the channel spent its charge", function()
+		-- Darktide 1.13 shortened the channel to 3.67 s, inside the 5.6 s unwield wait. The
+		-- engine's own action_end -> wield_previous must go through; redirecting it back to
+		-- the relic re-channels and spends a second charge.
+		local state = {}
+		_fallback_state_by_unit[unit] = state
+		local combat_ability = make_item_ability("zealot_relic")
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		_inventory_component.wielded_slot = "slot_combat_ability"
+		_weapon_action_component.template_name = "zealot_relic"
+		_mock_time = _mock_time + 0.1
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_unwield", state.item_stage)
+
+		local locked_before_charge, _, reason = ItemFallback.should_lock_weapon_switch(unit)
+		assert.is_true(locked_before_charge)
+		assert.equals("sequence", reason)
+
+		_last_charge_event_by_unit[unit] = { ability_name = "zealot_relic", fixed_t = _mock_time + 0.03 }
+		_mock_time = _mock_time + 3.7
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+		assert.equals("waiting_unwield", state.item_stage)
+
+		assert.is_false(ItemFallback.should_lock_weapon_switch(unit))
+	end)
+
 	it("schedule_retry resets active stage and keeps the earliest retry time", function()
 		_fallback_state_by_unit[unit] = {
 			item_stage = "waiting_start",
@@ -420,6 +478,33 @@ describe("item_fallback", function()
 			held_slot = "slot_grenade_ability",
 		}, _events[1])
 		assert.matches("fallback_item_slot_locked:zealot_relic:bot_unit_1", _debug_logs[1].key, 1, true)
+	end)
+
+	it("defers a new attempt while a grenade sequence holds the bot", function()
+		-- Run 4 (2026-10-11): a relic wield queued during a knives throw was swallowed by the
+		-- grenade's weapon-switch block and the relic attempt timed out.
+		local state = {}
+		local combat_ability = make_item_ability("zealot_relic")
+
+		_grenade_sequence_active = function(unit_arg)
+			return unit_arg == unit, "zealot_throwing_knives"
+		end
+
+		ItemFallback.try_queue_item(
+			unit,
+			mock_unit_data_extension,
+			mock_ability_extension,
+			state,
+			_mock_time,
+			combat_ability,
+			{}
+		)
+
+		assert.is_nil(state.item_stage)
+		assert.equals(0, #_queued_inputs)
+		assert.is_not_nil(
+			find_log("fallback item blocked zealot_relic (grenade sequence active for zealot_throwing_knives)")
+		)
 	end)
 
 	it("fast-retries when another locked slot blocks waiting_wield confirmation", function()

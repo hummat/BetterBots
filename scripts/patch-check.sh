@@ -510,6 +510,27 @@ check_anchor_multiline \
 	"scripts/settings/ability/ability_templates/ogryn_gunlugger_stance.lua" \
 	'action_stance_change = \{[\s\S]*?anim = "mid_reload_finished",[\s\S]*?auto_wield_slot = "slot_secondary",[\s\S]*?start_input = "stance_pressed",' \
 	"Gunlugger stance animation and auto-wield contract"
+# item_fallback releases the relic sequence lock after the charge is spent because the
+# channel exits through action_end -> wield_previous, and re-wielding the relic with a
+# charge left starts another channel (#118 runtime validation, 2026-10-11).
+check_anchor_multiline \
+	"scripts/settings/equipment/weapon_templates/combat_abilities/zealot_relic.lua" \
+	'action_zealot_channel = \{[\s\S]*?conditional_state_to_action_input = \{\s+action_end = \{\s+input_name = "wield_previous",[\s\S]*?weapon_template\.conditional_state_to_action_input = \{\s+\{\s+conditional_state = "combat_ability_charges_left",\s+input_name = "channel",' \
+	"relic channel engine-owned exit and re-channel on wield"
+# bot_profiles converts template talents to { tier, target_slot, node_name } and
+# tests/bot_profiles_spec.lua transcribes this engine code (Darktide 1.13 talent shape).
+check_anchor_multiline \
+	"scripts/utilities/player_talents/player_talents.lua" \
+	'PlayerTalents\.add_archetype_base_talents = function \(archetype, talents\)\s+table\.clear\(_has_target_slot_scratch\)\s+for talent_name, talent_data in pairs\(talents\) do\s+local target_slot = talent_data\.target_slot[\s\S]*?talent_data\.tier = talent_data\.tier \+ base_talent_data\.tier\s+talent_data\.target_slot = base_talent_data\.target_slot' \
+	"base talents merge into table-shaped profile talents"
+check_anchor \
+	"scripts/utilities/local_profile_backend_parser.lua" \
+	"PlayerTalents.add_archetype_base_talents(archetype, talents)" \
+	"local profile parser applies archetype base talents"
+check_anchor_multiline \
+	"scripts/ui/views/talent_builder_view/utilities/talent_layout_parser.lua" \
+	'TalentLayoutParser\.selected_talents_from_selected_nodes = function[\s\S]*?local node_slot = node\.target_slot[\s\S]*?talent_data\.node_name = node\.widget_name' \
+	"real characters take target_slot and node_name from layout nodes"
 check_anchor \
 	"scripts/extension_systems/input/bot_unit_input.lua" \
 	"BotUnitInput.set_aim_position = function" \

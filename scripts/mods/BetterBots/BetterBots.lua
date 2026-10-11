@@ -448,6 +448,12 @@ GrenadeFallback.wire({
 			return true, _equipped_combat_ability_name(unit)
 		end
 
+		-- The item lock above only engages once slot_combat_ability is wielded; cover the gap
+		-- between queueing the item wield and the slot switch landing.
+		if fallback_state and fallback_state.item_stage == "waiting_wield" then
+			return true, fallback_state.item_ability_name
+		end
+
 		local queued_t = _recent_bt_combat_activation_t_by_unit[unit]
 		if queued_t then
 			local elapsed = _fixed_time() - queued_t

@@ -8,8 +8,12 @@
   slot-switch inputs and `use_ability_charge`; item abilities (relic, force field,
   drone) and every item grenade/blitz stopped firing. Fixed in `5471574`, with the
   queued-input check in `engine_api_check.lua` (`ef227cd` adds single-quote
-  literals after an Astra cross-model review). `make check` green; no in-game run
-  yet. Checklist: `docs/dev/validation-tracker.md` item 7.
+  literals after an Astra cross-model review). Two AirGPU runs on 1.13.2 confirmed
+  the fix and found two more 1.13 breaks, both fixed on the branch: the relic bot
+  double-spent its charges, and built-in bot profiles failed to parse because 1.13
+  changed the talent table shape. Still unverified in game: `/bb_state`,
+  `Ctrl+Shift+R` mid-mission, both new fixes. Checklist:
+  `docs/dev/validation-tracker.md` item 7.
 - The 1.13.0 Mourningstar crash from the same Nexus report is unexplained and needs
   a log.
 

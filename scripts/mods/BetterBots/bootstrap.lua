@@ -794,6 +794,7 @@ function M.load_and_init(ctx)
 
 			return GrenadeFallback.should_lock_weapon_switch(unit)
 		end,
+		is_grenade_sequence_active = GrenadeFallback.should_block_wield_input,
 	})
 
 	Debug.wire({

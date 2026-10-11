@@ -1765,6 +1765,25 @@ describe("startup regressions", function()
 		assert.is_true(grenade_wire.refs.is_combat_ability_active("bot_unit"))
 	end)
 
+	it("defers grenade fallback while an item ability waits for its wield", function()
+		-- The item lock only engages once slot_combat_ability is wielded; a grenade started in
+		-- the wield gap blocks the relic's slot switch and times the relic attempt out.
+		local harness = make_bootstrap_harness()
+		harness:load()
+
+		local ability_init = find_named_call(harness.init_calls, "AbilityQueue")
+		local grenade_wire = find_named_call(harness.wire_calls, "GrenadeFallback")
+		ability_init.deps.fallback_state_by_unit.bot_unit = {
+			item_stage = "waiting_wield",
+			item_ability_name = "zealot_relic",
+		}
+
+		local active, ability_name = grenade_wire.refs.is_combat_ability_active("bot_unit")
+
+		assert.is_true(active)
+		assert.equals("zealot_relic", ability_name)
+	end)
+
 	it("defers grenade fallback immediately after BT combat ability entry", function()
 		local fixed_t = 10
 		local harness = make_bootstrap_harness({

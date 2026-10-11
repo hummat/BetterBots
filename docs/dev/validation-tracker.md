@@ -31,6 +31,89 @@ Expected v1.2.3 coordination markers when the collision paths occur:
 - team cooldown still staggers same-category abilities (`suppressed <template> (<reason>)` or rule `team_cooldown_suppressed` after another bot's `charge consumed`)
 - after `Ctrl+Shift+R`, the `consume_ability_usage_cost` hook still fires (`charge consumed` lines resume, zero rehook warnings in `bb-log warnings`)
 
+**v1.2.4 #118 candidate (2026-10-11)**: branch `fix/118-slot-wield-input`, commit
+`78a6fda4a864a4f588699f7bcdbb8ed9d2c5060e`; `BetterBots.zip` SHA-256
+`9c9b3db0928da3a3d0330338d31615407bac33778ee8e8c13870fe42844bfc31`.
+`make check-ci` passed. Staged for AirGPU as `~/transfer/BetterBots.zip`. The
+local-only game-root bundle `BetterBots-airgpu-118-bundle.zip` (SHA-256
+`aba6b7bbaa04069330a79d739a19a875098862aa9185f83e173fac02707093c8`) contains the
+Nexus downloads of DML 26.06.24, DMF 26.08.19, and SoloPlay 2.6.10, plus
+Tertium 7 (Nexus file 5878) with the
+local personality/archetype nil-guard, and this BetterBots build, loaded
+BetterBots first.
+
+The 2026-10-11 AirGPU runs on Darktide 1.13.2 confirmed the slot-switch fix. Both
+ran with FullSoloProbe loaded alongside. Run 1 (`console-2026-10-11-15.47.52`,
+BetterBots second after FullSoloProbe) logged drone 3/3, force field 2/2, frag 1/1,
+plus working whistle and shout; two wield timeouts recovered on the next attempt.
+Run 2 (`console-2026-10-11-16.09.18`, BetterBots last) logged Ogryn Rock 5/5, Zealot
+knives 1/1 through `auto-fire complete without stable grenade slot`, and drone 2/2.
+Neither run had a BetterBots Lua error. They found two bugs:
+
+- The relic bot spent both charges in a row. 1.13 cut `action_zealot_channel`
+  to 3.67 s, below the `channel` profile's 5.6 s unwield delay, so BetterBots' lock
+  turned the engine's `wield_previous` back into `slot_combat_ability`, and the
+  relic template re-channels on wield while a charge remains. The lock now lets go
+  once the charge is spent.
+- Every built-in profile failed `parse_profile` with `player_talents.lua:42: attempt
+  to index local 'talent_data' (a number value)`; the logs show Zealot, Psyker, and Ogryn.
+  1.13 stores talents as `{ tier, target_slot, node_name }`; `bot_profiles.lua` now
+  builds that shape from the archetype talent tree.
+
+The runs did not cover `/bb_state`, `Ctrl+Shift+R` mid-mission, or Broker flash (no
+DLC). Tertium logs `generate_random_name` as a missing hook target because 1.13
+removed `ProfileUtils.generate_random_name`; only Tertium's bot names depend on it.
+
+**v1.2.4 #118 follow-up build (2026-10-11)**: commit `78a6fda` plus the uncommitted
+relic and talent fixes; `BetterBots.zip` SHA-256
+`b9fb136868a5d8d955227d3d21a518af87d0bb23c68944fd8989c56bf82f04f1`. `make check-ci`
+passed with 1750 tests, and an Astra cross-model review found no defects. Installed on
+AirGPU in place of the earlier build (kept as `mods\BetterBots.prev-118a`), load order
+FullSoloProbe, SoloPlay, Tertium4Or5, BetterBots.
+
+Run 3 on this build (`console-2026-10-11-16.38.31`) passed the talent fix. The Zealot,
+Psyker, and Ogryn built-in profiles resolved with no `profile parse failed` line. The built-in Zealot
+(Heinrike) spawned with thunder hammer and bolter, dashed 3 times, and threw Flame
+grenades twice, so the template blitz kept the base Shock grenade out. `/bb_state` ran
+twice without an error and printed `cd=36.97/52.80` for the relic bot on cooldown. The
+relic bot (Leatha, a Tertium character) channelled twice, 88 s apart, one charge each.
+Both times it went back to `slot_primary` about 3.7 s after the channel, with no
+`redirected wield_slot` line. Leatha has one relic charge (`charges=0/1`), so the run
+could not reach the re-channel itself. The run 2 bot spent two charges 4.2 s apart
+after a redirect at the 3.67 s channel end, so it had at least two. `Ctrl+Shift+R` was
+not exercised (one `BetterBots loaded` line).
+
+Run 4 (`console-2026-10-11-16.49.49`, load order SoloPlay, Tertium4Or5, BetterBots,
+no FullSoloProbe, DMF Developer Mode on) passed the hot reload. `Ctrl+Shift+R` at
+16:55:13 logged `Mods reloaded.` and a second `BetterBots loaded`; the relic bot's
+`charge consumed` fired 20 s later, and `bb-log warnings` stayed empty. The only error
+lines are Tertium's `generate_random_name` hook, once per load. Force field went 1/1
+(place, then `unwield_to_previous`) and `/bb_state` printed six bots without an error.
+The relic bot (Severa) again had one charge (`charges=0/1`). Its first two attempts
+ended in `wield timeout` because the same bot started a Zealot knives throw in the same
+frame (16:53:32.697 relic, 32.698 knives) and again 0.2 s into the next knives throw;
+the third attempt at 16:53:46 channelled. Item abilities skipped the `grenade sequence
+active` gate, and the grenade's `combat ability active` gate ignored an item still in
+`waiting_wield`. Both gates now cover that gap.
+
+**v1.2.4 #118 build 3 (2026-10-11)**: the follow-up build plus the item/grenade gate
+fix; `BetterBots.zip` SHA-256
+`04a9baacbf9ffbb9ee1a43bf603159c06a86f431f9f46c4c03a9bead79cc9246`. `make check`
+passed with 1752 tests. Installed on AirGPU (previous build kept as
+`mods\BetterBots.prev-118b`), load order BetterBots, SoloPlay, Tertium4Or5, the first
+BetterBots-first boot of a v1.2.4 build.
+
+Run 5 on build 3 (`console-2026-10-11-17.03.30`, cold boot, BetterBots loaded first)
+passed. Zero `wield timeout` lines, zero BetterBots warnings, and the only error line is
+Tertium's `generate_random_name`. The relic bot (Liari, `charges=0/1`) went 4 wields, 4
+channels, 4 consumes, one charge each, and returned to its weapon after every channel.
+Both new gates fired: `fallback item blocked zealot_relic (grenade sequence active for
+zealot_throwing_knives)` 14 times, then the relic went through once the throw ended,
+and `grenade blocked: combat ability active` fired in the same frame as each relic wield.
+Force field went 2/2, knives 14, and `/bb_state` printed six bots twice without an error.
+One force field attempt was skipped while the bot held `unarmed` and retried. The relic
+double-spend still has no live repro, since no bot in runs 3 to 5 had two relic charges.
+
 **v1.2.3 hardening candidate (2026-07-25)**: based on commit
 `60fe30c715254360500f4aec45fed6da3589ac54` plus the reviewed, uncommitted
 animation and interaction guards. `BetterBots.zip` SHA-256:
