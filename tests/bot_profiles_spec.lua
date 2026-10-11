@@ -14,6 +14,71 @@ rawset(_G, "require", function(modname)
 	return _original_require(modname)
 end)
 
+-- LocalProfileBackendParser.parse_profile talent handling, transcribed from
+-- ../Darktide-Source-Code scripts/utilities/local_profile_backend_parser.lua and
+-- scripts/utilities/player_talents/player_talents.lua (1.13). A no-op parse_profile
+-- hid the 1.13 talent-shape break: the engine indexes talent_data.target_slot, so a
+-- template that still stores `name = tier` numbers fails here exactly as in game.
+-- scripts/patch-check.sh pins the engine lines this mirrors.
+local function engine_base_talents(archetype, selected_talents)
+	local out_talents = {}
+	local conditional_talents = {}
+
+	for talent_name, talent_data in pairs(archetype.base_talents) do
+		out_talents[talent_name] = talent_data
+		conditional_talents[talent_name] = { tier = talent_data.tier, target_slot = talent_data.target_slot }
+	end
+
+	if archetype.conditional_base_talents then
+		for talent_name, selection_data in pairs(selected_talents or {}) do
+			conditional_talents[talent_name] = selection_data
+		end
+		for talent_name, talent_data in pairs(archetype.conditional_base_talents) do
+			local result = archetype.conditional_base_talent_funcs[talent_name](conditional_talents)
+			if result then
+				out_talents[talent_name] = type(result) == "table" and result or talent_data
+			end
+		end
+	end
+
+	return out_talents
+end
+
+local function engine_profile_parser(archetypes)
+	return {
+		parse_profile = function(profile, character_id)
+			profile.character_id = character_id
+			profile.talents = profile.talents or {}
+
+			local talents = profile.talents
+			local archetype = archetypes[profile.archetype]
+			local has_target_slot = {}
+
+			for _, talent_data in pairs(talents) do
+				local target_slot = talent_data.target_slot
+				if target_slot then
+					has_target_slot[target_slot] = true
+				end
+			end
+
+			for talent_name, base_talent_data in pairs(engine_base_talents(archetype, talents)) do
+				local target_slot = base_talent_data.target_slot
+				if not (target_slot and has_target_slot[target_slot]) then
+					local talent_data = talents[talent_name] or { tier = 0 }
+					talent_data.tier = talent_data.tier + base_talent_data.tier
+					talent_data.target_slot = base_talent_data.target_slot
+					talents[talent_name] = talent_data
+				end
+			end
+		end,
+	}
+end
+
+-- Real archetypes always carry base_talents (scripts/settings/archetype/archetypes/*.lua).
+local function fake_archetype(name, breed)
+	return { name = name, breed = breed, base_talents = {} }
+end
+
 local _mock_settings = {}
 local _debug_logs = {}
 local _echo_messages = {}
@@ -623,7 +688,7 @@ describe("bot_profiles", function()
 				}
 
 				local fake_archetypes = {
-					zealot = { name = "zealot", breed = "human" },
+					zealot = fake_archetype("zealot", "human"),
 				}
 
 				local fake_weapon_templates = {
@@ -647,11 +712,7 @@ describe("bot_profiles", function()
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function(_profile, _id)
-								return true
-							end,
-						}
+						return engine_profile_parser(fake_archetypes)
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
 						return fake_archetypes
@@ -761,14 +822,10 @@ describe("bot_profiles", function()
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function()
-								return true
-							end,
-						}
+						return engine_profile_parser({ zealot = fake_archetype("zealot", "human") })
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
-						return { zealot = { name = "zealot", breed = "human" } }
+						return { zealot = fake_archetype("zealot", "human") }
 					end
 					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
 						return {
@@ -866,7 +923,7 @@ describe("bot_profiles", function()
 				}
 
 				local fake_archetypes = {
-					zealot = { name = "zealot", breed = "human" },
+					zealot = fake_archetype("zealot", "human"),
 				}
 
 				local fake_weapon_templates = {
@@ -891,11 +948,7 @@ describe("bot_profiles", function()
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function(_profile, _id)
-								return true
-							end,
-						}
+						return engine_profile_parser(fake_archetypes)
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
 						return fake_archetypes
@@ -1048,10 +1101,10 @@ describe("bot_profiles", function()
 					}
 
 					local fake_archetypes = {
-						veteran = { name = "veteran", breed = "human" },
-						zealot = { name = "zealot", breed = "human" },
-						psyker = { name = "psyker", breed = "human" },
-						ogryn = { name = "ogryn", breed = "ogryn" },
+						veteran = fake_archetype("veteran", "human"),
+						zealot = fake_archetype("zealot", "human"),
+						psyker = fake_archetype("psyker", "human"),
+						ogryn = fake_archetype("ogryn", "ogryn"),
 					}
 
 					local fake_weapon_templates = {
@@ -1064,11 +1117,7 @@ describe("bot_profiles", function()
 							return fake_master_items
 						end
 						if modname == "scripts/utilities/local_profile_backend_parser" then
-							return {
-								parse_profile = function()
-									return true
-								end,
-							}
+							return engine_profile_parser(fake_archetypes)
 						end
 						if modname == "scripts/settings/archetype/archetypes" then
 							return fake_archetypes
@@ -1160,6 +1209,101 @@ describe("bot_profiles", function()
 			end
 		end)
 
+		it("builds 1.13 talent entries from the archetype talent tree", function()
+			local saved_require = require
+			local layout_path = "scripts/ui/views/talent_builder_view/layouts/zealot_tree"
+
+			local ok, err = pcall(function()
+				local zealot = fake_archetype("zealot", "human")
+				zealot.talent_layout_file_path = layout_path
+				-- Shape of scripts/settings/archetype/archetypes/zealot_archetype.lua base_talents.
+				zealot.base_talents = {
+					zealot_dash = { target_slot = "slot_combat_ability", tier = 1 },
+					zealot_shock_grenade = { target_slot = "slot_grenade_ability", tier = 1 },
+					zealot_more_toughness_on_melee = { tier = 1 },
+				}
+				local fake_archetypes = { zealot = zealot }
+				local fake_layout = {
+					nodes = {
+						{
+							widget_name = "node_blitz",
+							talent = "zealot_flame_grenade",
+							target_slot = "slot_grenade_ability",
+						},
+						{ widget_name = "node_keystone", talent = "zealot_martyrdom" },
+					},
+				}
+
+				rawset(_G, "require", function(modname)
+					if modname == "scripts/backend/master_items" then
+						return {
+							get_cached = function()
+								return all_expected_curio_defs()
+							end,
+							get_item_or_fallback = function(item_id)
+								return { name = item_id }
+							end,
+							get_item_instance = function(gear)
+								return { name = gear.masterDataInstance.id }
+							end,
+						}
+					end
+					if modname == "scripts/utilities/local_profile_backend_parser" then
+						return engine_profile_parser(fake_archetypes)
+					end
+					if modname == "scripts/settings/archetype/archetypes" then
+						return fake_archetypes
+					end
+					if modname == "scripts/settings/equipment/weapon_templates/weapon_templates" then
+						return {
+							thunderhammer_2h_p1_m1 = { base_stats = { damage_stat = {} } },
+							bolter_p1_m1 = { base_stats = { damage_stat = {} } },
+						}
+					end
+					if modname == layout_path then
+						return fake_layout
+					end
+					return saved_require(modname)
+				end)
+
+				local Profiles = dofile("scripts/mods/BetterBots/bot_profiles.lua")
+				Profiles.init({
+					mod = mock_mod,
+					debug_log = function() end,
+					debug_enabled = function()
+						return false
+					end,
+					profile_templates = BotProfileTemplates,
+				})
+				Profiles.reset()
+				_mock_settings.bot_slot_1_profile = "zealot"
+				_mock_settings.bot_slot_2_profile = "zealot"
+
+				local first = Profiles.resolve_profile({ archetype = "veteran", loadout = {}, talents = {} })
+				local second = Profiles.resolve_profile({ archetype = "veteran", loadout = {}, talents = {} })
+				local talents = first.talents
+
+				assert.same({
+					tier = 1,
+					target_slot = "slot_grenade_ability",
+					node_name = "node_blitz",
+				}, talents.zealot_flame_grenade)
+				assert.same({ tier = 1, node_name = "node_keystone" }, talents.zealot_martyrdom)
+				-- The template's blitz claims slot_grenade_ability, so the base blitz stays out;
+				-- nothing claims the combat-ability slot, so the base ability is added.
+				assert.is_nil(talents.zealot_shock_grenade)
+				assert.same({ tier = 1, target_slot = "slot_combat_ability" }, talents.zealot_dash)
+				assert.same({ tier = 1 }, talents.zealot_more_toughness_on_melee)
+				assert.is_false(
+					first.talents.zealot_martyrdom == second.talents.zealot_martyrdom,
+					"same-class bots must not share talent entries"
+				)
+			end)
+
+			rawset(_G, "require", saved_require)
+			assert.is_true(ok, err)
+		end)
+
 		it("returns the vanilla profile when MasterItems.get_item_instance returns nil for any weapon slot", function()
 			local saved_require = require
 			local warnings = {}
@@ -1182,18 +1326,14 @@ describe("bot_profiles", function()
 					end,
 				}
 
-				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+				local fake_archetypes = { zealot = fake_archetype("zealot", "human") }
 
 				rawset(_G, "require", function(modname)
 					if modname == "scripts/backend/master_items" then
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function()
-								return true
-							end,
-						}
+						return engine_profile_parser(fake_archetypes)
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
 						return fake_archetypes
@@ -1292,18 +1432,14 @@ describe("bot_profiles", function()
 						return { name = gear.masterDataInstance.id, source = "instance" }
 					end,
 				}
-				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+				local fake_archetypes = { zealot = fake_archetype("zealot", "human") }
 
 				rawset(_G, "require", function(modname)
 					if modname == "scripts/backend/master_items" then
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function()
-								return true
-							end,
-						}
+						return engine_profile_parser(fake_archetypes)
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
 						return fake_archetypes
@@ -1396,18 +1532,14 @@ describe("bot_profiles", function()
 						return { name = gear.masterDataInstance.id, source = "instance" }
 					end,
 				}
-				local fake_archetypes = { zealot = { name = "zealot", breed = "human" } }
+				local fake_archetypes = { zealot = fake_archetype("zealot", "human") }
 
 				rawset(_G, "require", function(modname)
 					if modname == "scripts/backend/master_items" then
 						return fake_master_items
 					end
 					if modname == "scripts/utilities/local_profile_backend_parser" then
-						return {
-							parse_profile = function()
-								return true
-							end,
-						}
+						return engine_profile_parser(fake_archetypes)
 					end
 					if modname == "scripts/settings/archetype/archetypes" then
 						return fake_archetypes

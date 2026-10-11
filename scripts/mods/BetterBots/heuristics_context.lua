@@ -619,8 +619,8 @@ local function build_context(unit, blackboard)
 	-- F1: expose talent + buff state for heuristics. Vanilla bot stubs lack
 	-- both extensions, so fall back to an empty talents table and a
 	-- zero-returning current_stacks closure. Callers check context.talents[name]
-	-- for presence (value is the talent tier) and context.current_stacks(name)
-	-- for stacking buff counts.
+	-- for presence only (values are { tier, target_slot } tables since Darktide 1.13)
+	-- and context.current_stacks(name) for stacking buff counts.
 	local talent_extension = ScriptUnit.has_extension(unit, "talent_system")
 	if talent_extension and talent_extension.talents then
 		context.talents = talent_extension:talents() or EMPTY_TALENTS

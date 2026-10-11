@@ -116,6 +116,60 @@ local function _deep_copy_profile(source)
 	return copy
 end
 
+local TALENT_LAYOUT_PATH_FIELDS = { "talent_layout_file_path", "specialization_talent_layout_file_path" }
+
+-- Darktide 1.13 stores profile talents as { tier, target_slot, node_name }
+-- (PlayerTalents.add_archetype_base_talents indexes talent_data.target_slot). Templates
+-- list `name = tier`; slot and node come from the archetype's talent tree, the same way
+-- TalentLayoutParser.selected_talents_from_selected_nodes builds them for real characters.
+-- target_slot matters: it keeps the archetype's base ability out of a slot the template fills.
+local function _talents_from_template(class_name, archetype, template_talents)
+	local node_by_talent = {}
+
+	for i = 1, #TALENT_LAYOUT_PATH_FIELDS do
+		local layout_path = archetype[TALENT_LAYOUT_PATH_FIELDS[i]]
+		local ok, layout = false, nil
+		if layout_path then
+			ok, layout = pcall(require, layout_path)
+		end
+
+		if ok and type(layout) == "table" and layout.nodes then
+			for _, node in ipairs(layout.nodes) do
+				if node.talent and not node_by_talent[node.talent] then
+					node_by_talent[node.talent] = node
+				end
+			end
+		end
+	end
+
+	local known_talents = archetype.talents
+	local talents = {}
+	for talent_name, tier in pairs(template_talents or {}) do
+		local node = node_by_talent[talent_name]
+		if known_talents and not known_talents[talent_name] then
+			_warn_resolution(
+				"unknown_talent:" .. class_name .. ":" .. talent_name,
+				"unknown talent " .. talent_name .. " in the " .. class_name .. " profile"
+			)
+		elseif not node and _debug_enabled() then
+			-- The engine applies talent definitions by name; a node missing from the tree
+			-- only means the build no longer matches the current tree layout.
+			_debug_log(
+				"bot_profiles:talent_not_in_tree:" .. class_name .. ":" .. talent_name,
+				0,
+				"talent " .. talent_name .. " is not in the " .. class_name .. " talent tree (no target_slot)"
+			)
+		end
+		talents[talent_name] = {
+			tier = tier,
+			target_slot = node and node.target_slot,
+			node_name = node and node.widget_name,
+		}
+	end
+
+	return talents
+end
+
 local function _resolve_profile_template(class_name)
 	if _resolved_profiles[class_name] then
 		return _resolved_profiles[class_name]
@@ -414,6 +468,8 @@ local function _resolve_profile_template(class_name)
 		end
 	end
 
+	profile.talents = _talents_from_template(class_name, archetype_table, template.talents)
+
 	-- Run parse_profile to inject base talents and build loadout metadata.
 	-- Note: parse_profile reads profile.archetype as a string for the archetype name,
 	-- but we've already resolved it to a table. Save and restore.
@@ -531,11 +587,8 @@ local function resolve_profile(profile)
 	profile.current_level = resolved.current_level or 30
 	profile.gender = resolved.gender
 	profile.selected_voice = resolved.selected_voice
-	-- Shallow-copy: same-class bots must not share mutable table references
-	profile.talents = {}
-	for k, v in pairs(resolved.talents or {}) do
-		profile.talents[k] = v
-	end
+	-- Deep-copy: same-class bots must not share mutable talent entries
+	profile.talents = _deep_copy_profile(resolved.talents or {})
 	profile.bot_gestalts = {}
 	for k, v in pairs(resolved.bot_gestalts or {}) do
 		profile.bot_gestalts[k] = v
