@@ -72,6 +72,7 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 [*]The built-in BetterBots bot profiles load again. 1.13 changed how talents are stored, so the profiles failed to load and bots fell back to their vanilla loadouts.
 [*]Fixed a relic Zealot spending both charges back to back. 1.13 shortened the relic channel, and BetterBots pulled the bot back into the relic as the channel ended, which started a second one. My test bots only had one relic charge, so the tests cover this fix but no mission run has. If your relic bot still double-dips, please send me the log.
 [*]The relic (and the other held abilities) no longer collides with a knife or grenade throw from the same bot. In one run the relic came about 14 seconds late because of it.
+[*]Fixed bots crashing in melee after a mod hot reload ([font=Courier New]Ctrl+Shift+R[/font]). After a reload BetterBots stayed unhooked, and vanilla melee code then tripped over weapon data BetterBots normally filters out. Thanks to RussKie for the report and crash log.
 [*]Checked in five Solo Play runs on Darktide 1.13.2, with BetterBots both first and last in the load order and one hot reload: no BetterBots errors or warnings. The same Nexus report mentioned a crash in the Mourningstar after 1.13. None of my runs crashed there, so if you hit it, the console log would help a lot.
 [/list]
 
