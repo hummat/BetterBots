@@ -64,6 +64,17 @@ BetterBots is not trying to decide the one correct way to play Solo Play. The se
 
 [size=3][b]Latest update[/b][/size]
 
+[b]v1.2.4[/b]
+
+[list]
+[*]Fixed for Darktide 1.13. The patch removed the inputs BetterBots used to switch a bot into its ability or grenade slot, so the Zealot relic (Chorus), Psyker Force Field, the Arbites drone, and every grenade or blitz the bot has to take in hand first quietly stopped firing. Thanks to DiomedeBro for the report. Bots use all of them again.
+[*]1.13 also removed the function BetterBots watched to see when an ability or grenade charge was spent. BetterBots listens to its replacement now, so grenade charge tracking and team cooldown staggering work again, and [font=Courier New]/bb_state[/font] shows cooldowns again.
+[*]The built-in BetterBots bot profiles load again. 1.13 changed how talents are stored, so the profiles failed to load and bots fell back to their vanilla loadouts.
+[*]Fixed a relic Zealot spending both charges back to back. 1.13 shortened the relic channel, and BetterBots pulled the bot back into the relic as the channel ended, which started a second one. My test bots only had one relic charge, so the tests cover this fix but no mission run has. If your relic bot still double-dips, please send me the log.
+[*]The relic (and the other held abilities) no longer collides with a knife or grenade throw from the same bot. In one run the relic came about 14 seconds late because of it.
+[*]Checked in five Solo Play runs on Darktide 1.13.2, with BetterBots both first and last in the load order and one hot reload: no BetterBots errors or warnings. The same Nexus report mentioned a crash in the Mourningstar after 1.13. None of my runs crashed there, so if you hit it, the console log would help a lot.
+[/list]
+
 [b]v1.2.3[/b]
 
 [list]
