@@ -121,6 +121,7 @@ Use project-local tooling configs before handing off changes:
 - `make check-ci` → non-mutating CI gate
 - `make package` → build Nexus-ready `BetterBots.zip`
 - `make release VERSION=X.Y.Z` → patch-check-refresh + check + package + tag + push + upload ZIP (CI also attaches ZIP)
+  - **`CI did not create release vX.Y.Z within timeout` after the tag push is usually a false failure.** `scripts/release.sh` waits 60 s, and the `Create GitHub Release` workflow reruns the checks first (1m16s for v1.2.4). Run `gh run watch <id>`, then confirm `BetterBots.zip` with `gh release view vX.Y.Z`; do not re-run `make release`, the tag already exists.
   - **Post-release (all 4 Nexus fields required):**
     1. Update `docs/nexus-description.bbcode` — remove fixed bugs from "Known issues", update "New in vX.Y.Z", move shipped features to ✓ in roadmap. Commit + push.
     2. Brief overview (≤350 chars, plain text) for the Nexus "Summary" field.
